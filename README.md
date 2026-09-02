@@ -13,8 +13,7 @@ Python subset was hand-derived bottom-up, one problem at a time, and all
 164 solutions were proven (`kprove` → `#Top`) against it, using a
 112-repo corpus of proven K techniques as the knowledge base. This is
 where the unified reference semantics and the methodology came from;
-both were later packaged as the **kit**
-([nlp-research-rosu/kit](https://github.com/nlp-research-rosu/kit)) — an
+both were later packaged as the **kit** — an
 `intent → code → spec → proof` skill plugin for coding agents.
 
 - `first-pass/questions/<id>-<name>/` — per-problem proof: `solution.py`,
@@ -45,9 +44,7 @@ guided tour in [`showcase/`](showcase/README.md) — two end-to-end worked
 examples plus the full experimental context on one card. The AAAI-27
 supplementary package, exactly as shipped, is self-contained under
 `second-pass/submission/`. The paper itself — the AAAI-27 submission
-and tech report — is the [`tech-report/`](tech-report) submodule
-([nlp-research-rosu/aaai-submission](https://github.com/nlp-research-rosu/aaai-submission),
-private org repo).
+and tech report — is kept in a separate private org repo.
 
 ## History
 

@@ -55,8 +55,7 @@ adversarial session audits the Lean proofs under mechanical gates.
 - [`../first-pass/semantic/`](../first-pass/semantic/) — the unified
   reference semantics and shared lemma library, frozen as it stood at
   the end of the first pass (`src/`).
-- [nlp-research-rosu/kit](https://github.com/nlp-research-rosu/kit) (private org repo) —
-  the kit: the verification method from the first pass packaged as a
+- **The kit** — the verification method from the first pass packaged as a
   skill plugin that walks an agent from intent to code, spec, and proof.
 - [`../second-pass/runs/`](../second-pass/runs/) — the complete campaign
   output, one tree per arm:

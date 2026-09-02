@@ -5,9 +5,7 @@ semantics for the Python subset exercised by HumanEval was derived
 bottom-up, and the partial correctness of all 164 HumanEval solutions
 was proved against it, one problem at a time, with a human in the loop.
 Everything the later automation depends on came out of this pass: the
-unified reference semantics, the proof methodology, and the **kit**
-([nlp-research-rosu/kit](https://github.com/nlp-research-rosu/kit),
-private org repo) that packages the methodology as agent skills.
+unified reference semantics, the proof methodology, and the **kit** that packages the methodology as agent skills.
 
 ## How it worked
 
