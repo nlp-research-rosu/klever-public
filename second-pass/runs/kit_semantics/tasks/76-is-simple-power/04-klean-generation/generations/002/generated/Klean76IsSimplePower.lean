@@ -1,0 +1,2 @@
+import Klean76IsSimplePower.Rewrite
+import Klean76IsSimplePower.Lemmas

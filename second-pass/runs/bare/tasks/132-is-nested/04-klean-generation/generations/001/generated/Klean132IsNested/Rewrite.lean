@@ -1,0 +1,5 @@
+import Klean132IsNested.Func
+
+inductive Rewrites : SortGeneratedTopCell → SortGeneratedTopCell → Prop where
+  | tran {s1 s2 s3 : SortGeneratedTopCell} (t1 : Rewrites s1 s2) (t2 : Rewrites s2 s3) : Rewrites s1 s3
+  | VERIFICATION_KLEAN_EXPORT_kxExport0 {V0 : SortInt} {V1 : SortBString} {_DotVar0 : SortGeneratedCounterCell} {_DotVar2 : SortK} {_Gen0 : SortFunctionsCell} {_Gen1 : SortEnvCell} {_Gen2 : SortResultCell} {_Val0 : SortBool} (defn_Val0 : «scan(_,_)_VERIFICATION_Bool_Int_BString» V0 V1 = some _Val0) : Rewrites { py := { k := { val := SortK.kseq (SortKItem.«#kxExport0(_,_)_VERIFICATION-KLEAN-EXPORT_KItem_Int_BString» V0 V1) _DotVar2 }, functions := _Gen0, env := _Gen1, result := _Gen2 }, generatedCounter := _DotVar0 } { py := { k := { val := SortK.kseq ((@inj SortBool SortKItem) _Val0) _DotVar2 }, functions := _Gen0, env := _Gen1, result := _Gen2 }, generatedCounter := _DotVar0 }

@@ -1,0 +1,1475 @@
+Script started on 2026-07-31 06:55:37-05:00 [<not executed on terminal>]
+### k_rule_inventory.py
+#!/usr/bin/env python3
+"""Canonical lexical inventory of simplification rules in verification.k."""
+
+from __future__ import annotations
+
+import dataclasses
+import hashlib
+import json
+import re
+import stat
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+_MODULE_NAME_RE = re.compile(
+    r"^[ \t]+(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"(?:[ \t]+\[[^\]\r\n]*\])?[ \t]*$"
+)
+_TRAILING_ATTRIBUTES_RE = re.compile(
+    r"\[(?P<attributes>[^\[\]]*)\][ \t\r\n]*\Z", re.S
+)
+_CELL_TAG_RE = re.compile(
+    r"<(?P<close>/)?(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"[ \t]*(?P<self_close>/)?>"
+)
+_OUTER_SENTENCE_KEYWORDS = {
+    "imports",
+    "syntax",
+    "rule",
+    "configuration",
+    "context",
+    "claim",
+    "alias",
+}
+
+
+class KRuleInventoryError(RuntimeError):
+    """Raised when verification.k cannot produce a canonical inventory."""
+
+
+@dataclass(frozen=True)
+class KRule:
+    source_rule_id: str
+    module: str
+    start_line: int
+    end_line: int
+    normalized_sha256: str
+    attributes: list[str]
+    text: str
+
+
+@dataclass(frozen=True)
+class _Sentence:
+    keyword: str
+    start: int
+
+
+@dataclass(frozen=True)
+class _Module:
+    name: str
+    content_start: int
+    content_end: int
+    imports: tuple[str, ...]
+    sentences: tuple[_Sentence, ...]
+
+
+@dataclass(frozen=True)
+class _RuleSpan:
+    rule: KRule
+    start_offset: int
+    end_offset: int
+    attribute_start: int | None
+    attribute_end: int | None
+
+
+def canonical_json_sha256(document: Any) -> str:
+    encoded = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _mask_non_code(text: str) -> str:
+    """Mask comments and string bodies without changing source offsets."""
+
+    output = list(text)
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                state = "code"
+            else:
+                output[index] = " "
+            index += 1
+            continue
+        if state == "string":
+            if character == "\\" and following:
+                output[index] = " "
+                output[index + 1] = " "
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            elif character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                output[index] = output[index + 1] = " "
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                output[index] = output[index + 1] = " "
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output[index] = output[index + 1] = " "
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output[index] = output[index + 1] = " "
+            state = "block-comment"
+            block_depth = 1
+            index += 2
+            continue
+        if character == '"':
+            state = "string"
+        index += 1
+    return "".join(output)
+
+
+def _line_ranges(text: str, start: int = 0) -> list[tuple[int, int, int]]:
+    ranges: list[tuple[int, int, int]] = []
+    line_start = start
+    while line_start < len(text):
+        newline = text.find("\n", line_start)
+        next_start = len(text) if newline < 0 else newline + 1
+        line_end = len(text) if newline < 0 else newline
+        content_end = (
+            line_end - 1
+            if line_end > line_start and text[line_end - 1] == "\r"
+            else line_end
+        )
+        ranges.append((line_start, content_end, next_start))
+        if newline < 0:
+            break
+        line_start = next_start
+    return ranges
+
+
+def _line_heads(text: str) -> list[tuple[int, int, str, str]]:
+    """Return physical-line word heads without assigning K grammar meaning."""
+
+    heads: list[tuple[int, int, str, str]] = []
+    for line_start, content_end, _next_start in _line_ranges(text):
+        index = line_start
+        while index < content_end and text[index] in " \t":
+            index += 1
+        word_end = index
+        while word_end < content_end and (
+            text[word_end].isalnum() or text[word_end] in "_'"
+        ):
+            word_end += 1
+        if word_end > index:
+            heads.append(
+                (
+                    line_start,
+                    content_end,
+                    text[index:word_end],
+                    text[word_end:content_end],
+                )
+            )
+    return heads
+
+
+def _line_word(line: str) -> tuple[str, str, int]:
+    stripped = line.lstrip()
+    indent = len(line) - len(stripped)
+    word_end = 0
+    while word_end < len(stripped) and (
+        stripped[word_end].isalnum() or stripped[word_end] in "_'"
+    ):
+        word_end += 1
+    return stripped[:word_end], stripped[word_end:], indent + word_end
+
+
+def _rule_continuation(line: str) -> tuple[str, int] | None:
+    stripped = line.lstrip()
+    if stripped.startswith("["):
+        return "attributes", len(line) - len(stripped)
+    word, rest, word_end = _line_word(line)
+    for keyword in ("requires", "ensures"):
+        if word == keyword and (
+            not rest
+            or not (
+                rest[0].isalnum()
+                or rest[0] in "_'"
+            )
+        ):
+            return keyword, word_end
+    return None
+
+
+def _starts_outer_transition(line: str) -> bool:
+    keyword, rest, _word_end = _line_word(line)
+    separated = bool(rest) and rest[0] in " \t"
+    if keyword == "module":
+        return separated and _MODULE_NAME_RE.fullmatch(rest) is not None
+    if keyword == "endmodule":
+        return not rest.strip()
+    if keyword == "rule":
+        return not rest or separated
+    return keyword in _OUTER_SENTENCE_KEYWORDS and separated
+
+
+def _terminal_attribute_line(line: str) -> bool:
+    match = _TRAILING_ATTRIBUTES_RE.search(line)
+    if match is None:
+        return False
+    start = match.start()
+    return start == 0 or line[start - 1].isspace()
+
+
+def _scan_rule_delimiters(
+    line: str,
+    delimiters: list[str],
+) -> None:
+    closing = {")": "(", "]": "[", "}": "{"}
+    index = 0
+    while index < len(line):
+        if line[index] == "<":
+            cell = _CELL_TAG_RE.match(line, index)
+            if cell is not None:
+                marker = f"<{cell.group('name')}>"
+                if cell.group("close"):
+                    if delimiters and delimiters[-1] == marker:
+                        delimiters.pop()
+                elif not cell.group("self_close"):
+                    delimiters.append(marker)
+                index = cell.end()
+                continue
+        character = line[index]
+        if character in "([{":
+            delimiters.append(character)
+        elif character in closing:
+            if delimiters and delimiters[-1] == closing[character]:
+                delimiters.pop()
+        index += 1
+
+
+def _rule_bubble_end(masked_text: str, start: int) -> int:
+    """Find when an outer rule bubble returns control to outer parsing."""
+
+    seen_rewrite = False
+    clause_has_content = False
+    candidate_end: int | None = None
+    delimiters: list[str] = []
+    ranges = _line_ranges(masked_text, start)
+    for line_start, line_end, next_start in ranges:
+        line = masked_text[line_start:line_end]
+        if not line.strip():
+            continue
+
+        continuation = (
+            _rule_continuation(line)
+            if seen_rewrite and candidate_end is not None
+            else None
+        )
+        if candidate_end is not None:
+            if continuation is None and _starts_outer_transition(line):
+                return candidate_end
+            candidate_end = None
+
+        content_start = 0
+        if continuation is not None:
+            kind, content_start = continuation
+            if kind in {"requires", "ensures"}:
+                clause_has_content = False
+
+        if not seen_rewrite:
+            rewrite = line.find("=>")
+            if rewrite >= 0:
+                seen_rewrite = True
+                content_start = rewrite + 2
+            else:
+                content_start = len(line)
+
+        _scan_rule_delimiters(line, delimiters)
+        if seen_rewrite and line[content_start:].strip():
+            clause_has_content = True
+
+        if (
+            seen_rewrite
+            and clause_has_content
+            and not delimiters
+            and _terminal_attribute_line(line)
+        ):
+            return next_start
+        if seen_rewrite and clause_has_content and not delimiters:
+            candidate_end = next_start
+    if candidate_end is not None:
+        return candidate_end
+
+### klean_preflight.py
+#!/usr/bin/env python3
+"""Hard, model-free sanity gate for a deterministic Klean generation."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
+
+REPO = Path(__file__).resolve().parent.parent
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from tools import klean_export
+from tools import lemma_discovery_contract
+
+
+class KleanPreflightError(RuntimeError):
+    pass
+
+
+_SIDECAR_NAMES = (
+    "input-manifest.json",
+    "generator-manifest.json",
+    "trust-inventory.json",
+    "export-result.json",
+)
+
+
+@dataclass(frozen=True)
+class PreflightSnapshot:
+    stage1_workspace_sha256: str
+    stage3_discovery_manifest_sha256: str
+    generated_tree_sha256: str
+    sidecar_sha256: tuple[tuple[str, str], ...]
+
+
+def _preflight_snapshot(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+) -> PreflightSnapshot:
+    generated = generation / "generated"
+    try:
+        sidecars = tuple(
+            (
+                name,
+                hashlib.sha256(
+                    pipeline_path.read_bytes()
+                ).hexdigest(),
+            )
+            for name in _SIDECAR_NAMES
+            if (
+                pipeline_path := generation / name
+            ).is_file()
+            and not pipeline_path.is_symlink()
+        )
+        if len(sidecars) != len(_SIDECAR_NAMES):
+            raise KleanPreflightError(
+                "preflight sidecar set is incomplete or unsafe"
+            )
+        return PreflightSnapshot(
+            stage1_workspace_sha256=klean_export.tree_digest(
+                frozen_input
+            ),
+            stage3_discovery_manifest_sha256=hashlib.sha256(
+                discovery_manifest.read_bytes()
+            ).hexdigest(),
+            generated_tree_sha256=klean_export.tree_digest(generated),
+            sidecar_sha256=sidecars,
+        )
+    except (OSError, klean_export.KleanExportError) as error:
+        raise KleanPreflightError(
+            "cannot snapshot immutable preflight inputs"
+        ) from error
+
+
+def _require_unchanged_snapshot(
+    expected: PreflightSnapshot,
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+) -> None:
+    current = _preflight_snapshot(
+        frozen_input, discovery_manifest, generation
+    )
+    if current.stage1_workspace_sha256 != (
+        expected.stage1_workspace_sha256
+    ):
+        raise KleanPreflightError(
+            "frozen Stage 1 input changed during preflight"
+        )
+    if current.stage3_discovery_manifest_sha256 != (
+        expected.stage3_discovery_manifest_sha256
+    ):
+        raise KleanPreflightError(
+            "validated Stage 3 discovery manifest changed during preflight"
+        )
+    if current.generated_tree_sha256 != expected.generated_tree_sha256:
+        raise KleanPreflightError(
+            "generated project changed during preflight"
+        )
+    if current.sidecar_sha256 != expected.sidecar_sha256:
+        raise KleanPreflightError(
+            "generation sidecar changed during preflight"
+        )
+
+
+def _regular_json(path: Path, label: str) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise KleanPreflightError(f"{label} must be a regular file: {path}")
+    try:
+        document = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise KleanPreflightError(f"{label} is malformed: {path}") from error
+    if not isinstance(document, dict):
+        raise KleanPreflightError(f"{label} must be a JSON object")
+    return document
+
+
+def _run(
+    command: list[str],
+    *,
+    cwd: Path,
+    timeout: int,
+) -> tuple[int, str]:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            timeout=timeout,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        return result.returncode, result.stdout
+    except subprocess.TimeoutExpired:
+        return 124, f"TIMEOUT after {timeout}s"
+
+
+def _lean_sources(generated: Path) -> list[Path]:
+    return [
+        path
+        for _relative, kind, path in klean_export._tree_entries(generated)
+        if kind == "file" and path.suffix == ".lean"
+    ]
+
+
+def _trust_declarations(sources: list[Path]) -> dict[str, tuple[str, str]]:
+    declarations: dict[str, tuple[str, str]] = {}
+    for source in sources:
+        for declaration in klean_export.lean_trust_declarations(source):
+            name = declaration["name"]
+            if name in declarations:
+                raise KleanPreflightError(
+                    f"duplicate trust declaration: {name}"
+                )
+            declarations[name] = (
+                declaration["kind"],
+                declaration["type"],
+            )
+    return declarations
+
+
+def _reject_proposition_trust(
+    generated: Path,
+    sources: list[Path],
+    declarations: dict[str, tuple[str, str]],
+) -> None:
+    """Apply a policy that is independent of the generator's allowlist.
+
+    Generated executable constants may remain opaque at the Klean boundary,
+    but generated propositions/proofs may never be assumed.  In particular,
+    the immutable target module must contain only a proposition definition,
+    never an axiom or opaque proof.
+    """
+
+    for source in sources:
+        relative = source.relative_to(generated).as_posix()
+        if source.name == "Lemmas.lean" and re.search(
+            r"(?m)^\s*(?:axiom|opaque)\s+", source.read_text()
+        ):
+            raise KleanPreflightError(
+                f"proposition trust is forbidden in {relative}"
+            )
+    for name, (_kind, lean_type) in declarations.items():
+        normalized = " ".join(lean_type.split())
+        proposition_like = (
+            normalized in {"Prop", "True", "False"}
+            or " Prop" in f" {normalized}"
+            or re.search(r":\s*Prop(?:\s|$)", normalized) is not None
+            or normalized.startswith(("∀ ", "∃ "))
+            or re.search(r"(^|[ (])(?:True|False)(?:$|[ )])", normalized)
+            is not None
+            or re.search(r"(?:^| )[^ ]+\s*=\s*[^ ]+", normalized) is not None
+        )
+        if proposition_like:
+            raise KleanPreflightError(
+                f"proposition trust is forbidden for {name}: {lean_type}"
+            )
+
+
+def _source_and_obligation_gate(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generated: Path,
+    input_manifest: dict[str, Any],
+    generator_manifest: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    verification = frozen_input / "verification.k"
+    if not verification.is_file() or verification.is_symlink():
+        raise KleanPreflightError("frozen input is missing regular verification.k")
+    try:
+        validated = lemma_discovery_contract.validate_trust_boundary(
+            frozen_input, discovery_manifest
+        )
+    except lemma_discovery_contract.LemmaDiscoveryContractError as error:
+        raise KleanPreflightError(str(error)) from error
+    discovery_hash = hashlib.sha256(discovery_manifest.read_bytes()).hexdigest()
+    if input_manifest.get("inventory_sha256") != validated[
+        "inventory_sha256"
+    ]:
+        raise KleanPreflightError(
+            "Stage 1/Stage 3 inventory hash changed after deterministic export"
+        )
+    source_rules = klean_export._domain_source_rules(
+        validated, discovery_hash
+    )
+    if input_manifest.get("source_rules") != source_rules:
+        raise KleanPreflightError(
+            "Stage 3 DOMAIN_LEMMA inventory changed after deterministic export"
+        )
+    if input_manifest.get("verification_sha256") != hashlib.sha256(
+        verification.read_bytes()
+    ).hexdigest():
+        raise KleanPreflightError("verification.k hash changed after export")
+
+    mapping_path = generated / "obligation-map.json"
+    obligation_map = _regular_json(mapping_path, "obligation map")
+    if obligation_map.get("source_rules") != source_rules:
+        raise KleanPreflightError(
+            "source rules and generated obligations are not bijective"
+        )
+    obligations = obligation_map.get("obligations")
+    if not isinstance(obligations, list):
+        raise KleanPreflightError("generated obligation list is malformed")
+    eligible = source_rules
+    expected_ids = [rule["source_rule_id"] for rule in eligible]
+    observed_ids: list[str] = []
+    for obligation in obligations:
+        if not isinstance(obligation, dict):
+            raise KleanPreflightError("generated obligation is malformed")
+        source_rule_id = obligation.get("source_rule_id")
+        if not isinstance(source_rule_id, str):
+            raise KleanPreflightError("generated obligation ID is malformed")
+        observed_ids.append(source_rule_id)
+        lean_conjunct = obligation.get("lean_conjunct")
+        if not isinstance(lean_conjunct, str) or not lean_conjunct:
+            raise KleanPreflightError("generated Lean conjunct is malformed")
+        if obligation.get("lean_conjunct_sha256") != klean_export.sha256_text(
+            lean_conjunct
+        ):
+            raise KleanPreflightError("generated Lean conjunct hash changed")
+        source_rule = eligible[len(observed_ids) - 1] if len(
+            observed_ids
+        ) <= len(eligible) else None
+        if source_rule is None or obligation.get("source_span") != {
+            "start_line": source_rule["start_line"],
+            "end_line": source_rule["end_line"],
+        }:
+            raise KleanPreflightError(
+                "source rules and generated obligations are not bijective"
+            )
+        for key in (
+            "normalized_sha256",
+            "inventory_sha256",
+            "discovery_manifest_sha256",
+        ):
+            if obligation.get(key) != source_rule[key]:
+                raise KleanPreflightError(
+                    "generated obligation provenance differs from "
+                    f"Stage 1/Stage 3: {key}"
+                )
+    if observed_ids != expected_ids or len(set(observed_ids)) != len(
+        observed_ids
+    ):
+        raise KleanPreflightError(
+            "source rules and generated obligations are not bijective"
+        )
+    parameters = obligation_map.get("trust_parameters")
+    if not isinstance(parameters, list):
+        raise KleanPreflightError("generated trust-parameter list is malformed")
+    validate_trust_parameter_links(expected_ids, parameters)
+    if generator_manifest.get("obligation_count") != len(obligations):
+        raise KleanPreflightError("generator obligation count changed")
+    if generator_manifest.get("obligation_map_sha256") != hashlib.sha256(
+        mapping_path.read_bytes()
+    ).hexdigest():
+        raise KleanPreflightError("generated obligation map hash changed")
+    expected_definition = klean_export.expected_target_definition(
+        obligation_map
+    )
+    try:
+        target = klean_export.target_statement(generated)
+    except klean_export.KleanExportError as error:
+        raise KleanPreflightError(str(error)) from error
+    if expected_definition is None:
+        if target is not None:
+            raise KleanPreflightError(
+                "zero obligations unexpectedly generated a target proposition"
+            )
+    elif (
+        target is None
+        or target.get("definition_sha256")
+        != klean_export.sha256_text(expected_definition)
+    ):
+        raise KleanPreflightError(
+            "generated target is not the exact conjunction of mapped obligations"
+        )
+    return source_rules, obligations
+
+
+def validate_trust_parameter_links(
+    expected_ids: list[str], parameters: list[object]
+) -> set[str]:
+    """Validate every opaque parameter without requiring one per theorem."""
+
+    bound_rule_ids: set[str] = set()
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanPreflightError("generated trust parameter is malformed")
+        source_rule_ids = parameter.get("source_rule_ids")
+        if (
+            not isinstance(source_rule_ids, list)
+            or not source_rule_ids
+            or not all(
+                isinstance(source_rule_id, str)
+                and source_rule_id in expected_ids
+                for source_rule_id in source_rule_ids
+            )
+        ):
+            raise KleanPreflightError(
+                "trust parameter is not bound to source obligations"
+            )
+        bound_rule_ids.update(source_rule_ids)
+    return bound_rule_ids
+
+
+def _check_imports(generated: Path, sources: list[Path]) -> None:
+    for source in sources:
+        for line in source.read_text().splitlines():
+
+### lemma-discovery.json
+{
+    "schema_version": 2,
+    "inventory_sha256": "b6a5c8a6de1f4db5b68d5cc26578cacf31fb03dfb7b59d122c3544c81b30760c",
+    "rules": [
+        {
+            "source_rule_id": "rule-8035a5d5e2dd908c685b0f3f6b47722aade54582ecf7e781dfd68bc1469d72b1",
+            "classification": "DEFINITION",
+            "rationale": "This simplification equation defines the singleton-string case of strLt as integer-code comparison. Stage 1 separately proves the correspondence against MPY without VERIFICATION, so it is not a trusted DOMAIN_LEMMA; the required simplification-class constraint places it under DEFINITION."
+        },
+        {
+            "source_rule_id": "rule-dc6f73badfec4f23e1af1f381ddb673851960f3a7dd453b5a529e29eea13dbc1",
+            "classification": "DEFINITION",
+            "rationale": "This is a zero-argument macro expansion naming the exact translated AST of the inner insertion-loop body; it constructs syntax and does not execute or assert a mathematical fact."
+        },
+        {
+            "source_rule_id": "rule-d8c6975c42f7acfdc026a371bbd271bff09144d250d960f6b474f010e3a77c91",
+            "classification": "DEFINITION",
+            "rationale": "This is a zero-argument macro expansion naming the exact translated AST statements after the inner loop; it is a structural proof-term definition."
+        },
+        {
+            "source_rule_id": "rule-0f9f3b5d7e5349a6b9e4e08ae6ff00e9b64d8642453a18a90ada8eea2bfa6d08",
+            "classification": "DEFINITION",
+            "rationale": "This rule expands antiOuterBody to the exact translated conditional and insertion-loop AST, making it a named syntax definition rather than an execution rule."
+        },
+        {
+            "source_rule_id": "rule-5075fc023e8cdbd37d170a98412b835adec6946ebd2141dee39edbea6eb0d8ad",
+            "classification": "DEFINITION",
+            "rationale": "This rule is the structural macro definition of the function tail AST containing the final append and return."
+        },
+        {
+            "source_rule_id": "rule-c4913eca7f7a04a7ced779f502220f126d5ee7b0ee403b488e8b7e5329129ccb",
+            "classification": "DEFINITION",
+            "rationale": "This is the empty-input recurrence equation for the mathematical insertion summary insertGo, returning the accumulator or appending the pending character according to the insertion flag."
+        },
+        {
+            "source_rule_id": "rule-f0184627a2c4a3d544b5b84141379073793a96b835d2753217df57bda16c9883",
+            "classification": "DEFINITION",
+            "rationale": "This is the structurally recursive nonempty-input equation for insertGo; it consumes one old character and defines the summary's next accumulator and insertion flag."
+        },
+        {
+            "source_rule_id": "rule-652e6e29910efceeca6a31b0b63ec16bfe1d38ac2b9054d6d2a69a37ba8dcec4",
+            "classification": "DEFINITION",
+            "rationale": "This is the base recurrence equation for antiGo, defining the completed result when no input characters remain."
+        },
+        {
+            "source_rule_id": "rule-6e83d7b52d40fb31d78ba87b9b7e825cf4ae9515a0fa193cce3b0b083ee08657",
+            "classification": "DEFINITION",
+            "rationale": "This is the structurally recursive nonempty-input equation for antiGo, defining the space and non-space transitions while consuming one input character."
+        }
+    ]
+}
+
+### generator-manifest.json
+{
+    "exporter_sha256": "bbd11ce0fe6ac12ea89d4bdc70c260044bc9f87c987ff310684b637ea6464a07",
+    "generated_tree_sha256": "1674b1db22fed880156b73d95f892508ff3681d5cb4484d12dab1fe1e5bbe61e",
+    "klean_py_sha256": "42a38e6d65b74af3536acc49947b7cfbac809406bdfe5549841e3132af5a5c4d",
+    "modeled_collection_hooks": [
+        ".List",
+        ".Map",
+        "ListItem",
+        "_List_",
+        "_Map_",
+        "_|->_"
+    ],
+    "modeled_operational_hooks": [],
+    "modeled_recursive_functions": [],
+    "obligation_count": 0,
+    "obligation_map_sha256": "cf331f312938e04436a60d1dc49b5a1f6f60b03f3283415439a7c175e9812048",
+    "provenance": {
+        "generator_image_id": "sha256:f884238cea5ab1ed0da0a75d0c9a29ac4abe988616c3f493ba60e74ca3290cf7",
+        "inventory_sha256": "b6a5c8a6de1f4db5b68d5cc26578cacf31fb03dfb7b59d122c3544c81b30760c",
+        "stage1_workspace_sha256": "30ee607e4db2c763d3a61fbd783e6d1d4e23c5f2e1d49916ea0f428d024add1d",
+        "stage3_discovery_manifest_sha256": "f9beba61b82ac748b1a73e5cfdddddd1e187a043aa7b8538d3b585540f0b3ccf"
+    },
+    "schema_version": 3,
+    "target": null,
+    "toolchain": {
+        "codex_cli_version": "0.144.6",
+        "k_base_image": "runtimeverificationinc/kframework-k:ubuntu-jammy-7.1.293@sha256:f3f64ab72bd7b560082d50e4c6c23e107025cf217ca62ab73700104fc45de09a",
+        "k_version": "7.1.293",
+        "lean_commit": "ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05",
+        "lean_toolchain": "leanprover/lean4:v4.22.0",
+        "pyk_project": "pyk@runtimeverification/k",
+        "pyk_version": "7.1.293",
+        "runtimeverification_k_commit": "ff15baac9e66426612ec45ff912af7f14965b64a"
+    }
+}
+
+### generation source-manifest.json
+{
+    "files": {
+        "klean.py": "42a38e6d65b74af3536acc49947b7cfbac809406bdfe5549841e3132af5a5c4d",
+        "klean_export.py": "bbd11ce0fe6ac12ea89d4bdc70c260044bc9f87c987ff310684b637ea6464a07"
+    },
+    "generator_image_id": "sha256:f884238cea5ab1ed0da0a75d0c9a29ac4abe988616c3f493ba60e74ca3290cf7",
+    "schema_version": 1
+}
+
+### input-manifest.json
+{
+    "definitions": [
+        {
+            "attributes": [
+                "simplification"
+            ],
+            "classification": "DEFINITION",
+            "end_line": 12,
+            "module": "VERIFICATION",
+            "normalized_sha256": "8035a5d5e2dd908c685b0f3f6b47722aade54582ecf7e781dfd68bc1469d72b1",
+            "rationale": "This simplification equation defines the singleton-string case of strLt as integer-code comparison. Stage 1 separately proves the correspondence against MPY without VERIFICATION, so it is not a trusted DOMAIN_LEMMA; the required simplification-class constraint places it under DEFINITION.",
+            "source_rule_id": "rule-8035a5d5e2dd908c685b0f3f6b47722aade54582ecf7e781dfd68bc1469d72b1",
+            "start_line": 8,
+            "text": "  rule strLt(\n         iCons(C:Int, .IntSeq),\n         iCons(D:Int, .IntSeq))\n    => C <Int D\n    [simplification]"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 33,
+            "module": "VERIFICATION",
+            "normalized_sha256": "dc6f73badfec4f23e1af1f381ddb673851960f3a7dd453b5a529e29eea13dbc1",
+            "rationale": "This is a zero-argument macro expansion naming the exact translated AST of the inner insertion-loop body; it constructs syntax and does not execute or assert a mathematical fact.",
+            "source_rule_id": "rule-dc6f73badfec4f23e1af1f381ddb673851960f3a7dd453b5a529e29eea13dbc1",
+            "start_line": 21,
+            "text": "  rule antiInnerBody()\n    => If(\n         BoolOp(\n           \"and\",\n           (UnaryOp(\"not\", Name(\"inserted\")),\n            Compare(Name(\"char\"), CmpOp(\"<\", Name(\"old_char\"))),\n            .Exprs)),\n         AugAssign(Name(\"new_word\"), \"+\", Name(\"char\"))\n         Assign(Name(\"inserted\"), Bool(true))\n         .Stmts,\n         .Stmts)\n       AugAssign(Name(\"new_word\"), \"+\", Name(\"old_char\"))\n       .Stmts"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 43,
+            "module": "VERIFICATION",
+            "normalized_sha256": "d8c6975c42f7acfdc026a371bbd271bff09144d250d960f6b474f010e3a77c91",
+            "rationale": "This is a zero-argument macro expansion naming the exact translated AST statements after the inner loop; it is a structural proof-term definition.",
+            "source_rule_id": "rule-d8c6975c42f7acfdc026a371bbd271bff09144d250d960f6b474f010e3a77c91",
+            "start_line": 35,
+            "text": "  rule antiPostInsert()\n    => If(\n         UnaryOp(\"not\", Name(\"inserted\")),\n         AugAssign(Name(\"new_word\"), \"+\", Name(\"char\"))\n         Assign(Name(\"inserted\"), Bool(true))\n         .Stmts,\n         .Stmts)\n       Assign(Name(\"word\"), Name(\"new_word\"))\n       .Stmts"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 56,
+            "module": "VERIFICATION",
+            "normalized_sha256": "0f9f3b5d7e5349a6b9e4e08ae6ff00e9b64d8642453a18a90ada8eea2bfa6d08",
+            "rationale": "This rule expands antiOuterBody to the exact translated conditional and insertion-loop AST, making it a named syntax definition rather than an execution rule.",
+            "source_rule_id": "rule-0f9f3b5d7e5349a6b9e4e08ae6ff00e9b64d8642453a18a90ada8eea2bfa6d08",
+            "start_line": 45,
+            "text": "  rule antiOuterBody()\n    => If(\n         Compare(Name(\"char\"), CmpOp(\"==\", Str(\" \"))),\n         AugAssign(Name(\"result\"), \"+\", Name(\"word\"))\n         AugAssign(Name(\"result\"), \"+\", Str(\" \"))\n         Assign(Name(\"word\"), Str(\"\"))\n         .Stmts,\n         Assign(Name(\"new_word\"), Str(\"\"))\n         Assign(Name(\"inserted\"), Bool(false))\n         For(Name(\"old_char\"), Name(\"word\"), antiInnerBody())\n         antiPostInsert())\n       .Stmts"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 61,
+            "module": "VERIFICATION",
+            "normalized_sha256": "5075fc023e8cdbd37d170a98412b835adec6946ebd2141dee39edbea6eb0d8ad",
+            "rationale": "This rule is the structural macro definition of the function tail AST containing the final append and return.",
+            "source_rule_id": "rule-5075fc023e8cdbd37d170a98412b835adec6946ebd2141dee39edbea6eb0d8ad",
+            "start_line": 58,
+            "text": "  rule antiTail()\n    => AugAssign(Name(\"result\"), \"+\", Name(\"word\"))\n       Return(Name(\"result\"))\n       .Stmts"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 72,
+            "module": "VERIFICATION",
+            "normalized_sha256": "c4913eca7f7a04a7ced779f502220f126d5ee7b0ee403b488e8b7e5329129ccb",
+            "rationale": "This is the empty-input recurrence equation for the mathematical insertion summary insertGo, returning the accumulator or appending the pending character according to the insertion flag.",
+            "source_rule_id": "rule-c4913eca7f7a04a7ced779f502220f126d5ee7b0ee403b488e8b7e5329129ccb",
+            "start_line": 68,
+            "text": "  rule insertGo(.IntSeq, C:Int, A:IntSeq, B:Bool)\n    => #if B\n       #then A\n       #else seqConcat(A, iCons(C, .IntSeq))\n       #fi"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 91,
+            "module": "VERIFICATION",
+            "normalized_sha256": "f0184627a2c4a3d544b5b84141379073793a96b835d2753217df57bda16c9883",
+            "rationale": "This is the structurally recursive nonempty-input equation for insertGo; it consumes one old character and defines the summary's next accumulator and insertion flag.",
+            "source_rule_id": "rule-f0184627a2c4a3d544b5b84141379073793a96b835d2753217df57bda16c9883",
+            "start_line": 73,
+            "text": "  rule insertGo(\n         iCons(OLD:Int, IS:IntSeq),\n         C:Int,\n         A:IntSeq,\n         B:Bool)\n    => #if notBool B andBool C <Int OLD\n       #then insertGo(\n               IS,\n               C,\n               seqConcat(\n                 seqConcat(A, iCons(C, .IntSeq)),\n                 iCons(OLD, .IntSeq)),\n               true)\n       #else insertGo(\n               IS,\n               C,\n               seqConcat(A, iCons(OLD, .IntSeq)),\n               B)\n       #fi"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 96,
+            "module": "VERIFICATION",
+            "normalized_sha256": "652e6e29910efceeca6a31b0b63ec16bfe1d38ac2b9054d6d2a69a37ba8dcec4",
+            "rationale": "This is the base recurrence equation for antiGo, defining the completed result when no input characters remain.",
+            "source_rule_id": "rule-652e6e29910efceeca6a31b0b63ec16bfe1d38ac2b9054d6d2a69a37ba8dcec4",
+            "start_line": 95,
+            "text": "  rule antiGo(.IntSeq, R:IntSeq, W:IntSeq)\n    => seqConcat(R, W)"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 107,
+            "module": "VERIFICATION",
+            "normalized_sha256": "6e83d7b52d40fb31d78ba87b9b7e825cf4ae9515a0fa193cce3b0b083ee08657",
+            "rationale": "This is the structurally recursive nonempty-input equation for antiGo, defining the space and non-space transitions while consuming one input character.",
+            "source_rule_id": "rule-6e83d7b52d40fb31d78ba87b9b7e825cf4ae9515a0fa193cce3b0b083ee08657",
+            "start_line": 97,
+            "text": "  rule antiGo(iCons(C:Int, S:IntSeq), R:IntSeq, W:IntSeq)\n    => #if C ==Int 32\n       #then antiGo(\n               S,\n               seqConcat(seqConcat(R, W), iCons(32, .IntSeq)),\n               .IntSeq)\n       #else antiGo(\n               S,\n               R,\n               insertGo(W, C, .IntSeq, false))\n       #fi"
+        }
+    ],
+    "frozen_input_sha256": "30ee607e4db2c763d3a61fbd783e6d1d4e23c5f2e1d49916ea0f428d024add1d",
+    "inventory_sha256": "b6a5c8a6de1f4db5b68d5cc26578cacf31fb03dfb7b59d122c3544c81b30760c",
+    "lowered_structural_definition_rules": [],
+    "modeled_collection_hooks": [
+        ".List",
+        ".Map",
+        "ListItem",
+        "_List_",
+        "_Map_",
+        "_|->_"
+    ],
+    "modeled_operational_hooks": [],
+    "modeled_recursive_functions": [],
+    "operational_rules": [],
+    "problem": "86-anti-shuffle",
+    "promoted_structural_definitions": [],
+    "proved_derived_lemmas": [],
+    "required_k_files": [
+        "/frozen-k/program-generated.k",
+        "/frozen-k/reference-semantics/semantics.k",
+        "/frozen-k/reference-semantics/semantics/assert.k",
+        "/frozen-k/reference-semantics/semantics/bool.k",
+        "/frozen-k/reference-semantics/semantics/builtins.k",
+        "/frozen-k/reference-semantics/semantics/call.k",
+        "/frozen-k/reference-semantics/semantics/comprehension.k",
+        "/frozen-k/reference-semantics/semantics/concrete.k",
+        "/frozen-k/reference-semantics/semantics/controls.k",
+        "/frozen-k/reference-semantics/semantics/core.k",
+        "/frozen-k/reference-semantics/semantics/dict.k",
+        "/frozen-k/reference-semantics/semantics/float.k",
+        "/frozen-k/reference-semantics/semantics/functions.k",
+        "/frozen-k/reference-semantics/semantics/int.k",
+        "/frozen-k/reference-semantics/semantics/iter.k",
+        "/frozen-k/reference-semantics/semantics/list.k",
+        "/frozen-k/reference-semantics/semantics/methods.k",
+        "/frozen-k/reference-semantics/semantics/operators.k",
+        "/frozen-k/reference-semantics/semantics/range.k",
+        "/frozen-k/reference-semantics/semantics/set.k",
+        "/frozen-k/reference-semantics/semantics/sort.k",
+        "/frozen-k/reference-semantics/semantics/str.k",
+        "/frozen-k/reference-semantics/semantics/subscript.k",
+        "/frozen-k/reference-semantics/semantics/syntax.k",
+        "/frozen-k/reference-semantics/semantics/tuple.k",
+        "/frozen-k/verification.k"
+    ],
+    "schema_version": 3,
+    "source_rules": [],
+    "stage1_workspace_sha256": "30ee607e4db2c763d3a61fbd783e6d1d4e23c5f2e1d49916ea0f428d024add1d",
+    "stage3_discovery_manifest_sha256": "f9beba61b82ac748b1a73e5cfdddddd1e187a043aa7b8538d3b585540f0b3ccf",
+    "summary_functions": [
+        {
+            "argument_sorts": [],
+            "name": "antiInnerBody",
+            "return_sort": "Stmts"
+        },
+        {
+            "argument_sorts": [],
+            "name": "antiPostInsert",
+            "return_sort": "Stmts"
+        },
+        {
+            "argument_sorts": [],
+            "name": "antiOuterBody",
+            "return_sort": "Stmts"
+        },
+        {
+            "argument_sorts": [],
+            "name": "antiTail",
+            "return_sort": "Stmts"
+        },
+        {
+            "argument_sorts": [
+                "IntSeq",
+                "Int",
+                "IntSeq",
+                "Bool"
+            ],
+            "name": "insertGo",
+            "return_sort": "IntSeq"
+        },
+        {
+            "argument_sorts": [
+                "IntSeq",
+                "IntSeq",
+                "IntSeq"
+            ],
+            "name": "antiGo",
+            "return_sort": "IntSeq"
+        }
+    ],
+    "syntax_module": "MPY-SYNTAX",
+    "verification_module": "VERIFICATION",
+    "verification_sha256": "303963e3703c0a00059f7bd9841056f40f76498247bcbb568700c3de2399ead2"
+}
+
+### preflight.json
+{
+    "designated_sorry_count": 0,
+    "diagnostics": [
+        {
+            "command": [
+                "lake",
+                "clean"
+            ],
+            "exit_code": 0,
+            "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "output_tail": ""
+        },
+        {
+            "command": [
+                "lake",
+                "build"
+            ],
+            "exit_code": 0,
+            "output_sha256": "2c424777e015508f17e168dd1b4f83ca8e2eb4c1ac2f7886878ca9cde55bb8f1",
+            "output_tail": "\u2714 [2/9] Built Klean86AntiShuffle.Prelude\n\u2714 [3/9] Built Klean86AntiShuffle.Sorts\n\u2714 [4/9] Built Klean86AntiShuffle.Inj\n\u2714 [5/9] Built Klean86AntiShuffle.Lemmas\n\u2714 [6/9] Built Klean86AntiShuffle.Func\n\u2714 [7/9] Built Klean86AntiShuffle.Rewrite\n\u2714 [8/9] Built Klean86AntiShuffle\nBuild completed successfully.\n"
+        }
+    ],
+    "frozen_input_sha256": "30ee607e4db2c763d3a61fbd783e6d1d4e23c5f2e1d49916ea0f428d024add1d",
+    "generated_tree_sha256": "1674b1db22fed880156b73d95f892508ff3681d5cb4484d12dab1fe1e5bbe61e",
+    "obligation_count": 0,
+    "schema_version": 3,
+    "stage1_workspace_sha256": "30ee607e4db2c763d3a61fbd783e6d1d4e23c5f2e1d49916ea0f428d024add1d",
+    "stage3_discovery_manifest_sha256": "f9beba61b82ac748b1a73e5cfdddddd1e187a043aa7b8538d3b585540f0b3ccf",
+    "status": "KLEAN_NO_OBLIGATIONS",
+    "target": null,
+    "trust_declaration_count": 41
+}
+
+### export-result.json
+{
+    "frozen_input_sha256": "30ee607e4db2c763d3a61fbd783e6d1d4e23c5f2e1d49916ea0f428d024add1d",
+    "generated_tree_sha256": "1674b1db22fed880156b73d95f892508ff3681d5cb4484d12dab1fe1e5bbe61e",
+    "obligation_count": 0,
+    "problem": "86-anti-shuffle",
+    "schema_version": 3,
+    "stage3_discovery_manifest_sha256": "f9beba61b82ac748b1a73e5cfdddddd1e187a043aa7b8538d3b585540f0b3ccf",
+    "status": "KLEAN_NO_OBLIGATIONS",
+    "trust_inventory_sha256": "f1ce5c3405e31ca8e898c397d95b90da3f6d1e91e85787029ceea95fc6e5681e"
+}
+
+### trust-inventory.json
+{
+    "allowlist": [
+        {
+            "declaration_name": "concatAx",
+            "kind": "axiom",
+            "line": "183",
+            "name": "ListHookDef.concatAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T \u2192 List T \u2192 Option (List T)"
+        },
+        {
+            "declaration_name": "elementAx",
+            "kind": "axiom",
+            "line": "184",
+            "name": "ListHookDef.elementAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "T \u2192 List T"
+        },
+        {
+            "declaration_name": "fillAx",
+            "kind": "axiom",
+            "line": "190",
+            "name": "ListHookDef.fillAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T \u2192 Int \u2192 T \u2192 Option (List T)"
+        },
+        {
+            "declaration_name": "getAx",
+            "kind": "axiom",
+            "line": "186",
+            "name": "ListHookDef.getAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "Int \u2192 List T \u2192 Option T"
+        },
+        {
+            "declaration_name": "inListAx",
+            "kind": "axiom",
+            "line": "192",
+            "name": "ListHookDef.inListAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "T \u2192 List T \u2192 Bool"
+        },
+        {
+            "declaration_name": "makeAx",
+            "kind": "axiom",
+            "line": "188",
+            "name": "ListHookDef.makeAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "Int \u2192 T \u2192 Option (List T)"
+        },
+        {
+            "declaration_name": "pushAx",
+            "kind": "axiom",
+            "line": "185",
+            "name": "ListHookDef.pushAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "T \u2192 List T \u2192 List T"
+        },
+        {
+            "declaration_name": "rangeAx",
+            "kind": "axiom",
+            "line": "191",
+            "name": "ListHookDef.rangeAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T \u2192 Int \u2192 Int \u2192 Option (List T)"
+        },
+        {
+            "declaration_name": "sizeAx",
+            "kind": "axiom",
+            "line": "193",
+            "name": "ListHookDef.sizeAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T \u2192 Int"
+        },
+        {
+            "declaration_name": "splitAx",
+            "kind": "axiom",
+            "line": "194",
+            "name": "ListHookDef.splitAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T \u2192 Nat \u2192 Nat \u2192 Option (List T \u00d7 List T \u00d7 List T)"
+        },
+        {
+            "declaration_name": "unitAx",
+            "kind": "axiom",
+            "line": "182",
+            "name": "ListHookDef.unitAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T"
+        },
+        {
+            "declaration_name": "updateAllAx",
+            "kind": "axiom",
+            "line": "189",
+            "name": "ListHookDef.updateAllAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T \u2192 Int \u2192 List T \u2192 Option (List T)"
+        },
+        {
+            "declaration_name": "updteAx",
+            "kind": "axiom",
+            "line": "187",
+            "name": "ListHookDef.updteAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "Int \u2192 T \u2192 List T \u2192 Option (List T)"
+        },
+        {
+            "declaration_name": "choiceAx",
+            "kind": "axiom",
+            "line": "78",
+            "name": "MapHookDef.choiceAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V) \u2192 K -- arbitrary key from a map"
+        },
+        {
+            "declaration_name": "concatAx",
+            "kind": "axiom",
+            "line": "69",
+            "name": "MapHookDef.concatAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V) \u2192 List (K \u00d7 V) \u2192 Option (List (K \u00d7 V))"
+        },
+        {
+            "declaration_name": "consAx",
+            "kind": "axiom",
+            "line": "64",
+            "name": "MapHookDef.consAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "K \u2192 V \u2192 List (K \u00d7 V) \u2192 List (K \u00d7 V)"
+        },
+        {
+            "declaration_name": "deleteAx",
+            "kind": "axiom",
+            "line": "68",
+            "name": "MapHookDef.deleteAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V) \u2192 K \u2192 List (K \u00d7 V)"
+        },
+        {
+            "declaration_name": "differenceAx",
+            "kind": "axiom",
+            "line": "70",
+            "name": "MapHookDef.differenceAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V) \u2192 List (K \u00d7 V) \u2192 List (K \u00d7 V)"
+        },
+        {
+            "declaration_name": "in_keysAx",
+            "kind": "axiom",
+            "line": "74",
+            "name": "MapHookDef.in_keysAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V) \u2192 K \u2192 Bool"
+        },
+        {
+            "declaration_name": "includesAx",
+            "kind": "axiom",
+            "line": "77",
+            "name": "MapHookDef.includesAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V) \u2192 List (K \u00d7 V) \u2192 Bool -- map inclusion"
+        },
+        {
+            "declaration_name": "keysAx",
+            "kind": "axiom",
+            "line": "73",
+            "name": "MapHookDef.keysAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V) \u2192 List K"
+        },
+        {
+            "declaration_name": "lookupAx",
+            "kind": "axiom",
+            "line": "65",
+            "name": "MapHookDef.lookupAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V) \u2192 K \u2192 Option V"
+        },
+        {
+            "declaration_name": "lookupAx?",
+            "kind": "axiom",
+            "line": "66",
+            "name": "MapHookDef.lookupAx?",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V) \u2192 K \u2192 V -- lookup with default"
+        },
+        {
+            "declaration_name": "removeAllAx",
+            "kind": "axiom",
+            "line": "72",
+            "name": "MapHookDef.removeAllAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V) \u2192 List K \u2192 List (K \u00d7 V)"
+        },
+        {
+            "declaration_name": "sizeAx",
+            "kind": "axiom",
+            "line": "76",
+            "name": "MapHookDef.sizeAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V) \u2192 Nat"
+        },
+        {
+            "declaration_name": "splitAx",
+            "kind": "axiom",
+            "line": "80",
+            "name": "MapHookDef.splitAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V) \u2192 List K \u2192 Option (List V \u00d7 List (K \u00d7 V))"
+        },
+        {
+            "declaration_name": "unitAx",
+            "kind": "axiom",
+            "line": "63",
+            "name": "MapHookDef.unitAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V)"
+        },
+        {
+            "declaration_name": "updateAx",
+            "kind": "axiom",
+            "line": "67",
+            "name": "MapHookDef.updateAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "K \u2192 V \u2192 List (K \u00d7 V) \u2192 List (K \u00d7 V)"
+        },
+        {
+            "declaration_name": "updateMapAx",
+            "kind": "axiom",
+            "line": "71",
+            "name": "MapHookDef.updateMapAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V) \u2192 List (K \u00d7 V) \u2192 List (K \u00d7 V)"
+        },
+        {
+            "declaration_name": "valuesAx",
+            "kind": "axiom",
+            "line": "75",
+            "name": "MapHookDef.valuesAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List (K \u00d7 V) \u2192 List V"
+        },
+        {
+            "declaration_name": "choiceAx",
+            "kind": "axiom",
+            "line": "134",
+            "name": "SetHookDef.choiceAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T \u2192 T"
+        },
+        {
+            "declaration_name": "concatAx",
+            "kind": "axiom",
+            "line": "126",
+            "name": "SetHookDef.concatAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T \u2192 List T \u2192 Option (List T)"
+        },
+        {
+            "declaration_name": "differenceAx",
+            "kind": "axiom",
+            "line": "130",
+            "name": "SetHookDef.differenceAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T \u2192 List T \u2192 List T"
+        },
+        {
+            "declaration_name": "elementAx",
+            "kind": "axiom",
+            "line": "127",
+            "name": "SetHookDef.elementAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "T \u2192 List T"
+        },
+        {
+            "declaration_name": "inSetAx",
+            "kind": "axiom",
+            "line": "131",
+            "name": "SetHookDef.inSetAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "T \u2192 List T \u2192 Bool"
+        },
+        {
+            "declaration_name": "inclusionAx",
+            "kind": "axiom",
+            "line": "132",
+            "name": "SetHookDef.inclusionAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T \u2192 List T \u2192 Bool"
+        },
+        {
+            "declaration_name": "intersectionAx",
+            "kind": "axiom",
+            "line": "129",
+            "name": "SetHookDef.intersectionAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T \u2192 List T \u2192 List T"
+        },
+        {
+            "declaration_name": "sizeAx",
+            "kind": "axiom",
+            "line": "133",
+            "name": "SetHookDef.sizeAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T \u2192 Int"
+        },
+        {
+            "declaration_name": "splitAx",
+            "kind": "axiom",
+            "line": "135",
+            "name": "SetHookDef.splitAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T \u2192 List T \u2192 Option (List T)"
+        },
+        {
+            "declaration_name": "unionAx",
+            "kind": "axiom",
+            "line": "128",
+            "name": "SetHookDef.unionAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T \u2192 List T \u2192 List T"
+        },
+        {
+            "declaration_name": "unitAx",
+            "kind": "axiom",
+            "line": "125",
+            "name": "SetHookDef.unitAx",
+            "reason": "Klean-generated trust boundary",
+            "source": "Klean86AntiShuffle/Prelude.lean",
+            "type": "List T"
+        }
+    ],
+    "automatic_axiomatization": [],
+    "automatic_noncomputable_repair": false,
+    "axioms": [
+        "ListHookDef.concatAx",
+        "ListHookDef.elementAx",
+        "ListHookDef.fillAx",
+        "ListHookDef.getAx",
+        "ListHookDef.inListAx",
+        "ListHookDef.makeAx",
+        "ListHookDef.pushAx",
+        "ListHookDef.rangeAx",
+        "ListHookDef.sizeAx",
+        "ListHookDef.splitAx",
+        "ListHookDef.unitAx",
+        "ListHookDef.updateAllAx",
+        "ListHookDef.updteAx",
+        "MapHookDef.choiceAx",
+        "MapHookDef.concatAx",
+        "MapHookDef.consAx",
+        "MapHookDef.deleteAx",
+        "MapHookDef.differenceAx",
+        "MapHookDef.in_keysAx",
+        "MapHookDef.includesAx",
+        "MapHookDef.keysAx",
+        "MapHookDef.lookupAx",
+        "MapHookDef.lookupAx?",
+        "MapHookDef.removeAllAx",
+        "MapHookDef.sizeAx",
+        "MapHookDef.splitAx",
+        "MapHookDef.unitAx",
+        "MapHookDef.updateAx",
+        "MapHookDef.updateMapAx",
+        "MapHookDef.valuesAx",
+        "SetHookDef.choiceAx",
+        "SetHookDef.concatAx",
+        "SetHookDef.differenceAx",
+        "SetHookDef.elementAx",
+        "SetHookDef.inSetAx",
+        "SetHookDef.inclusionAx",
+        "SetHookDef.intersectionAx",
+        "SetHookDef.sizeAx",
+        "SetHookDef.splitAx",
+        "SetHookDef.unionAx",
+        "SetHookDef.unitAx"
+    ],
+    "designated_sorries": 0,
+    "modeled_collection_hooks": [
+        ".List",
+        ".Map",
+        "ListItem",
+        "_List_",
+        "_Map_",
+        "_|->_"
+    ],
+    "modeled_operational_hooks": [],
+    "modeled_recursive_functions": [],
+    "noncomputable_definitions": [
+        "ListHook",
+        "ListItem",
+        "MapHook",
+        "SetHook",
+        "_List_",
+        "_Map_",
+        "\u00ab.List\u00bb",
+        "\u00ab.Map\u00bb",
+        "\u00ab_|->_\u00bb"
+    ],
+    "other_sorries": 0
+}
+
+Script done on 2026-07-31 06:55:37-05:00 [COMMAND_EXIT_CODE="0"]

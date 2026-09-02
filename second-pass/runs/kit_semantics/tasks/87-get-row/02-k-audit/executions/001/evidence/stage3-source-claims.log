@@ -1,0 +1,339 @@
+COMMAND: bash -lc for\ f\ in\ prove.sh\ row-model.k\ verification.k\ spec.k\ shape-connection.k\ shape-connection-spec.k\;\ do\ echo\ \"=====\ \$f\ =====\"\;\ nl\ -ba\ \"\$f\"\;\ done
+===== prove.sh =====
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	expect_failure() {
+     5	  local label="$1"
+     6	  shift
+     7	
+     8	  set +e
+     9	  "$@"
+    10	  local status=$?
+    11	  set -e
+    12	
+    13	  if [[ $status -eq 0 ]]; then
+    14	    echo "UNEXPECTED SUCCESS: $label"
+    15	    exit 1
+    16	  fi
+    17	  echo "EXPECTED FAILURE: $label (exit $status)"
+    18	}
+    19	
+    20	python3 py2mpy.py solution.py > solution.mpy
+    21	python3 py2mpy.py smoke.py > smoke.mpy
+    22	python3 -m py_compile solution.py smoke.py differential_test.py
+    23	python3 smoke.py
+    24	python3 differential_test.py
+    25	
+    26	kompile reference-semantics/semantics.k \
+    27	  --backend llvm \
+    28	  --main-module MPY-KRUN \
+    29	  --syntax-module MPY-SYNTAX \
+    30	  --output-definition runtime-kompiled
+    31	krun smoke.mpy --definition runtime-kompiled > krun-smoke.out
+    32	rg -q '^    \.K$' krun-smoke.out
+    33	
+    34	kompile --backend haskell shape-connection.k \
+    35	  --main-module SHAPE-CONNECTION \
+    36	  --syntax-module ROW-MODEL-SYNTAX \
+    37	  --output-definition shape-connection-kompiled
+    38	kprove shape-connection-spec.k \
+    39	  --definition shape-connection-kompiled \
+    40	  --spec-module SHAPE-CONNECTION-SPEC
+    41	
+    42	kompile --backend haskell verification.k \
+    43	  --main-module VERIFICATION \
+    44	  --syntax-module VERIFICATION-SYNTAX \
+    45	  --output-definition verification-kompiled
+    46	kprove spec.k \
+    47	  --definition verification-kompiled \
+    48	  --spec-module SPEC
+    49	
+    50	kompile --backend haskell mutation.k \
+    51	  --main-module MUTATION \
+    52	  --syntax-module MUTATION-SYNTAX \
+    53	  --output-definition mutation-kompiled
+    54	
+    55	expect_failure "wrong returned reference" \
+    56	  kprove spec-vacuity.k \
+    57	    --definition verification-kompiled \
+    58	    --spec-module SPEC-VACUITY
+    59	expect_failure "coordinate-append body mutation" \
+    60	  kprove spec-body-mutation.k \
+    61	    --definition mutation-kompiled \
+    62	    --spec-module SPEC-BODY-MUTATION
+    63	expect_failure "incorrect For bridge result" \
+    64	  kprove shape-connection-bad-spec.k \
+    65	    --definition shape-connection-kompiled \
+    66	    --spec-module SHAPE-CONNECTION-BAD-SPEC
+    67	
+    68	echo "All positive proofs passed and all negative probes failed as expected."
+===== row-model.k =====
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module ROW-MODEL-SYNTAX
+     4	  imports MPY-CORE
+     5	
+     6	  syntax ValSeq ::= rowContents(Val) [function, total]
+     7	  syntax Bool ::= listRows(ValSeq) [function, total]
+     8	endmodule
+     9	
+    10	module ROW-MODEL
+    11	  imports MPY
+    12	  imports ROW-MODEL-SYNTAX
+    13	
+    14	  rule rowContents(list(VS:ValSeq)) => VS
+    15	  rule rowContents(_:Val) => .ValSeq [owise]
+    16	
+    17	  rule listRows(.ValSeq) => true
+    18	  rule listRows(vCons(V:Val, VS:ValSeq))
+    19	    => (V ==K list(rowContents(V))) andBool listRows(VS)
+    20	endmodule
+===== verification.k =====
+     1	requires "row-model.k"
+     2	
+     3	module VERIFICATION-SYNTAX
+     4	  imports ROW-MODEL-SYNTAX
+     5	
+     6	  syntax ValSeq ::= scanAppend(ValSeq, ValSeq, Int, Int, Int) [function, total]
+     7	                  | rowsAppend(ValSeq, ValSeq, Int, Int) [function]
+     8	  syntax Int ::= advanceIndex(Int, ValSeq) [function, total]
+     9	
+    10	  syntax Stmts ::= "INNERBODY"  [macro]
+    11	                 | "OUTERBODY"  [macro]
+    12	                 | "GETROWBODY" [macro]
+    13	  syntax Val ::= "COLUMNCLOSURE" [macro]
+    14	               | "ROWCLOSURE"    [macro]
+    15	endmodule
+    16	
+    17	module VERIFICATION
+    18	  imports ROW-MODEL
+    19	  imports VERIFICATION-SYNTAX
+    20	
+    21	  rule <k> For(T:Expr, V:Val, B:Stmts)
+    22	        => #loop(list(rowContents(V)), T, B) ... </k>
+    23	       requires V ==K list(rowContents(V))
+    24	       [priority(40)]
+    25	
+    26	  rule advanceIndex(I:Int, .ValSeq) => I
+    27	  rule advanceIndex(I:Int, vCons(_:Val, VS:ValSeq))
+    28	    => advanceIndex(I +Int 1, VS)
+    29	
+    30	  rule scanAppend(ACC:ValSeq, .ValSeq, _:Int, _:Int, _:Int) => ACC
+    31	  rule scanAppend(ACC:ValSeq, vCons(V:Val, VS:ValSeq),
+    32	                  X:Int, RI:Int, CI:Int)
+    33	    => scanAppend(
+    34	         valSeqConcat(
+    35	           ACC,
+    36	           vCons(tuple(vCons(RI, vCons(CI, .ValSeq))), .ValSeq)),
+    37	         VS, X, RI, CI +Int 1)
+    38	    requires V ==K X
+    39	    [simplification]
+    40	  rule scanAppend(ACC:ValSeq, vCons(V:Val, VS:ValSeq),
+    41	                  X:Int, RI:Int, CI:Int)
+    42	    => scanAppend(ACC, VS, X, RI, CI +Int 1)
+    43	    requires notBool (V ==K X)
+    44	    [simplification]
+    45	
+    46	  rule rowsAppend(ACC:ValSeq, .ValSeq, _:Int, _:Int) => ACC
+    47	  rule rowsAppend(ACC:ValSeq,
+    48	                  vCons(V:Val, RS:ValSeq),
+    49	                  X:Int, RI:Int)
+    50	    => rowsAppend(scanAppend(ACC, rowContents(V), X, RI, 0),
+    51	                  RS, X, RI +Int 1)
+    52	    requires V ==K list(rowContents(V))
+    53	    [simplification]
+    54	
+    55	  rule INNERBODY
+    56	    => If(Compare(Name("value"),
+    57	                  CmpOp("in", TupleExpr((Name("x"), .Exprs)))),
+    58	          Expr(Call(Attribute(Name("coordinates"), "append"),
+    59	                    (TupleExpr((Name("row_index"), Name("column_index"), .Exprs)),
+    60	                     .Exprs)))
+    61	          .Stmts,
+    62	          .Stmts)
+    63	       AugAssign(Name("column_index"), "+", Int(1))
+    64	       .Stmts
+    65	
+    66	  rule OUTERBODY
+    67	    => Assign(Name("column_index"), Int(0))
+    68	       Assign(Name("value"), Int(0))
+    69	       For(Name("value"), Name("row"), INNERBODY)
+    70	       AugAssign(Name("row_index"), "+", Int(1))
+    71	       .Stmts
+    72	
+    73	  rule GETROWBODY
+    74	    => Assign(Name("coordinates"), ListExpr(.Exprs))
+    75	       Assign(Name("row_index"), Int(0))
+    76	       Assign(Name("row"), NoneVal)
+    77	       Assign(Name("column_index"), Int(0))
+    78	       Assign(Name("value"), Int(0))
+    79	       For(Name("row"), Name("lst"), OUTERBODY)
+    80	       Assign(Name("coordinates"),
+    81	              Call(Name("sorted"),
+    82	                   (Name("coordinates"),
+    83	                    KwArg("key", Name("_column_desc")),
+    84	                    .Exprs)))
+    85	       Return(Call(Name("sorted"),
+    86	                   (Name("coordinates"),
+    87	                    KwArg("key", Name("_row_asc")),
+    88	                    .Exprs)))
+    89	       .Stmts
+    90	
+    91	  rule COLUMNCLOSURE
+    92	    => closureVal(("coordinate", .ParamNames),
+    93	                  Return(UnaryOp("-", Subscript(Name("coordinate"), Int(1))))
+    94	                  .Stmts,
+    95	                  0)
+    96	
+    97	  rule ROWCLOSURE
+    98	    => closureVal(("coordinate", .ParamNames),
+    99	                  Return(Subscript(Name("coordinate"), Int(0)))
+   100	                  .Stmts,
+   101	                  0)
+   102	endmodule
+===== spec.k =====
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [inner-loop]:
+     7	    <k> #loop(list(VS:ValSeq), Name("value"), INNERBODY)
+     8	        => .K ... </k>
+     9	    <env> L:Int </env>
+    10	    <scopes>
+    11	      SC:Map
+    12	      L |-> scope(
+    13	        "coordinates" |-> ref(OUT:Int)
+    14	        "column_index" |-> (CI:Int => advanceIndex(CI, VS))
+    15	        "lst" |-> LST:Val
+    16	        "row" |-> ROW:Val
+    17	        "row_index" |-> RI:Int
+    18	        "value" |-> (_OLD:Val => ?LAST:Val)
+    19	        "x" |-> X:Int,
+    20	        parent(0))
+    21	    </scopes>
+    22	    <heap>
+    23	      OUT |-> list(ACC:ValSeq
+    24	                    => scanAppend(ACC, VS, X, RI, CI))
+    25	      H:Map
+    26	    </heap>
+    27	
+    28	  claim [outer-loop]:
+    29	    <k> #loop(list(RS:ValSeq), Name("row"), OUTERBODY)
+    30	        => .K ... </k>
+    31	    <env> L:Int </env>
+    32	    <scopes>
+    33	      SC:Map
+    34	      L |-> scope(
+    35	        "column_index" |-> (_CI:Int => ?FINALCI:Int)
+    36	        "coordinates" |-> ref(OUT:Int)
+    37	        "lst" |-> LST:Val
+    38	        "row" |-> (_OLDROW:Val => ?FINALROW:Val)
+    39	        "row_index" |-> (RI:Int => advanceIndex(RI, RS))
+    40	        "value" |-> (_OLDVALUE:Val => ?FINALVALUE:Val)
+    41	        "x" |-> X:Int,
+    42	        parent(0))
+    43	    </scopes>
+    44	    <heap>
+    45	      OUT |-> list(ACC:ValSeq
+    46	                    => rowsAppend(
+    47	                         ACC,
+    48	                         RS,
+    49	                         X,
+    50	                         RI))
+    51	      H:Map
+    52	    </heap>
+    53	    requires listRows(RS)
+    54	
+    55	  claim [column-key]:
+    56	    <k> Call(Name("_column_desc"),
+    57	             (tuple(vCons(RI:Int, vCons(CI:Int, .ValSeq))), .Exprs))
+    58	        => 0 -Int CI </k>
+    59	    <env> 0 </env>
+    60	    <scopes>
+    61	      0 |-> scope("_column_desc" |-> COLUMNCLOSURE
+    62	                  "_row_asc" |-> ROWCLOSURE,
+    63	                  parent(-1))
+    64	      -1 |-> builtinsScope
+    65	    </scopes>
+    66	    <scopeLoc> 1 </scopeLoc>
+    67	    <heap> .Map </heap>
+    68	    <heapLoc> 0 </heapLoc>
+    69	    <stack> .List </stack>
+    70	    <ret> noRet </ret>
+    71	    <exc> NoExc </exc>
+    72	    <exit-code> 0 </exit-code>
+    73	
+    74	  claim [row-key]:
+    75	    <k> Call(Name("_row_asc"),
+    76	             (tuple(vCons(RI:Int, vCons(CI:Int, .ValSeq))), .Exprs))
+    77	        => RI </k>
+    78	    <env> 0 </env>
+    79	    <scopes>
+    80	      0 |-> scope("_column_desc" |-> COLUMNCLOSURE
+    81	                  "_row_asc" |-> ROWCLOSURE,
+    82	                  parent(-1))
+    83	      -1 |-> builtinsScope
+    84	    </scopes>
+    85	    <scopeLoc> 1 </scopeLoc>
+    86	    <heap> .Map </heap>
+    87	    <heapLoc> 0 </heapLoc>
+    88	    <stack> .List </stack>
+    89	    <ret> noRet </ret>
+    90	    <exc> NoExc </exc>
+    91	    <exit-code> 0 </exit-code>
+    92	
+    93	  claim [get-row]:
+    94	    <k> Call(Name("get_row"), (list(RS:ValSeq), X:Int, .Exprs))
+    95	        => ref(2) </k>
+    96	    <env> 0 </env>
+    97	    <scopes>
+    98	      0 |-> scope(
+    99	        "_column_desc" |-> COLUMNCLOSURE
+   100	        "_row_asc" |-> ROWCLOSURE
+   101	        "get_row" |-> closureVal(("lst", "x", .ParamNames),
+   102	                                  GETROWBODY,
+   103	                                  0),
+   104	        parent(-1))
+   105	      -1 |-> builtinsScope
+   106	    </scopes>
+   107	    <scopeLoc> 1 </scopeLoc>
+   108	    <heap>
+   109	      .Map
+   110	      => 0 |-> list(rowsAppend(.ValSeq, RS, X, 0))
+   111	         1 |-> list(sortKeyVS(
+   112	                      rowsAppend(.ValSeq, RS, X, 0),
+   113	                      COLUMNCLOSURE))
+   114	         2 |-> list(sortKeyVS(
+   115	                      sortKeyVS(
+   116	                        rowsAppend(.ValSeq, RS, X, 0),
+   117	                        COLUMNCLOSURE),
+   118	                      ROWCLOSURE))
+   119	    </heap>
+   120	    <heapLoc> 0 => 3 </heapLoc>
+   121	    <stack> .List </stack>
+   122	    <ret> noRet </ret>
+   123	    <exc> NoExc </exc>
+   124	    <exit-code> 0 </exit-code>
+   125	    requires listRows(RS)
+   126	endmodule
+===== shape-connection.k =====
+     1	requires "row-model.k"
+     2	
+     3	module SHAPE-CONNECTION
+     4	  imports ROW-MODEL
+     5	endmodule
+===== shape-connection-spec.k =====
+     1	requires "shape-connection.k"
+     2	
+     3	module SHAPE-CONNECTION-SPEC
+     4	  imports SHAPE-CONNECTION
+     5	
+     6	  claim [for-list-shape]:
+     7	    <k> For(T:Expr, V:Val, B:Stmts)
+     8	        => #loop(list(rowContents(V)), T, B) ... </k>
+     9	    requires V ==K list(rowContents(V))
+    10	endmodule
+EXIT STATUS: 0

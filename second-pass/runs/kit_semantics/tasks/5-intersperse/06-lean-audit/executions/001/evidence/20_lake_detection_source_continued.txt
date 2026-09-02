@@ -1,0 +1,154 @@
+$ sed -n "1,120p" Lake CLI Main
+/-
+Copyright (c) 2021 Mac Malone. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Mac Malone
+-/
+prelude
+import Lake.Load
+import Lake.Util.Error
+import Lake.Util.MainM
+import Lake.Util.Cli
+import Lake.CLI.Init
+import Lake.CLI.Help
+import Lake.CLI.Build
+import Lake.CLI.Error
+import Lake.CLI.Actions
+import Lake.CLI.Translate
+import Lake.CLI.Serve
+
+-- # CLI
+
+open System
+open Lean (Json toJson fromJson? NameMap)
+
+namespace Lake
+
+/-! ## General options for top-level `lake` -/
+
+structure LakeOptions where
+  args : List String := []
+  rootDir : FilePath := "."
+  configFile : FilePath := defaultConfigFile
+  elanInstall? : Option ElanInstall := none
+  leanInstall? : Option LeanInstall := none
+  lakeInstall? : Option LakeInstall := none
+  configOpts : NameMap String := {}
+  packageOverrides : Array PackageEntry := #[]
+  subArgs : List String := []
+  wantsHelp : Bool := false
+  verbosity : Verbosity := .normal
+  updateDeps : Bool := false
+  updateToolchain : Bool := true
+  reconfigure : Bool := false
+  oldMode : Bool := false
+  trustHash : Bool := true
+  noBuild : Bool := false
+  noCache : Option Bool := none
+  failLv : LogLevel := .error
+  outLv? : Option LogLevel := .none
+  ansiMode : AnsiMode := .auto
+  outFormat : OutFormat := .text
+
+def LakeOptions.outLv (opts : LakeOptions) : LogLevel :=
+  opts.outLv?.getD opts.verbosity.minLogLv
+
+/-- Get the Lean installation. Error if missing. -/
+def LakeOptions.getLeanInstall (opts : LakeOptions) : Except CliError LeanInstall :=
+  match opts.leanInstall? with
+  | none => .error CliError.unknownLeanInstall
+  | some lean => .ok lean
+
+/-- Get the Lake installation. Error if missing. -/
+def LakeOptions.getLakeInstall (opts : LakeOptions) : Except CliError LakeInstall :=
+  match opts.lakeInstall? with
+  | none => .error CliError.unknownLakeInstall
+  | some lake => .ok lake
+
+/-- Get the Lean and Lake installation. Error if either is missing. -/
+def LakeOptions.getInstall (opts : LakeOptions) : Except CliError (LeanInstall × LakeInstall) := do
+  return (← opts.getLeanInstall, ← opts.getLakeInstall)
+
+/-- Compute the Lake environment based on `opts`. Error if an install is missing. -/
+def LakeOptions.computeEnv (opts : LakeOptions) : EIO CliError Lake.Env := do
+  Env.compute (← opts.getLakeInstall) (← opts.getLeanInstall) opts.elanInstall?
+    opts.noCache |>.adaptExcept fun msg => .invalidEnv msg
+
+/-- Make a `LoadConfig` from a `LakeOptions`. -/
+def LakeOptions.mkLoadConfig (opts : LakeOptions) : EIO CliError LoadConfig := do
+  let some wsDir ← resolvePath? opts.rootDir
+    | throw <| .missingRootDir opts.rootDir
+  return {
+    lakeArgs? := opts.args.toArray
+    lakeEnv := ← opts.computeEnv
+    wsDir
+    relConfigFile := opts.configFile
+    packageOverrides := opts.packageOverrides
+    lakeOpts := opts.configOpts
+    leanOpts := Lean.Options.empty
+    reconfigure := opts.reconfigure
+    updateDeps := opts.updateDeps
+    updateToolchain := opts.updateToolchain
+  }
+
+/-- Make a `BuildConfig` from a `LakeOptions`. -/
+def LakeOptions.mkBuildConfig (opts : LakeOptions) (out := OutStream.stderr) : BuildConfig where
+  oldMode := opts.oldMode
+  trustHash := opts.trustHash
+  noBuild := opts.noBuild
+  verbosity := opts.verbosity
+  failLv := opts.failLv
+  outLv := opts.outLv
+  ansiMode := opts.ansiMode
+  out := out
+
+export LakeOptions (mkLoadConfig mkBuildConfig)
+
+/-! ## Monad -/
+
+abbrev CliMainM := ExceptT CliError MainM
+abbrev CliStateM := StateT LakeOptions CliMainM
+abbrev CliM := ArgsT CliStateM
+
+def CliM.run (self : CliM α) (args : List String) : BaseIO ExitCode := do
+  let (elanInstall?, leanInstall?, lakeInstall?) ← findInstall?
+  let main := self.run' args |>.run' {args, elanInstall?, leanInstall?, lakeInstall?}
+  let main := main.run >>= fun | .ok a => pure a | .error e => error e.toString
+  main.run
+
+@[inline] def CliStateM.runLogIO (x : LogIO α) : CliStateM α := do
+  let opts ← get
+  MainM.runLogIO x opts.outLv opts.ansiMode
+$ rg getLakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Error.lean:48:| unknownLakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Error.lean:86:| unknownLakeInstall      => "could not detect the configuration of the Lake installation"
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:34:  lakeInstall? : Option LakeInstall := none
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:62:def LakeOptions.getLakeInstall (opts : LakeOptions) : Except CliError LakeInstall :=
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:63:  match opts.lakeInstall? with
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:64:  | none => .error CliError.unknownLakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:68:def LakeOptions.getInstall (opts : LakeOptions) : Except CliError (LeanInstall × LakeInstall) := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:69:  return (← opts.getLeanInstall, ← opts.getLakeInstall)
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:73:  Env.compute (← opts.getLakeInstall) (← opts.getLeanInstall) opts.elanInstall?
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:113:  let (elanInstall?, leanInstall?, lakeInstall?) ← findInstall?
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:114:  let main := self.run' args |>.run' {args, elanInstall?, leanInstall?, lakeInstall?}
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:243:  IO.println s!"Lake:\n{repr <| opts.lakeInstall?}"
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Build/Module.lean:209:    plugins := plugins.push (← getLakeInstall).sharedDynlib
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Monad.lean:249:@[inline] def getLakeInstall : m LakeInstall :=
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Monad.lean:254:  (·.home) <$> getLakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Monad.lean:258:  (·.srcDir) <$> getLakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Monad.lean:262:  (·.libDir) <$> getLakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Monad.lean:266:  (·.lake) <$> getLakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean:26:  lake : LakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean:108:  (lake : LakeInstall) (lean : LeanInstall) (elan? : Option ElanInstall)
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:133:structure LakeInstall where
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:145:@[inline] def LakeInstall.sharedLib (self : LakeInstall) : FilePath :=
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:149:def LakeInstall.ofLean (lean : LeanInstall) : LakeInstall where
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:302:def getLakeInstall? (lake : FilePath) : BaseIO (Option LakeInstall) := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:304:  let lake : LakeInstall := {home, lake}
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:344:def findLakeInstall? : BaseIO (Option LakeInstall) := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:346:    if let some lake ← getLakeInstall? lake then
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:360:`findLeanInstall?` and `findLakeInstall?`. Setting `LAKE_OVERRIDE_LEAN` to true
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:368:def findInstall? : BaseIO (Option ElanInstall × Option LeanInstall × Option LakeInstall) := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:372:      let lake := LakeInstall.ofLean {sysroot}
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:376:      let lake := LakeInstall.ofLean lean
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:379:    return (elan?, ← findLeanInstall?, ← findLakeInstall?)

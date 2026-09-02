@@ -1,0 +1,276 @@
+COMMAND
+nl -ba frozen Stage 1 source files; inspect Stage 3 manifest
+
+verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // Pure reference model.  Starting at candidate F, remove every occurrence
+     7	  // of a factor while F * F can still fit in N; otherwise advance F.  At
+     8	  // termination N is the greatest prime factor of the original input.
+     9	  syntax Int ::= lpfSpec(Int, Int) [function]
+    10	  rule lpfSpec(N, F) => N
+    11	    requires F *Int F >Int N
+    12	  rule lpfSpec(N, F) => lpfSpec(N /Int F, F)
+    13	    requires F *Int F <=Int N andBool N %Int F ==Int 0
+    14	  rule lpfSpec(N, F) => lpfSpec(N, F +Int 1)
+    15	    requires F *Int F <=Int N andBool N %Int F =/=Int 0
+    16	
+    17	  // Named AST fragments are macros only: after kompilation the claims contain
+    18	  // exactly the constructors emitted into solution.mpy.
+    19	  syntax Stmt ::= "factorLoop" [macro]
+    20	  rule factorLoop
+    21	    => While(
+    22	         Compare(BinOp("*", Name("factor"), Name("factor")),
+    23	                 CmpOp("<=", Name("n"))),
+    24	         If(Compare(BinOp("%", Name("n"), Name("factor")),
+    25	                    CmpOp("==", Int(0))),
+    26	            Assign(Name("n"), BinOp("//", Name("n"), Name("factor"))),
+    27	            Assign(Name("factor"), BinOp("+", Name("factor"), Int(1)))))
+    28	
+    29	  syntax PyModule ::= "solutionModule" [macro]
+    30	  rule solutionModule
+    31	    => Module(
+    32	         FuncDef("largest_prime_factor", Params("n"),
+    33	           Assign(Name("factor"), Int(2))
+    34	           factorLoop
+    35	           Return(Name("n"))))
+    36	endmodule
+
+spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Loop invariant/refinement: at any positive residual N and candidate F,
+     7	  // executing the translated loop and return computes the pure lpfSpec value.
+     8	  claim [loop-refines-lpf]:
+     9	    <py>
+    10	      <k> execStmt(factorLoop) ~> exec(Return(Name("n")) .Stmts)
+    11	        => .K </k>
+    12	      <input> _INPUT </input>
+    13	      <env> "factor" |-> F "n" |-> N
+    14	        => "factor" |-> ?_:Int "n" |-> lpfSpec(N, F) </env>
+    15	      <result> noResult => result(lpfSpec(N, F)) </result>
+    16	    </py>
+    17	    requires N >Int 1 andBool F >=Int 2
+    18	
+    19	  // Universal end-to-end theorem.  This is stronger than the prompt's domain:
+    20	  // it holds for every N > 1, including prime inputs.
+    21	  claim [largest-prime-factor-correct]:
+    22	    <py>
+    23	      <k> solutionModule => .K </k>
+    24	      <input> N </input>
+    25	      <env> .Map
+    26	        => "factor" |-> ?_:Int "n" |-> lpfSpec(N, 2) </env>
+    27	      <result> noResult => result(lpfSpec(N, 2)) </result>
+    28	    </py>
+    29	    requires N >Int 1
+    30	
+    31	  claim [prompt-example-13195]:
+    32	    <py>
+    33	      <k> solutionModule => .K </k>
+    34	      <input> 13195 </input>
+    35	      <env> .Map => ?_:Map </env>
+    36	      <result> noResult => result(29) </result>
+    37	    </py>
+    38	
+    39	  claim [prompt-example-2048]:
+    40	    <py>
+    41	      <k> solutionModule => .K </k>
+    42	      <input> 2048 </input>
+    43	      <env> .Map => ?_:Map </env>
+    44	      <result> noResult => result(2) </result>
+    45	    </py>
+    46	endmodule
+
+semantic.k
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports STRING-SYNTAX
+     4	
+     5	  syntax PyModule ::= "Module" "(" Stmts ")"
+     6	  syntax Stmts ::= List{Stmt, ""}
+     7	  syntax Strings ::= List{String, ","}
+     8	  syntax Params ::= "Params" "(" Strings ")"
+     9	
+    10	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    11	                | "Assign" "(" Expr "," Expr ")"
+    12	                | "While" "(" Expr "," Stmts ")"
+    13	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    14	                | "Return" "(" Expr ")"
+    15	
+    16	  syntax Expr ::= "Int" "(" Int ")"
+    17	                | "Name" "(" String ")"
+    18	                | "BinOp" "(" String "," Expr "," Expr ")"
+    19	                | "Compare" "(" Expr "," CmpOps ")"
+    20	  syntax CmpOps ::= List{CmpOp, ","}
+    21	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    22	endmodule
+    23	
+    24	module SEMANTIC
+    25	  imports MPY-SYNTAX
+    26	  imports INT
+    27	  imports BOOL
+    28	  imports MAP
+    29	
+    30	  syntax Result ::= "noResult" | "result" "(" Int ")"
+    31	
+    32	  configuration
+    33	    <py>
+    34	      <k> $PGM:PyModule </k>
+    35	      <input> $N:Int </input>
+    36	      <env> .Map </env>
+    37	      <result> noResult </result>
+    38	    </py>
+    39	
+    40	  // This task only needs integers, integer arithmetic, comparisons,
+    41	  // assignment, conditionals, while, return, and one top-level function.
+    42	  syntax Int ::= evalInt(Expr, Map) [function]
+    43	  rule evalInt(Int(I), _) => I
+    44	  rule evalInt(Name(X), X |-> I _M) => I
+    45	  rule evalInt(BinOp("+", A, B), M) => evalInt(A, M) +Int evalInt(B, M)
+    46	  rule evalInt(BinOp("*", A, B), M) => evalInt(A, M) *Int evalInt(B, M)
+    47	  rule evalInt(BinOp("//", A, B), M) => evalInt(A, M) /Int evalInt(B, M)
+    48	    requires evalInt(B, M) =/=Int 0
+    49	  rule evalInt(BinOp("%", A, B), M) => evalInt(A, M) %Int evalInt(B, M)
+    50	    requires evalInt(B, M) =/=Int 0
+    51	
+    52	  syntax Bool ::= evalBool(Expr, Map) [function]
+    53	  rule evalBool(Compare(A, CmpOp("<=", B)), M)
+    54	    => evalInt(A, M) <=Int evalInt(B, M)
+    55	  rule evalBool(Compare(A, CmpOp("==", B)), M)
+    56	    => evalInt(A, M) ==Int evalInt(B, M)
+    57	
+    58	  syntax KItem ::= exec(Stmts)
+    59	                 | execStmt(Stmt)
+    60	                 | setVar(String, Int)
+    61	
+    62	  // Loading the translated module invokes its required entry point with N.
+    63	  rule <k> Module(FuncDef("largest_prime_factor", Params("n"), BODY))
+    64	            => exec(BODY) ... </k>
+    65	       <input> N </input>
+    66	       <env> .Map => "n" |-> N </env>
+    67	
+    68	  rule exec(.Stmts) => .K
+    69	  rule exec(S SS) => execStmt(S) ~> exec(SS)
+    70	
+    71	  rule <k> execStmt(Assign(Name(X), E)) => setVar(X, evalInt(E, M)) ... </k>
+    72	       <env> M </env>
+    73	  rule <k> setVar(X, I) => .K ... </k>
+    74	       <env> M => M [ X <- I ] </env>
+    75	
+    76	  rule <k> execStmt(If(COND, THEN, _ELSE)) => exec(THEN) ... </k>
+    77	       <env> M </env>
+    78	    requires evalBool(COND, M)
+    79	  rule <k> execStmt(If(COND, _THEN, ELSE)) => exec(ELSE) ... </k>
+    80	       <env> M </env>
+    81	    requires notBool evalBool(COND, M)
+    82	
+    83	  rule <k> execStmt(While(COND, BODY))
+    84	            => exec(BODY) ~> execStmt(While(COND, BODY)) ... </k>
+    85	       <env> M </env>
+    86	    requires evalBool(COND, M)
+    87	  rule <k> execStmt(While(COND, _BODY)) => .K ... </k>
+    88	       <env> M </env>
+    89	    requires notBool evalBool(COND, M)
+    90	
+    91	  rule <k> execStmt(Return(E)) => .K ... </k>
+    92	       <env> M </env>
+    93	       <result> noResult => result(evalInt(E, M)) </result>
+    94	endmodule
+
+solution.py
+     1	def largest_prime_factor(n: int):
+     2	    factor = 2
+     3	    while factor * factor <= n:
+     4	        if n % factor == 0:
+     5	            n = n // factor
+     6	        else:
+     7	            factor = factor + 1
+     8	    return n
+
+solution.mpy
+     1	Module(
+     2	  FuncDef("largest_prime_factor", Params("n"),
+     3	    Assign(Name("factor"), Int(2))
+     4	    While(Compare(
+     5	      BinOp("*", Name("factor"), Name("factor")),
+     6	      CmpOp("<=", Name("n"))),
+     7	      If(Compare(
+     8	        BinOp("%", Name("n"), Name("factor")),
+     9	        CmpOp("==", Int(0))),
+    10	        Assign(Name("n"), BinOp("//", Name("n"), Name("factor"))),
+    11	        Assign(Name("factor"), BinOp("+", Name("factor"), Int(1)))))
+    12	    Return(Name("n"))))
+
+prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	set -x
+     4	
+     5	proof_build_dir="$(mktemp -d "$PWD/.kproof.XXXXXX")"
+     6	trap 'rm -rf -- "$proof_build_dir"' EXIT
+     7	
+     8	# Recreate the submitted constructor term and require it to be current.
+     9	python3 py2mpy.py solution.py > "$proof_build_dir/solution.mpy"
+    10	cmp solution.mpy "$proof_build_dir/solution.mpy"
+    11	
+    12	# verification.k imports semantic.k, so this compiles both the interpreter and
+    13	# the pure reference model into the definition used by krun and kprove.
+    14	kompile verification.k \
+    15	  --backend haskell \
+    16	  --main-module VERIFICATION \
+    17	  --syntax-module MPY-SYNTAX \
+    18	  --output-definition "$proof_build_dir/verification-kompiled"
+    19	
+    20	# Exercise the actual generated program through the custom semantics.
+    21	krun solution.mpy --definition "$proof_build_dir/verification-kompiled" \
+    22	  -cN=13195 --output pretty | tee "$proof_build_dir/run-13195.out"
+    23	grep -F 'result ( 29 )' "$proof_build_dir/run-13195.out"
+    24	
+    25	krun solution.mpy --definition "$proof_build_dir/verification-kompiled" \
+    26	  -cN=2048 --output pretty | tee "$proof_build_dir/run-2048.out"
+    27	grep -F 'result ( 2 )' "$proof_build_dir/run-2048.out"
+    28	
+    29	# Prove the loop refinement, universal end-to-end result, and both examples.
+    30	kprove spec.k \
+    31	  --definition "$proof_build_dir/verification-kompiled" \
+    32	  --spec-module SPEC \
+    33	  --output pretty
+
+lemma-discovery.json
+{
+    "schema_version": 2,
+    "inventory_sha256": "f715fe7d9395ed053677b2631fd590296b3a715799e4a8c563f12c76b2fed95c",
+    "rules": [
+        {
+            "source_rule_id": "rule-b489aea63970d411594bff613776dd4bfb15b7ac7fe48b33b080c25e1c15104e",
+            "classification": "DEFINITION",
+            "rationale": "This is the terminating case of the lpfSpec mathematical recurrence: once F squared exceeds N, the summary is defined to return N."
+        },
+        {
+            "source_rule_id": "rule-9f466ec05d3a0f3d8752ddb1fee638ad7b8dde8cbbbbad9fb7a1ee11ff00da54",
+            "classification": "DEFINITION",
+            "rationale": "This equation defines the divisible branch of lpfSpec by removing one factor F and recursively summarizing the quotient."
+        },
+        {
+            "source_rule_id": "rule-6bcfd228f976749c4488d33cabe64a1899dd5afdd53b74669fbdb7e39f26004b",
+            "classification": "DEFINITION",
+            "rationale": "This equation defines the nondivisible branch of lpfSpec by advancing the candidate factor and recurring."
+        },
+        {
+            "source_rule_id": "rule-714829c2a43113532931e52647ec59e899cbe92207d6c68dda64aca3e7e4a2d7",
+            "classification": "DEFINITION",
+            "rationale": "This macro equation defines the named factorLoop proof term as the translated While and If AST fragment."
+        },
+        {
+            "source_rule_id": "rule-1cd257a656a378c8604c9e23fa722fe9b878c2f65050396e8713e5991b93b63f",
+            "classification": "DEFINITION",
+            "rationale": "This macro equation defines the named solutionModule proof term as the complete translated function AST."
+        }
+    ]
+}

@@ -1,0 +1,56 @@
+      return some path
+  return none
+
+def findAllWithExt (sp : SearchPath) (ext : String) : IO (Array FilePath) := do
+  let mut paths := #[]
+  for p in sp do
+    if (← p.isDir) then
+      paths := paths ++ (← p.walkDir).filter (·.extension == some ext)
+  return paths
+
+end SearchPath
+
+builtin_initialize searchPathRef : IO.Ref SearchPath ← IO.mkRef {}
+
+@[export lean_get_prefix]
+def getBuildDir : IO FilePath := do
+  return (← IO.appDir).parent |>.get!
+
+@[export lean_get_libdir]
+def getLibDir (leanSysroot : FilePath) : IO FilePath := do
+  let mut buildDir := leanSysroot
+  -- use stage1 stdlib with stage0 executable (which should never be distributed outside of the build directory)
+  if Internal.isStage0 () then
+    buildDir := buildDir / ".." / "stage1"
+  return buildDir / "lib" / "lean"
+
+def getBuiltinSearchPath (leanSysroot : FilePath) : IO SearchPath :=
+  return [← getLibDir leanSysroot]
+
+def addSearchPathFromEnv (sp : SearchPath) : IO SearchPath := do
+  let val ← IO.getEnv "LEAN_PATH"
+  match val with
+  | none     => pure sp
+  | some val => pure <| SearchPath.parse val ++ sp
+
+/--
+Initialize Lean's search path given Lean's system root and an initial search path.
+The system root can be obtained via `getBuildDir` (for internal use) or
+`findSysroot` (for external users). -/
+def initSearchPath (leanSysroot : FilePath) (sp : SearchPath := ∅) : IO Unit := do
+  let sp := sp ++ (← addSearchPathFromEnv (← getBuiltinSearchPath leanSysroot))
+  searchPathRef.set sp
+
+@[export lean_init_search_path]
+private def initSearchPathInternal : IO Unit := do
+  initSearchPath (← getBuildDir)
+
+/-- Find the compiled `.olean` of a module in the `LEAN_PATH` search path. -/
+partial def findOLean (mod : Name) : IO FilePath := do
+  let sp ← searchPathRef.get
+  if let some fname ← sp.findWithExt "olean" mod then
+    return fname
+  else
+    let pkg := FilePath.mk <| mod.getRoot.toString (escape := false)
+    throw <| IO.userError s!"unknown module prefix '{pkg}'\n\n\
+      No directory '{pkg}' or file '{pkg}.olean' in the search path entries:\n\

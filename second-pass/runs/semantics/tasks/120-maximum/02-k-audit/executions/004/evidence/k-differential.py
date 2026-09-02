@@ -1,0 +1,21 @@
+def maximum(arr, k):
+    if k == 0:
+        return []
+    return sorted(arr)[-k:]
+
+assert maximum([-3, -4, 5], 3) == [-4, -3, 5]
+assert maximum([4, -4, 4], 2) == [4, 4]
+assert maximum([-3, 2, 1, 2, -1, -2, 1], 1) == [2]
+assert maximum([1, 2, 3], 0) == []
+assert maximum([-1000], 1) == [-1000]
+assert maximum([1000], 0) == []
+assert maximum([-1000, 1000], 1) == [1000]
+assert maximum([-1000, 1000], 2) == [-1000, 1000]
+assert maximum([-287, 647, -870, -218, 602], 5) == [-870, -287, -218, 602, 647]
+assert maximum([-537, 877, 54, 896], 0) == []
+assert maximum([588], 1) == [588]
+assert maximum([786], 0) == []
+assert maximum([-662, 139, 870, 950], 1) == [950]
+assert maximum([620, -796, 159, -97, -147], 5) == [-796, -147, -97, 159, 620]
+assert maximum([433, 674, -22, 404], 0) == []
+assert maximum([-583, -313], 1) == [-313]

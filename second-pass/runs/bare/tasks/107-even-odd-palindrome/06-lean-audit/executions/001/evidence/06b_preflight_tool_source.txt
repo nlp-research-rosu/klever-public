@@ -1,0 +1,193 @@
+COMMAND: sed -n 521\,1040p /reference/tools/klean_preflight.py
+
+    _reject_proposition_trust(generated, sources, declared)
+    allowlist = inventory.get("allowlist")
+    if not isinstance(allowlist, list):
+        raise KleanPreflightError("trust inventory allowlist is malformed")
+    expected: dict[str, tuple[str, str]] = {}
+    for entry in allowlist:
+        if not isinstance(entry, dict):
+            raise KleanPreflightError("trust allowlist entry is malformed")
+        name = entry.get("name")
+        kind = entry.get("kind")
+        lean_type = entry.get("type")
+        reason = entry.get("reason")
+        if not all(
+            isinstance(value, str) and value
+            for value in (name, kind, lean_type, reason)
+        ):
+            raise KleanPreflightError("trust allowlist entry is incomplete")
+        if name in expected:
+            raise KleanPreflightError(
+                f"duplicate trust allowlist entry: {name}"
+            )
+        expected[name] = (kind, lean_type)
+    if declared != expected:
+        raise KleanPreflightError(
+            "generated axiom/opaque declarations differ from trust allowlist"
+        )
+    _check_imports(generated, sources)
+    export_bindings = {
+        "frozen_input_sha256": input_hash,
+        "stage3_discovery_manifest_sha256": discovery_hash,
+        "generated_tree_sha256": generated_hash,
+        "trust_inventory_sha256": sidecar_hashes[
+            "trust-inventory.json"
+        ],
+    }
+    for field, expected_hash in export_bindings.items():
+        if export_result.get(field) != expected_hash:
+            label = (
+                "trust inventory hash"
+                if field == "trust_inventory_sha256"
+                else field
+            )
+            raise KleanPreflightError(
+                f"export result {label} does not match immutable inputs"
+            )
+
+    with tempfile.TemporaryDirectory(prefix="klean-preflight-") as temporary:
+        clean = Path(temporary) / "project"
+        shutil.copytree(generated, clean)
+        diagnostics: list[dict[str, Any]] = []
+        for command in (["lake", "clean"], ["lake", "build"]):
+            code, output = run_command(command, cwd=clean, timeout=600)
+            diagnostics.append(
+                {
+                    "command": command,
+                    "exit_code": code,
+                    "output_sha256": hashlib.sha256(output.encode()).hexdigest(),
+                    "output_tail": output[-4000:],
+                }
+            )
+            if code != 0:
+                raise KleanPreflightError(
+                    f"{' '.join(command)} failed ({code}): {output[-600:]}"
+                )
+    _require_unchanged_snapshot(
+        snapshot, frozen_input, discovery_manifest, generation
+    )
+    return {
+        "schema_version": 3,
+        "status": "PASS" if obligations else "KLEAN_NO_OBLIGATIONS",
+        "frozen_input_sha256": input_hash,
+        "stage1_workspace_sha256": input_hash,
+        "stage3_discovery_manifest_sha256": discovery_hash,
+        "generated_tree_sha256": generated_hash,
+        "target": target,
+        "obligation_count": len(obligations),
+        "trust_declaration_count": len(declared),
+        "designated_sorry_count": 0,
+        "diagnostics": diagnostics,
+    }
+
+
+def run_preflight(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    *,
+    toolchain_lock: Path,
+    run_command: Callable[..., tuple[int, str]] = _run,
+) -> dict[str, Any]:
+    frozen_input = Path(frozen_input)
+    discovery_manifest = Path(discovery_manifest)
+    generation = Path(generation)
+    output = generation / "preflight.json"
+    if output.exists() or output.is_symlink():
+        raise KleanPreflightError(f"preflight result already exists: {output}")
+
+    def error_document(error: KleanPreflightError) -> dict[str, Any]:
+        try:
+            stage1_hash = klean_export.tree_digest(frozen_input)
+        except (OSError, klean_export.KleanExportError):
+            stage1_hash = None
+        try:
+            stage3_hash = hashlib.sha256(
+                discovery_manifest.read_bytes()
+            ).hexdigest()
+        except OSError:
+            stage3_hash = None
+        return {
+            "schema_version": 3,
+            "status": "KLEAN_PREFLIGHT_ERROR",
+            "error": str(error),
+            "stage1_workspace_sha256": stage1_hash,
+            "stage3_discovery_manifest_sha256": stage3_hash,
+        }
+
+    publication_snapshot: PreflightSnapshot | None = None
+    try:
+        publication_snapshot = _preflight_snapshot(
+            frozen_input, discovery_manifest, generation
+        )
+        document = check_generation(
+            frozen_input,
+            discovery_manifest,
+            generation,
+            toolchain_lock=toolchain_lock,
+            run_command=run_command,
+        )
+        _require_unchanged_snapshot(
+            publication_snapshot,
+            frozen_input,
+            discovery_manifest,
+            generation,
+        )
+    except KleanPreflightError as error:
+        document = error_document(error)
+    temporary = output.with_name(f".{output.name}.tmp")
+    temporary.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+    if (
+        document.get("status") in {"PASS", "KLEAN_NO_OBLIGATIONS"}
+        and publication_snapshot is not None
+    ):
+        try:
+            _require_unchanged_snapshot(
+                publication_snapshot,
+                frozen_input,
+                discovery_manifest,
+                generation,
+            )
+        except KleanPreflightError as error:
+            document = error_document(error)
+            temporary.write_text(
+                json.dumps(document, indent=2, sort_keys=True) + "\n"
+            )
+    os.replace(temporary, output)
+    return document
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", required=True, type=Path)
+    parser.add_argument("--discovery-manifest", required=True, type=Path)
+    parser.add_argument("--generation", required=True, type=Path)
+    parser.add_argument(
+        "--toolchain-lock",
+        type=Path,
+        default=REPO / "data/klean-toolchain.lock.json",
+    )
+    arguments = parser.parse_args(argv)
+    try:
+        result = run_preflight(
+            arguments.input,
+            arguments.discovery_manifest,
+            arguments.generation,
+            toolchain_lock=arguments.toolchain_lock,
+        )
+    except KleanPreflightError as error:
+        print(f"Klean preflight failed: {error}", file=sys.stderr)
+        return 2
+    print(json.dumps(result, sort_keys=True))
+    return (
+        0
+        if result["status"] in {"PASS", "KLEAN_NO_OBLIGATIONS"}
+        else 1
+    )
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+EXIT_CODE: 0

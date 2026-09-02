@@ -1,0 +1,572 @@
+Script started on 2026-07-31 02:13:28-05:00 [<not executed on terminal>]
++ rg -n -C 12 #Ceil|Ceil|ceil|isSome|True|obligation|trust_parameters /reference/generation-tools/klean.py
++ head -1200
+220-
+221-
+222-def canonicalize_lean_injection_chains(
+223-    text: str,
+224-    subsorts: Mapping[str, Collection[str]],
+225-) -> str:
+226-    """Render explicit injections with Klean's canonical subsort semantics."""
+227-
+228-    descendants = {
+229-        supersort: set(direct_subsorts)
+230-        for supersort, direct_subsorts in subsorts.items()
+231-    }
+232:    changed = True
+233-    while changed:
+234-        changed = False
+235-        for supersort, current in descendants.items():
+236-            expanded = set(current)
+237-            for subsort in current:
+238-                expanded.update(descendants.get(subsort, ()))
+239-            if expanded != current:
+240-                descendants[supersort] = expanded
+241:                changed = True
+242-
+243-    head = re.compile(
+244-        r"(?P<outer>Sort[A-Za-z0-9_]+)\.inj_"
+245-        r"(?P<middle>Sort[A-Za-z0-9_]+)\s+"
+246-    )
+247-
+248-    def strip_balanced_parentheses(argument: str) -> str:
+249-        stripped = argument.strip()
+250-        while stripped.startswith("("):
+251-            try:
+252-                inner, end = _lean_application_argument(stripped, 0)
+253-            except ValueError:
+254-                break
+255-            if end != len(stripped):
+256-                break
+257-            stripped = inner[1:-1].strip()
+258-        return stripped
+259-
+260:    while True:
+261-        replacement: tuple[int, int, str] | None = None
+262-        for outer_match in head.finditer(text):
+263-            try:
+264-                outer_argument, outer_end = _lean_application_argument(
+265-                    text, outer_match.end()
+266-                )
+267-            except ValueError:
+268-                continue
+269-            inner_text = strip_balanced_parentheses(outer_argument)
+270-            inner_match = head.match(inner_text)
+271-            if (
+272-                inner_match is None
+--
+288-                continue
+289-            replacement = (
+290-                outer_match.start(),
+291-                outer_end,
+292-                f"{outer_sort}.inj_{innermost_sort} {inner_argument}",
+293-            )
+294-            break
+295-        if replacement is None:
+296-            break
+297-        start, end, canonical = replacement
+298-        text = text[:start] + canonical + text[end:]
+299-
+300:    while True:
+301-        replacement = None
+302-        for match in head.finditer(text):
+303-            outer_sort = match.group("outer")
+304-            subsort = match.group("middle")
+305-            if (
+306-                subsort not in descendants.get(outer_sort, set())
+307-                or not descendants.get(subsort)
+308-            ):
+309-                continue
+310-            try:
+311-                argument, end = _lean_application_argument(
+312-                    text, match.end()
+--
+381-
+382-
+383-def operational_trust_rewrite_uid(
+384-    rule_uid: str, sort_name: str
+385-) -> str | None:
+386-    """Return the UID only when the trust rule is an operational rewrite."""
+387-
+388-    if sort_name == "SortGeneratedTopCell":
+389-        return rule_uid
+390-    return None
+391-
+392-
+393:def lean_quantified_obligation(
+394-    proposition: str,
+395-    *,
+396-    universal_binders: tuple[str, ...],
+397-    existential_binders: tuple[str, ...],
+398-    hypotheses: tuple[str, ...] = (),
+399-) -> str:
+400-    """Place K rule inputs outside and fresh outputs inside the goal."""
+401-
+402-    if existential_binders:
+403-        proposition = (
+404-            f"∃ {' '.join(existential_binders)}, {proposition}"
+405-        )
+--
+709-            axiom, source_marker, eligible_by_line
+710-        )
+711-        if selected is None or not Rule.is_rule(axiom):
+712-            continue
+713-        rule = Rule.from_axiom(axiom)
+714-        start_line, _source_rule = selected
+715-        seen_lines.append(start_line)
+716-        rewrite_uid = operational_trust_rewrite_uid(
+717-            rule.uid, rule.sort.name
+718-        )
+719-        if rewrite_uid is not None:
+720-            rewrite_uids.add(rewrite_uid)
+721:            needs_operational_rewrites = True
+722-        patterns = [rule.lhs, rule.rhs]
+723-        requires = getattr(rule, "req", None)
+724-        if requires is not None:
+725-            patterns.append(requires)
+726-        ensures = getattr(rule, "ens", None)
+727-        if ensures is not None:
+728-            patterns.append(ensures)
+729-        for pattern in patterns:
+730-            symbols |= collect_symbols(pattern)
+731-            sorts |= _pattern_sort_names(pattern)
+732-    if sorted(seen_lines) != sorted(eligible_by_line):
+733-        raise RuntimeError(
+--
+749-        definition._rewrite_symbols()
+750-    )
+751-    keep = baseline | {
+752-        symbol for symbol in extra_symbols if symbol in definition.symbols
+753-    }
+754-    symbols = FrozenDict(
+755-        (symbol, declaration)
+756-        for symbol, declaration in definition.symbols.items()
+757-        if symbol in keep
+758-    )
+759-    # Retain executable equations required by the rewrite projection.  The
+760-    # immutable target statement separately parameterizes functions used by
+761:    # trust obligations, so it does not assume those equations.
+762-    functions = FrozenDict(
+763-        (symbol, rules)
+764-        for symbol, rules in definition.functions.items()
+765-        if symbol in baseline
+766-    )
+767-    projected = definition.let(
+768-        symbols=symbols, functions=functions
+769-    ).project_to_symbols()
+770-    retained_sorts = set(projected.sorts) | extra_sorts
+771-    sorts = FrozenDict(
+772-        (sort, declaration)
+773-        for sort, declaration in definition.sorts.items()
+--
+801-        K2Lean4,
+802-        _opt_symbol_ident,
+803-        _param_sorts,
+804-        _symbol_ident,
+805-        _var_ident,
+806-    )
+807-    from pyk.kore.manip import collect_symbols
+808-    from pyk.kore.parser import KoreParser
+809-    from pyk.kore.rule import Rule
+810-    from pyk.kore.syntax import (
+811-        And,
+812-        App,
+813:        Ceil,
+814-        DV,
+815-        EVar,
+816-        Equals,
+817-        MLQuant,
+818-        SortApp,
+819-        String,
+820-        SVar,
+821-        Top,
+822-    )
+823-
+824-    definition = KoreParser(
+825-        (definition_directory / "definition.kore").read_text()
+826-    ).definition()
+827-    full_definition = _load_defn(definition_directory)
+828-    converter = K2Lean4(full_definition)
+829-
+830-    def lean_pattern(pattern: object) -> str:
+831-        return canonicalize_lean_injection_chains(
+832:            str(converter._transform_pattern(pattern, concrete=True)),
+833-            full_definition.subsorts,
+834-        )
+835-
+836-    def is_generated_wildcard(pattern: object) -> bool:
+837-        return isinstance(pattern, EVar) and re.fullmatch(
+838-            r"Var'Unds'Gen\d+", pattern.name
+839-        ) is not None
+840-
+841-    def is_true(pattern: object) -> bool:
+842-        if isinstance(pattern, Top) or is_generated_wildcard(pattern):
+843:            return True
+844-        if isinstance(pattern, And):
+845-            return all(is_true(item) for item in pattern.ops)
+846-        return (
+847-            isinstance(pattern, DV)
+848-            and isinstance(pattern.sort, SortApp)
+849-            and pattern.sort.name == "SortBool"
+850-            and isinstance(pattern.value, String)
+851-            and pattern.value.value == "true"
+852-        )
+853-
+854-    def conclusion(lhs: object, rhs: object, sort_name: str) -> str:
+855-        def equality(pattern: Equals) -> str:
+--
+860-            )
+861-
+862-        if isinstance(lhs, Equals) and isinstance(rhs, Equals):
+863-            return lean_predicate_equivalence(
+864-                equality(lhs), equality(rhs)
+865-            )
+866-        if isinstance(lhs, Equals) and is_true(rhs):
+867-            return equality(lhs)
+868-        if isinstance(rhs, Equals) and is_true(lhs):
+869-            return equality(rhs)
+870-        if not sort_name.startswith("Sort"):
+871-            # A rule whose sort is a sort variable (e.g. ``Q0``) is a
+872:            # matching-logic predicate simplification (``#Ceil`` definedness
+873-            # lemmas and the like).  Both sides are predicates, related by
+874-            # logical equivalence rather than typed term equality at a
+875-            # non-existent Lean type.
+876-            return lean_predicate_equivalence(
+877-                lean_pattern(lhs), lean_pattern(rhs)
+878-            )
+879-        left = lean_pattern(lhs)
+880-        right = lean_pattern(rhs)
+881-        return lean_rule_relation(left, right, sort_name)
+882-
+883-    def collect_variables(pattern: object, variables: dict[str, str]) -> None:
+884-        pending = [pattern]
+885-        while pending:
+886-            current = pending.pop()
+887-            if isinstance(current, (EVar, SVar)):
+888-                # Set variables (``@V``) in matching-logic simplification rules
+889:                # bind exactly like element variables in the Lean obligation.
+890-                variables[current.name] = current.sort.name
+891-            pending.extend(getattr(current, "patterns", ()))
+892-
+893-    def collect_ml_bound(pattern: object, names: set[str]) -> None:
+894-        # Variables bound by a matching-logic quantifier (``\exists``/``\forall``)
+895-        # are already bound inside the transformed proposition; they must not be
+896-        # re-bound as rule-level existentials.
+897-        pending = [pattern]
+898-        while pending:
+899-            current = pending.pop()
+900-            if isinstance(current, MLQuant):
+901-                names.add(current.var.name)
+902-            pending.extend(getattr(current, "patterns", ()))
+903-
+904-    def is_partial_function(symbol: str) -> bool:
+905-        declaration = full_definition.symbols.get(symbol)
+906-        if declaration is None or symbol not in full_definition.functions:
+907-            return False
+908-        attrs = declaration.attrs_by_key
+909-        return "total" not in attrs and "functional" not in attrs
+910-
+911:    def collect_ceil_operand_symbols(
+912-        pattern: object, term_symbols: set[str], opt_symbols: set[str]
+913-    ) -> None:
+914:        # Mirrors k2lean4's ``\ceil`` rendering: a partial application head
+915-        # becomes an Option-valued trust parameter and its arguments render as
+916-        # plain terms; injections, constructors and total functions contribute
+917-        # only their arguments' definedness (and hence no symbol of their own).
+918-        if (
+919-            isinstance(pattern, App)
+920-            and pattern.symbol != "inj"
+921-            and is_partial_function(pattern.symbol)
+922-        ):
+923-            opt_symbols.add(pattern.symbol)
+924-            for argument in pattern.args:
+925-                term_symbols |= collect_symbols(argument)
+926-            return
+927-        for child in getattr(pattern, "patterns", ()):
+928:            collect_ceil_operand_symbols(child, term_symbols, opt_symbols)
+929-
+930:    def collect_obligation_symbols(
+931-        pattern: object, term_symbols: set[str], opt_symbols: set[str]
+932-    ) -> None:
+933:        # ``collect_symbols`` unaware of ``\ceil``: a partial head under
+934:        # ``\ceil`` is rendered Option-valued, so it must not surface as a
+935-        # total trust parameter.
+936:        if isinstance(pattern, Ceil):
+937:            collect_ceil_operand_symbols(
+938-                pattern.pattern, term_symbols, opt_symbols
+939-            )
+940-            return
+941-        if isinstance(pattern, App):
+942-            term_symbols.add(pattern.symbol)
+943-        for child in getattr(pattern, "patterns", ()):
+944:            collect_obligation_symbols(child, term_symbols, opt_symbols)
+945-
+946-    eligible_by_line = _source_rule_lines(source_rule_inventory)
+947-    source_rules = list(eligible_by_line.values())
+948-    reserved_identifiers = _definition_reserved_identifiers(
+949-        full_definition, _symbol_ident
+950-    )
+951-
+952-    propositions: list[
+953-        tuple[int, str, dict[str, object], set[str]]
+954-    ] = []
+955-    used_symbols: set[str] = set()
+956-    opt_used_symbols: set[str] = set()
+957:    # Marker prefix distinguishing Option-valued (``\ceil``) uses inside a
+958-    # rule's symbol set; KORE symbols never start with ``?``.
+959:    ceil_option_marker = "?"
+960-    for axiom in (
+961-        sentence
+962-        for module in definition.modules
+963-        for sentence in module.sentences
+964-    ):
+965-        selected = _source_rule_for_axiom(
+966-            axiom, source_marker, eligible_by_line
+967-        )
+968-        if selected is None or not Rule.is_rule(axiom):
+969-            continue
+970-        rule = Rule.from_axiom(axiom)
+971-        start_line, source_rule = selected
+--
+984-            )
+985-        )
+986-        normalized_lhs = next(normalized)
+987-        normalized_rhs = next(normalized)
+988-        requires = next(normalized) if raw_requires is not None else None
+989-        ensures = next(normalized) if raw_ensures is not None else None
+990-        universal_variables: dict[str, str] = {}
+991-        rhs_variables: dict[str, str] = {}
+992-        collect_variables(normalized_lhs, universal_variables)
+993-        collect_variables(normalized_rhs, rhs_variables)
+994-        rule_term_symbols: set[str] = set()
+995-        rule_opt_symbols: set[str] = set()
+996:        collect_obligation_symbols(
+997-            normalized_lhs, rule_term_symbols, rule_opt_symbols
+998-        )
+999:        collect_obligation_symbols(
+1000-            normalized_rhs, rule_term_symbols, rule_opt_symbols
+1001-        )
+1002-        rule_symbols = rule_term_symbols | {
+1003:            ceil_option_marker + symbol for symbol in rule_opt_symbols
+1004-        }
+1005-        used_symbols |= rule_term_symbols
+1006-        opt_used_symbols |= rule_opt_symbols
+1007-        hypotheses: list[str] = []
+1008-        if requires is not None:
+1009-            requires_term = lean_pattern(requires)
+1010-            if requires_term not in ("true", "(true)"):
+1011-                collect_variables(requires, universal_variables)
+1012-                required_symbols: set[str] = set()
+1013-                required_opt_symbols: set[str] = set()
+1014:                collect_obligation_symbols(
+1015-                    requires, required_symbols, required_opt_symbols
+1016-                )
+1017-                requires_proposition = lean_requires_proposition(
+1018-                    requires_term
+1019-                )
+1020-                equality_requires = requires_proposition != (
+1021-                    f"({requires_term}) = true"
+1022-                )
+1023-                if equality_requires:
+1024-                    required_symbols = {
+1025-                        symbol
+1026-                        for symbol in required_symbols
+1027-                        if not is_k_equality_identifier(
+1028-                            _symbol_ident(symbol)
+1029-                        )
+1030-                    }
+1031-                rule_symbols |= required_symbols | {
+1032:                    ceil_option_marker + symbol
+1033-                    for symbol in required_opt_symbols
+1034-                }
+1035-                used_symbols |= required_symbols
+1036-                opt_used_symbols |= required_opt_symbols
+1037-                hypotheses.append(
+1038-                    f"(h : {requires_proposition})"
+1039-                )
+1040-        if ensures is not None:
+1041-            collect_variables(ensures, rhs_variables)
+1042-            ensured_symbols: set[str] = set()
+1043-            ensured_opt_symbols: set[str] = set()
+1044:            collect_obligation_symbols(
+1045-                ensures, ensured_symbols, ensured_opt_symbols
+1046-            )
+1047-            rule_symbols |= ensured_symbols | {
+1048:                ceil_option_marker + symbol
+1049-                for symbol in ensured_opt_symbols
+1050-            }
+1051-            used_symbols |= ensured_symbols
+1052-            opt_used_symbols |= ensured_opt_symbols
+1053-        ml_bound_variables: set[str] = set()
+1054-        collect_ml_bound(normalized_rhs, ml_bound_variables)
+1055-        existential_variables = {
+1056-            name: sort
+1057-            for name, sort in rhs_variables.items()
+1058-            if name not in universal_variables
+1059-            and name not in ml_bound_variables
+1060-        }
+1061-        proposition = conclusion(
+1062-            normalized_lhs, normalized_rhs, rule.sort.name
+1063-        )
+1064-        if ensures is not None:
+1065-            ensures_term = lean_pattern(ensures)
+1066-            if ensures_term not in ("true", "(true)"):
+1067-                proposition = f"({proposition}) ∧ ({ensures_term} = true)"
+1068:        proposition = lean_quantified_obligation(
+1069-            proposition,
+1070-            universal_binders=tuple(
+1071-                f"({_quoted_identifier(_var_ident(name))} : {sort})"
+1072-                for name, sort in universal_variables.items()
+1073-            ),
+1074-            existential_binders=tuple(
+1075-                f"({_quoted_identifier(_var_ident(name))} : {sort})"
+1076-                for name, sort in existential_variables.items()
+1077-            ),
+1078-            hypotheses=tuple(hypotheses),
+1079-        )
+1080-        proposition = quote_reserved_lean_identifiers(
+--
+1083-        propositions.append(
+1084-            (start_line, proposition, source_rule, rule_symbols)
+1085-        )
+1086-
+1087-    propositions.sort(key=lambda item: item[0])
+1088-    seen_ids = [
+1089-        str(source_rule["source_rule_id"])
+1090-        for _line, _proposition, source_rule, _symbols in propositions
+1091-    ]
+1092-    expected_ids = [str(item["source_rule_id"]) for item in source_rules]
+1093-    if seen_ids != expected_ids:
+1094-        raise RuntimeError(
+1095:            "source trust rules and generated Lean obligations are not bijective"
+1096-        )
+1097-
+1098-    parameters: list[dict[str, str]] = []
+1099-    polymorphic_definitions: dict[str, str] = {}
+1100-    for symbol in sorted(used_symbols):
+1101-        if symbol == "inj" or symbol not in full_definition.symbols:
+1102-            continue
+1103-        declaration = full_definition.symbols[symbol]
+1104-        if "function" not in declaration.attrs_by_key:
+1105-            continue
+1106-        # Sort-polymorphic hooks (for example K ``ite``) cannot carry a
+1107-        # monomorphic opaque binding; model them with an honest total Lean
+--
+1125-        binding = {
+1126-            "kore_symbol": symbol,
+1127-            "name": name,
+1128-            "type": lean_type,
+1129-            "source_rule_ids": [
+1130-                str(source_rule["source_rule_id"])
+1131-                for _line, _proposition, source_rule, symbols in propositions
+1132-                if symbol in symbols
+1133-            ],
+1134-        }
+1135-        binding["binding_sha256"] = hashlib.sha256(
+1136-            json.dumps(
+1137:                binding, sort_keys=True, separators=(",", ":")
+1138-            ).encode()
+1139-        ).hexdigest()
+1140-        parameters.append(binding)
+1141-
+1142-    for symbol in sorted(opt_used_symbols):
+1143-        # Option-valued counterparts of partial functions applied under
+1144:        # ``\ceil``: definedness is preserved as ``(f? args).isSome`` instead
+1145-        # of being collapsed by a dishonest total binding.
+1146-        declaration = full_definition.symbols[symbol]
+1147-        parameter_sorts = list(_param_sorts(declaration))
+1148-        lean_type = " → ".join(
+1149-            parameter_sorts + [f"Option {declaration.sort.name}"]
+1150-        )
+1151-        lean_type = quote_reserved_lean_identifiers(
+1152-            lean_type, reserved_identifiers
+1153-        )
+1154-        name = _opt_symbol_ident(symbol)
+1155-        binding = {
+1156-            "kore_symbol": symbol,
+1157-            "name": name,
+1158-            "type": lean_type,
+1159-            "source_rule_ids": [
+1160-                str(source_rule["source_rule_id"])
+1161-                for _line, _proposition, source_rule, symbols in propositions
+1162:                if ceil_option_marker + symbol in symbols
+1163-            ],
+1164-        }
+1165-        binding["binding_sha256"] = hashlib.sha256(
+1166-            json.dumps(
+1167:                binding, sort_keys=True, separators=(",", ":")
+1168-            ).encode()
+1169-        ).hexdigest()
+1170-        parameters.append(binding)
+1171-
+1172-    namespace = f"{library_name}.Lemmas"
+1173-    lines = [
+1174-        f"import {library_name}.Inj",
+1175-        *(
+1176-            [f"import {library_name}.Rewrite"]
+1177-            if any(
+1178-                "Rewrites " in proposition
+1179-                for _line, proposition, _source_rule, _symbols
+--
+1183-        ),
+1184-        "",
+1185-        "/- K trust-boundary goals. The second-pass agent must replace every",
+1186-        "   writable opaque stub with an honest definition and prove this",
+1187-        "   immutable proposition in the separate Proof.lean workspace. -/",
+1188-        "",
+1189-        f"namespace {namespace}",
+1190-        "",
+1191-    ]
+1192-    if propositions and polymorphic_definitions:
+1193-        # Honest total models for sort-polymorphic hooks the propositions apply
+1194-        # (for example K ``ite`` rendered as ``kite``); emitted ahead of the
+1195:        # obligation so targetStatement resolves them in-namespace.
+1196-        for _ident, definition_line in sorted(polymorphic_definitions.items()):
+1197-            lines.append(definition_line)
+1198-        lines.append("")
+1199-    if propositions:
+1200-        lines.append("def targetStatement")
+1201-        for parameter in parameters:
+1202-            lines.append(
+1203-                f"    ({parameter['name']} : {parameter['type']})"
+1204-            )
+1205-        lines.extend(
+1206-            (
+1207-                "    : Prop :=",
+--
+1226-            {
+1227-                "source_rule_id": source_rule["source_rule_id"],
+1228-                "source_span": {
+1229-                    "start_line": source_rule["start_line"],
+1230-                    "end_line": source_rule["end_line"],
+1231-                },
+1232-                "lean_conjunct": proposition,
+1233-                "lean_conjunct_sha256": hashlib.sha256(
+1234-                    proposition.encode()
+1235-                ).hexdigest(),
+1236-            }
+1237-        )
+1238:    (package_directory / "obligation-map.json").write_text(
+1239-        json.dumps(
+1240-            {
+1241-                "schema_version": 1,
+1242-                "source_rules": source_rules,
+1243:                "obligations": mappings,
+1244:                "trust_parameters": parameters,
+1245-            },
+1246-            indent=2,
+1247:            sort_keys=True,
+1248-        )
+1249-        + "\n"
+1250-    )
+1251-    return len(propositions)
+1252-
+1253-
+1254-def _patch_prelude(package_directory: Path, library_name: str) -> None:
+1255-    prelude = package_directory / library_name / "Prelude.lean"
+1256-    text = prelude.read_text()
+1257-    if "SortFloat" in text:
+1258-        return
+1259-    if _PRELUDE_ANCHOR not in text:
+
+Script done on 2026-07-31 02:13:28-05:00 [COMMAND_EXIT_CODE="0"]

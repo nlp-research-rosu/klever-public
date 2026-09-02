@@ -1,0 +1,95 @@
+$ nl -ba /reference/k-proof/solution.py
+     1	def modp(n: int, p: int):
+     2	    return 2 ** n % p
+
+$ nl -ba /reference/k-proof/solution.mpy
+     1	Module(
+     2	  FuncDef("modp", Params("n", "p"),
+     3	    Return(BinOp("%", BinOp("**", Int(2), Name("n")), Name("p")))))
+
+$ nl -ba /reference/k-proof/spec.k
+     6	  claim [modp]:
+     7	    <k>
+     8	      Call(Name("modp"), Int(N:Int), Int(P:Int))
+     9	      =>
+    10	      pyMod(2 ^Int N, P)
+    11	    </k>
+    12	    <env> 0 </env>
+    13	    <scopes>
+    14	      0 |-> scope(
+    15	        "modp" |->
+    16	          closureVal(
+    17	            ("n", "p"),
+    18	            Return(BinOp("%", BinOp("**", Int(2), Name("n")), Name("p"))),
+    19	            0
+    20	          ),
+    21	        parent(-1)
+    22	      )
+    23	      -1 |-> builtinsScope
+    24	    </scopes>
+    25	    <scopeLoc> 1 </scopeLoc>
+    26	    <heap> .Map </heap>
+    27	    <heapLoc> 0 </heapLoc>
+    28	    <stack> .List </stack>
+    29	    <ret> noRet </ret>
+    30	    <exc> NoExc </exc>
+    31	    <exit-code> 0 </exit-code>
+    32	    requires N >=Int 0 andBool P =/=Int 0
+
+$ nl -ba /reference/k-proof/reference-semantics/semantics/operators.k | sed -n '10,17p'
+    10	  rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>
+    11	
+    12	  rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+
+$ nl -ba /reference/k-proof/reference-semantics/semantics/int.k | sed -n '9,20p'
+     9	  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    10	  // Bool participates in int arithmetic (x += (a == b))
+    11	  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+    12	  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+    13	  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+    14	  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+    15	  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+    16	  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+    17	  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+    18	
+    19	  syntax Int ::= pyMod(Int, Int) [function]
+    20	  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+
+$ nl -ba /reference/k-proof/reference-semantics/semantics/call.k | sed -n '18,21p;69,74p'
+    18	  // evaluate callee, then args ([owise]: problem-local Call interceptions beat this)
+    19	  syntax KItem ::= #callee(Exprs)
+    20	  rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]
+    21	  rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>
+    69	  rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT
+    70	        => #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+    71	       <env>     CALLERL:Int => NEWL </env>
+    72	       <scopes>   STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes>
+    73	       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+    74	       <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+
+$ nl -ba /reference/k-proof/reference-semantics/semantics/functions.k | sed -n '62,66p;77,90p'
+    62	  // ==== bind params ========================================================
+    63	  rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>
+    64	  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k>
+    65	       <env> L:Int </env>
+    66	       <scopes> ... L |-> scope(M:Map => M [ P <- V ], _) ... </scopes>
+    77	  // ==== return / pop the frame (the returned expr evaluates by strictness) ==
+    78	  rule <k> Return(V:Val) ~> _ => #pop </k>
+    79	       <ret> noRet => retV(V) </ret>
+    80	  rule <k> #endcall => #pop ... </k>
+    81	       <ret> noRet => retV(noneV) </ret>
+    85	  rule <k> #pop => V ~> CONT </k>
+    86	       <ret>   retV(V) => noRet </ret>
+    87	       <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack>
+    88	       <env>   L:Int => CALLERL </env>
+    89	       <scopes> SC:Map => SC [ L <- undef ] </scopes>
+    90	       <scopeLoc> _ => SAVEDL </scopeLoc>
+
+Operational judgment:
+  The claim executes the bound closure through the ordinary call, binding,
+  strict BinOp dispatch, integer exponentiation, modulo, return, and frame-pop
+  rules. N >= 0 enables the exponent rule; P != 0 keeps modulo defined. The
+  result is exactly pyMod(2 ^Int N, P), identical to the source body under the
+  supplied semantics. verification.k adds no bridge, summary, simplifier, or
+  mathematical fact.
+

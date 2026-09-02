@@ -1,0 +1,114 @@
+Initial required preflight command:
+  PYTHONPATH=/reference python - <<'PY'
+  from pathlib import Path
+  from tools.klean_preflight import check_generation
+  check_generation(
+      Path('/reference/k-proof'),
+      Path('/reference/lemma-discovery.json'),
+      Path('/reference/klean-generation'),
+      toolchain_lock=Path('/reference/klean-toolchain.lock.json'),
+  )
+  PY
+
+Initial result (exit 1):
+  Traceback (most recent call last):
+    File "<stdin>", line 3, in <module>
+    File "/reference/tools/klean_preflight.py", line 582, in check_generation
+      raise KleanPreflightError(
+  tools.klean_preflight.KleanPreflightError: lake clean failed (1): error: could not detect the configuration of the Lake installation
+
+Runtime diagnosis:
+  `/proc/self/status` exposed a host Pid and a distinct NSpid. Lean 4.22's
+  runtime used getpid() (the namespace PID) to resolve `/proc/<pid>/exe`, but
+  this container's `/proc` was mounted with host PIDs. `lean --version`
+  consequently printed `error: failed to locate application`.
+
+Narrow workaround source:
+  /tmp/audit-work/lean-hostpid-shim.c
+
+  #define _GNU_SOURCE
+  #include <stdio.h>
+  #include <sys/syscall.h>
+  #include <sys/types.h>
+  #include <unistd.h>
+  pid_t getpid(void) {
+      FILE *status = fopen("/proc/self/status", "r");
+      if (status != NULL) {
+          char line[256];
+          while (fgets(line, sizeof(line), status) != NULL) {
+              long host_pid;
+              if (sscanf(line, "Pid:\t%ld", &host_pid) == 1) {
+                  fclose(status);
+                  return (pid_t)host_pid;
+              }
+          }
+          fclose(status);
+      }
+      return (pid_t)syscall(SYS_getpid);
+  }
+
+Command:
+  gcc -shared -fPIC -O2 -Wall -Wextra -o /tmp/audit-work/lean-hostpid-shim.so /tmp/audit-work/lean-hostpid-shim.c
+  sha256sum /tmp/audit-work/lean-hostpid-shim.c /tmp/audit-work/lean-hostpid-shim.so
+  LD_PRELOAD=/tmp/audit-work/lean-hostpid-shim.so lean --version
+  LD_PRELOAD=/tmp/audit-work/lean-hostpid-shim.so lake --version
+
+Result (exit 0):
+  09d4eacfed4fcbc7864a2e0f34fe2a94b339948977c430e8823020a1f0ab5db6  /tmp/audit-work/lean-hostpid-shim.c
+  3caf922c1790ada662f1e5ede521ea73809c4149169155ec041c1e0d183a828d  /tmp/audit-work/lean-hostpid-shim.so
+  Lean (version 4.22.0, x86_64-unknown-linux-gnu, commit ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05, Release)
+  Lake version 5.0.0-src+ba2cbbf (Lean version 4.22.0)
+
+Fresh Stage-5 project:
+  /tmp/audit-work/stage5-proof.Ib1FOg
+
+The immutable generated project was copied to:
+  /tmp/audit-work/stage5-proof.Ib1FOg/Base
+
+The candidate source files copied beside Base were:
+  Proof.lean
+  Proof/Operational.lean
+  lakefile.lean
+  lake-manifest.json
+  lean-toolchain
+
+Command:
+  LD_PRELOAD=/tmp/audit-work/lean-hostpid-shim.so lake clean
+
+Complete result (exit 0):
+  <no output>
+
+Command:
+  LD_PRELOAD=/tmp/audit-work/lean-hostpid-shim.so lake build
+
+Complete result (exit 0):
+  ✔ [3/9] Built Klean95CheckDictCase.Prelude
+  ✔ [4/9] Built Klean95CheckDictCase.Sorts
+  ✔ [5/9] Built Klean95CheckDictCase.Inj
+  ⚠ [6/9] Built Klean95CheckDictCase.Lemmas
+  warning: Klean95CheckDictCase/Lemmas.lean:19:22: unused variable `h`
+
+  Note: This linter can be disabled with `set_option linter.unusedVariables false`
+  warning: Klean95CheckDictCase/Lemmas.lean:20:24: unused variable `h`
+
+  Note: This linter can be disabled with `set_option linter.unusedVariables false`
+  ✔ [7/9] Built Proof.Operational
+  ✔ [8/9] Built Proof
+  Build completed successfully.
+
+Post-build integrity command:
+  PYTHONPATH=/reference python <Base/candidate target and trust scan>
+
+Result (exit 0):
+  Base tree SHA-256:
+    421f3b002c1d56266949d340367f5657d5e54d77e0a70cd81246f9773da9e916
+  Original generated tree SHA-256:
+    421f3b002c1d56266949d340367f5657d5e54d77e0a70cd81246f9773da9e916
+  Base unchanged and bound to manifest/audit input: true
+  Fresh target equals generator manifest: true
+  Fresh target equals audit input: true
+  Candidate targetStatement declarations: []
+  Candidate axiom/opaque declarations: []
+  Candidate sorry locations: []
+  Candidate admit locations: []
+  Candidate unsafe locations: []

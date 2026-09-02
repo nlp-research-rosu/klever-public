@@ -1,0 +1,70 @@
+WHY THIS WAS NEEDED
+The audit sandbox has an unshared PID namespace, while /proc exposes a
+different namespace.  Lean 4.22 obtains its application path with
+getpid() followed by readlink("/proc/<pid>/exe").  The mismatch prevented
+the pinned Lean/Lake executable from locating itself; this is visible in the
+complete failed runs in 05_preflight-rerun.txt, 05b_preflight-rerun-elan.txt,
+and 05c_preflight-rerun-roots.txt.
+
+UNSHIMMED OBSERVATION
+COMMAND: env -u LD_PRELOAD python3 (script calling os.getpid/os.readlink)
+EXIT_CODE: 0
+python_getpid= 3
+/proc/3/exe -> FileNotFoundError [Errno 2] No such file or directory: '/proc/3/exe'
+/proc/self/exe -> /usr/bin/python3.10
+
+SHIM SCOPE
+Only readlink calls whose complete path has the form /proc/<digits>/exe are
+redirected to /proc/self/exe.  Every other path is passed unchanged to the
+readlinkat syscall.  The shim changes executable-path discovery only; it does
+not change source files, Lean declarations, elaboration, compilation, or the
+kernel checker.
+
+SOURCE SHA256
+418ab3c8d0dde8385c788a37357ee5a333995d220dee557ccc46f78cdc28cf23  /tmp/audit-work/proc-exe-shim.c
+
+SHARED OBJECT SHA256
+7505a5134e8a0d30e065ef1059497bbdd23ee2e3fc8a16134b847332458259e9  /tmp/audit-work/proc-exe-shim.so
+
+SOURCE
+#define _GNU_SOURCE
+#include <ctype.h>
+#include <fcntl.h>
+#include <stddef.h>
+#include <string.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+
+static int is_proc_pid_exe(const char *path) {
+    const char prefix[] = "/proc/";
+    const char suffix[] = "/exe";
+    size_t length;
+    size_t index;
+
+    if (path == NULL || strncmp(path, prefix, sizeof(prefix) - 1) != 0) {
+        return 0;
+    }
+    length = strlen(path);
+    if (length <= (sizeof(prefix) - 1) + (sizeof(suffix) - 1) ||
+        strcmp(path + length - (sizeof(suffix) - 1), suffix) != 0) {
+        return 0;
+    }
+    for (index = sizeof(prefix) - 1;
+         index < length - (sizeof(suffix) - 1);
+         ++index) {
+        if (!isdigit((unsigned char)path[index])) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+ssize_t readlink(const char *path, char *buffer, size_t size) {
+    const char *resolved = is_proc_pid_exe(path) ? "/proc/self/exe" : path;
+    return syscall(SYS_readlinkat, AT_FDCWD, resolved, buffer, size);
+}
+
+PINNED LEAN CHECK
+COMMAND: env ELAN_HOME=/opt/elan LD_PRELOAD=/tmp/audit-work/proc-exe-shim.so /opt/elan/toolchains/leanprover--lean4---v4.22.0/bin/lean --version
+EXIT_CODE: 0
+Lean (version 4.22.0, x86_64-unknown-linux-gnu, commit ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05, Release)

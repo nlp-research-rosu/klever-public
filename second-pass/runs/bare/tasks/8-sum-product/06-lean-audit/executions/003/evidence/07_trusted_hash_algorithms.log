@@ -1,0 +1,302 @@
+Script started on 2026-07-28 00:59:58-05:00 [<not executed on terminal>]
++ sed -n 160,225p /reference/tools/pipeline_contract.py
+
+def require_real_directory(path: Path, label: str) -> Path:
+    if not stat.S_ISDIR(_lstat(path, label).st_mode):
+        raise PipelineContractError(f"{label} must be a real directory: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise PipelineContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def require_regular_file(path: Path, label: str) -> Path:
+    if not stat.S_ISREG(_lstat(path, label).st_mode):
+        raise PipelineContractError(f"{label} must be a real regular file: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise PipelineContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise PipelineContractError(f"cannot hash file {path}: {error}") from error
+    return digest.hexdigest()
+
+
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, "tree root")
+    digest = hashlib.sha256()
+    pending = [root]
+    entries: list[tuple[str, str, Path]] = []
+    while pending:
+        directory = pending.pop()
+        try:
+            children = list(os.scandir(directory))
+        except OSError as error:
+            raise PipelineContractError(f"cannot scan tree {directory}: {error}") from error
+        for child in children:
+            path = Path(child.path)
+            try:
+                mode = child.stat(follow_symlinks=False).st_mode
+            except OSError as error:
+                raise PipelineContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise PipelineContractError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    for relative, kind, path in sorted(entries):
+        encoded = relative.encode()
+        digest.update(len(encoded).to_bytes(4, "big"))
+        digest.update(encoded)
+        digest.update(kind.encode() + b"\0")
+        if kind == "file":
+            try:
++ sed -n 180,315p /reference/tools/klean_audit_contract.py
+            )
+        ):
+            raise KleanAuditContractError(
+                "Lean workspace changed after Stage 5 succeeded"
+            )
+        if (
+            current_outputs.get("evidence")
+            != (
+                result_outputs.get("evidence")
+                if isinstance(result_outputs, dict)
+                else None
+            )
+            or current_outputs.get("evidence")
+            != (
+                invocation_outputs.get("evidence")
+                if isinstance(invocation_outputs, dict)
+                else None
+            )
+        ):
+            raise KleanAuditContractError(
+                "Stage 5 invocation evidence changed after success"
+            )
+        return workspace, invocation, result
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _stage1_source_hashes(workspace: Path) -> dict[str, str]:
+    try:
+        return {
+            path.relative_to(workspace).as_posix(): (
+                pipeline_contract.sha256_file(path)
+            )
+            for path in pipeline_contract._walk_regular_files(
+                workspace, "Stage 1 source workspace"
+            )
+        }
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _generation_producer_sources(
+    repo: Path, generator_manifest: dict[str, Any]
+) -> tuple[Path, str]:
+    provenance = generator_manifest.get("provenance")
+    image_id = (
+        provenance.get("generator_image_id")
+        if isinstance(provenance, dict)
+        else None
+    )
+    if not isinstance(image_id, str) or not image_id.startswith("sha256:"):
+        raise KleanAuditContractError(
+            "generator image ID is missing from Stage 4 provenance"
+        )
+    image_key = image_id.removeprefix("sha256:")
+    try:
+        image_key = pipeline_contract.validate_safe_component(
+            image_key, "generator image ID"
+        )
+        bundle = pipeline_contract._require_direct_directory(
+            repo / "data/stage4-producer-sources",
+            image_key,
+            "Stage 4 producer source bundle",
+        )
+        source_manifest = pipeline_contract._read_regular_json(
+            bundle / "source-manifest.json",
+            "Stage 4 producer source manifest",
+        )
+        expected_files = {
+            "klean_export.py": generator_manifest.get("exporter_sha256"),
+            "klean.py": generator_manifest.get("klean_py_sha256"),
+        }
+        if (
+            set(source_manifest) != {
+                "schema_version",
+                "generator_image_id",
+                "files",
+            }
+            or source_manifest.get("schema_version") != 1
+            or source_manifest.get("generator_image_id") != image_id
+            or source_manifest.get("files") != expected_files
+        ):
+            raise KleanAuditContractError(
+                "Stage 4 producer source manifest differs from generator "
+                "provenance"
+            )
+        observed_names = {
+            path.relative_to(bundle).as_posix()
+            for path in pipeline_contract._walk_regular_files(
+                bundle, "Stage 4 producer source bundle"
+            )
+        }
+        if observed_names != {
+            "source-manifest.json",
+            "klean_export.py",
+            "klean.py",
+        }:
+            raise KleanAuditContractError(
+                "Stage 4 producer source bundle has unexpected files"
+            )
+        for name, expected in expected_files.items():
+            digest = _validate_sha256(
+                expected, f"Stage 4 producer source {name} SHA-256"
+            )
+            source = pipeline_contract.require_regular_file(
+                bundle / name, f"Stage 4 producer source {name}"
+            )
+            if pipeline_contract.sha256_file(source) != digest:
+                raise KleanAuditContractError(
+                    f"Stage 4 producer source {name} SHA-256 differs "
+                    "from generator provenance"
+                )
+        return bundle, pipeline_contract.sha256_tree(bundle)
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def resolve_stage6_audit(
+    repo: Path, run_id: str, problem: str
+) -> dict[str, Any]:
+    """Resolve and re-hash every frozen input to the Stage 6 audit."""
+
+    try:
+        task, _state, run = pipeline_contract._resolve_task_state(
+            repo, run_id, problem
+        )
+        pipeline_contract.require_task_unblocked(task, "Stage 6")
+        k_stage = pipeline_contract.require_real_directory(
+            task / "01-k-proof", "Stage 1"
+        )
+        k_workspace = pipeline_contract.require_real_directory(
+            k_stage / "workspace", "Stage 1 K workspace"
+        )
+        k_result = pipeline_contract._read_regular_json(
+            k_stage / "result.json", "Stage 1 result"
+        )
++ rg -n def tree_digest|def _tree_entries /reference/tools/klean_export.py
+647:def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+670:def tree_digest(root: Path) -> str:
++ sed -n 300,390p /reference/tools/klean_export.py
+        if name.endswith("-SYNTAX") and name in modules
+    )
+    preferred = (
+        verification_module.removesuffix("-VERIFICATION") + "-SYNTAX"
+    )
+    if haskell_syntax_modules:
+        syntax_module = haskell_syntax_modules[-1]
+    elif explicit_syntax_modules:
+        syntax_module = explicit_syntax_modules[-1]
+    elif preferred in syntax_modules:
+        syntax_module = preferred
+    elif len(syntax_modules) == 1:
+        syntax_module = syntax_modules[0]
+    elif not syntax_modules:
+        raise KleanExportError(
+            f"no reachable -SYNTAX module for {verification_module}"
+        )
+    else:
+        raise KleanExportError(
+            "multiple reachable -SYNTAX modules: "
+            + ", ".join(syntax_modules)
+        )
+    required_by: dict[Path, set[Path]] = {
+        path: set() for path in reached_files
+    }
+    for parent in reached_files:
+        for dependency in file_requires.get(parent, ()):
+            if dependency in reached_files:
+                required_by[dependency].add(parent)
+    entry_files = tuple(
+        sorted(
+            (
+                path
+                for path in reached_files
+                if not required_by[path]
+            ),
+            key=str,
+        )
+    )
+    if not entry_files:
+        entry_files = (verification_file,)
+    return DefinitionResolution(
+        verification_file=verification_file,
+        verification_module=verification_module,
+        syntax_module=syntax_module,
+        required_files=tuple(sorted(reached_files, key=str)),
+        entry_files=entry_files,
+    )
+
+
+def stage_definition_driver(
+    scratch: Path,
+    workspace: Path,
+    resolution: DefinitionResolution,
+    transformed_verification: str,
+    export_module_text: str,
+) -> Path:
+    """Mirror the frozen K closure and require each root exactly once."""
+
+    scratch = Path(scratch)
+    workspace = Path(workspace).resolve()
+    source_root = scratch / "definition-source"
+    source_root.mkdir()
+    staged: dict[Path, Path] = {}
+    for source in resolution.required_files:
+        relative = source.relative_to(workspace)
+        destination = source_root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        staged[source] = destination
+    staged_verification = staged.get(resolution.verification_file)
+    if staged_verification is None:
+        raise KleanExportError("definition closure omitted verification.k")
+    staged_verification.write_text(transformed_verification)
+    entry_files: list[Path] = []
+    for source in resolution.entry_files:
+        entry = staged.get(source)
+        if entry is None:
+            raise KleanExportError("definition entry file is outside closure")
+        entry_files.append(entry)
+    driver = scratch / "export.k"
+    driver.write_text(
+        "".join(f'requires "{path}"\n' for path in entry_files)
+        + export_module_text
+    )
+    return driver
+
+
+def lib_name(package: str) -> str:
+    return "".join(word.capitalize() for word in package.split("-"))
+
+
+Script done on 2026-07-28 00:59:58-05:00 [COMMAND_EXIT_CODE="0"]

@@ -1,0 +1,467 @@
+Script started on 2026-07-26 12:08:28-05:00 [<not executed on terminal>]
+
+$ nl -ba semantic.k
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports BOOL-SYNTAX
+     5	  imports INT-SYNTAX
+     6	  imports STRING-SYNTAX
+     7	
+     8	  syntax Program ::= "Module" "(" Stmts ")" [symbol]
+     9	
+    10	  syntax Stmts ::= List{Stmt, ""}
+    11	  syntax Exprs ::= List{Expr, ","}
+    12	  syntax CmpOps ::= List{CmpOp, ","}
+    13	  syntax Strings ::= List{String, ","}
+    14	
+    15	  syntax Params ::= "Params" "(" Strings ")" [symbol]
+    16	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")" [symbol]
+    17	
+    18	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")" [symbol]
+    19	                | "Assign" "(" Expr "," Expr ")" [symbol]
+    20	                | "If" "(" Expr "," Stmts "," Stmts ")" [symbol]
+    21	                | "Return" "(" Expr ")" [symbol]
+    22	
+    23	  syntax Expr ::= "Name" "(" String ")" [symbol]
+    24	                | "Int" "(" Int ")" [symbol]
+    25	                | "Str" "(" String ")" [symbol]
+    26	                | "Bool" "(" Bool ")" [symbol]
+    27	                | "BinOp" "(" String "," Expr "," Expr ")" [symbol]
+    28	                | "UnaryOp" "(" String "," Expr ")" [symbol]
+    29	                | "BoolOp" "(" String "," Exprs ")" [symbol]
+    30	                | "Compare" "(" Expr "," CmpOps ")" [symbol]
+    31	                | "Subscript" "(" Expr "," Expr ")" [symbol]
+    32	                | "Attribute" "(" Expr "," String ")" [symbol]
+    33	                | "Call" "(" Expr "," Exprs ")" [symbol]
+    34	endmodule
+    35	
+    36	module SEMANTIC
+    37	  imports MPY-SYNTAX
+    38	  imports BOOL
+    39	  imports INT
+    40	  imports STRING
+    41	
+    42	  syntax PyVal ::= VInt(Int) | VStr(String) | VBool(Bool) [symbol]
+    43	                 | IteVal(Bool, PyVal, PyVal) [symbol]
+    44	  syntax Env ::= "EmptyEnv" | Bind(String, PyVal, Env) [symbol]
+    45	  syntax ExecResult ::= Normal(Env) | Returned(PyVal) [symbol]
+    46	                      | IfExec(Bool, ExecResult, ExecResult) [symbol]
+    47	
+    48	  syntax KItem ::= runProgram(Program, String) [function, total, symbol]
+    49	  syntax PyVal ::= eval(Expr, Env) [function, total, symbol]
+    50	                 | lookupVal(String, Env) [function, total, symbol]
+    51	  syntax ExecResult ::= exec(Stmts, Env) [function, total, symbol]
+    52	                      | continue(ExecResult, Stmts) [function, total, symbol]
+    53	  syntax Bool ::= asBool(PyVal) [function, total, symbol]
+    54	                | compareVals(String, PyVal, PyVal) [function, total, symbol]
+    55	                | endsWith(String, String) [function, total, symbol]
+    56	  syntax PyVal ::= addVals(PyVal, PyVal) [function, total, symbol]
+    57	                 | subscriptVal(PyVal, PyVal) [function, total, symbol]
+    58	  syntax Bool ::= boolOp(String, Exprs, Env) [function, total, symbol]
+    59	  syntax PyVal ::= resultValue(ExecResult) [function, total, symbol]
+    60	  // A direct hook keeps symbolic counting as a total primitive. The Domains
+    61	  // library's derived recursive count function is equivalent concretely, but
+    62	  // unfolds only after a symbolic find and therefore cannot drive proofs.
+    63	  syntax Int ::= occurrences(String, String) [function, total, symbol]
+    64	  rule occurrences(S, NEEDLE) => countAllOccurrences(S, NEEDLE) [concrete]
+    65	
+    66	  configuration <k> runProgram($PGM:Program, $INPUT:String) </k>
+    67	
+    68	  rule runProgram(
+    69	         Module(FuncDef("file_name_check", Params("file_name"), BODY)),
+    70	         S
+    71	       ) => resultValue(exec(BODY, Bind("file_name", VStr(S), EmptyEnv)))
+    72	
+    73	  rule resultValue(Returned(V)) => V
+    74	  rule resultValue(IfExec(B, R1, R2))
+    75	    => IteVal(B, resultValue(R1), resultValue(R2))
+    76	
+    77	  rule IteVal(true, V, _OTHER) => V
+    78	  rule IteVal(false, _OTHER, V) => V
+    79	  rule IfExec(true, R, _OTHER) => R
+    80	  rule IfExec(false, _OTHER, R) => R
+    81	
+    82	  rule exec(.Stmts, RHO) => Normal(RHO)
+    83	  rule exec(Assign(Name(X), E) SS, RHO)
+    84	    => exec(SS, Bind(X, eval(E, RHO), RHO))
+    85	  rule exec(Return(E) SS, RHO) => Returned(eval(E, RHO))
+    86	  rule exec(If(E, THEN, ELSE) SS, RHO)
+    87	    => IfExec(
+    88	         asBool(eval(E, RHO)),
+    89	         continue(exec(THEN, RHO), SS),
+    90	         continue(exec(ELSE, RHO), SS)
+    91	       )
+    92	
+    93	  rule continue(Normal(RHO), SS) => exec(SS, RHO)
+    94	  rule continue(Returned(V), _SS) => Returned(V)
+    95	  rule continue(IfExec(B, R1, R2), SS)
+    96	    => IfExec(B, continue(R1, SS), continue(R2, SS))
+    97	
+    98	  rule eval(Name(X), RHO) => lookupVal(X, RHO)
+    99	  rule lookupVal(X, Bind(X, V, _RHO)) => V
+   100	  rule lookupVal(X, Bind(Y, _V, RHO)) => lookupVal(X, RHO)
+   101	    requires X =/=String Y
+   102	  rule eval(Int(I), _RHO) => VInt(I)
+   103	  rule eval(Str(S), _RHO) => VStr(S)
+   104	  rule eval(Bool(B), _RHO) => VBool(B)
+   105	  rule eval(BinOp("+", E1, E2), RHO)
+   106	    => addVals(eval(E1, RHO), eval(E2, RHO))
+   107	  rule eval(UnaryOp("not", E), RHO) => VBool(notBool asBool(eval(E, RHO)))
+   108	  rule eval(BoolOp(OP, ES), RHO) => VBool(boolOp(OP, ES, RHO))
+   109	  rule eval(Compare(E1, CmpOp(OP, E2)), RHO)
+   110	    => VBool(compareVals(OP, eval(E1, RHO), eval(E2, RHO)))
+   111	  rule eval(Subscript(E1, E2), RHO)
+   112	    => subscriptVal(eval(E1, RHO), eval(E2, RHO))
+   113	
+   114	  syntax String ::= getString(PyVal) [function, total, symbol]
+   115	  rule getString(VStr(S)) => S
+   116	
+   117	  rule eval(Call(Name("len"), E), RHO)
+   118	    => VInt(lengthString(getString(eval(E, RHO))))
+   119	  rule eval(Call(Attribute(E, "count"), Str(NEEDLE)), RHO)
+   120	    => VInt(occurrences(getString(eval(E, RHO)), NEEDLE))
+   121	  rule eval(Call(Attribute(E, "endswith"), Str(SUFFIX)), RHO)
+   122	    => VBool(endsWith(getString(eval(E, RHO)), SUFFIX))
+   123	
+   124	  rule addVals(VInt(I1), VInt(I2)) => VInt(I1 +Int I2)
+   125	  rule subscriptVal(VStr(S), VInt(I))
+   126	    => VStr(substrString(S, I, I +Int 1))
+   127	
+   128	  rule asBool(VBool(B)) => B
+   129	
+   130	  rule boolOp("and", E1:Expr, E2:Expr, RHO)
+   131	    => asBool(eval(E1, RHO)) andBool asBool(eval(E2, RHO))
+   132	  rule boolOp("or", E1:Expr, E2:Expr, RHO)
+   133	    => asBool(eval(E1, RHO)) orBool asBool(eval(E2, RHO))
+   134	  rule boolOp("or", E1:Expr, E2:Expr, E3:Expr, RHO)
+   135	    => asBool(eval(E1, RHO))
+   136	       orBool asBool(eval(E2, RHO))
+   137	       orBool asBool(eval(E3, RHO))
+   138	
+   139	  rule compareVals("==", VInt(I1), VInt(I2)) => I1 ==Int I2
+   140	  rule compareVals("!=", VInt(I1), VInt(I2)) => I1 =/=Int I2
+   141	  rule compareVals(">", VInt(I1), VInt(I2)) => I1 >Int I2
+   142	  rule compareVals("<=", VStr(S1), VStr(S2)) => S1 <=String S2
+   143	
+   144	  rule endsWith(S, SUFFIX)
+   145	    => substrString(
+   146	         S,
+   147	         lengthString(S) -Int lengthString(SUFFIX),
+   148	         lengthString(S)
+   149	       ) ==String SUFFIX
+   150	    requires lengthString(S) >=Int lengthString(SUFFIX)
+   151	  rule endsWith(S, SUFFIX) => false
+   152	    requires lengthString(S) <Int lengthString(SUFFIX)
+   153	endmodule
+[exit 0]
+
+$ nl -ba verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  syntax Program ::= "solutionProgram" [function, total, symbol]
+     7	  syntax Int ::= digitCount(String) [function, total, symbol]
+     8	  syntax Bool ::= startsWithAsciiLetter(String) [function, total, symbol]
+     9	                | hasAcceptedSuffix(String) [function, total, symbol]
+    10	                | validFileName(String) [function, total, symbol]
+    11	  syntax PyVal ::= contractResult(String) [function, total, symbol]
+    12	
+    13	  rule digitCount(S) =>
+    14	       occurrences(S, "0")
+    15	    +Int occurrences(S, "1")
+    16	    +Int occurrences(S, "2")
+    17	    +Int occurrences(S, "3")
+    18	    +Int occurrences(S, "4")
+    19	    +Int occurrences(S, "5")
+    20	    +Int occurrences(S, "6")
+    21	    +Int occurrences(S, "7")
+    22	    +Int occurrences(S, "8")
+    23	    +Int occurrences(S, "9")
+    24	
+    25	  rule startsWithAsciiLetter(S) =>
+    26	       ("a" <=String substrString(S, 0, 1)
+    27	         andBool substrString(S, 0, 1) <=String "z")
+    28	    orBool
+    29	       ("A" <=String substrString(S, 0, 1)
+    30	         andBool substrString(S, 0, 1) <=String "Z")
+    31	
+    32	  rule hasAcceptedSuffix(S) =>
+    33	       endsWith(S, ".txt")
+    34	    orBool endsWith(S, ".exe")
+    35	    orBool endsWith(S, ".dll")
+    36	
+    37	  // This is the prompt's contract, stated independently of the AST evaluator.
+    38	  // Exactly one dot plus an accepted final suffix makes the text after that
+    39	  // unique dot exactly txt/exe/dll. A nonempty name makes character 0 defined.
+    40	  rule validFileName(S) =>
+    41	       occurrences(S, ".") ==Int 1
+    42	    andBool digitCount(S) <=Int 3
+    43	    andBool lengthString(S) >Int 0
+    44	    andBool startsWithAsciiLetter(S)
+    45	    andBool hasAcceptedSuffix(S)
+    46	
+    47	  // The same contract as a total result-valued decision tree. Each rejection
+    48	  // node is the negation of one conjunct of validFileName, in prompt order.
+    49	  rule contractResult(S) =>
+    50	    IteVal(occurrences(S, ".") =/=Int 1,
+    51	      VStr("No"),
+    52	      IteVal(digitCount(S) >Int 3,
+    53	        VStr("No"),
+    54	        IteVal(lengthString(S) ==Int 0,
+    55	          VStr("No"),
+    56	          IteVal(notBool startsWithAsciiLetter(S),
+    57	            VStr("No"),
+    58	            IteVal(hasAcceptedSuffix(S), VStr("Yes"), VStr("No"))))))
+    59	
+    60	  // A checked-in AST constant connects the proof to solution.mpy. prove.sh
+    61	  // regenerates solution.mpy and checks its recorded digest before kprove.
+    62	  rule solutionProgram =>
+    63	    Module(
+    64	      FuncDef("file_name_check", Params("file_name"),
+    65	        Assign(
+    66	          Name("digits"),
+    67	          BinOp(
+    68	            "+",
+    69	            BinOp(
+    70	              "+",
+    71	              BinOp(
+    72	                "+",
+    73	                BinOp(
+    74	                  "+",
+    75	                  BinOp(
+    76	                    "+",
+    77	                    BinOp(
+    78	                      "+",
+    79	                      BinOp(
+    80	                        "+",
+    81	                        BinOp(
+    82	                          "+",
+    83	                          BinOp(
+    84	                            "+",
+    85	                            Call(
+    86	                              Attribute(Name("file_name"), "count"),
+    87	                              Str("0")),
+    88	                            Call(
+    89	                              Attribute(Name("file_name"), "count"),
+    90	                              Str("1"))),
+    91	                          Call(
+    92	                            Attribute(Name("file_name"), "count"),
+    93	                            Str("2"))),
+    94	                        Call(
+    95	                          Attribute(Name("file_name"), "count"),
+    96	                          Str("3"))),
+    97	                      Call(Attribute(Name("file_name"), "count"), Str("4"))),
+    98	                    Call(Attribute(Name("file_name"), "count"), Str("5"))),
+    99	                  Call(Attribute(Name("file_name"), "count"), Str("6"))),
+   100	                Call(Attribute(Name("file_name"), "count"), Str("7"))),
+   101	              Call(Attribute(Name("file_name"), "count"), Str("8"))),
+   102	            Call(Attribute(Name("file_name"), "count"), Str("9"))))
+   103	        If(Compare(
+   104	          Call(Attribute(Name("file_name"), "count"), Str(".")),
+   105	          CmpOp("!=", Int(1))),
+   106	          Return(Str("No")),
+   107	          .Stmts)
+   108	        If(Compare(Name("digits"), CmpOp(">", Int(3))),
+   109	          Return(Str("No")),
+   110	          .Stmts)
+   111	        If(Compare(Call(Name("len"), Name("file_name")), CmpOp("==", Int(0))),
+   112	          Return(Str("No")),
+   113	          .Stmts)
+   114	        Assign(Name("first"), Subscript(Name("file_name"), Int(0)))
+   115	        If(UnaryOp(
+   116	          "not",
+   117	          BoolOp(
+   118	            "or",
+   119	            BoolOp(
+   120	              "and",
+   121	              Compare(Str("a"), CmpOp("<=", Name("first"))),
+   122	              Compare(Name("first"), CmpOp("<=", Str("z")))),
+   123	            BoolOp(
+   124	              "and",
+   125	              Compare(Str("A"), CmpOp("<=", Name("first"))),
+   126	              Compare(Name("first"), CmpOp("<=", Str("Z")))))),
+   127	          Return(Str("No")),
+   128	          .Stmts)
+   129	        If(BoolOp(
+   130	          "or",
+   131	          Call(Attribute(Name("file_name"), "endswith"), Str(".txt")),
+   132	          Call(Attribute(Name("file_name"), "endswith"), Str(".exe")),
+   133	          Call(Attribute(Name("file_name"), "endswith"), Str(".dll"))),
+   134	          Return(Str("Yes")),
+   135	          .Stmts)
+   136	        Return(Str("No"))))
+   137	endmodule
+[exit 0]
+
+$ nl -ba spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim <k> runProgram(solutionProgram, S:String)
+     7	          => contractResult(S)
+     8	        </k>
+     9	endmodule
+[exit 0]
+
+$ rg -n \^\[\[:space:\]\]\*syntax\\b\|\^\[\[:space:\]\]\*configuration\\b\|\^\[\[:space:\]\]\*rule\\b\|\^\[\[:space:\]\]\*claim\\b semantic.k verification.k spec.k
+semantic.k
+8:  syntax Program ::= "Module" "(" Stmts ")" [symbol]
+10:  syntax Stmts ::= List{Stmt, ""}
+11:  syntax Exprs ::= List{Expr, ","}
+12:  syntax CmpOps ::= List{CmpOp, ","}
+13:  syntax Strings ::= List{String, ","}
+15:  syntax Params ::= "Params" "(" Strings ")" [symbol]
+16:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")" [symbol]
+18:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")" [symbol]
+23:  syntax Expr ::= "Name" "(" String ")" [symbol]
+42:  syntax PyVal ::= VInt(Int) | VStr(String) | VBool(Bool) [symbol]
+44:  syntax Env ::= "EmptyEnv" | Bind(String, PyVal, Env) [symbol]
+45:  syntax ExecResult ::= Normal(Env) | Returned(PyVal) [symbol]
+48:  syntax KItem ::= runProgram(Program, String) [function, total, symbol]
+49:  syntax PyVal ::= eval(Expr, Env) [function, total, symbol]
+51:  syntax ExecResult ::= exec(Stmts, Env) [function, total, symbol]
+53:  syntax Bool ::= asBool(PyVal) [function, total, symbol]
+56:  syntax PyVal ::= addVals(PyVal, PyVal) [function, total, symbol]
+58:  syntax Bool ::= boolOp(String, Exprs, Env) [function, total, symbol]
+59:  syntax PyVal ::= resultValue(ExecResult) [function, total, symbol]
+63:  syntax Int ::= occurrences(String, String) [function, total, symbol]
+64:  rule occurrences(S, NEEDLE) => countAllOccurrences(S, NEEDLE) [concrete]
+66:  configuration <k> runProgram($PGM:Program, $INPUT:String) </k>
+68:  rule runProgram(
+73:  rule resultValue(Returned(V)) => V
+74:  rule resultValue(IfExec(B, R1, R2))
+77:  rule IteVal(true, V, _OTHER) => V
+78:  rule IteVal(false, _OTHER, V) => V
+79:  rule IfExec(true, R, _OTHER) => R
+80:  rule IfExec(false, _OTHER, R) => R
+82:  rule exec(.Stmts, RHO) => Normal(RHO)
+83:  rule exec(Assign(Name(X), E) SS, RHO)
+85:  rule exec(Return(E) SS, RHO) => Returned(eval(E, RHO))
+86:  rule exec(If(E, THEN, ELSE) SS, RHO)
+93:  rule continue(Normal(RHO), SS) => exec(SS, RHO)
+94:  rule continue(Returned(V), _SS) => Returned(V)
+95:  rule continue(IfExec(B, R1, R2), SS)
+98:  rule eval(Name(X), RHO) => lookupVal(X, RHO)
+99:  rule lookupVal(X, Bind(X, V, _RHO)) => V
+100:  rule lookupVal(X, Bind(Y, _V, RHO)) => lookupVal(X, RHO)
+102:  rule eval(Int(I), _RHO) => VInt(I)
+103:  rule eval(Str(S), _RHO) => VStr(S)
+104:  rule eval(Bool(B), _RHO) => VBool(B)
+105:  rule eval(BinOp("+", E1, E2), RHO)
+107:  rule eval(UnaryOp("not", E), RHO) => VBool(notBool asBool(eval(E, RHO)))
+108:  rule eval(BoolOp(OP, ES), RHO) => VBool(boolOp(OP, ES, RHO))
+109:  rule eval(Compare(E1, CmpOp(OP, E2)), RHO)
+111:  rule eval(Subscript(E1, E2), RHO)
+114:  syntax String ::= getString(PyVal) [function, total, symbol]
+115:  rule getString(VStr(S)) => S
+117:  rule eval(Call(Name("len"), E), RHO)
+119:  rule eval(Call(Attribute(E, "count"), Str(NEEDLE)), RHO)
+121:  rule eval(Call(Attribute(E, "endswith"), Str(SUFFIX)), RHO)
+124:  rule addVals(VInt(I1), VInt(I2)) => VInt(I1 +Int I2)
+125:  rule subscriptVal(VStr(S), VInt(I))
+128:  rule asBool(VBool(B)) => B
+130:  rule boolOp("and", E1:Expr, E2:Expr, RHO)
+132:  rule boolOp("or", E1:Expr, E2:Expr, RHO)
+134:  rule boolOp("or", E1:Expr, E2:Expr, E3:Expr, RHO)
+139:  rule compareVals("==", VInt(I1), VInt(I2)) => I1 ==Int I2
+140:  rule compareVals("!=", VInt(I1), VInt(I2)) => I1 =/=Int I2
+141:  rule compareVals(">", VInt(I1), VInt(I2)) => I1 >Int I2
+142:  rule compareVals("<=", VStr(S1), VStr(S2)) => S1 <=String S2
+144:  rule endsWith(S, SUFFIX)
+151:  rule endsWith(S, SUFFIX) => false
+
+spec.k
+6:  claim <k> runProgram(solutionProgram, S:String)
+
+verification.k
+6:  syntax Program ::= "solutionProgram" [function, total, symbol]
+7:  syntax Int ::= digitCount(String) [function, total, symbol]
+8:  syntax Bool ::= startsWithAsciiLetter(String) [function, total, symbol]
+11:  syntax PyVal ::= contractResult(String) [function, total, symbol]
+13:  rule digitCount(S) =>
+25:  rule startsWithAsciiLetter(S) =>
+32:  rule hasAcceptedSuffix(S) =>
+40:  rule validFileName(S) =>
+49:  rule contractResult(S) =>
+62:  rule solutionProgram =>
+[exit 0]
+
+$ rg -n \\\[\(\?:\[\^\]\]\*\\b\(\?:function\|total\|functional\|symbol\|concrete\|simplification\|simplifier\|priority\|owise\|anywhere\|macro\|alias\|trusted\)\\b\[\^\]\]\*\)\\\] semantic.k verification.k spec.k
+verification.k
+6:  syntax Program ::= "solutionProgram" [function, total, symbol]
+7:  syntax Int ::= digitCount(String) [function, total, symbol]
+8:  syntax Bool ::= startsWithAsciiLetter(String) [function, total, symbol]
+9:                | hasAcceptedSuffix(String) [function, total, symbol]
+10:                | validFileName(String) [function, total, symbol]
+11:  syntax PyVal ::= contractResult(String) [function, total, symbol]
+
+semantic.k
+8:  syntax Program ::= "Module" "(" Stmts ")" [symbol]
+15:  syntax Params ::= "Params" "(" Strings ")" [symbol]
+16:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")" [symbol]
+18:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")" [symbol]
+19:                | "Assign" "(" Expr "," Expr ")" [symbol]
+20:                | "If" "(" Expr "," Stmts "," Stmts ")" [symbol]
+21:                | "Return" "(" Expr ")" [symbol]
+23:  syntax Expr ::= "Name" "(" String ")" [symbol]
+24:                | "Int" "(" Int ")" [symbol]
+25:                | "Str" "(" String ")" [symbol]
+26:                | "Bool" "(" Bool ")" [symbol]
+27:                | "BinOp" "(" String "," Expr "," Expr ")" [symbol]
+28:                | "UnaryOp" "(" String "," Expr ")" [symbol]
+29:                | "BoolOp" "(" String "," Exprs ")" [symbol]
+30:                | "Compare" "(" Expr "," CmpOps ")" [symbol]
+31:                | "Subscript" "(" Expr "," Expr ")" [symbol]
+32:                | "Attribute" "(" Expr "," String ")" [symbol]
+33:                | "Call" "(" Expr "," Exprs ")" [symbol]
+42:  syntax PyVal ::= VInt(Int) | VStr(String) | VBool(Bool) [symbol]
+43:                 | IteVal(Bool, PyVal, PyVal) [symbol]
+44:  syntax Env ::= "EmptyEnv" | Bind(String, PyVal, Env) [symbol]
+45:  syntax ExecResult ::= Normal(Env) | Returned(PyVal) [symbol]
+46:                      | IfExec(Bool, ExecResult, ExecResult) [symbol]
+48:  syntax KItem ::= runProgram(Program, String) [function, total, symbol]
+49:  syntax PyVal ::= eval(Expr, Env) [function, total, symbol]
+50:                 | lookupVal(String, Env) [function, total, symbol]
+51:  syntax ExecResult ::= exec(Stmts, Env) [function, total, symbol]
+52:                      | continue(ExecResult, Stmts) [function, total, symbol]
+53:  syntax Bool ::= asBool(PyVal) [function, total, symbol]
+54:                | compareVals(String, PyVal, PyVal) [function, total, symbol]
+55:                | endsWith(String, String) [function, total, symbol]
+56:  syntax PyVal ::= addVals(PyVal, PyVal) [function, total, symbol]
+57:                 | subscriptVal(PyVal, PyVal) [function, total, symbol]
+58:  syntax Bool ::= boolOp(String, Exprs, Env) [function, total, symbol]
+59:  syntax PyVal ::= resultValue(ExecResult) [function, total, symbol]
+63:  syntax Int ::= occurrences(String, String) [function, total, symbol]
+64:  rule occurrences(S, NEEDLE) => countAllOccurrences(S, NEEDLE) [concrete]
+114:  syntax String ::= getString(PyVal) [function, total, symbol]
+[exit 0]
+
+$ rg -n \\\[\(\?:\[\^\]\]\*\\b\(\?:simplification\|simplifier\|priority\|owise\|anywhere\|macro\|alias\|trusted\)\\b\[\^\]\]\*\)\\\] semantic.k verification.k spec.k
+[exit 1]
+
+$ python3 -c $'\nimport re\nfrom collections import Counter\nfrom pathlib import Path\n\ntext = Path("solution.mpy").read_text()\nconstructors = re.findall(r"\\b([A-Z][A-Za-z0-9]*)\\s*\\(", text)\nfor name, count in sorted(Counter(constructors).items()):\n    print(name, count)\n'
+Assign 2
+Attribute 14
+BinOp 9
+BoolOp 4
+Call 15
+CmpOp 7
+Compare 7
+FuncDef 1
+If 5
+Int 4
+Module 1
+Name 24
+Params 1
+Return 6
+Str 24
+Subscript 1
+UnaryOp 1
+[exit 0]
+
+Script done on 2026-07-26 12:08:28-05:00 [COMMAND_EXIT_CODE="0"]

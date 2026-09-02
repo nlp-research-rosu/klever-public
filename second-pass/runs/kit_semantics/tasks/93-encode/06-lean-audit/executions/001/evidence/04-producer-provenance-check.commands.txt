@@ -1,0 +1,48 @@
+set -o pipefail
+printf 'COMMAND: PYTHONPATH=/reference python3 independent producer provenance check\n'
+PYTHONPATH=/reference python3 - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+from tools.pipeline_contract import sha256_tree
+
+audit = json.loads(Path('/audit-input.json').read_text())['resolution']
+generation = Path('/reference/klean-generation')
+bundle = Path('/reference/generation-tools')
+manifest = json.loads((generation / 'generator-manifest.json').read_text())
+source = json.loads((bundle / 'source-manifest.json').read_text())
+
+def file_sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+actual_files = {
+    'klean_export.py': file_sha(bundle / 'klean_export.py'),
+    'klean.py': file_sha(bundle / 'klean.py'),
+}
+expected_files = {
+    'klean_export.py': manifest['exporter_sha256'],
+    'klean.py': manifest['klean_py_sha256'],
+}
+image_id = manifest['provenance']['generator_image_id']
+audit_bundle_name = Path(audit['generation_producer_sources']).name
+checks = {
+    'bundle_exact_regular_files': sorted(p.name for p in bundle.iterdir()) == ['klean.py', 'klean_export.py', 'source-manifest.json'],
+    'actual_file_hashes_match_generator_manifest': actual_files == expected_files,
+    'source_manifest_file_hashes_match_generator_manifest': source['files'] == expected_files,
+    'source_manifest_file_hashes_match_actual': source['files'] == actual_files,
+    'source_manifest_image_matches_generator_manifest': source['generator_image_id'] == image_id,
+    'audit_input_bundle_name_matches_image_id': audit_bundle_name == image_id.removeprefix('sha256:'),
+    'bundle_tree_hash_matches_audit_input': sha256_tree(bundle) == audit['hashes']['generation_producer_sources_sha256'],
+}
+report = {
+    'actual_files': actual_files,
+    'expected_files': expected_files,
+    'generator_image_id': image_id,
+    'audit_input_bundle_name': audit_bundle_name,
+    'bundle_tree_sha256': sha256_tree(bundle),
+    'audit_input_bundle_tree_sha256': audit['hashes']['generation_producer_sources_sha256'],
+    'checks': checks,
+    'all_checks_pass': all(checks.values()),
+}
+print(json.dumps(report, indent=2, sort_keys=True))
+PY

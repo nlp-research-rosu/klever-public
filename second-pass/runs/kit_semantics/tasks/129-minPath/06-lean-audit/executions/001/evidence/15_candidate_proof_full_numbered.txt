@@ -1,0 +1,425 @@
+Script started on 2026-08-01 04:32:21-05:00 [<not executed on terminal>]
+     1	import Klean129Minpath.Lemmas
+     2	import Lean.Elab.Tactic.Omega
+     3	
+     4	namespace Proof
+     5	
+     6	private def intSeqList : SortIntSeq → List Int
+     7	  | SortIntSeq.«.IntSeq_MPY-CORE_IntSeq» => []
+     8	  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» x xs => x :: intSeqList xs
+     9	
+    10	private def valSeqList : SortValSeq → List SortVal
+    11	  | SortValSeq.«.ValSeq_MPY-CORE_ValSeq» => []
+    12	  | SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» x xs => x :: valSeqList xs
+    13	
+    14	private def listValSeq : List SortVal → SortValSeq
+    15	  | [] => SortValSeq.«.ValSeq_MPY-CORE_ValSeq»
+    16	  | x :: xs => SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» x (listValSeq xs)
+    17	
+    18	@[simp] private theorem valSeqList_listValSeq (xs : List SortVal) :
+    19	    valSeqList (listValSeq xs) = xs := by
+    20	  induction xs <;> simp [listValSeq, valSeqList, *]
+    21	
+    22	private def intSeqAtModel (xs : SortIntSeq) (i : Int) : Int :=
+    23	  if i < 0 then 0 else (intSeqList xs)[i.toNat]?.getD 0
+    24	
+    25	private def gridAtModel (p : SortIntSeq) (n i j : Int) : Int :=
+    26	  intSeqAtModel p (i * n + j)
+    27	
+    28	private def gridRowModel (p : SortIntSeq) (n i : Int) : SortValSeq :=
+    29	  listValSeq <| (List.range n.toNat).map fun j =>
+    30	    SortVal.inj_SortInt (gridAtModel p n i (Int.ofNat j))
+    31	
+    32	private def gridRowsModel (p : SortIntSeq) (n : Int) : SortValSeq :=
+    33	  listValSeq <| (List.range n.toNat).map fun i =>
+    34	    SortVal.inj_SortIterable
+    35	      (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq»
+    36	        (gridRowModel p n (Int.ofNat i)))
+    37	
+    38	private def valSeqAtModel (xs : SortValSeq) (i : Int) : SortVal :=
+    39	  if i < 0 then SortVal.«noneV_MPY-CORE_Val»
+    40	  else (valSeqList xs)[i.toNat]?.getD SortVal.«noneV_MPY-CORE_Val»
+    41	
+    42	private def valSeqConcatModel (xs ys : SortValSeq) : SortValSeq :=
+    43	  listValSeq (valSeqList xs ++ valSeqList ys)
+    44	
+    45	private def snocModel (xs : SortValSeq) (x : SortVal) : SortValSeq :=
+    46	  listValSeq (valSeqList xs ++ [x])
+    47	
+    48	private def pairPrefixModel (a : SortValSeq) (m : Int) : Nat → SortValSeq
+    49	  | 0 => a
+    50	  | r + 1 =>
+    51	      pairPrefixModel
+    52	        (snocModel (snocModel a (SortVal.inj_SortInt 1)) (SortVal.inj_SortInt m))
+    53	        m r
+    54	
+    55	private noncomputable def pairDoneModel (a o : SortValSeq) (r m : Int) : Bool :=
+    56	  @decide
+    57	    (valSeqList (pairPrefixModel a m r.toNat) = valSeqList o)
+    58	    (Classical.propDecidable _)
+    59	
+    60	private noncomputable def oddDoneModel (a o : SortValSeq) (r m : Int) : Bool :=
+    61	  @decide
+    62	    (valSeqList o =
+    63	      valSeqList (snocModel (pairPrefixModel a m r.toNat) (SortVal.inj_SortInt 1)))
+    64	    (Classical.propDecidable _)
+    65	
+    66	private def pyModModel (i n : Int) : Int :=
+    67	  if n = 0 then 0 else Int.tmod (Int.tmod i n + n) n
+    68	
+    69	private def oneRowModel (p : SortIntSeq) (n : Int) : Int :=
+    70	  if 0 < n then
+    71	    match (intSeqList p).idxOf? 1 with
+    72	    | some k => Int.ofNat (k / n.toNat)
+    73	    | none => Int.tdiv (-1) n
+    74	  else 0
+    75	
+    76	private def oneColModel (p : SortIntSeq) (n : Int) : Int :=
+    77	  if 0 < n then
+    78	    match (intSeqList p).idxOf? 1 with
+    79	    | some k => Int.ofNat (k % n.toNat)
+    80	    | none => pyModModel (-1) n
+    81	  else 0
+    82	
+    83	private def expectedValues (m : Int) : List Int :=
+    84	  (List.range m.toNat).map fun k => Int.ofNat k + 1
+    85	
+    86	private def validPermModel (p : SortIntSeq) (m : Int) : Bool :=
+    87	  decide (0 ≤ m ∧ (intSeqList p).Perm (expectedValues m))
+    88	
+    89	private def vsLenModel (xs : SortValSeq) : Int :=
+    90	  Int.ofNat (valSeqList xs).length
+    91	
+    92	private theorem expectedValues_nodup (m : Int) : (expectedValues m).Nodup := by
+    93	  unfold expectedValues
+    94	  exact List.Pairwise.map (R := fun a b : Nat => a ≠ b)
+    95	    (S := fun a b : Int => a ≠ b) (fun k => (k : Int) + 1)
+    96	    (by
+    97	      intro a b hab heq
+    98	      apply hab
+    99	      apply Int.ofNat_inj.mp
+   100	      exact Int.add_left_cancel (a := (1 : Int)) (b := (a : Int)) (c := (b : Int))
+   101	        (by simpa [Int.add_comm] using heq)) List.nodup_range
+   102	
+   103	private theorem one_mem_expectedValues {m : Int} (hm : 0 < m) :
+   104	    1 ∈ expectedValues m := by
+   105	  unfold expectedValues
+   106	  rw [List.mem_map]
+   107	  refine ⟨0, List.mem_range.mpr ?_, by simp⟩
+   108	  omega
+   109	
+   110	private theorem expectedValues_mem_bounds {m x : Int} (hm : 0 ≤ m)
+   111	    (hx : x ∈ expectedValues m) : 0 < x ∧ x < m + 1 := by
+   112	  unfold expectedValues at hx
+   113	  rw [List.mem_map] at hx
+   114	  rcases hx with ⟨k, hk, rfl⟩
+   115	  have hk' : k < m.toNat := List.mem_range.mp hk
+   116	  have hm' : (Int.ofNat m.toNat) = m := Int.toNat_of_nonneg hm
+   117	  change 0 < (k : Int) + 1 ∧ (k : Int) + 1 < m + 1
+   118	  constructor <;> omega
+   119	
+   120	private theorem int_idxOf?_eq_some_idxOf {xs : List Int} (h : 1 ∈ xs) :
+   121	    xs.idxOf? 1 = some (xs.idxOf 1) := by
+   122	  induction xs with
+   123	  | nil => simp at h
+   124	  | cons x xs ih =>
+   125	      by_cases hx : x = 1
+   126	      · subst x
+   127	        simp [List.idxOf?_cons]
+   128	      · have hx' : 1 ≠ x := fun heq => hx heq.symm
+   129	        have ht : 1 ∈ xs := by simpa [hx'] using h
+   130	        have hbeq : (x == (1 : Int)) = false := beq_eq_false_iff_ne.mpr hx
+   131	        simp [List.idxOf?_cons, List.idxOf_cons, hbeq, ih ht]
+   132	
+   133	private theorem mem_of_get?_eq_some {xs : List α} {k : Nat} {a : α}
+   134	    (h : xs[k]? = some a) : a ∈ xs := by
+   135	  induction xs generalizing k with
+   136	  | nil => simp at h
+   137	  | cons x xs ih =>
+   138	      cases k with
+   139	      | zero =>
+   140	          simp at h
+   141	          subst x
+   142	          simp
+   143	      | succ k =>
+   144	          simp at h
+   145	          exact List.mem_cons_of_mem _ (ih h)
+   146	
+   147	private theorem int_get?_idxOf_eq_one {xs : List Int} (h : 1 ∈ xs) :
+   148	    xs[xs.idxOf 1]? = some 1 := by
+   149	  induction xs with
+   150	  | nil => simp at h
+   151	  | cons x xs ih =>
+   152	      by_cases hx : x = 1
+   153	      · subst x
+   154	        simp
+   155	      · have hx' : 1 ≠ x := fun heq => hx heq.symm
+   156	        have ht : 1 ∈ xs := by simpa [hx'] using h
+   157	        have hbeq : (x == (1 : Int)) = false := beq_eq_false_iff_ne.mpr hx
+   158	        simp [List.idxOf_cons, hbeq, ih ht]
+   159	
+   160	private theorem int_idxOf_eq_of_get? {xs : List Int} {k : Nat}
+   161	    (hnd : xs.Nodup) (hget : xs[k]? = some 1) : xs.idxOf 1 = k := by
+   162	  induction xs generalizing k with
+   163	  | nil => simp at hget
+   164	  | cons x xs ih =>
+   165	      cases k with
+   166	      | zero =>
+   167	          simp at hget
+   168	          subst x
+   169	          simp
+   170	      | succ k =>
+   171	          simp at hget
+   172	          have hnd' := List.nodup_cons.mp hnd
+   173	          have hne : x ≠ 1 := by
+   174	            intro hx
+   175	            subst x
+   176	            exact hnd'.1 (mem_of_get?_eq_some hget)
+   177	          have hbeq : (x == (1 : Int)) = false := beq_eq_false_iff_ne.mpr hne
+   178	          simp [List.idxOf_cons, hbeq, ih hnd'.2 hget]
+   179	
+   180	private theorem flat_nonneg {i n j : Int} (hi : 0 ≤ i) (hn : 0 ≤ n)
+   181	    (hj : 0 ≤ j) : 0 ≤ i * n + j :=
+   182	  Int.add_nonneg (Int.mul_nonneg hi hn) hj
+   183	
+   184	private theorem flat_lt_square {i n j : Int} (hn : 0 ≤ n) (hi : i < n)
+   185	    (hj : j < n) : i * n + j < n * n := by
+   186	  have h₁ : i * n + j < i * n + n := Int.add_lt_add_left hj (i * n)
+   187	  have h₂raw : (i + 1) * n ≤ n * n :=
+   188	    Int.mul_le_mul_of_nonneg_right (Int.add_one_le_iff.mpr hi) hn
+   189	  have h₂ : i * n + n ≤ n * n := by
+   190	    simpa [Int.add_mul] using h₂raw
+   191	  exact Int.lt_of_lt_of_le h₁ h₂
+   192	
+   193	private theorem flat_toNat {i n j : Int} (hi : 0 ≤ i) (hn : 0 ≤ n)
+   194	    (hj : 0 ≤ j) :
+   195	    (i * n + j).toNat = i.toNat * n.toNat + j.toNat := by
+   196	  rw [Int.toNat_add (Int.mul_nonneg hi hn) hj, Int.toNat_mul hi hn]
+   197	
+   198	/- KORE symbol: Lbl'Unds'andBool'Unds'; frozen source obligations: rule-c542bea0ad56e556c87d2f0a1f3b92b8ebc7ede934ee79e3380edd4c8eec4a70, rule-97b792417dedc7de0727ca3c557d6c412015002a77809892b5d5cc700a2fd149, rule-cf5a0acce1b2eb580bfbacadd2e910a549de9a696af1ebfcf37925160d22a22b, rule-6239181de49e2422109895baef3c3011f33d8b5f0ae6785549600addc1a5cfc1, rule-b8a75762e8baeaf13b848647832cf0455607cbda75166ad623cdc8ded53ef987. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   199	def _andBool_ : SortBool → SortBool → SortBool := (· && ·)
+   200	/- KORE symbol: Lbl'Unds-GT-Eqls'Int'Unds'; frozen source obligations: rule-c542bea0ad56e556c87d2f0a1f3b92b8ebc7ede934ee79e3380edd4c8eec4a70, rule-97b792417dedc7de0727ca3c557d6c412015002a77809892b5d5cc700a2fd149, rule-cf5a0acce1b2eb580bfbacadd2e910a549de9a696af1ebfcf37925160d22a22b, rule-6239181de49e2422109895baef3c3011f33d8b5f0ae6785549600addc1a5cfc1, rule-b8a75762e8baeaf13b848647832cf0455607cbda75166ad623cdc8ded53ef987, rule-9b8ee50fdbbf692e2fa2c6bc4aa68e73f5759ff24a19c85fc3e0de3519dd9348. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   201	def «_>=Int_» (a b : SortInt) : SortBool := decide (a ≥ b)
+   202	/- KORE symbol: Lbl'Unds-LT-'Int'Unds'; frozen source obligations: rule-97b792417dedc7de0727ca3c557d6c412015002a77809892b5d5cc700a2fd149, rule-cf5a0acce1b2eb580bfbacadd2e910a549de9a696af1ebfcf37925160d22a22b, rule-6239181de49e2422109895baef3c3011f33d8b5f0ae6785549600addc1a5cfc1, rule-b8a75762e8baeaf13b848647832cf0455607cbda75166ad623cdc8ded53ef987. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   203	def «_<Int_» (a b : SortInt) : SortBool := decide (a < b)
+   204	/- KORE symbol: Lbl'UndsEqlsEqls'Int'Unds'; frozen source obligations: rule-6239181de49e2422109895baef3c3011f33d8b5f0ae6785549600addc1a5cfc1. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   205	def «_==Int_» (a b : SortInt) : SortBool := decide (a = b)
+   206	/- KORE symbol: Lbl'UndsPlus'Int'Unds'; frozen source obligations: rule-b8a75762e8baeaf13b848647832cf0455607cbda75166ad623cdc8ded53ef987. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   207	def «_+Int_» : SortInt → SortInt → SortInt := (· + ·)
+   208	/- KORE symbol: Lbl'UndsStar'Int'Unds'; frozen source obligations: rule-c542bea0ad56e556c87d2f0a1f3b92b8ebc7ede934ee79e3380edd4c8eec4a70, rule-97b792417dedc7de0727ca3c557d6c412015002a77809892b5d5cc700a2fd149, rule-cf5a0acce1b2eb580bfbacadd2e910a549de9a696af1ebfcf37925160d22a22b, rule-6239181de49e2422109895baef3c3011f33d8b5f0ae6785549600addc1a5cfc1, rule-b8a75762e8baeaf13b848647832cf0455607cbda75166ad623cdc8ded53ef987. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   209	def «_*Int_» : SortInt → SortInt → SortInt := (· * ·)
+   210	/- KORE symbol: LblgridAt; frozen source obligations: rule-cf5a0acce1b2eb580bfbacadd2e910a549de9a696af1ebfcf37925160d22a22b, rule-6239181de49e2422109895baef3c3011f33d8b5f0ae6785549600addc1a5cfc1, rule-b8a75762e8baeaf13b848647832cf0455607cbda75166ad623cdc8ded53ef987. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   211	def gridAt : SortIntSeq → SortInt → SortInt → SortInt → SortInt := gridAtModel
+   212	/- KORE symbol: LblgridRow; frozen source obligations: rule-97b792417dedc7de0727ca3c557d6c412015002a77809892b5d5cc700a2fd149, rule-cf5a0acce1b2eb580bfbacadd2e910a549de9a696af1ebfcf37925160d22a22b. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   213	def gridRow : SortIntSeq → SortInt → SortInt → SortValSeq := gridRowModel
+   214	/- KORE symbol: LblgridRows; frozen source obligations: rule-c542bea0ad56e556c87d2f0a1f3b92b8ebc7ede934ee79e3380edd4c8eec4a70, rule-97b792417dedc7de0727ca3c557d6c412015002a77809892b5d5cc700a2fd149. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   215	def gridRows : SortIntSeq → SortInt → SortValSeq := gridRowsModel
+   216	/- KORE symbol: LbloddDone; frozen source obligations: rule-9b8ee50fdbbf692e2fa2c6bc4aa68e73f5759ff24a19c85fc3e0de3519dd9348. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   217	noncomputable def oddDone : SortValSeq → SortValSeq → SortInt → SortInt → SortBool := oddDoneModel
+   218	/- KORE symbol: LbloneCol; frozen source obligations: rule-6239181de49e2422109895baef3c3011f33d8b5f0ae6785549600addc1a5cfc1. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   219	def oneCol : SortIntSeq → SortInt → SortInt := oneColModel
+   220	/- KORE symbol: LbloneRow; frozen source obligations: rule-6239181de49e2422109895baef3c3011f33d8b5f0ae6785549600addc1a5cfc1. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   221	def oneRow : SortIntSeq → SortInt → SortInt := oneRowModel
+   222	/- KORE symbol: LblpairDone; frozen source obligations: rule-9b8ee50fdbbf692e2fa2c6bc4aa68e73f5759ff24a19c85fc3e0de3519dd9348. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   223	noncomputable def pairDone : SortValSeq → SortValSeq → SortInt → SortInt → SortBool := pairDoneModel
+   224	/- KORE symbol: LblsnocVS; frozen source obligations: rule-79cc3308597d2aedf94188a46aa45b9302edb4bd5dc309fcd4bc218ec8dc5894, rule-9b8ee50fdbbf692e2fa2c6bc4aa68e73f5759ff24a19c85fc3e0de3519dd9348. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   225	def snocVS : SortValSeq → SortVal → SortValSeq := snocModel
+   226	/- KORE symbol: LblvalSeqAt'LParUndsCommUndsRParUnds'MPY-SUBSCRIPT'Unds'Val'Unds'ValSeq'Unds'Int; frozen source obligations: rule-97b792417dedc7de0727ca3c557d6c412015002a77809892b5d5cc700a2fd149, rule-cf5a0acce1b2eb580bfbacadd2e910a549de9a696af1ebfcf37925160d22a22b. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   227	def «valSeqAt(_,_)_MPY-SUBSCRIPT_Val_ValSeq_Int» : SortValSeq → SortInt → SortVal :=
+   228	  valSeqAtModel
+   229	/- KORE symbol: LblvalSeqConcat'LParUndsCommUndsRParUnds'MPY-LIST'Unds'ValSeq'Unds'ValSeq'Unds'ValSeq; frozen source obligations: rule-79cc3308597d2aedf94188a46aa45b9302edb4bd5dc309fcd4bc218ec8dc5894. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   230	def «valSeqConcat(_,_)_MPY-LIST_ValSeq_ValSeq_ValSeq» : SortValSeq → SortValSeq → SortValSeq :=
+   231	  valSeqConcatModel
+   232	/- KORE symbol: LblvalidPerm; frozen source obligations: rule-c542bea0ad56e556c87d2f0a1f3b92b8ebc7ede934ee79e3380edd4c8eec4a70, rule-97b792417dedc7de0727ca3c557d6c412015002a77809892b5d5cc700a2fd149, rule-cf5a0acce1b2eb580bfbacadd2e910a549de9a696af1ebfcf37925160d22a22b, rule-6239181de49e2422109895baef3c3011f33d8b5f0ae6785549600addc1a5cfc1, rule-b8a75762e8baeaf13b848647832cf0455607cbda75166ad623cdc8ded53ef987. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   233	def validPerm : SortIntSeq → SortInt → SortBool := validPermModel
+   234	/- KORE symbol: LblvsLen'LParUndsRParUnds'MPY-CORE'Unds'Int'Unds'ValSeq; frozen source obligations: rule-c542bea0ad56e556c87d2f0a1f3b92b8ebc7ede934ee79e3380edd4c8eec4a70. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   235	def «vsLen(_)_MPY-CORE_Int_ValSeq» : SortValSeq → SortInt := vsLenModel
+   236	
+   237	theorem final :
+   238	    Klean129Minpath.Lemmas.targetStatement _andBool_ «_>=Int_» «_<Int_» «_==Int_» «_+Int_» «_*Int_» gridAt gridRow gridRows oddDone oneCol oneRow pairDone snocVS «valSeqAt(_,_)_MPY-SUBSCRIPT_Val_ValSeq_Int» «valSeqConcat(_,_)_MPY-LIST_ValSeq_ValSeq_ValSeq» validPerm «vsLen(_)_MPY-CORE_Int_ValSeq» := by
+   239	  unfold Klean129Minpath.Lemmas.targetStatement
+   240	  constructor
+   241	  · intro N P h
+   242	    simp [_andBool_, «_>=Int_», validPerm, validPermModel, «_*Int_»] at h
+   243	    have hN : 0 ≤ N := Int.le_trans (by decide) h.1
+   244	    simp [«vsLen(_)_MPY-CORE_Int_ValSeq», vsLenModel, gridRows, gridRowsModel,
+   245	      Int.toNat_of_nonneg hN]
+   246	  constructor
+   247	  · intro I N P h
+   248	    simp [_andBool_, «_>=Int_», «_<Int_», validPerm, validPermModel,
+   249	      «_*Int_»] at h
+   250	    have hI0 : 0 ≤ I := h.1.2
+   251	    have hIN : I < N := h.2
+   252	    have hN0 : 0 ≤ N := Int.le_trans (by decide) h.1.1.1
+   253	    have hNat : I.toNat < N.toNat := Int.ofNat_lt.mp (by
+   254	      simpa [Int.toNat_of_nonneg hI0, Int.toNat_of_nonneg hN0] using hIN)
+   255	    change valSeqAtModel (gridRowsModel P N) I =
+   256	      SortVal.inj_SortIterable
+   257	        (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq» (gridRowModel P N I))
+   258	    simp [gridRowsModel, valSeqAtModel, Int.not_lt_of_ge hI0, hNat,
+   259	      Int.toNat_of_nonneg hI0]
+   260	  constructor
+   261	  · intro J I N P h
+   262	    simp [_andBool_, «_>=Int_», «_<Int_», validPerm, validPermModel,
+   263	      «_*Int_»] at h
+   264	    have hJ0 : 0 ≤ J := h.1.2
+   265	    have hJN : J < N := h.2
+   266	    have hN0 : 0 ≤ N := Int.le_trans (by decide) h.1.1.1.1.1
+   267	    have hNat : J.toNat < N.toNat := Int.ofNat_lt.mp (by
+   268	      simpa [Int.toNat_of_nonneg hJ0, Int.toNat_of_nonneg hN0] using hJN)
+   269	    simp [gridRow, gridRowModel,
+   270	      «valSeqAt(_,_)_MPY-SUBSCRIPT_Val_ValSeq_Int», valSeqAtModel,
+   271	      Int.not_lt_of_ge hJ0, hNat, Int.toNat_of_nonneg hJ0, gridAt]
+   272	  constructor
+   273	  · intro J I N P h
+   274	    simp [_andBool_, «_>=Int_», «_<Int_», «_==Int_», validPerm,
+   275	      validPermModel, «_*Int_»] at h ⊢
+   276	    have hN0 : 0 ≤ N := Int.le_trans (by decide) h.1.1.1.1.1
+   277	    have hNpos : 0 < N :=
+   278	      Int.lt_of_lt_of_le (by decide : (0 : Int) < 2) h.1.1.1.1.1
+   279	    have hI0 : 0 ≤ I := h.1.1.1.2
+   280	    have hIN : I < N := h.1.1.2
+   281	    have hJ0 : 0 ≤ J := h.1.2
+   282	    have hJN : J < N := h.2
+   283	    have hM0 : 0 ≤ N * N := h.1.1.1.1.2.1
+   284	    have hPerm : (intSeqList P).Perm (expectedValues (N * N)) :=
+   285	      h.1.1.1.1.2.2
+   286	    have hMpos : 0 < N * N := Int.mul_pos hNpos hNpos
+   287	    have hExpectedOne : 1 ∈ expectedValues (N * N) :=
+   288	      one_mem_expectedValues hMpos
+   289	    have hMemOne : 1 ∈ intSeqList P := hPerm.mem_iff.mpr hExpectedOne
+   290	    have hNodup : (intSeqList P).Nodup :=
+   291	      hPerm.symm.nodup (expectedValues_nodup (N * N))
+   292	    have hIdxOpt : (intSeqList P).idxOf? 1 = some ((intSeqList P).idxOf 1) :=
+   293	      int_idxOf?_eq_some_idxOf hMemOne
+   294	    have hRow : oneRow P N =
+   295	        Int.ofNat ((intSeqList P).idxOf 1 / N.toNat) := by
+   296	      unfold oneRow oneRowModel
+   297	      rw [if_pos hNpos, hIdxOpt]
+   298	    have hCol : oneCol P N =
+   299	        Int.ofNat ((intSeqList P).idxOf 1 % N.toNat) := by
+   300	      unfold oneCol oneColModel
+   301	      rw [if_pos hNpos, hIdxOpt]
+   302	    have hFlat0 : 0 ≤ I * N + J := flat_nonneg hI0 hN0 hJ0
+   303	    have hFlatLt : I * N + J < N * N := flat_lt_square hN0 hIN hJN
+   304	    have hFlatNat : (I * N + J).toNat < (N * N).toNat :=
+   305	      Int.ofNat_lt.mp (by
+   306	        simpa [Int.toNat_of_nonneg hFlat0, Int.toNat_of_nonneg hM0] using hFlatLt)
+   307	    have hLen : (intSeqList P).length = (N * N).toNat := by
+   308	      calc
+   309	        (intSeqList P).length = (expectedValues (N * N)).length := hPerm.length_eq
+   310	        _ = (N * N).toNat := by simp [expectedValues]
+   311	    have hBound : (I * N + J).toNat < (intSeqList P).length := by
+   312	      rw [hLen]
+   313	      exact hFlatNat
+   314	    have hGet := List.getElem?_eq_getElem hBound
+   315	    have hGrid : gridAt P N I J = (intSeqList P)[(I * N + J).toNat] := by
+   316	      unfold gridAt gridAtModel intSeqAtModel
+   317	      rw [if_neg (Int.not_lt_of_ge hFlat0), hGet]
+   318	      rfl
+   319	    have hNnatPos : 0 < N.toNat := Int.ofNat_lt.mp (by
+   320	      simpa [Int.toNat_of_nonneg hN0] using hNpos)
+   321	    have hJNat : J.toNat < N.toNat := Int.ofNat_lt.mp (by
+   322	      simpa [Int.toNat_of_nonneg hJ0, Int.toNat_of_nonneg hN0] using hJN)
+   323	    rw [← Bool.decide_and, decide_eq_decide]
+   324	    constructor
+   325	    · intro hOne
+   326	      have hAtOne : (intSeqList P)[(I * N + J).toNat]? = some 1 := by
+   327	        rw [hGet]
+   328	        exact congrArg some (hGrid.symm.trans hOne)
+   329	      have hIdx : (intSeqList P).idxOf 1 = (I * N + J).toNat :=
+   330	        int_idxOf_eq_of_get? hNodup hAtOne
+   331	      have hDivMod :
+   332	          (I * N + J).toNat / N.toNat = I.toNat ∧
+   333	          (I * N + J).toNat % N.toNat = J.toNat := by
+   334	        apply (Nat.div_mod_unique hNnatPos).2
+   335	        constructor
+   336	        · rw [flat_toNat hI0 hN0 hJ0]
+   337	          simp [Nat.add_comm, Nat.mul_comm]
+   338	        · exact hJNat
+   339	      constructor
+   340	      · rw [hRow]
+   341	        calc
+   342	          I = Int.ofNat I.toNat := (Int.toNat_of_nonneg hI0).symm
+   343	          _ = Int.ofNat ((I * N + J).toNat / N.toNat) :=
+   344	            congrArg Int.ofNat hDivMod.1.symm
+   345	          _ = Int.ofNat ((intSeqList P).idxOf 1 / N.toNat) := by rw [hIdx]
+   346	      · rw [hCol]
+   347	        calc
+   348	          J = Int.ofNat J.toNat := (Int.toNat_of_nonneg hJ0).symm
+   349	          _ = Int.ofNat ((I * N + J).toNat % N.toNat) :=
+   350	            congrArg Int.ofNat hDivMod.2.symm
+   351	          _ = Int.ofNat ((intSeqList P).idxOf 1 % N.toNat) := by rw [hIdx]
+   352	    · rintro ⟨hIRow, hJCol⟩
+   353	      rw [hRow] at hIRow
+   354	      rw [hCol] at hJCol
+   355	      have hINat : I.toNat = (intSeqList P).idxOf 1 / N.toNat := by
+   356	        have := congrArg Int.toNat hIRow
+   357	        simpa only [Int.toNat_natCast] using this
+   358	      have hJNatEq : J.toNat = (intSeqList P).idxOf 1 % N.toNat := by
+   359	        have := congrArg Int.toNat hJCol
+   360	        simpa only [Int.toNat_natCast] using this
+   361	      have hIdxFlat : (intSeqList P).idxOf 1 = (I * N + J).toNat := by
+   362	        rw [flat_toNat hI0 hN0 hJ0]
+   363	        calc
+   364	          (intSeqList P).idxOf 1 =
+   365	              N.toNat * ((intSeqList P).idxOf 1 / N.toNat) +
+   366	                (intSeqList P).idxOf 1 % N.toNat :=
+   367	            (Nat.div_add_mod ((intSeqList P).idxOf 1) N.toNat).symm
+   368	          _ = I.toNat * N.toNat + J.toNat := by
+   369	            rw [← hINat, ← hJNatEq]
+   370	            simp [Nat.mul_comm]
+   371	      have hAtIdx := int_get?_idxOf_eq_one hMemOne
+   372	      have hAtFlat : (intSeqList P)[(I * N + J).toNat]? = some 1 := by
+   373	        rw [← hIdxFlat]
+   374	        exact hAtIdx
+   375	      rw [hGrid]
+   376	      rw [hGet] at hAtFlat
+   377	      exact Option.some.inj hAtFlat
+   378	  constructor
+   379	  · intro N J I P h
+   380	    simp [_andBool_, «_>=Int_», «_<Int_», «_+Int_», validPerm,
+   381	      validPermModel, «_*Int_»] at h ⊢
+   382	    have hN0 : 0 ≤ N := Int.le_trans (by decide) h.1.1.1.1.1
+   383	    have hI0 : 0 ≤ I := h.1.1.1.2
+   384	    have hIN : I < N := h.1.1.2
+   385	    have hJ0 : 0 ≤ J := h.1.2
+   386	    have hJN : J < N := h.2
+   387	    have hM0 : 0 ≤ N * N := h.1.1.1.1.2.1
+   388	    have hPerm : (intSeqList P).Perm (expectedValues (N * N)) :=
+   389	      h.1.1.1.1.2.2
+   390	    have hFlat0 : 0 ≤ I * N + J := flat_nonneg hI0 hN0 hJ0
+   391	    have hFlatLt : I * N + J < N * N := flat_lt_square hN0 hIN hJN
+   392	    have hFlatNat : (I * N + J).toNat < (N * N).toNat :=
+   393	      Int.ofNat_lt.mp (by
+   394	        simpa [Int.toNat_of_nonneg hFlat0, Int.toNat_of_nonneg hM0] using hFlatLt)
+   395	    have hLen : (intSeqList P).length = (N * N).toNat := by
+   396	      calc
+   397	        (intSeqList P).length = (expectedValues (N * N)).length := hPerm.length_eq
+   398	        _ = (N * N).toNat := by simp [expectedValues]
+   399	    have hBound : (I * N + J).toNat < (intSeqList P).length := by
+   400	      rw [hLen]
+   401	      exact hFlatNat
+   402	    have hGet := List.getElem?_eq_getElem hBound
+   403	    have hGrid : gridAt P N I J = (intSeqList P)[(I * N + J).toNat] := by
+   404	      unfold gridAt gridAtModel intSeqAtModel
+   405	      rw [if_neg (Int.not_lt_of_ge hFlat0), hGet]
+   406	      rfl
+   407	    have hMem : (intSeqList P)[(I * N + J).toNat] ∈ intSeqList P :=
+   408	      List.getElem_mem hBound
+   409	    have hExpected : (intSeqList P)[(I * N + J).toNat] ∈ expectedValues (N * N) :=
+   410	      hPerm.mem_iff.mp hMem
+   411	    have hBounds := expectedValues_mem_bounds hM0 hExpected
+   412	    rw [hGrid]
+   413	    exact hBounds.2
+   414	  constructor
+   415	  · intro V A
+   416	    simp [«valSeqConcat(_,_)_MPY-LIST_ValSeq_ValSeq_ValSeq»,
+   417	      valSeqConcatModel, snocVS, snocModel, valSeqList]
+   418	  · intro M R P A h
+   419	    simp [«_>=Int_», oddDone, oddDoneModel, pairDone, pairDoneModel,
+   420	      snocVS, snocModel, eq_comm] at h ⊢
+   421	
+   422	end Proof
+
+Script done on 2026-08-01 04:32:21-05:00 [COMMAND_EXIT_CODE="0"]

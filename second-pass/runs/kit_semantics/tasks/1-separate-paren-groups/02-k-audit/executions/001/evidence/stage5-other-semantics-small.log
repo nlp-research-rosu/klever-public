@@ -1,0 +1,413 @@
+COMMAND: bash -lc for\ f\ in\ reference-semantics/semantics/assert.k\ reference-semantics/semantics/comprehension.k\ reference-semantics/semantics/concrete.k\ reference-semantics/semantics/dict.k\ reference-semantics/semantics/range.k\ reference-semantics/semantics/set.k\ reference-semantics/semantics/sort.k\ reference-semantics/semantics/tuple.k\;\ do\ echo\ \"=====\ \$f\"\;\ nl\ -ba\ \"\$f\"\;\ done
+===== reference-semantics/semantics/assert.k
+     1	// reference/src/semantics/assert.k — MPY-ASSERT
+     2	
+     3	module MPY-ASSERT
+     4	  imports MPY-CORE
+     5	
+     6	  rule <k> Assert(V:Val) => .K ... </k>
+     7	       requires truthy(V)
+     8	  rule <k> Assert(V:Val) ~> _ => .K </k>
+     9	       <exc> NoExc => AssertionError </exc>
+    10	       <exit-code> _ => 1 </exit-code>
+    11	       requires notBool truthy(V)
+    12	
+    13	  rule <k> Assert(ref(H:Int)) => Assert(V) ... </k>
+    14	       <heap> ... H |-> V:Val ... </heap>
+    15	       [priority(40)]
+    16	endmodule
+===== reference-semantics/semantics/comprehension.k
+     1	// reference/src/semantics/comprehension.k — MPY-COMPREHENSION
+     2	
+     3	module MPY-COMPREHENSION
+     4	  imports MPY-CORE
+     5	  imports MPY-OPERATORS
+     6	  imports MPY-LIST
+     7	  imports MPY-CONTROLS
+     8	  imports MPY-FUNCTIONS
+     9	
+    10	  // A comprehension is pure syntactic sugar
+    11	  rule ListComp(ELT:Expr, Gs:CompFors) => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)
+    12	  rule GenExp(ELT:Expr, Gs:CompFors)   => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)
+    13	
+    14	  syntax Stmts ::= compBody(CompFors, Expr) [macro]
+    15	  rule compBody(Gs:CompFors, ELT:Expr)
+    16	    => Assign(Name("$acc"), ListExpr(.Exprs)) compNest(Gs, ELT) Return(Name("$acc"))
+    17	
+    18	  syntax Stmt ::= compNest(CompFors, Expr) [macro-rec]
+    19	  rule compNest(.CompFors, ELT:Expr)
+    20	    => Assign(Name("$acc"), BinOp("+", Name("$acc"), ListExpr(ELT)))
+    21	  rule compNest((CompFor(T:Expr, ITER:Expr, Fs:Exprs) GRest:CompFors), ELT:Expr)
+    22	    => For(T, ITER, If(compGuard(Fs), compNest(GRest, ELT), .Stmts))
+    23	
+    24	  syntax Expr ::= compGuard(Exprs) [macro]
+    25	  rule compGuard(.Exprs)             => Bool(true)
+    26	  rule compGuard((F:Expr, Fs:Exprs)) => BoolOp("and", (F, Fs))
+    27	endmodule
+===== reference-semantics/semantics/concrete.k
+     1	// reference/src/semantics/concrete.k — MPY-CONCRETE
+     2	// Concrete-execution-only rules, visible ONLY to the llvm build (run.sh kompiles
+     3	// MPY-CONCRETE; verification builds import MPY and never see these). Rationale:
+     4	// a k-cell rule matching value constructors NARROWS abstract Vals in the haskell
+     5	// backend ([concrete] is not respected on rewrite rules) — probed on
+     6	// 26-remove-duplicates, where element compares branched into deepEqVS.
+     7	
+     8	module MPY-CONCRETE
+     9	  imports MPY
+    10	
+    11	  // deep equality for list compares whose elements are heap objects
+    12	  // (list-of-lists): Python == is structural at every depth.
+    13	  rule <k> Compare(list(A:ValSeq), CmpOp("==", list(B:ValSeq))) => deepEqVS(A, B, HP) ... </k>
+    14	       <heap> HP:Map </heap>
+    15	       requires hasRefVS(A) orBool hasRefVS(B)
+    16	  rule <k> Compare(list(A:ValSeq), CmpOp("!=", list(B:ValSeq))) => notBool deepEqVS(A, B, HP) ... </k>
+    17	       <heap> HP:Map </heap>
+    18	       requires hasRefVS(A) orBool hasRefVS(B)
+    19	
+    20	  // ==== keyed sort, concrete leg ============================================
+    21	  // Computes each key by a REAL call through the uniform #callee machinery
+    22	  // (closures, len, type objects all work), stable-inserts on the key, and
+    23	  // allocates the result. priority(40) beats sort.k's opaque rules, so krun
+    24	  // runs this and proofs (which never see MPY-CONCRETE) keep sortKeyVS.
+    25	  syntax Val ::= kvP(Val, Val)
+    26	  syntax KItem ::= #ksort(ValSeq, Val, ValSeq, Bool)
+    27	                 | #ksIns(Val, ValSeq, Val, ValSeq, Bool)
+    28	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals))
+    29	        => #ksort(VS, KV, .ValSeq, false) ... </k>
+    30	       [priority(40)]
+    31	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals))
+    32	        => #ksort(VS, KV, .ValSeq, RB) ... </k>
+    33	       [priority(40)]
+    34	  rule <k> #ksort(.ValSeq, _:Val, ACC:ValSeq, RB:Bool)
+    35	        => #alloc(list(condRev(unpairVS(ACC), RB))) ... </k>
+    36	  rule <k> #ksort(vCons(V:Val, R:ValSeq), KV:Val, ACC:ValSeq, RB:Bool)
+    37	        => KV ~> #callee((V, .Exprs)) ~> #ksIns(V, R, KV, ACC, RB) ... </k>
+    38	  rule <k> K:Val ~> #ksIns(V:Val, R:ValSeq, KV:Val, ACC:ValSeq, RB:Bool)
+    39	        => #ksort(R, KV, insPair(ACC, K, V), RB) ... </k>
+    40	       requires notBool isKwV(K)
+    41	
+    42	  syntax ValSeq ::= insPair(ValSeq, Val, Val) [function]
+    43	  rule insPair(.ValSeq, K:Val, V:Val) => vCons(kvP(K, V), .ValSeq)
+    44	  rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val)
+    45	    => vCons(kvP(K, V), vCons(kvP(K2, V2), R))
+    46	       requires kLt(K, K2)
+    47	  rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val)
+    48	    => vCons(kvP(K2, V2), insPair(R, K, V))
+    49	       requires notBool kLt(K, K2)
+    50	
+    51	  syntax Bool ::= kLt(Val, Val) [function]
+    52	  rule kLt(I1:Int, I2:Int)             => I1 <Int I2
+    53	  rule kLt(F1:Float, F2:Float)         => F1 <Float F2
+    54	  rule kLt(str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+    55	
+    56	  syntax ValSeq ::= unpairVS(ValSeq) [function, total]
+    57	  rule unpairVS(.ValSeq) => .ValSeq
+    58	  rule unpairVS(vCons(kvP(_:Val, V:Val), R:ValSeq)) => vCons(V, unpairVS(R))
+    59	  rule unpairVS(vCons(V:Val, R:ValSeq)) => vCons(V, unpairVS(R)) [owise]
+    60	endmodule
+===== reference-semantics/semantics/dict.k
+     1	// reference/src/semantics/dict.k — MPY-DICT
+     2	//
+     3	// Minimal dict support. A dict value is `dictV(KS, VS)`: PARALLEL insertion-ordered key/value
+     4	// ValSeqs (Python dict order; keys distinct; re-inserting a key updates its value in place, keeping
+     5	// the original position). Concrete for krun (the ordered build + `.keys()` are the real ops); a proof
+     6	// over a SYMBOLIC dict passes `dictV(KS, WS)` with a symbolic key sequence KS and reads
+     7	// `d.keys() = list(KS)`, then keeps each key opaque problem-locally.
+     8	//
+     9	// Only the pieces needed so far: a dict VALUE (so `{}` inside a mixed list evaluates and
+    10	// `isinstance(x, int)` rejects it), the `{k: v, ...}` literal, and `.keys()`. More dict ops (subscript
+    11	// / `.get()` / `.values()` / dict `==`) are added as dict problems need them — kept minimal + additive.
+    12	
+    13	module MPY-DICT
+    14	  imports MPY-CORE
+    15	  imports MPY-ITER
+    16	  imports MPY-METHODS
+    17	  imports MPY-LIST
+    18	
+    19	  // dict as PARALLEL ordered key/value ValSeqs (same length; keys distinct).
+    20	  syntax Val ::= dictV(ValSeq, ValSeq)
+    21	
+    22	  // ==== DictExpr: {k: v, ...} literal. Eval each key then value, left to right, insert-with-dedup.
+    23	  syntax KItem ::= #dictAcc(Entries, ValSeq, ValSeq)
+    24	                 | #dictKey(Expr, Entries, ValSeq, ValSeq)
+    25	                 | #dictVal(Val, Entries, ValSeq, ValSeq)
+    26	  rule <k> DictExpr(ES:Entries) => #dictAcc(ES, .ValSeq, .ValSeq) ... </k>
+    27	  rule <k> #dictAcc(.Entries, KS:ValSeq, VS:ValSeq) => dictV(KS, VS) ... </k>
+    28	  rule <k> #dictAcc((Entry(K:Expr, V:Expr), REST:Entries), KS:ValSeq, VS:ValSeq)
+    29	        => K ~> #dictKey(V, REST, KS, VS) ... </k>
+    30	  rule <k> KV:Val ~> #dictKey(V:Expr, REST:Entries, KS:ValSeq, VS:ValSeq)
+    31	        => V ~> #dictVal(KV, REST, KS, VS) ... </k>
+    32	  rule <k> VV:Val ~> #dictVal(KV:Val, REST:Entries, KS:ValSeq, VS:ValSeq)
+    33	        => #dictAcc(REST, dPutK(KS, KV), dPutV(KS, VS, KV, VV)) ... </k>
+    34	
+    35	  // insert-with-dedup helpers (concrete Val key equality via ==K). [total] so buildFold over a dict is
+    36	  // total (its #Ceil is #Top) — needed when a symbolic proof carries a built dict as a config value.
+    37	  syntax Bool ::= dHasKey(ValSeq, Val) [function, total]
+    38	  rule dHasKey(.ValSeq, _:Val)                => false
+    39	  rule dHasKey(vCons(A:Val, _:ValSeq), K:Val) => true          requires A ==K K
+    40	  rule dHasKey(vCons(A:Val, R:ValSeq), K:Val) => dHasKey(R, K) requires notBool (A ==K K)
+    41	
+    42	  // dPutK: KS unchanged if K already present, else append K (keep-first-position).
+    43	  syntax ValSeq ::= dPutK(ValSeq, Val) [function, total]
+    44	  rule dPutK(KS:ValSeq, K:Val) => KS                                  requires dHasKey(KS, K)
+    45	  rule dPutK(KS:ValSeq, K:Val) => valSeqConcat(KS, vCons(K, .ValSeq)) requires notBool dHasKey(KS, K)
+    46	
+    47	  // dPutV: parallel to KS — set the value at K's position if present, else append V at the end. The
+    48	  // [owise] catch-all covers the degenerate mismatched-length case (never reached for a well-formed dict).
+    49	  syntax ValSeq ::= dPutV(ValSeq, ValSeq, Val, Val) [function, total]
+    50	  rule dPutV(vCons(A:Val, _:ValSeq), vCons(_:Val, VR:ValSeq), K:Val, V:Val)  => vCons(V, VR)
+    51	       requires A ==K K
+    52	  rule dPutV(vCons(A:Val, KR:ValSeq), vCons(B:Val, VR:ValSeq), K:Val, V:Val) => vCons(B, dPutV(KR, VR, K, V))
+    53	       requires notBool (A ==K K)
+    54	  rule dPutV(_KS:ValSeq, VS:ValSeq, _K:Val, V:Val) => valSeqConcat(VS, vCons(V, .ValSeq)) [owise]
+    55	
+    56	  // ==== dict methods ========================================================
+    57	  // d.keys() -> a FRESH list object of the ordered keys (k-cell: it allocates).
+    58	  rule <k> #applyK(toCall(boundMethodV(dictV(KS:ValSeq, _:ValSeq), "keys")), .Vals)
+    59	        => #alloc(list(KS)) ... </k>
+    60	       [priority(40)]
+    61	
+    62	  // ==== dict subscript READ: d[k] (assoc lookup; KeyError is out of subset) ==
+    63	  rule applyIndexD(dictV(KS:ValSeq, VS:ValSeq), K:Val) => dGet(KS, VS, K)
+    64	  syntax Val ::= applyIndexD(Val, Val) [function]
+    65	  rule <k> Subscript(dictV(KS:ValSeq, VS:ValSeq), K:Val) => applyIndexD(dictV(KS, VS), K) ... </k>
+    66	       [priority(45)]
+    67	
+    68	  // ==== dict subscript-assign: d[k] = v (insert/update in place) =============
+    69	  // Only for a LOCAL dict variable X (the current scope holds it). Reuses dPutK/dPutV.
+    70	  syntax Val ::= dictSet(Val, Val, Val) [function]
+    71	  rule dictSet(dictV(KS:ValSeq, VS:ValSeq), K:Val, V:Val) => dictV(dPutK(KS, K), dPutV(KS, VS, K, V))
+    72	
+    73	  // RHS evaluates first (Assign strictness), then the key. Dispatch on the scope
+    74	  // value: a bare dict updates in the scope (dicts stay values); a ref (a heap
+    75	  // list — or a heap dict later) writes the heap in place.
+    76	  syntax KItem ::= #dsetK(String, Val)
+    77	  rule <k> Assign(Subscript(Name(X:String), K:Expr), VV:Val) => K ~> #dsetK(X, VV) ... </k>
+    78	  rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => .K ... </k>
+    79	       <env> L:Int </env>
+    80	       <scopes> ... L |-> scope(M:Map => M [ X <- dictSet({M[X]}:>Val, KV, VV) ], _) ... </scopes>
+    81	       requires X in_keys(M) andBool notBool isRefV({M[X]}:>Val)
+    82	  rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => #dsetV({M[X]}:>Val, KV, VV) ... </k>
+    83	       <env> L:Int </env>
+    84	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    85	       requires X in_keys(M) andBool isRefV({M[X]}:>Val)
+    86	  syntax KItem ::= #dsetV(Val, Val, Val)
+    87	  rule <k> #dsetV(ref(H:Int), I:Int, VV:Val) => .K ... </k>
+    88	       <heap> ... H |-> list(VS:ValSeq => setVSAt(VS, normIdxD(I, vsLen(VS)), VV)) ... </heap>
+    89	  // negative-index normalization local to the write (subscript.k's is not imported here)
+    90	  syntax Int ::= normIdxD(Int, Int) [function, total]
+    91	  rule normIdxD(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0
+    92	  rule normIdxD(I:Int, _:Int)   => I          requires I >=Int 0
+    93	
+    94	  // ==== dict == (order-insensitive: same size + same key->value pairs) =======
+    95	  rule applyCmp("==", dictV(KS1:ValSeq, VS1:ValSeq), dictV(KS2:ValSeq, VS2:ValSeq))
+    96	    => (vsLen(KS1) ==Int vsLen(KS2)) andBool dSubset(KS1, VS1, KS2, VS2)
+    97	  syntax Bool ::= dSubset(ValSeq, ValSeq, ValSeq, ValSeq) [function]
+    98	  rule dSubset(.ValSeq, .ValSeq, _:ValSeq, _:ValSeq) => true
+    99	  rule dSubset(vCons(K:Val, KR:ValSeq), vCons(V:Val, VR:ValSeq), KS2:ValSeq, VS2:ValSeq)
+   100	    => dHasKey(KS2, K) andBool (dGet(KS2, VS2, K) ==K V) andBool dSubset(KR, VR, KS2, VS2)
+   101	  syntax Val ::= dGet(ValSeq, ValSeq, Val) [function]
+   102	  rule dGet(vCons(A:Val, _:ValSeq), vCons(B:Val, _:ValSeq), K:Val) => B                requires A ==K K
+   103	  rule dGet(vCons(A:Val, KR:ValSeq), vCons(_:Val, VR:ValSeq), K:Val) => dGet(KR, VR, K) requires notBool (A ==K K)
+   104	endmodule
+===== reference-semantics/semantics/range.k
+     1	// reference/src/semantics/range.k — MPY-RANGE
+     2	// rangeObj: the range helpers (inRange / rangeLen) + its #iterNext case. rangeObj itself is
+     3	// declared in MPY-CORE's Iterable union; this module owns its behavior.
+     4	
+     5	module MPY-RANGE
+     6	  imports MPY-CORE
+     7	  imports MPY-ITER
+     8	
+     9	  syntax Bool ::= inRange(Int, Int, Int) [function, total]
+    10	  rule inRange(I:Int, HI:Int, ST:Int) => (ST >Int 0 andBool I <Int HI) orBool (ST <Int 0 andBool I >Int HI)
+    11	
+    12	  syntax Int ::= rangeLen(Int, Int, Int) [function]
+    13	  rule rangeLen(LO:Int, HI:Int, ST:Int) => (HI -Int LO +Int ST -Int 1) /Int ST
+    14	       requires ST >Int 0 andBool HI >Int LO
+    15	  rule rangeLen(LO:Int, HI:Int, ST:Int) => (LO -Int HI -Int ST -Int 1) /Int (0 -Int ST)
+    16	       requires ST <Int 0 andBool HI <Int LO
+    17	  rule rangeLen(LO:Int, HI:Int, ST:Int) => 0
+    18	       requires (ST >Int 0 andBool HI <=Int LO) orBool (ST <Int 0 andBool HI >=Int LO)
+    19	
+    20	  rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int))
+    21	        => #iterYield(I, rangeObj(I +Int ST, HI, ST)) ... </k>
+    22	       requires inRange(I, HI, ST)
+    23	  rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterDone ... </k>
+    24	       requires notBool inRange(I, HI, ST)
+    25	endmodule
+===== reference-semantics/semantics/set.k
+     1	// reference/src/semantics/set.k — MPY-SET
+     2	
+     3	module MPY-SET
+     4	  imports MPY-CORE
+     5	
+     6	  // a set value, carried as its distinct codes in first-seen order (order is irrelevant
+     7	  // to membership/cardinality — the two observations sets support here).
+     8	  syntax Val ::= setV(IntSeq)
+     9	
+    10	  // membership of a code in the accumulated distinct-code sequence
+    11	  syntax Bool ::= codeIn(Int, IntSeq) [function, total]
+    12	  rule codeIn(_:Int, .IntSeq)                => false
+    13	  rule codeIn(C:Int, iCons(H:Int, T:IntSeq)) => C ==Int H orBool codeIn(C, T)
+    14	
+    15	  // the distinct codes of CS (insert-if-absent fold, first-seen order)
+    16	  syntax IntSeq ::= dedupCodes(IntSeq)         [function, total]
+    17	                  | dedupFrom(IntSeq, IntSeq)  [function, total]
+    18	  rule dedupCodes(CS:IntSeq) => dedupFrom(CS, .IntSeq)
+    19	  rule dedupFrom(.IntSeq, ACC:IntSeq) => ACC
+    20	  rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, ACC)
+    21	       requires codeIn(C, ACC)
+    22	  rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, snocCode(ACC, C))
+    23	       requires notBool codeIn(C, ACC)
+    24	
+    25	  syntax IntSeq ::= snocCode(IntSeq, Int) [function, total]
+    26	  rule snocCode(.IntSeq, C:Int)                => iCons(C, .IntSeq)
+    27	  rule snocCode(iCons(H:Int, T:IntSeq), C:Int) => iCons(H, snocCode(T, C))
+    28	
+    29	  // ==== set equality: two sets are equal iff mutually subsuming ==============
+    30	  // subsetCodes(A, B) — every code of A occurs in B (duplicates in A are harmless).
+    31	  syntax Bool ::= subsetCodes(IntSeq, IntSeq) [function, total]
+    32	  rule subsetCodes(.IntSeq, _:IntSeq)                => true
+    33	  rule subsetCodes(iCons(C:Int, S:IntSeq), B:IntSeq) => codeIn(C, B) andBool subsetCodes(S, B)
+    34	
+    35	  syntax Bool ::= sameSet(IntSeq, IntSeq) [function, total]
+    36	  rule sameSet(A:IntSeq, B:IntSeq) => subsetCodes(A, B) andBool subsetCodes(B, A)
+    37	
+    38	  // set == set  (the only comparison sets support here)
+    39	  rule applyCmp("==", setV(A:IntSeq), setV(B:IntSeq)) => sameSet(A, B)
+    40	endmodule
+===== reference-semantics/semantics/sort.k
+     1	// reference/src/semantics/sort.k — MPY-SORT
+     2	// Trusted sorted(): sorted(list) as an opaque ascending permutation `sortVS` — opaque symbolic
+     3	// for kprove (a trusted primitive, correctness/ordering proved in Lean / notes/sort-probe),
+     4	// and a concrete insertion sort for krun. Wrappers verify the logic AROUND the sort (index /
+     5	// slice / filter / dedup); indexing an opaque sortVS(VS) carries through as an opaque term, so
+     6	// no ordering lemma is needed in K — the trust (sortVS = real sorted) is discharged by each
+     7	// problem's differential test. Only int lists (compared by projectIntTotal); keyed / string
+     8	// sorts are separate. Fires only via the "sorted" builtin, so inert for non-sorting programs.
+     9	
+    10	module MPY-SORT
+    11	  imports MPY-BUILTINS
+    12	  imports MPY-SUBSCRIPT
+    13	
+    14	  // sortVS(VS): the ascending sort of the Val list VS. Opaque for symbolic VS (no-evaluators);
+    15	  // concrete insertion sort for krun.
+    16	  // Concrete sort matches Int-sorted elements directly (an int Val IS an Int); projectIntTotal
+    17	  // (lemmas-only) is not available in the semantics. Int and str lists.
+    18	  syntax ValSeq ::= sortVS(ValSeq) [function, total, symbol(sortVS), no-evaluators]
+    19	  syntax ValSeq ::= insVS(Int, ValSeq) [function]
+    20	  rule sortVS(.ValSeq)                => .ValSeq          [concrete]
+    21	  rule sortVS(vCons(X:Int, R:ValSeq)) => insVS(X, sortVS(R)) [concrete]
+    22	  rule insVS(X:Int, .ValSeq)                => vCons(X, .ValSeq) [concrete]
+    23	  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]
+    24	  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X  >Int Y [concrete]
+    25	  // str elements insert by the shared lexicographic strLt (methods.k)
+    26	  syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]
+    27	  rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]
+    28	  rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]
+    29	  rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(A), vCons(str(B), R))
+    30	       requires strLt(A, B) orBool A ==K B [concrete]
+    31	  rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(B), insVSs(A, R))
+    32	       requires notBool (strLt(A, B) orBool A ==K B) [concrete]
+    33	
+    34	  // sorted(list) constructs a NEW object: k-cell pre-dispatch (beats the [owise]
+    35	  // applyBuiltin routing in call.k) so the result allocates.
+    36	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), .Vals))
+    37	        => #alloc(list(sortVS(VS))) ... </k>
+    38	
+    39	  // mutator: xs.sort() — the in-place heap write over the same trusted sortVS
+    40	  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "sort")), .Vals) => noneV ... </k>
+    41	       <heap> ... H |-> list(VS:ValSeq => sortVS(VS)) ... </heap>
+    42	       [priority(40)]
+    43	
+    44	  // ==== keyed / reversed sorted() (WP2) =====================================
+    45	  // sortKeyVS(VS, KV): the stable ascending sort of VS by the key value KV
+    46	  // (a closure/builtin/type — anything callable). OPAQUE here; the concrete
+    47	  // leg (MPY-CONCRETE, llvm only) computes keys by REAL calls and stable-
+    48	  // inserts, at priority(40) over these.
+    49	  syntax ValSeq ::= sortKeyVS(ValSeq, Val) [function, total, symbol(sortKeyVS), no-evaluators]
+    50	
+    51	  syntax ValSeq ::= revVS(ValSeq) [function, total]
+    52	                  | revVSAcc(ValSeq, ValSeq) [function, total]
+    53	  rule revVS(S:ValSeq) => revVSAcc(S, .ValSeq)
+    54	  rule revVSAcc(.ValSeq, A:ValSeq) => A
+    55	  rule revVSAcc(vCons(V:Val, R:ValSeq), A:ValSeq) => revVSAcc(R, vCons(V, A))
+    56	
+    57	  syntax ValSeq ::= condRev(ValSeq, Bool) [function, total]
+    58	  rule condRev(S:ValSeq, false) => S
+    59	  rule condRev(S:ValSeq, true)  => revVS(S)
+    60	
+    61	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals))
+    62	        => #alloc(list(sortKeyVS(VS, KV))) ... </k>
+    63	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals))
+    64	        => #alloc(list(condRev(sortKeyVS(VS, KV), RB))) ... </k>
+    65	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("reverse", RB:Bool), .Vals))
+    66	        => #alloc(list(condRev(sortVS(VS), RB))) ... </k>
+    67	
+    68	  // Indexing the opaque sorted list: `valSeqAt(sortVS(VS), I)` is DEFINED because valSeqAt is
+    69	  // [total] (subscript.k) — it stays an abstract total value for a symbolic sort and reduces
+    70	  // over the concrete sort for krun. No separate sortedAt indirection is needed; wrappers write
+    71	  // their postcondition directly as valSeqAt(sortVS(VS), …).
+    72	endmodule
+===== reference-semantics/semantics/tuple.k
+     1	// reference/src/semantics/tuple.k — MPY-TUPLE
+     2	
+     3	module MPY-TUPLE
+     4	  imports MPY-CORE
+     5	  imports MPY-ITER
+     6	  imports MPY-LIST
+     7	  imports MPY-METHODS
+     8	
+     9	  // ==== iteration (the iterator protocol's tuple case) ======================
+    10	  rule <k> #iterNext(tuple(.ValSeq))                => #iterDone ... </k>
+    11	  rule <k> #iterNext(tuple(vCons(V:Val, R:ValSeq))) => #iterYield(V, tuple(R)) ... </k>
+    12	
+    13	  // ==== TupleExpr: tuple(ValSeq) literal + == != ===========================
+    14	  syntax ApplyK ::= "toTuple"
+    15	  rule <k> TupleExpr(ES:Exprs) => #evalArgs(ES, .Vals, toTuple) ... </k>
+    16	  rule <k> #applyK(toTuple, ACC:Vals) => tuple(vals2valSeq(ACC)) ... </k>
+    17	
+    18	  rule applyCmp("==", tuple(A:ValSeq), tuple(B:ValSeq)) => A ==K B
+    19	  // membership routes through the same k-cell fold as lists (list.k)
+    20	  rule <k> Compare(LV:Val, CmpOp("in",     tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ... </k>
+    21	  rule <k> Compare(LV:Val, CmpOp("not in", tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ~> #notB ... </k>
+    22	  // t.index(v): first index of v (ValueError out of subset)
+    23	  rule applyMethod(tuple(VS:ValSeq), "index", V:Val, .Vals) => idxOfVS(VS, V, 0)
+    24	  syntax Int ::= idxOfVS(ValSeq, Val, Int) [function]
+    25	  rule idxOfVS(vCons(A:Val, _:ValSeq), V:Val, I:Int) => I requires A ==K V
+    26	  rule idxOfVS(vCons(A:Val, R:ValSeq), V:Val, I:Int) => idxOfVS(R, V, I +Int 1)
+    27	       requires notBool (A ==K V)
+    28	  rule applyCmp("!=", tuple(A:ValSeq), tuple(B:ValSeq)) => notBool (A ==K B)
+    29	
+    30	  // ==== target binding: bind a Name or a TupleExpr target to a value ========
+    31	  syntax KItem ::= #bindTgt(Expr, Val)
+    32	  rule <k> #bindTgt(Name(X:String), V:Val) => .K ... </k>
+    33	       <env> L:Int </env>
+    34	       <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>
+    35	  rule <k> #bindTgt(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k>
+    36	       <env> L:Int </env>
+    37	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    38	       requires "$cells" in_keys(M)
+    39	        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+    40	        andBool X in_keys(M) andBool isCellRef({M[X]}:>Val)
+    41	       [priority(40)]
+    42	  rule <k> #bindTgt(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>
+    43	  rule <k> #bindTgt(TupleExpr(TS:Exprs), list(VS:ValSeq))  => #unpackSeq(TS, VS) ... </k>
+    44	  rule <k> #bindTgt(TupleExpr(TS:Exprs), ref(H:Int)) => #bindTgt(TupleExpr(TS), V) ... </k>
+    45	       <heap> ... H |-> V:Val ... </heap>
+    46	       [priority(40)]
+    47	
+    48	  // ==== unpacking: a, b = <tuple|list> (RHS evaluated by strictness) ========
+    49	  syntax KItem ::= #unpackSeq(Exprs, ValSeq)
+    50	  rule <k> Assign(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>
+    51	  rule <k> Assign(TupleExpr(TS:Exprs), list(VS:ValSeq))  => #unpackSeq(TS, VS) ... </k>
+    52	  rule <k> Assign(TupleExpr(TS:Exprs), ref(H:Int)) => Assign(TupleExpr(TS), V) ... </k>
+    53	       <heap> ... H |-> V:Val ... </heap>
+    54	       [priority(40)]
+    55	  rule <k> #unpackSeq((T:Expr, TS:Exprs), vCons(V:Val, VS:ValSeq))
+    56	        => #bindTgt(T, V) ~> #unpackSeq(TS, VS) ... </k>
+    57	  rule <k> #unpackSeq(.Exprs, .ValSeq) => .K ... </k>
+    58	endmodule
+
+EXIT_STATUS: 0

@@ -1,0 +1,710 @@
+$ nl -ba /reference/k-proof/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION-SYNTAX
+     4	  imports MPY-SYNTAX
+     5	  imports FLOAT-SYNTAX
+     6	
+     7	  // A proof-domain representation of every finite list of numeric
+     8	  // coefficients.  Its embedding is the actual ValSeq consumed by MPY.
+     9	  syntax NumSeq ::= ".NumSeq"
+    10	                  | nInt(Int, NumSeq)
+    11	                  | nFloat(Float, NumSeq)
+    12	
+    13	  syntax ValSeq ::= numVals(NumSeq) [function, total]
+    14	  syntax Int ::= numLen(NumSeq) [function, total]
+    15	  syntax Bool ::= lastNonZero(NumSeq) [function, total]
+    16	  syntax Bool ::= validCoeffs(NumSeq) [function, total]
+    17	
+    18	  // Exact, non-operational abbreviations for the translated source syntax.
+    19	  syntax Stmts ::= "polyStep" [function, total]
+    20	                 | "polyBody" [function, total]
+    21	                 | "expandBody" [function, total]
+    22	                 | "bisectBody" [function, total]
+    23	                 | "findZeroBody" [function, total]
+    24	  syntax Expr ::= "expandCond" [function, total]
+    25	                | "bisectCond" [function, total]
+    26	  syntax Module ::= "solutionModule" [function, total]
+    27	
+    28	  // Exact mathematical summaries of the three source loops.
+    29	  syntax Float ::= polyAcc(NumSeq, Float, Float, Float)
+    30	                   [function, total, symbol(polyAcc), no-evaluators]
+    31	                 | polyValue(NumSeq, Float)
+    32	                   [function, total, symbol(polyValue), no-evaluators]
+    33	                 | polyPower(NumSeq, Float, Float)
+    34	                   [function, total, symbol(polyPower), no-evaluators]
+    35	                 | bracketBegin(NumSeq, Float, Float)
+    36	                   [function, total, symbol(bracketBegin), no-evaluators]
+    37	                 | bracketEnd(NumSeq, Float, Float)
+    38	                   [function, total, symbol(bracketEnd), no-evaluators]
+    39	                 | solveFrom(NumSeq, Float, Float)
+    40	                   [function, total, symbol(solveFrom), no-evaluators]
+    41	                 | bisectFrom(NumSeq, Float, Float)
+    42	                   [function, total, symbol(bisectFrom), no-evaluators]
+    43	  syntax Val ::= polyLast(NumSeq, Val)
+    44	                 [function, total, symbol(polyLast), no-evaluators]
+    45	endmodule
+    46	
+    47	module VERIFICATION-BASE
+    48	  imports MPY
+    49	  imports VERIFICATION-SYNTAX
+    50	
+    51	  rule numVals(.NumSeq) => .ValSeq
+    52	  rule numVals(nInt(I, NS)) => vCons(I, numVals(NS))
+    53	  rule numVals(nFloat(F, NS)) => vCons(F, numVals(NS))
+    54	
+    55	  // Injectivity consequences of the three disjoint embedding equations.
+    56	  // These expose the NumSeq constructor selected by MPY's ValSeq iterator.
+    57	  rule { numVals(@NS:NumSeq) #Equals .ValSeq }
+    58	    => { @NS #Equals .NumSeq }
+    59	    [simplification]
+    60	  rule { numVals(@NS1:NumSeq) #Equals numVals(@NS2:NumSeq) }
+    61	    => { @NS1 #Equals @NS2 }
+    62	    [simplification]
+    63	  rule { numVals(@NS:NumSeq)
+    64	         #Equals vCons(@I:Int, numVals(@R:NumSeq)) }
+    65	    => { @NS #Equals nInt(@I, @R) }
+    66	    [simplification]
+    67	  rule { numVals(@NS:NumSeq)
+    68	         #Equals vCons(@F:Float, numVals(@R:NumSeq)) }
+    69	    => { @NS #Equals nFloat(@F, @R) }
+    70	    [simplification]
+    71	
+    72	  rule numLen(.NumSeq) => 0
+    73	  rule numLen(nInt(_, NS)) => 1 +Int numLen(NS)
+    74	  rule numLen(nFloat(_, NS)) => 1 +Int numLen(NS)
+    75	
+    76	  rule lastNonZero(.NumSeq) => false
+    77	  rule lastNonZero(nInt(I, .NumSeq)) => I =/=Int 0
+    78	  rule lastNonZero(nFloat(F, .NumSeq)) => notBool eqF(F, 0.0)
+    79	  rule lastNonZero(nInt(_, NS)) => lastNonZero(NS)
+    80	    requires numLen(NS) >Int 0
+    81	  rule lastNonZero(nFloat(_, NS)) => lastNonZero(NS)
+    82	    requires numLen(NS) >Int 0
+    83	
+    84	  rule validCoeffs(NS)
+    85	    => numLen(NS) >=Int 2
+    86	       andBool numLen(NS) %Int 2 ==Int 0
+    87	       andBool lastNonZero(NS)
+    88	
+    89	  rule polyStep
+    90	    => Assign(
+    91	         Name("value"),
+    92	         BinOp("+", Name("value"),
+    93	                    BinOp("*", Name("coeff"), Name("power"))))
+    94	       Assign(Name("power"), BinOp("*", Name("power"), Name("x")))
+    95	
+    96	  rule polyBody
+    97	    => Assign(Name("value"), Float(0.0))
+    98	       Assign(Name("power"), Float(1.0))
+    99	       Assign(Name("coeff"), Float(0.0))
+   100	       For(Name("coeff"), Name("xs"), polyStep)
+   101	       Return(Name("value"))
+   102	
+   103	  rule expandCond
+   104	    => Compare(
+   105	         BinOp("*",
+   106	           Call(Name("poly"), (Name("xs"), Name("begin"), .Exprs)),
+   107	           Call(Name("poly"), (Name("xs"), Name("end"), .Exprs))),
+   108	         CmpOp(">", Float(0.0)))
+   109	
+   110	  rule expandBody
+   111	    => Assign(Name("begin"), BinOp("*", Name("begin"), Float(2.0)))
+   112	       Assign(Name("end"), BinOp("*", Name("end"), Float(2.0)))
+   113	
+   114	  rule bisectCond
+   115	    => Compare(
+   116	         BinOp("-", Name("end"), Name("begin")),
+   117	         CmpOp(">", Float(1e-10)))
+   118	
+   119	  rule bisectBody
+   120	    => Assign(
+   121	         Name("center"),
+   122	         BinOp("/", BinOp("+", Name("begin"), Name("end")), Float(2.0)))
+   123	       If(
+   124	         Compare(
+   125	           BinOp("*",
+   126	             Call(Name("poly"), (Name("xs"), Name("center"), .Exprs)),
+   127	             Call(Name("poly"), (Name("xs"), Name("begin"), .Exprs))),
+   128	           CmpOp(">", Float(0.0))),
+   129	         Assign(Name("begin"), Name("center")),
+   130	         Assign(Name("end"), Name("center")))
+   131	
+   132	  rule findZeroBody
+   133	    => Assign(
+   134	         Name("begin"),
+   135	         BinOp("/",
+   136	           Call(Name("len"), (Name("xs"), .Exprs)),
+   137	           UnaryOp("-", Call(Name("len"), (Name("xs"), .Exprs)))))
+   138	       Assign(
+   139	         Name("end"),
+   140	         BinOp("/",
+   141	           Call(Name("len"), (Name("xs"), .Exprs)),
+   142	           Call(Name("len"), (Name("xs"), .Exprs))))
+   143	       Assign(Name("center"), Float(0.0))
+   144	       While(expandCond, expandBody)
+   145	       While(bisectCond, bisectBody)
+   146	       Return(Name("begin"))
+   147	
+   148	  rule solutionModule
+   149	    => Module(
+   150	         FuncDef("poly", Params(("xs", "x")), polyBody)
+   151	         FuncDef("find_zero", Params("xs"), findZeroBody))
+   152	
+   153	  // Horner-by-powers fold used by poly.  Both clauses are exact restatements
+   154	  // of one source iteration for the corresponding numeric constructor.
+   155	  rule polyAcc(.NumSeq, _X, A, _P) => A [simplification]
+   156	  rule polyAcc(nInt(I, NS), X, A, P)
+   157	    => polyAcc(NS, X,
+   158	               addF(A, mulF(intToF(I), P)),
+   159	               mulF(P, X))
+   160	    [simplification]
+   161	  rule polyAcc(nFloat(F, NS), X, A, P)
+   162	    => polyAcc(NS, X,
+   163	               addF(A, mulF(F, P)),
+   164	               mulF(P, X))
+   165	    [simplification]
+   166	  rule polyValue(NS, X) => polyAcc(NS, X, 0.0, 1.0)
+   167	    [simplification]
+   168	  rule polyPower(.NumSeq, _X, P) => P [simplification]
+   169	  rule polyPower(nInt(_I, NS), X, P)
+   170	    => polyPower(NS, X, mulF(P, X))
+   171	    [simplification]
+   172	  rule polyPower(nFloat(_F, NS), X, P)
+   173	    => polyPower(NS, X, mulF(P, X))
+   174	    [simplification]
+   175	  rule polyLast(.NumSeq, C) => C [simplification]
+   176	  rule polyLast(nInt(I, NS), _C)
+   177	    => polyLast(NS, I)
+   178	    [simplification]
+   179	  rule polyLast(nFloat(F, NS), _C)
+   180	    => polyLast(NS, F)
+   181	    [simplification]
+   182	
+   183	  // Exact projections of the pair of endpoints produced by the expansion
+   184	  // loop.  Their guards are the source guard and its negation.
+   185	  rule bracketBegin(NS, B, E)
+   186	    => bracketBegin(NS, mulF(B, 2.0), mulF(E, 2.0))
+   187	    requires gtF(mulF(polyValue(NS, B), polyValue(NS, E)), 0.0)
+   188	    [simplification]
+   189	  rule bracketBegin(NS, B, E) => B
+   190	    requires notBool gtF(mulF(polyValue(NS, B), polyValue(NS, E)), 0.0)
+   191	    [simplification]
+   192	  rule bracketEnd(NS, B, E)
+   193	    => bracketEnd(NS, mulF(B, 2.0), mulF(E, 2.0))
+   194	    requires gtF(mulF(polyValue(NS, B), polyValue(NS, E)), 0.0)
+   195	    [simplification]
+   196	  rule bracketEnd(NS, B, E) => E
+   197	    requires notBool gtF(mulF(polyValue(NS, B), polyValue(NS, E)), 0.0)
+   198	    [simplification]
+   199	
+   200	  // The bisection loop summary.  The outer clauses split on the while guard;
+   201	  // the two recursive clauses then split on the exact source if-condition.
+   202	  rule bisectFrom(NS, B, E)
+   203	    => bisectFrom(NS, divF(addF(B, E), 2.0), E)
+   204	    requires gtF(subF(E, B), 1e-10)
+   205	      andBool gtF(
+   206	        mulF(polyValue(NS, divF(addF(B, E), 2.0)),
+   207	             polyValue(NS, B)),
+   208	        0.0)
+   209	    [simplification]
+   210	  rule bisectFrom(NS, B, E)
+   211	    => bisectFrom(NS, B, divF(addF(B, E), 2.0))
+   212	    requires gtF(subF(E, B), 1e-10)
+   213	      andBool notBool gtF(
+   214	        mulF(polyValue(NS, divF(addF(B, E), 2.0)),
+   215	             polyValue(NS, B)),
+   216	        0.0)
+   217	    [simplification]
+   218	  rule bisectFrom(_NS, B, E)
+   219	    => B
+   220	    requires notBool gtF(subF(E, B), 1e-10)
+   221	    [simplification]
+   222	
+   223	  rule solveFrom(NS, B, E)
+   224	    => bisectFrom(NS, bracketBegin(NS, B, E), bracketEnd(NS, B, E))
+   225	    [simplification]
+   226	endmodule
+   227	
+   228	module VERIFICATION
+   229	  imports VERIFICATION-BASE
+   230	endmodule
+$ nl -ba /reference/k-proof/solution.py
+     1	def poly(xs: list, x: float):
+     2	    value = 0.0
+     3	    power = 1.0
+     4	    coeff = 0.0
+     5	    for coeff in xs:
+     6	        value = value + coeff * power
+     7	        power = power * x
+     8	    return value
+     9	
+    10	
+    11	def find_zero(xs: list):
+    12	    begin = len(xs) / -len(xs)
+    13	    end = len(xs) / len(xs)
+    14	    center = 0.0
+    15	    while poly(xs, begin) * poly(xs, end) > 0.0:
+    16	        begin = begin * 2.0
+    17	        end = end * 2.0
+    18	    while end - begin > 0.0000000001:
+    19	        center = (begin + end) / 2.0
+    20	        if poly(xs, center) * poly(xs, begin) > 0.0:
+    21	            begin = center
+    22	        else:
+    23	            end = center
+    24	    return begin
+$ nl -ba /reference/k-proof/solution.mpy
+     1	Module(
+     2	  FuncDef("poly", Params("xs", "x"),
+     3	    Assign(Name("value"), Float(0.0))
+     4	    Assign(Name("power"), Float(1.0))
+     5	    Assign(Name("coeff"), Float(0.0))
+     6	    For(Name("coeff"), Name("xs"),
+     7	      Assign(
+     8	        Name("value"),
+     9	        BinOp(
+    10	          "+",
+    11	          Name("value"),
+    12	          BinOp("*", Name("coeff"), Name("power"))))
+    13	      Assign(Name("power"), BinOp("*", Name("power"), Name("x"))))
+    14	    Return(Name("value")))
+    15	  FuncDef("find_zero", Params("xs"),
+    16	    Assign(
+    17	      Name("begin"),
+    18	      BinOp(
+    19	        "/",
+    20	        Call(Name("len"), Name("xs")),
+    21	        UnaryOp("-", Call(Name("len"), Name("xs")))))
+    22	    Assign(
+    23	      Name("end"),
+    24	      BinOp(
+    25	        "/",
+    26	        Call(Name("len"), Name("xs")),
+    27	        Call(Name("len"), Name("xs"))))
+    28	    Assign(Name("center"), Float(0.0))
+    29	    While(Compare(
+    30	      BinOp(
+    31	        "*",
+    32	        Call(Name("poly"), Name("xs"), Name("begin")),
+    33	        Call(Name("poly"), Name("xs"), Name("end"))),
+    34	      CmpOp(">", Float(0.0))),
+    35	      Assign(Name("begin"), BinOp("*", Name("begin"), Float(2.0)))
+    36	      Assign(Name("end"), BinOp("*", Name("end"), Float(2.0))))
+    37	    While(Compare(
+    38	      BinOp("-", Name("end"), Name("begin")),
+    39	      CmpOp(">", Float(1e-10))),
+    40	      Assign(
+    41	        Name("center"),
+    42	        BinOp("/", BinOp("+", Name("begin"), Name("end")), Float(2.0)))
+    43	      If(Compare(
+    44	        BinOp(
+    45	          "*",
+    46	          Call(Name("poly"), Name("xs"), Name("center")),
+    47	          Call(Name("poly"), Name("xs"), Name("begin"))),
+    48	        CmpOp(">", Float(0.0))),
+    49	        Assign(Name("begin"), Name("center")),
+    50	        Assign(Name("end"), Name("center"))))
+    51	    Return(Name("begin"))))
+$ nl -ba /reference/k-proof/verification-program.mpy
+     1	solutionModule
+$ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC-CONNECTION
+     4	  imports VERIFICATION-BASE
+     5	
+     6	  // Constructor-split circularities for the unbounded coefficient fold in
+     7	  // poly.  They preserve an arbitrary continuation and all framed state.
+     8	  claim [poly-loop-empty]:
+     9	    <k>
+    10	      #loop(list(numVals(.NumSeq)), Name("coeff"), polyStep)
+    11	      => .K ...
+    12	    </k>
+    13	    <env> L </env>
+    14	    <scopes>
+    15	      BASE:Map
+    16	      (L |-> scope(
+    17	        .Map
+    18	          [ "xs" <- XSV:Val ]
+    19	          [ "value" <- (A:Float => polyAcc(.NumSeq, X, A, P)) ]
+    20	          [ "power" <- (P:Float => polyPower(.NumSeq, X, P)) ]
+    21	          [ "x" <- X:Float ]
+    22	          [ "coeff" <- (C:Val => polyLast(.NumSeq, C)) ],
+    23	        PAR:Parent))
+    24	    </scopes>
+    25	    <scopeLoc> SL </scopeLoc>
+    26	    <heap> HEAP </heap>
+    27	    <heapLoc> HL </heapLoc>
+    28	    <stack> REST:List </stack>
+    29	    <ret> noRet </ret>
+    30	    <exc> NoExc </exc>
+    31	    <exit-code> 0 </exit-code>
+    32	    requires notBool L in_keys(BASE)
+    33	
+    34	  claim [poly-loop-int]:
+    35	    <k>
+    36	      #loop(list(numVals(nInt(I:Int, NS:NumSeq))), Name("coeff"), polyStep)
+    37	      => .K ...
+    38	    </k>
+    39	    <env> L </env>
+    40	    <scopes>
+    41	      BASE:Map
+    42	      (L |-> scope(
+    43	        .Map
+    44	          [ "xs" <- XSV:Val ]
+    45	          [ "value" <- (A:Float => polyAcc(nInt(I, NS), X, A, P)) ]
+    46	          [ "power" <- (P:Float => polyPower(nInt(I, NS), X, P)) ]
+    47	          [ "x" <- X:Float ]
+    48	          [ "coeff" <- (C:Val => polyLast(nInt(I, NS), C)) ],
+    49	        PAR:Parent))
+    50	    </scopes>
+    51	    <scopeLoc> SL </scopeLoc>
+    52	    <heap> HEAP </heap>
+    53	    <heapLoc> HL </heapLoc>
+    54	    <stack> REST:List </stack>
+    55	    <ret> noRet </ret>
+    56	    <exc> NoExc </exc>
+    57	    <exit-code> 0 </exit-code>
+    58	    requires notBool L in_keys(BASE)
+    59	
+    60	  claim [poly-loop-float]:
+    61	    <k>
+    62	      #loop(list(numVals(nFloat(F:Float, NS:NumSeq))), Name("coeff"), polyStep)
+    63	      => .K ...
+    64	    </k>
+    65	    <env> L </env>
+    66	    <scopes>
+    67	      BASE:Map
+    68	      (L |-> scope(
+    69	        .Map
+    70	          [ "xs" <- XSV:Val ]
+    71	          [ "value" <- (A:Float => polyAcc(nFloat(F, NS), X, A, P)) ]
+    72	          [ "power" <- (P:Float => polyPower(nFloat(F, NS), X, P)) ]
+    73	          [ "x" <- X:Float ]
+    74	          [ "coeff" <- (C:Val => polyLast(nFloat(F, NS), C)) ],
+    75	        PAR:Parent))
+    76	    </scopes>
+    77	    <scopeLoc> SL </scopeLoc>
+    78	    <heap> HEAP </heap>
+    79	    <heapLoc> HL </heapLoc>
+    80	    <stack> REST:List </stack>
+    81	    <ret> noRet </ret>
+    82	    <exc> NoExc </exc>
+    83	    <exit-code> 0 </exit-code>
+    84	    requires notBool L in_keys(BASE)
+    85	
+    86	  // Circularity for the root-bracketing loop.  It stops at the exact
+    87	  // fixed-semantics head of the following bisection loop.
+    88	  claim [expand-loop]:
+    89	    <k>
+    90	      #while(expandCond, expandBody)
+    91	      ~> (While(bisectCond, bisectBody)
+    92	          Return(Name("begin")) .Stmts)
+    93	      ~> #endcall
+    94	      =>
+    95	      (While(bisectCond, bisectBody)
+    96	       Return(Name("begin")) .Stmts)
+    97	      ~> #endcall
+    98	    </k>
+    99	    <env> 1 </env>
+   100	    <scopes>
+   101	      (0 |-> scope(
+   102	        .Map
+   103	          [ "poly" <- closureVal(("xs", "x"), polyBody, 0) ]
+   104	          [ "find_zero" <- closureVal("xs", findZeroBody, 0) ],
+   105	        parent(-1)))
+   106	      (-1 |-> builtinsScope)
+   107	      (1 |-> scope(
+   108	        .Map
+   109	          [ "xs" <- list(numVals(NS:NumSeq)) ]
+   110	          [ "begin" <- B:Float ]
+   111	          [ "end" <- E:Float ]
+   112	          [ "center" <- C:Float ],
+   113	        parent(0)))
+   114	      =>
+   115	      (0 |-> scope(
+   116	        .Map
+   117	          [ "poly" <- closureVal(("xs", "x"), polyBody, 0) ]
+   118	          [ "find_zero" <- closureVal("xs", findZeroBody, 0) ],
+   119	        parent(-1)))
+   120	      (-1 |-> builtinsScope)
+   121	      (1 |-> scope(
+   122	        .Map
+   123	          [ "xs" <- list(numVals(NS)) ]
+   124	          [ "begin" <- bracketBegin(NS, B, E) ]
+   125	          [ "end" <- bracketEnd(NS, B, E) ]
+   126	          [ "center" <- C ],
+   127	        parent(0)))
+   128	    </scopes>
+   129	    <scopeLoc> 2 </scopeLoc>
+   130	    <heap> HEAP </heap>
+   131	    <heapLoc> HL </heapLoc>
+   132	    <stack> ListItem(frame(.K, 0, 1)) </stack>
+   133	    <ret> noRet </ret>
+   134	    <exc> NoExc </exc>
+   135	    <exit-code> 0 </exit-code>
+   136	    requires validCoeffs(NS)
+   137	
+   138	  // The fixed semantics exposes a statement-list tail one statement at a
+   139	  // time.  This generic connection contains no program summary.
+   140	  claim [bisect-head]:
+   141	    <k>
+   142	      (While(bisectCond, bisectBody)
+   143	       Return(Name("begin")) .Stmts)
+   144	      ~> #endcall
+   145	      =>
+   146	      #while(bisectCond, bisectBody)
+   147	      ~> (Return(Name("begin")) .Stmts)
+   148	      ~> #endcall
+   149	    </k>
+   150	    <env> ENV </env>
+   151	    <scopes> SCOPES </scopes>
+   152	    <scopeLoc> SL </scopeLoc>
+   153	    <heap> HEAP </heap>
+   154	    <heapLoc> HL </heapLoc>
+   155	    <stack> STACK </stack>
+   156	    <ret> RET </ret>
+   157	    <exc> EXC </exc>
+   158	    <exit-code> 0 </exit-code>
+   159	
+   160	  // Circularity for the unbounded bisection loop and its exact return suffix.
+   161	  claim [bisect-loop]:
+   162	    <k>
+   163	      #while(bisectCond, bisectBody)
+   164	      ~> (Return(Name("begin")) .Stmts)
+   165	      ~> #endcall
+   166	      => bisectFrom(NS, B, E)
+   167	    </k>
+   168	    <env> 1 => 0 </env>
+   169	    <scopes>
+   170	      (0 |-> scope(
+   171	        .Map
+   172	          [ "poly" <- closureVal(("xs", "x"), polyBody, 0) ]
+   173	          [ "find_zero" <- closureVal("xs", findZeroBody, 0) ],
+   174	        parent(-1)))
+   175	      (-1 |-> builtinsScope)
+   176	      (1 |-> scope(
+   177	        .Map
+   178	          [ "xs" <- list(numVals(NS:NumSeq)) ]
+   179	          [ "begin" <- B:Float ]
+   180	          [ "end" <- E:Float ]
+   181	          [ "center" <- C:Float ],
+   182	        parent(0)))
+   183	      =>
+   184	         (0 |-> scope(
+   185	           .Map
+   186	             [ "poly" <- closureVal(("xs", "x"), polyBody, 0) ]
+   187	             [ "find_zero" <- closureVal("xs", findZeroBody, 0) ],
+   188	           parent(-1)))
+   189	         (-1 |-> builtinsScope)
+   190	    </scopes>
+   191	    <scopeLoc> 2 => 1 </scopeLoc>
+   192	    <heap> HEAP </heap>
+   193	    <heapLoc> HL </heapLoc>
+   194	    <stack>
+   195	      ListItem(frame(.K, 0, 1))
+   196	      => .List
+   197	    </stack>
+   198	    <ret> noRet </ret>
+   199	    <exc> NoExc </exc>
+   200	    <exit-code> 0 </exit-code>
+   201	    requires validCoeffs(NS)
+   202	
+   203	endmodule
+   204	
+   205	module SPEC
+   206	  imports VERIFICATION-BASE
+   207	
+   208	  // Prefix 1: exact module loading, name resolution, and argument evaluation.
+   209	  claim [find-load]:
+   210	    <k>
+   211	      #loadAll(solutionModule)
+   212	      ~> Call(Name("find_zero"), (list(numVals(NS:NumSeq)), .Exprs))
+   213	      => #applyK(
+   214	           toCall(closureVal("xs", findZeroBody, 0)),
+   215	           (list(numVals(NS)), .Vals))
+   216	    </k>
+   217	    <env> 0 </env>
+   218	    <scopes>
+   219	      (0 |-> scope(.Map, parent(-1)))
+   220	      (-1 |-> builtinsScope)
+   221	      =>
+   222	      (0 |-> scope(
+   223	        .Map
+   224	          [ "poly" <- closureVal(("xs", "x"), polyBody, 0) ]
+   225	          [ "find_zero" <- closureVal("xs", findZeroBody, 0) ],
+   226	        parent(-1)))
+   227	      (-1 |-> builtinsScope)
+   228	    </scopes>
+   229	    <scopeLoc> 1 </scopeLoc>
+   230	    <heap> .Map </heap>
+   231	    <heapLoc> 0 </heapLoc>
+   232	    <stack> .List </stack>
+   233	    <ret> noRet </ret>
+   234	    <exc> NoExc </exc>
+   235	    <exit-code> 0 </exit-code>
+   236	    requires validCoeffs(NS)
+   237	
+   238	  // Prefix 2: exact closure application, parameter binding, and initialization
+   239	  // through the loop head used by SPEC-CONNECTION.expand-loop.
+   240	  claim [find-init]:
+   241	    <k>
+   242	      #applyK(
+   243	        toCall(closureVal("xs", findZeroBody, 0)),
+   244	        (list(numVals(NS:NumSeq)), .Vals))
+   245	      =>
+   246	      #while(expandCond, expandBody)
+   247	      ~> (While(bisectCond, bisectBody)
+   248	          Return(Name("begin")) .Stmts)
+   249	      ~> #endcall
+   250	    </k>
+   251	    <env> 0 => 1 </env>
+   252	    <scopes>
+   253	      (0 |-> scope(
+   254	        .Map
+   255	          [ "poly" <- closureVal(("xs", "x"), polyBody, 0) ]
+   256	          [ "find_zero" <- closureVal("xs", findZeroBody, 0) ],
+   257	        parent(-1)))
+   258	      (-1 |-> builtinsScope)
+   259	      =>
+   260	      (0 |-> scope(
+   261	        .Map
+   262	          [ "poly" <- closureVal(("xs", "x"), polyBody, 0) ]
+   263	          [ "find_zero" <- closureVal("xs", findZeroBody, 0) ],
+   264	        parent(-1)))
+   265	      (-1 |-> builtinsScope)
+   266	      (1 |-> scope(
+   267	        .Map
+   268	          [ "xs" <- list(numVals(NS)) ]
+   269	          [ "begin" <-
+   270	              divII(vsLen(numVals(NS)), 0 -Int vsLen(numVals(NS))) ]
+   271	          [ "end" <- divII(vsLen(numVals(NS)), vsLen(numVals(NS))) ]
+   272	          [ "center" <- 0.0 ],
+   273	        parent(0)))
+   274	    </scopes>
+   275	    <scopeLoc> 1 => 2 </scopeLoc>
+   276	    <heap> .Map </heap>
+   277	    <heapLoc> 0 </heapLoc>
+   278	    <stack>
+   279	      .List
+   280	      => ListItem(frame(.K, 0, 1))
+   281	    </stack>
+   282	    <ret> noRet </ret>
+   283	    <exc> NoExc </exc>
+   284	    <exit-code> 0 </exit-code>
+   285	    requires validCoeffs(NS)
+   286	endmodule
+$ nl -ba /reference/k-proof/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py smoke.py > smoke.mpy
+     6	python3 py2mpy.py solution-body-mutation.py > solution-body-mutation.mpy
+     7	python3 py2mpy.py solution.py | cmp - solution.mpy
+     8	
+     9	kompile reference-semantics/semantics.k \
+    10	  --backend llvm \
+    11	  --main-module MPY-KRUN \
+    12	  --syntax-module MPY-SYNTAX \
+    13	  --output-definition runtime-kompiled
+    14	
+    15	krun smoke.mpy --definition runtime-kompiled
+    16	python3 validate.py
+    17	
+    18	kompile verification.k \
+    19	  --backend haskell \
+    20	  --main-module VERIFICATION-BASE \
+    21	  --syntax-module VERIFICATION-SYNTAX \
+    22	  --output-definition verification-base-kompiled
+    23	
+    24	diff -q \
+    25	  <(krun solution.mpy --definition verification-base-kompiled) \
+    26	  <(krun verification-program.mpy --definition verification-base-kompiled)
+    27	
+    28	set +e
+    29	diff -q \
+    30	  <(krun solution-body-mutation.mpy --definition verification-base-kompiled) \
+    31	  <(krun verification-program.mpy --definition verification-base-kompiled)
+    32	body_mutation_status=$?
+    33	set -e
+    34	
+    35	if [[ $body_mutation_status -eq 0 ]]; then
+    36	  echo "ERROR: material source-body mutation escaped the identity check" >&2
+    37	  exit 1
+    38	fi
+    39	
+    40	echo "Expected source-body identity rejection observed (exit $body_mutation_status)."
+    41	
+    42	kprove spec.k \
+    43	  --definition verification-base-kompiled \
+    44	  --spec-module SPEC \
+    45	  --claims SPEC.find-load,SPEC.find-init
+    46	
+    47	kprove spec.k \
+    48	  --definition verification-base-kompiled \
+    49	  --spec-module SPEC-CONNECTION \
+    50	  --claims SPEC-CONNECTION.poly-loop-empty,SPEC-CONNECTION.poly-loop-int,SPEC-CONNECTION.poly-loop-float
+    51	
+    52	kprove spec.k \
+    53	  --definition verification-base-kompiled \
+    54	  --spec-module SPEC-CONNECTION \
+    55	  --claims SPEC-CONNECTION.poly-loop-empty,SPEC-CONNECTION.poly-loop-int,SPEC-CONNECTION.poly-loop-float,SPEC-CONNECTION.expand-loop
+    56	
+    57	kprove spec.k \
+    58	  --definition verification-base-kompiled \
+    59	  --spec-module SPEC-CONNECTION \
+    60	  --claims SPEC-CONNECTION.bisect-head
+    61	
+    62	kprove spec.k \
+    63	  --definition verification-base-kompiled \
+    64	  --spec-module SPEC-CONNECTION \
+    65	  --claims SPEC-CONNECTION.poly-loop-empty,SPEC-CONNECTION.poly-loop-int,SPEC-CONNECTION.poly-loop-float,SPEC-CONNECTION.bisect-loop
+    66	
+    67	set +e
+    68	mutation_output="$(
+    69	  kprove spec-mutation.k \
+    70	    --definition verification-base-kompiled \
+    71	    --spec-module SPEC-MUTATION \
+    72	    --claims SPEC-MUTATION.wrong-poly-result 2>&1
+    73	)"
+    74	mutation_status=$?
+    75	set -e
+    76	printf '%s\n' "$mutation_output"
+    77	
+    78	if [[ $mutation_status -eq 0 ]]; then
+    79	  echo "ERROR: deliberately false mutation unexpectedly proved" >&2
+    80	  exit 1
+    81	fi
+    82	
+    83	if [[ $mutation_output != *"WarnStuckClaimState"* ]]; then
+    84	  echo "ERROR: mutation failed for an unexpected reason" >&2
+    85	  exit 1
+    86	fi
+    87	
+    88	echo "Expected mutation rejection observed (exit $mutation_status)."
+$ nl -ba /reference/k-proof/prompt.py
+     1	import math
+     2	
+     3	
+     4	def poly(xs: list, x: float):
+     5	    """
+     6	    Evaluates polynomial with coefficients xs at point x.
+     7	    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n
+     8	    """
+     9	    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])
+    10	
+    11	
+    12	def find_zero(xs: list):
+    13	    """ xs are coefficients of a polynomial.
+    14	    find_zero find x such that poly(x) = 0.
+    15	    find_zero returns only only zero point, even if there are many.
+    16	    Moreover, find_zero only takes list xs having even number of coefficients
+    17	    and largest non zero coefficient as it guarantees
+    18	    a solution.
+    19	    >>> round(find_zero([1, 2]), 2) # f(x) = 1 + 2x
+    20	    -0.5
+    21	    >>> round(find_zero([-6, 11, -6, 1]), 2) # (x - 1) * (x - 2) * (x - 3) = -6 + 11x - 6x^2 + x^3
+    22	    1.0
+    23	    """

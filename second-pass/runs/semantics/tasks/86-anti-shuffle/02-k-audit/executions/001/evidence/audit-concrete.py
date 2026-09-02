@@ -1,0 +1,15 @@
+def anti_shuffle(s):
+    result = ""
+    word = ""
+    for word in s.split(" "):
+        result += "".join(sorted(list(word)))
+        result += " "
+    return result[:-1]
+
+
+assert anti_shuffle("Hi") == "Hi"
+assert anti_shuffle("hello") == "ehllo"
+assert anti_shuffle("Hello World!!!") == "Hello !!!Wdlor"
+assert anti_shuffle("") == ""
+assert anti_shuffle("  ba  dc ") == "  ab  cd "
+assert anti_shuffle("ba") == "ab"

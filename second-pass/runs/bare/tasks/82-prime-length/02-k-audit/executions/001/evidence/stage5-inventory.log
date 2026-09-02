@@ -1,0 +1,310 @@
+WORKDIR: /tmp/audit-work/82-prime-length
+COMMAND: /audit-output/evidence/stage5_inventory.sh
+== complete reviewed K sources ==
+----- semantic.k -----
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports BOOL-SYNTAX
+     5	  imports INT-SYNTAX
+     6	  imports STRING-SYNTAX
+     7	
+     8	  syntax Program ::= "Module" "(" Stmts ")"
+     9	
+    10	  syntax Stmts ::= List{Stmt, ""}
+    11	  syntax Stmt ::= "FuncDef" "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"
+    12	                | "Assign" "(" Expr "," Expr ")"
+    13	                | "Return" "(" Expr ")"
+    14	
+    15	  syntax Params   ::= "Params" "(" Strings ")"
+    16	  syntax CellVars ::= "CellVars" "(" Strings ")"
+    17	  syntax FreeVars ::= "FreeVars" "(" Strings ")"
+    18	  syntax Strings  ::= List{String, ","}
+    19	
+    20	  syntax Expr ::= "Int" "(" Int ")"
+    21	                | "Bool" "(" Bool ")"
+    22	                | "Str" "(" String ")"
+    23	                | "Name" "(" String ")"
+    24	                | "Call" "(" Expr "," Exprs ")"
+    25	                | "BinOp" "(" String "," Expr "," Expr ")"
+    26	                | "BoolOp" "(" String "," Exprs ")"
+    27	                | "Compare" "(" Expr "," CmpOps ")"
+    28	                | "GenExp" "(" Expr "," CompFors ")"
+    29	
+    30	  syntax Exprs ::= List{Expr, ","}
+    31	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    32	  syntax CmpOps ::= List{CmpOp, ","}
+    33	  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+    34	  syntax CompFors ::= List{CompFor, ""}
+    35	
+    36	  syntax Value ::= "VInt" "(" Int ")"
+    37	                 | "VBool" "(" Bool ")"
+    38	                 | "VStr" "(" String ")"
+    39	
+    40	  syntax Result ::= "noResult" | Value
+    41	  syntax KItem ::= "run" "(" Program "," Value ")"
+    42	                 | "#exec" "(" Stmts ")"
+    43	endmodule
+    44	
+    45	module SEMANTIC
+    46	  imports MPY-SYNTAX
+    47	  imports BOOL
+    48	  imports INT
+    49	  imports MAP
+    50	  imports STRING
+    51	
+    52	  configuration
+    53	    <py>
+    54	      <k> run($PGM:Program, $ARG:Value) </k>
+    55	      <env> .Map </env>
+    56	      <return> noResult </return>
+    57	    </py>
+    58	
+    59	  // Loading the translated module also performs the requested entry-point
+    60	  // call.  This task has one top-level function and one positional argument.
+    61	  rule <k> run(Module(FuncDef(F, Params(P, .Strings), _CV, _FV, BODY)), ARG)
+    62	           => #exec(BODY) ... </k>
+    63	       <env> .Map => P |-> ARG </env>
+    64	    requires F ==String "prime_length"
+    65	
+    66	  rule <k> #exec(Assign(Name(X), E) SS) => #exec(SS) ... </k>
+    67	       <env> ENV => ENV [ X <- eval(E, ENV) ] </env>
+    68	
+    69	  rule <k> #exec(Return(E) _SS) => .K ... </k>
+    70	       <env> ENV </env>
+    71	       <return> noResult => eval(E, ENV) </return>
+    72	
+    73	  syntax Value ::= eval(Expr, Map) [function, total]
+    74	  rule eval(Int(I),       _ENV) => VInt(I)
+    75	  rule eval(Bool(B),      _ENV) => VBool(B)
+    76	  rule eval(Str(S),       _ENV) => VStr(S)
+    77	  rule eval(Name(X),       ENV) => {ENV[X]}:>Value
+    78	    requires X in_keys(ENV)
+    79	
+    80	  rule eval(Call(Name("len"), E), ENV)
+    81	    => VInt(valueLength(eval(E, ENV)))
+    82	
+    83	  syntax Int ::= valueLength(Value) [function, total]
+    84	  rule valueLength(VStr(S)) => lengthString(S)
+    85	
+    86	  rule eval(BinOp("%", E1, E2), ENV)
+    87	    => VInt(asInt(eval(E1, ENV)) %Int asInt(eval(E2, ENV)))
+    88	
+    89	  syntax Int ::= asInt(Value) [function, total]
+    90	  rule asInt(VInt(I)) => I
+    91	
+    92	  rule eval(Compare(E1, CmpOp(">=", E2)), ENV)
+    93	    => VBool(asInt(eval(E1, ENV)) >=Int asInt(eval(E2, ENV)))
+    94	  rule eval(Compare(E1, CmpOp("!=", E2)), ENV)
+    95	    => VBool(asInt(eval(E1, ENV)) =/=Int asInt(eval(E2, ENV)))
+    96	
+    97	  rule eval(BoolOp("and", E1, E2), ENV)
+    98	    => VBool(asBool(eval(E1, ENV)) andBool asBool(eval(E2, ENV)))
+    99	
+   100	  // Expressions in this semantics are pure.  Eager evaluation therefore has
+   101	  // the same result as Python's short-circuiting `and` for the accepted AST.
+   102	
+   103	  syntax Bool ::= asBool(Value) [function, total]
+   104	  rule asBool(VBool(B)) => B
+   105	
+   106	  // `all(n % i != 0 for i in range(lo, hi))` denotes that every candidate
+   107	  // in the half-open integer range is a non-divisor.  The source AST is kept
+   108	  // intact by py2mpy; this semantic rule gives that AST its meaning.
+   109	  rule eval(
+   110	         Call(Name("all"),
+   111	           GenExp(
+   112	             Compare(BinOp("%", Name(NX), Name(IX)), CmpOp("!=", Int(0))),
+   113	             CompFor(Name(IX),
+   114	               Call(Name("range"), Int(LO), Name(HX)),
+   115	               Bool(true)))),
+   116	         ENV)
+   117	    => VBool(noDivisors(asInt({ENV[NX]}:>Value),
+   118	                        LO,
+   119	                        asInt({ENV[HX]}:>Value)))
+   120	    requires NX =/=String IX
+   121	     andBool NX in_keys(ENV)
+   122	     andBool HX in_keys(ENV)
+   123	
+   124	  // Executable, ground definition of universal non-divisibility on [D, HI).
+   125	  // concrete(...) deliberately keeps the recursive range opaque during a
+   126	  // symbolic proof while evaluating it completely for every concrete run.
+   127	  syntax Bool ::= noDivisors(Int, Int, Int) [function, total]
+   128	  rule noDivisors(_N, D, HI) => true
+   129	    requires D >=Int HI
+   130	    [concrete(D, HI), simplification]
+   131	  rule noDivisors(N, D, HI) => false
+   132	    requires D <Int HI andBool N %Int D ==Int 0
+   133	    [concrete(N, D, HI), simplification]
+   134	  rule noDivisors(N, D, HI) => noDivisors(N, D +Int 1, HI)
+   135	    requires D <Int HI andBool N %Int D =/=Int 0
+   136	    [concrete(N, D, HI), simplification]
+   137	endmodule
+----- verification.k -----
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // Canonical program term used by spec.k.  prove.sh macro-expands this term
+     7	  // and solution.mpy and compares their canonical KAST, binding the proof to
+     8	  // the freshly translated implementation rather than to a stale copy.
+     9	  syntax Program ::= "solutionProgram" [macro]
+    10	  rule solutionProgram =>
+    11	    Module(
+    12	      FuncDef("prime_length", Params("string"), CellVars("n"), FreeVars(.Strings),
+    13	        Assign(Name("n"), Call(Name("len"), Name("string")))
+    14	        Return(
+    15	          BoolOp(
+    16	            "and",
+    17	            Compare(Name("n"), CmpOp(">=", Int(2))),
+    18	            Call(
+    19	              Name("all"),
+    20	              GenExp(
+    21	                Compare(
+    22	                  BinOp("%", Name("n"), Name("i")),
+    23	                  CmpOp("!=", Int(0))),
+    24	                CompFor(
+    25	                  Name("i"),
+    26	                  Call(Name("range"), Int(2), Name("n")),
+    27	                  Bool(true))))))))
+    28	
+    29	  // Mathematical contract used by the reachability specification.  For
+    30	  // N >= 2, N is prime exactly when no integer in [2, N) divides it.
+    31	  syntax Bool ::= isPrime(Int) [function, total]
+    32	  rule isPrime(N) => (N >=Int 2 andBool noDivisors(N, 2, N))
+    33	endmodule
+----- spec.k -----
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // One symbolic reachability claim covers every possible input string.
+     7	  // Its postcondition is the independently named primality predicate from
+     8	  // verification.k, applied to the K builtin string length.
+     9	  claim
+    10	    <py>
+    11	      <k>
+    12	        run(solutionProgram, VStr(S))
+    13	        => .K
+    14	      </k>
+    15	      <env>
+    16	        .Map
+    17	        => ("string" |-> VStr(S)
+    18	            "n" |-> VInt(lengthString(S)))
+    19	      </env>
+    20	      <return>
+    21	        noResult => VBool(isPrime(lengthString(S)))
+    22	      </return>
+    23	    </py>
+    24	endmodule
+== local declarations, configuration, rules, and claims ==
+spec.k:9:  claim
+verification.k:9:  syntax Program ::= "solutionProgram" [macro]
+verification.k:10:  rule solutionProgram =>
+verification.k:31:  syntax Bool ::= isPrime(Int) [function, total]
+verification.k:32:  rule isPrime(N) => (N >=Int 2 andBool noDivisors(N, 2, N))
+semantic.k:8:  syntax Program ::= "Module" "(" Stmts ")"
+semantic.k:10:  syntax Stmts ::= List{Stmt, ""}
+semantic.k:11:  syntax Stmt ::= "FuncDef" "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"
+semantic.k:15:  syntax Params   ::= "Params" "(" Strings ")"
+semantic.k:16:  syntax CellVars ::= "CellVars" "(" Strings ")"
+semantic.k:17:  syntax FreeVars ::= "FreeVars" "(" Strings ")"
+semantic.k:18:  syntax Strings  ::= List{String, ","}
+semantic.k:20:  syntax Expr ::= "Int" "(" Int ")"
+semantic.k:30:  syntax Exprs ::= List{Expr, ","}
+semantic.k:31:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+semantic.k:32:  syntax CmpOps ::= List{CmpOp, ","}
+semantic.k:33:  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+semantic.k:34:  syntax CompFors ::= List{CompFor, ""}
+semantic.k:36:  syntax Value ::= "VInt" "(" Int ")"
+semantic.k:40:  syntax Result ::= "noResult" | Value
+semantic.k:41:  syntax KItem ::= "run" "(" Program "," Value ")"
+semantic.k:52:  configuration
+semantic.k:61:  rule <k> run(Module(FuncDef(F, Params(P, .Strings), _CV, _FV, BODY)), ARG)
+semantic.k:66:  rule <k> #exec(Assign(Name(X), E) SS) => #exec(SS) ... </k>
+semantic.k:69:  rule <k> #exec(Return(E) _SS) => .K ... </k>
+semantic.k:73:  syntax Value ::= eval(Expr, Map) [function, total]
+semantic.k:74:  rule eval(Int(I),       _ENV) => VInt(I)
+semantic.k:75:  rule eval(Bool(B),      _ENV) => VBool(B)
+semantic.k:76:  rule eval(Str(S),       _ENV) => VStr(S)
+semantic.k:77:  rule eval(Name(X),       ENV) => {ENV[X]}:>Value
+semantic.k:80:  rule eval(Call(Name("len"), E), ENV)
+semantic.k:83:  syntax Int ::= valueLength(Value) [function, total]
+semantic.k:84:  rule valueLength(VStr(S)) => lengthString(S)
+semantic.k:86:  rule eval(BinOp("%", E1, E2), ENV)
+semantic.k:89:  syntax Int ::= asInt(Value) [function, total]
+semantic.k:90:  rule asInt(VInt(I)) => I
+semantic.k:92:  rule eval(Compare(E1, CmpOp(">=", E2)), ENV)
+semantic.k:94:  rule eval(Compare(E1, CmpOp("!=", E2)), ENV)
+semantic.k:97:  rule eval(BoolOp("and", E1, E2), ENV)
+semantic.k:103:  syntax Bool ::= asBool(Value) [function, total]
+semantic.k:104:  rule asBool(VBool(B)) => B
+semantic.k:109:  rule eval(
+semantic.k:127:  syntax Bool ::= noDivisors(Int, Int, Int) [function, total]
+semantic.k:128:  rule noDivisors(_N, D, HI) => true
+semantic.k:130:    [concrete(D, HI), simplification]
+semantic.k:131:  rule noDivisors(N, D, HI) => false
+semantic.k:133:    [concrete(N, D, HI), simplification]
+semantic.k:134:  rule noDivisors(N, D, HI) => noDivisors(N, D +Int 1, HI)
+semantic.k:136:    [concrete(N, D, HI), simplification]
+== potentially proof-relevant attributes and symbols ==
+function: verification.k:31:  syntax Bool ::= isPrime(Int) [function, total]
+semantic.k:60:  // call.  This task has one top-level function and one positional argument.
+semantic.k:73:  syntax Value ::= eval(Expr, Map) [function, total]
+semantic.k:83:  syntax Int ::= valueLength(Value) [function, total]
+semantic.k:89:  syntax Int ::= asInt(Value) [function, total]
+semantic.k:103:  syntax Bool ::= asBool(Value) [function, total]
+semantic.k:127:  syntax Bool ::= noDivisors(Int, Int, Int) [function, total]
+functional: total: verification.k:31:  syntax Bool ::= isPrime(Int) [function, total]
+semantic.k:73:  syntax Value ::= eval(Expr, Map) [function, total]
+semantic.k:83:  syntax Int ::= valueLength(Value) [function, total]
+semantic.k:89:  syntax Int ::= asInt(Value) [function, total]
+semantic.k:103:  syntax Bool ::= asBool(Value) [function, total]
+semantic.k:127:  syntax Bool ::= noDivisors(Int, Int, Int) [function, total]
+simplification: semantic.k:130:    [concrete(D, HI), simplification]
+semantic.k:133:    [concrete(N, D, HI), simplification]
+semantic.k:136:    [concrete(N, D, HI), simplification]
+concrete: semantic.k:125:  // concrete(...) deliberately keeps the recursive range opaque during a
+semantic.k:126:  // symbolic proof while evaluating it completely for every concrete run.
+semantic.k:130:    [concrete(D, HI), simplification]
+semantic.k:133:    [concrete(N, D, HI), simplification]
+semantic.k:136:    [concrete(N, D, HI), simplification]
+priority: owise: macro: verification.k:6:  // Canonical program term used by spec.k.  prove.sh macro-expands this term
+verification.k:9:  syntax Program ::= "solutionProgram" [macro]
+anywhere: hook: impure: opaque: semantic.k:125:  // concrete(...) deliberately keeps the recursive range opaque during a
+claim: spec.k:6:  // One symbolic reachability claim covers every possible input string.
+spec.k:9:  claim
+rule: verification.k:10:  rule solutionProgram =>
+verification.k:32:  rule isPrime(N) => (N >=Int 2 andBool noDivisors(N, 2, N))
+semantic.k:61:  rule <k> run(Module(FuncDef(F, Params(P, .Strings), _CV, _FV, BODY)), ARG)
+semantic.k:66:  rule <k> #exec(Assign(Name(X), E) SS) => #exec(SS) ... </k>
+semantic.k:69:  rule <k> #exec(Return(E) _SS) => .K ... </k>
+semantic.k:74:  rule eval(Int(I),       _ENV) => VInt(I)
+semantic.k:75:  rule eval(Bool(B),      _ENV) => VBool(B)
+semantic.k:76:  rule eval(Str(S),       _ENV) => VStr(S)
+semantic.k:77:  rule eval(Name(X),       ENV) => {ENV[X]}:>Value
+semantic.k:80:  rule eval(Call(Name("len"), E), ENV)
+semantic.k:84:  rule valueLength(VStr(S)) => lengthString(S)
+semantic.k:86:  rule eval(BinOp("%", E1, E2), ENV)
+semantic.k:90:  rule asInt(VInt(I)) => I
+semantic.k:92:  rule eval(Compare(E1, CmpOp(">=", E2)), ENV)
+semantic.k:94:  rule eval(Compare(E1, CmpOp("!=", E2)), ENV)
+semantic.k:97:  rule eval(BoolOp("and", E1, E2), ENV)
+semantic.k:104:  rule asBool(VBool(B)) => B
+semantic.k:108:  // intact by py2mpy; this semantic rule gives that AST its meaning.
+semantic.k:109:  rule eval(
+semantic.k:128:  rule noDivisors(_N, D, HI) => true
+semantic.k:131:  rule noDivisors(N, D, HI) => false
+semantic.k:134:  rule noDivisors(N, D, HI) => noDivisors(N, D +Int 1, HI)
+== constructors and tokens visibly used by submitted solution.mpy ==
+constructors {'Assign': 1, 'BinOp': 1, 'Bool': 1, 'BoolOp': 1, 'Call': 3, 'CellVars': 1, 'CmpOp': 2, 'CompFor': 1, 'Compare': 2, 'FreeVars': 1, 'FuncDef': 1, 'GenExp': 1, 'Int': 3, 'Module': 1, 'Name': 10, 'Params': 1, 'Return': 1}
+string_tokens {'"!="': 1, '"%"': 1, '">="': 1, '"all"': 1, '"and"': 1, '"i"': 2, '"len"': 1, '"n"': 5, '"prime_length"': 1, '"range"': 1, '"string"': 2}
+== candidate K/helper source inventory ==
+/candidate/semantic-kompiled/README.md
+/candidate/semantic.k
+/candidate/spec.k
+/candidate/verification-kompiled/README.md
+/candidate/verification.k
+
+EXIT_STATUS: 0

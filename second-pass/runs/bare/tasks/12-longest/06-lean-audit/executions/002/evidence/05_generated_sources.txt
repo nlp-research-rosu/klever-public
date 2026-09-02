@@ -1,0 +1,796 @@
+Script started on 2026-07-28 00:14:20-05:00 [<not executed on terminal>]
+FILE /reference/klean-generation/generated/Klean12Longest.lean
+a4f2646c62773000e0cb130a336ff88911e739d1ffc3033eb7118f76cba470a5  /reference/klean-generation/generated/Klean12Longest.lean
+import Klean12Longest.Rewrite
+import Klean12Longest.Lemmas
+FILE /reference/klean-generation/generated/Klean12Longest/Prelude.lean
+eddb8af83ef64c00cdbba79bf9c321f4a28bbffb82ee1198fb69f43bc7e182fb  /reference/klean-generation/generated/Klean12Longest/Prelude.lean
+/-
+K Prelude in Lean 4
+
+Functions with the `hook` attribute need to have a manual implementation in the backends.
+This file contains the Lean 4 definitions of the hooked functions in `domains.md`.
+
+Currently we translate hooked functions as uninterpreted functions together with axioms asserting their behavior.
+The current definition can be put into three levels:
+
+1. Signature Level:
+The signature of the hooks, this includes aliases for Sorts and function symbols for hooked functions.
+
+2. Rule Level:
+The behavior of the uninterpreted symbols can be asserted through axioms or theorems.
+Inconsistencies can arise from them, so it falls under the user to make sure axioms are consistent and/or theorems provable.
+
+3. Simplification Level:
+With the theory defined through function rules, simplifications can be stated as theorems.
+These theorems should be provable directly from the function rules and the semantics of the Sorts.
+ -/
+
+-- Basic K types
+abbrev SortBool         : Type := Bool
+abbrev SortBytes        : Type := ByteArray
+abbrev SortId           : Type := String
+abbrev SortFloat        : Type := Float
+abbrev SortInt          : Type := Int
+abbrev SortString       : Type := String
+abbrev SortStringBuffer : Type := String
+
+/-
+The `Map` sort represents a generalized associative array.
+Each key can be paired with an arbitrary value, and can be used to reference its associated value.
+Multiple bindings for the same key are not allowed.
+Note that both keys and values will always be KItems.
+ -/
+
+-- Signature to be instantiated by map implementations
+structure MapHookSig (K V : Type) where
+  unit       : List (K × V)
+  cons       : K → V → List (K × V) → List (K × V)
+  lookup     : List (K × V) → K → Option V
+  lookup?    : List (K × V) → K → V -- lookup with default
+  update     : K → V → List (K × V) → List (K × V)
+  delete     : List (K × V) → K → List (K × V)
+  concat     : List (K × V) → List (K × V) → Option (List (K × V))
+  difference : List (K × V) → List (K × V) → List (K × V)
+  updateMap  : List (K × V) → List (K × V) → List (K × V)
+  removeAll  : List (K × V) → List K → List (K × V)
+  keys       : List (K × V) → List K
+  in_keys    : List (K × V) → K → Bool
+  values     : List (K × V) → List V
+  size       : List (K × V) → Nat
+  includes   : List (K × V) → List (K × V) → Bool -- List (K × V) inclusion
+  choice     : List (K × V) → K -- arbitrary key from a List (K × V)
+  -- nodup is not satisfiable in the current implementation with `List (K × V)`
+  -- nodup      : forall al : List (K × V), List.Nodup (keys al)
+  split      : List (K × V) → List K → Option (List V × List (K × V))
+
+-- We use axioms to have uninterpreted functions
+namespace MapHookDef
+  variable (K V : Type)
+  axiom unitAx       : List (K × V)
+  axiom consAx       : K → V → List (K × V) → List (K × V)
+  axiom lookupAx     : List (K × V) → K → Option V
+  axiom lookupAx?    : List (K × V) → K → V -- lookup with default
+  axiom updateAx     : K → V → List (K × V) → List (K × V)
+  axiom deleteAx     : List (K × V) → K → List (K × V)
+  axiom concatAx     : List (K × V) → List (K × V) → Option (List (K × V))
+  axiom differenceAx : List (K × V) → List (K × V) → List (K × V)
+  axiom updateMapAx  : List (K × V) → List (K × V) → List (K × V)
+  axiom removeAllAx  : List (K × V) → List K → List (K × V)
+  axiom keysAx       : List (K × V) → List K
+  axiom in_keysAx    : List (K × V) → K → Bool
+  axiom valuesAx     : List (K × V) → List V
+  axiom sizeAx       : List (K × V) → Nat
+  axiom includesAx   : List (K × V) → List (K × V) → Bool -- map inclusion
+  axiom choiceAx     : List (K × V) → K -- arbitrary key from a map
+  -- axiom nodupAx      : forall m, List.Nodup (keysAx K V m)
+  axiom splitAx      : List (K × V) → List K → Option (List V × List (K × V))
+end MapHookDef
+
+-- Uninterpreted Map implementation
+noncomputable def MapHook (K V : Type) : MapHookSig K V :=
+  { unit       := MapHookDef.unitAx K V,
+    cons       := MapHookDef.consAx K V,
+    lookup     := MapHookDef.lookupAx K V,
+    lookup?    := MapHookDef.lookupAx? K V,
+    update     := MapHookDef.updateAx K V,
+    delete     := MapHookDef.deleteAx K V,
+    concat     := MapHookDef.concatAx K V,
+    difference := MapHookDef.differenceAx K V,
+    updateMap  := MapHookDef.updateMapAx K V,
+    removeAll  := MapHookDef.removeAllAx K V,
+    keys       := MapHookDef.keysAx K V,
+    in_keys    := MapHookDef.in_keysAx K V,
+    values     := MapHookDef.valuesAx K V,
+    size       := MapHookDef.sizeAx K V,
+    includes   := MapHookDef.includesAx K V,
+    choice     := MapHookDef.choiceAx K V,
+    -- nodup      := MapHookDef.nodupAx K V,
+    split      := MapHookDef.splitAx K V }
+
+/-
+Implementation of immutable, associative, commutative sets of `KItem`.
+The sets are nilpotent, i.e., the concatenation of two sets containing elements in common is `#False` (note however, this may be silently allowed during concrete execution).
+If you intend to add an element to a set that might already be present in the set, use the `|Set` operator instead.
+ -/
+
+structure SetHookSig (T : Type) where
+  unit         : List T
+  concat       : List T → List T → Option (List T)
+  element      : T → List T
+  union        : List T → List T → List T
+  intersection : List T → List T → List T
+  difference   : List T → List T → List T
+  inSet        : T → List T → Bool
+  inclusion    : List T → List T → Bool
+  size         : List T → Int
+  choice       : List T → T
+  split        : List T → List T → Option (List T)
+
+namespace SetHookDef
+  variable (T : Type)
+  axiom unitAx         : List T
+  axiom concatAx       : List T → List T → Option (List T)
+  axiom elementAx      : T → List T
+  axiom unionAx        : List T → List T → List T
+  axiom intersectionAx : List T → List T → List T
+  axiom differenceAx   : List T → List T → List T
+  axiom inSetAx        : T → List T → Bool
+  axiom inclusionAx    : List T → List T → Bool
+  axiom sizeAx         : List T → Int
+  axiom choiceAx       : List T → T
+  axiom splitAx        : List T → List T → Option (List T)
+end SetHookDef
+
+noncomputable def SetHook (T : Type) : SetHookSig T :=
+  { unit         := SetHookDef.unitAx T,
+    concat       := SetHookDef.concatAx T,
+    element      := SetHookDef.elementAx T,
+    union        := SetHookDef.unionAx T,
+    intersection := SetHookDef.intersectionAx T,
+    difference   := SetHookDef.differenceAx T,
+    inSet        := SetHookDef.inSetAx T,
+    inclusion    := SetHookDef.inclusionAx T,
+    size         := SetHookDef.sizeAx T,
+    choice       := SetHookDef.choiceAx T,
+    split        := SetHookDef.splitAx T }
+
+/-
+The `List` sort is an ordered collection that may contain duplicate elements.
+ -/
+
+structure listHookSig (T : Type) where
+  unit      : List T
+  concat    : List T → List T → Option (List T)
+  element   : T → List T
+  push      : T → List T → List T
+  get       : Int → List T → Option T
+  updte     : Int → T → List T → Option (List T)
+  -- create a List T with `length` elements, each containing  `value`. `Option` return type from `Int` parameter
+  make      : Int → T → Option (List T)
+  -- create a new `List T` which is equal to `dest` except the  `N` elements starting at `index` are replaced with the   contents of `src`
+  -- Having `index + size(src) > size(dest)` is undefined
+  -- updateList(dest: List T, index: Int, src: List T)
+  updateAll : List T → Int → List T → Option (List T)
+  -- create a new `List T` where the `length` elements starting   at `index` are replaced with `value`
+  fill      : List T → Int → T → Option (List T)
+  -- compute a new `List T` by removing `fromFront` elements from   the front of the list and `fromBack` elements from the back   of the List T
+  -- range(List T, fromFront: Int, fromBack: Int)
+  range     : List T → Int → Int → Option (List T)
+  -- compute whether an element is in a List T
+  -- the hook is `in`, but clashes with Lean syntax
+  inList    : T → List T → Bool
+  size      : List T → Int
+  -- split list into prefix, middle and postfix, given prefix and postfix length
+  split     : List T → Nat → Nat → Option (List T × List T × List T)
+
+namespace ListHookDef
+  variable (T : Type)
+  axiom unitAx      : List T
+  axiom concatAx    : List T → List T → Option (List T)
+  axiom elementAx   : T → List T
+  axiom pushAx      : T → List T → List T
+  axiom getAx       : Int → List T → Option T
+  axiom updteAx     : Int → T → List T → Option (List T)
+  axiom makeAx      : Int → T → Option (List T)
+  axiom updateAllAx : List T → Int → List T → Option (List T)
+  axiom fillAx      : List T → Int → T → Option (List T)
+  axiom rangeAx     : List T → Int → Int → Option (List T)
+  axiom inListAx    : T → List T → Bool
+  axiom sizeAx      : List T → Int
+  axiom splitAx     : List T → Nat → Nat → Option (List T × List T × List T)
+end ListHookDef
+
+noncomputable def ListHook (T : Type) : listHookSig T :=
+  { unit      := ListHookDef.unitAx T,
+    concat    := ListHookDef.concatAx T,
+    element   := ListHookDef.elementAx T,
+    push      := ListHookDef.pushAx T,
+    get       := ListHookDef.getAx T,
+    updte     := ListHookDef.updteAx T,
+    make      := ListHookDef.makeAx T,
+    updateAll := ListHookDef.updateAllAx T,
+    fill      := ListHookDef.fillAx T,
+    range     := ListHookDef.rangeAx T,
+    inList    := ListHookDef.inListAx T,
+    size      := ListHookDef.sizeAx T,
+    split     := ListHookDef.splitAx T }
+
+class Inj (From To : Type) : Type where
+  inj (x : From) : To
+  retr (x : To) : Option From
+
+def inj {From To : Type} [inst : Inj From To] := inst.inj
+def retr {From To : Type} [inst : Inj From To] := inst.retr
+
+-- Instances
+
+instance: BEq UInt8 where
+  beq a b := decide (Eq a b)
+
+instance: BEq SortBytes where
+  beq a b := (ByteArray.toList a) == (ByteArray.toList b)
+
+def ByteArray.decEq (a b : ByteArray) : Decidable (Eq a b) :=
+  match a, b with
+  | ⟨⟨al⟩⟩, ⟨⟨bl⟩⟩ => match List.hasDecEq al bl with
+    | isTrue t => isTrue (by rw [t])
+    | isFalse f => isFalse (by simp [f])
+
+instance: DecidableEq SortBytes := ByteArray.decEq
+
+/-! ### Function Implementations -/
+
+-- `SortInt`
+
+-- Operations
+def «_+Int_» (x0 x1 : SortInt) : Option SortInt := some (x0 + x1)
+def «_-Int_» (x0 x1 : SortInt) : Option SortInt := some (x0 - x1)
+def «_*Int_» (x0 x1 : SortInt) : Option SortInt := some (x0 * x1)
+def «_/Int_» (x0 x1 : SortInt) : Option SortInt :=
+  ite (x1 == 0) none (Int.tdiv x0 x1)
+def _modInt_ (x0 x1 : SortInt) : Option SortInt :=
+  ite (x1 == 0) none (Int.emod x0 x1)
+def «_^%Int__» (x0 x1 x2 : SortInt) : Option SortInt :=
+   if x2 == 0 then none else
+   match x1 with -- TODO: Revisit this implementation
+   | .ofNat n => some (Int.emod (Int.pow x0 n) x2)
+   | _ => none
+def «maxInt(_,_)_INT-COMMON_Int_Int_Int» (x0 x1 : SortInt) :=
+  some (ite (x0 < x1) x1 x0)
+def «log2Int(_)_INT-COMMON_Int_Int» (x0 : SortInt) : Option SortInt :=
+  ite (0 < x0) ((Nat.log2 x0.toNat) : Int) none
+def «~Int_» (x0 : SortInt) : Option SortInt := some (.not x0)
+
+-- Comparisons
+def «_<=Int_» (x0 x1 : SortInt) : Option SortBool := some (x0 <= x1)
+def «_>=Int_» (x0 x1 : SortInt) : Option SortBool := some (x0 >= x1)
+def «_<Int_» (x0 x1 : SortInt) : Option SortBool := some (x0 < x1)
+def «_>Int_» (x0 x1 : SortInt) : Option SortBool := some (x0 > x1)
+def «_==Int_» (x0 x1 : SortInt) : Option SortBool := some (x0 == x1)
+
+-- `SortBytes`
+
+inductive SortEndianness : Type where
+  | bigEndianBytes : SortEndianness
+  | littleEndianBytes : SortEndianness
+  deriving BEq, DecidableEq
+
+inductive SortSignedness : Type where
+  | signedBytes : SortSignedness
+  | unsignedBytes : SortSignedness
+  deriving BEq, DecidableEq
+
+def «.Bytes_BYTES-HOOKED_Bytes» : Option SortBytes := some .empty
+
+-- Adapted from https://github.com/runtimeverification/haskell-backend/blob/362dab30d6435ec117862fea722be67373572034/kore/src/Kore/Builtin/InternalBytes.hs#L496-L511
+def «Int2Bytes(_,_,_)_BYTES-HOOKED_Bytes_Int_Int_Endianness» (x0 x1 : SortInt) (x2 : SortEndianness) : Option SortBytes :=
+  match x2 with
+  | .littleEndianBytes => some littleEndian.toByteArray
+  | .bigEndianBytes => some littleEndian.reverse.toByteArray
+  where
+  littleEndian : List UInt8 :=
+    let pad := ite (x1 < 0) 0xFF 0x00
+    let rec bytes (len : Nat) (n : Int) : List UInt8 :=
+      match len, n with
+      | 0, _ => []
+      | .succ l, 0 => pad :: bytes l 0
+      | .succ l, n => ⟨(n % 256).toNat⟩ :: bytes l (n / 256)
+    bytes x0.toNat x1
+
+-- Adapted from
+-- https://github.com/runtimeverification/haskell-backend/blob/362dab30d6435ec117862fea722be67373572034/kore/src/Kore/Builtin/InternalBytes.hs#L527-L543
+-- Note that we use `List.foldl` and not `ByteArray.foldl` for ease of reasoning
+def «Bytes2Int(_,_,_)_BYTES-HOOKED_Int_Bytes_Endianness_Signedness» (bytes : SortBytes) (endian : SortEndianness) (sign : SortSignedness) : Option SortInt :=
+  match sign with
+  | .unsignedBytes => Int.ofNat unsigned
+  | .signedBytes => if 2 * unsigned >= modulus then (Int.ofNat unsigned) - (Int.ofNat modulus)
+                    else Int.ofNat unsigned
+  where
+  modulus : Nat := res.1
+  unsigned : Nat := res.2
+  res : Nat×Nat :=
+    let littleEndian := match endian with
+                        | .littleEndianBytes => bytes.toList
+                            --match bytes with |⟨⟨l⟩⟩ => l
+                        | .bigEndianBytes => bytes.toList.reverse
+                            --match bytes with |⟨⟨l⟩⟩ => l.reverse
+    let go (res : Nat×Nat) (b : UInt8) : Nat×Nat :=
+      -- `place` is `res.1`
+      -- `acc` is `res.2`
+      let place := res.1 * 0x100
+      let acc := res.2 + res.1 * b.toNat
+      ⟨place, acc⟩
+    List.foldl go (1, 0) littleEndian
+
+/--
+Pads to the right `len - b.length` bytes with specified `val` value
+-/
+def «padRightBytes(_,_,_)_BYTES-HOOKED_Bytes_Bytes_Int_Int» (b : SortBytes) (len val : SortInt) : Option SortBytes :=
+  if val < 0 ∨ 255 < val then none else
+  some { data := (Array.rightpad len.toNat (⟨val.toNat⟩ : UInt8) b.data)}
+
+/--
+Pads to the left `len - b.length` bytes with specified `val` value
+-/
+def «padLeftBytes(_,_,_)_BYTES-HOOKED_Bytes_Bytes_Int_Int» (b : SortBytes) (len val : SortInt) : Option SortBytes :=
+  if val < 0 ∨ 255 < val then none else
+  some { data := (Array.leftpad len.toNat (⟨val.toNat⟩ : UInt8) b.data)}
+
+def «lengthBytes(_)_BYTES-HOOKED_Int_Bytes» (x0 : SortBytes) : Option SortInt :=
+  Int.ofNat x0.size
+
+/--
+Replaces the contents of `dest` from index `index` with the contents of `src`
+If `dest.size < index + src.size` the result is `none`
+-/
+def «replaceAtBytes(_,_,_)_BYTES-HOOKED_Bytes_Bytes_Int_Bytes» (dest : SortBytes) (index : SortInt) (src : SortBytes) : Option SortBytes :=
+  if index < 0 then none else
+  if dest.size < index + src.size then none else
+  let init := dest.data.extract 0 index.toNat
+  let rem := dest.data.extract (index.toNat + src.size) dest.size
+  some { data := init ++ src.data ++ rem }
+
+/--
+Get a new `Bytes` object containing a range of bytes from the input `Bytes`
+-/
+def «substrBytes(_,_,_)_BYTES-HOOKED_Bytes_Bytes_Int_Int» (b : SortBytes) (startIndex : SortInt) (endIndex : SortInt) : Option SortBytes :=
+  if startIndex < 0 then none else
+  if endIndex < startIndex then none else
+  if b.size < endIndex then none else
+  b.extract startIndex.toNat endIndex.toNat
+FILE /reference/klean-generation/generated/Klean12Longest/Sorts.lean
+3ccf11379b5c4862ab0fdd246ca206bd9b22f1f27b159b1c809f8d3acdf9deea  /reference/klean-generation/generated/Klean12Longest/Sorts.lean
+import Klean12Longest.Prelude
+
+structure SortGeneratedCounterCell : Type where
+  val : SortInt
+
+mutual
+  inductive SortCmpOp : Type where
+    | «CmpOp(_,_)_MPY-SYNTAX_CmpOp_String_Expr» (x0 : SortString) (x1 : SortExpr) : SortCmpOp
+
+  inductive SortCmpOps : Type where
+    | «.List{"_,__MPY-SYNTAX_CmpOps_CmpOp_CmpOps"}_CmpOps» : SortCmpOps
+    | «_,__MPY-SYNTAX_CmpOps_CmpOp_CmpOps» (x0 : SortCmpOp) (x1 : SortCmpOps) : SortCmpOps
+
+  inductive SortExpr : Type where
+    | «Call(_,_)_MPY-SYNTAX_Expr_Expr_Exprs» (x0 : SortExpr) (x1 : SortExprs) : SortExpr
+    | «Compare(_,_)_MPY-SYNTAX_Expr_Expr_CmpOps» (x0 : SortExpr) (x1 : SortCmpOps) : SortExpr
+    | «Int(_)_MPY-SYNTAX_Expr_Int» (x0 : SortInt) : SortExpr
+    | «ListExpr(_)_MPY-SYNTAX_Expr_Exprs» (x0 : SortExprs) : SortExpr
+    | «Name(_)_MPY-SYNTAX_Expr_String» (x0 : SortString) : SortExpr
+    | «NoneVal_MPY-SYNTAX_Expr» : SortExpr
+    | «Str(_)_MPY-SYNTAX_Expr_String» (x0 : SortString) : SortExpr
+    | «Subscript(_,_)_MPY-SYNTAX_Expr_Expr_Expr» (x0 : SortExpr) (x1 : SortExpr) : SortExpr
+
+  inductive SortExprs : Type where
+    | «.List{"_,__MPY-SYNTAX_Exprs_Expr_Exprs"}_Exprs» : SortExprs
+    | «_,__MPY-SYNTAX_Exprs_Expr_Exprs» (x0 : SortExpr) (x1 : SortExprs) : SortExprs
+end
+
+inductive SortStrings : Type where
+  | «.List{"_,__MPY-SYNTAX_Strings_String_Strings"}_Strings» : SortStrings
+  | «_,__MPY-SYNTAX_Strings_String_Strings» (x0 : SortString) (x1 : SortStrings) : SortStrings
+
+mutual
+  inductive SortValue : Type where
+    | «boolVal(_)_MPY-SEMANTICS_Value_Bool» (x0 : SortBool) : SortValue
+    | «intVal(_)_MPY-SEMANTICS_Value_Int» (x0 : SortInt) : SortValue
+    | «listVal(_)_MPY-SEMANTICS_Value_Values» (x0 : SortValues) : SortValue
+    | «noneVal_MPY-SEMANTICS_Value» : SortValue
+    | «seqVal(_,_,_)_VERIFICATION_Value_String_Int_Int» (x0 : SortString) (x1 : SortInt) (x2 : SortInt) : SortValue
+    | «strVal(_)_MPY-SEMANTICS_Value_String» (x0 : SortString) : SortValue
+
+  inductive SortValues : Type where
+    | «.List{"_,__MPY-SEMANTICS_Values_Value_Values"}_Values» : SortValues
+    | «_,__MPY-SEMANTICS_Values_Value_Values» (x0 : SortValue) (x1 : SortValues) : SortValues
+end
+
+inductive SortParams : Type where
+  | «Params(_)_MPY-SYNTAX_Params_Strings» (x0 : SortStrings) : SortParams
+
+structure SortArgsCell : Type where
+  val : SortValue
+
+inductive SortOutput : Type where
+  | inj_SortValue (x : SortValue) : SortOutput
+  | «noOutput_MPY-SEMANTICS_Output» : SortOutput
+
+mutual
+  inductive SortStmt : Type where
+    | «Assign(_,_)_MPY-SYNTAX_Stmt_Expr_Expr» (x0 : SortExpr) (x1 : SortExpr) : SortStmt
+    | «For(_,_,_)_MPY-SYNTAX_Stmt_Expr_Expr_Stmts» (x0 : SortExpr) (x1 : SortExpr) (x2 : SortStmts) : SortStmt
+    | «FuncDef(_,_,_)_MPY-SYNTAX_Stmt_String_Params_Stmts» (x0 : SortString) (x1 : SortParams) (x2 : SortStmts) : SortStmt
+    | «If(_,_,_)_MPY-SYNTAX_Stmt_Expr_Stmts_Stmts» (x0 : SortExpr) (x1 : SortStmts) (x2 : SortStmts) : SortStmt
+    | «ImportFrom(_,_)_MPY-SYNTAX_Stmt_String_Strings» (x0 : SortString) (x1 : SortStrings) : SortStmt
+    | «Module(_)_MPY-SYNTAX_Stmt_Stmts» (x0 : SortStmts) : SortStmt
+    | «Return()_MPY-SYNTAX_Stmt» : SortStmt
+    | «Return(_)_MPY-SYNTAX_Stmt_Expr» (x0 : SortExpr) : SortStmt
+
+  inductive SortStmts : Type where
+    | «.List{"___MPY-SYNTAX_Stmts_Stmt_Stmts"}_Stmts» : SortStmts
+    | «___MPY-SYNTAX_Stmts_Stmt_Stmts» (x0 : SortStmt) (x1 : SortStmts) : SortStmts
+end
+
+structure SortOutCell : Type where
+  val : SortOutput
+
+inductive SortFunction : Type where
+  | «function(_,_)_MPY-SEMANTICS_Function_Params_Stmts» (x0 : SortParams) (x1 : SortStmts) : SortFunction
+  | «noFunction_MPY-SEMANTICS_Function» : SortFunction
+
+structure SortFunctionCell : Type where
+  val : SortFunction
+
+mutual
+  structure SortEnvCell : Type where
+    val : SortMap
+
+  structure SortGeneratedTopCell : Type where
+    mpy : SortMpyCell
+    generatedCounter : SortGeneratedCounterCell
+
+  inductive SortK : Type where
+    | dotk : SortK
+    | kseq (x0 : SortKItem) (x1 : SortK) : SortK
+
+  structure SortKCell : Type where
+    val : SortK
+
+  inductive SortKItem : Type where
+    | inj_SortArgsCell (x : SortArgsCell) : SortKItem
+    | inj_SortBool (x : SortBool) : SortKItem
+    | inj_SortCmpOp (x : SortCmpOp) : SortKItem
+    | inj_SortCmpOps (x : SortCmpOps) : SortKItem
+    | inj_SortEnvCell (x : SortEnvCell) : SortKItem
+    | inj_SortExpr (x : SortExpr) : SortKItem
+    | inj_SortExprs (x : SortExprs) : SortKItem
+    | inj_SortFunction (x : SortFunction) : SortKItem
+    | inj_SortFunctionCell (x : SortFunctionCell) : SortKItem
+    | inj_SortGeneratedCounterCell (x : SortGeneratedCounterCell) : SortKItem
+    | inj_SortGeneratedTopCell (x : SortGeneratedTopCell) : SortKItem
+    | inj_SortInt (x : SortInt) : SortKItem
+    | inj_SortKCell (x : SortKCell) : SortKItem
+    | inj_SortMap (x : SortMap) : SortKItem
+    | inj_SortMpyCell (x : SortMpyCell) : SortKItem
+    | inj_SortOutCell (x : SortOutCell) : SortKItem
+    | inj_SortOutput (x : SortOutput) : SortKItem
+    | inj_SortParams (x : SortParams) : SortKItem
+    | inj_SortStmt (x : SortStmt) : SortKItem
+    | inj_SortStmts (x : SortStmts) : SortKItem
+    | inj_SortString (x : SortString) : SortKItem
+    | inj_SortStrings (x : SortStrings) : SortKItem
+    | inj_SortValue (x : SortValue) : SortKItem
+    | inj_SortValues (x : SortValues) : SortKItem
+    | «#kxExport0(_)_VERIFICATION-KLEAN-EXPORT_KItem_Strings» (x0 : SortStrings) : SortKItem
+    | «#kxExport1(_)_VERIFICATION-KLEAN-EXPORT_KItem_Strings» (x0 : SortStrings) : SortKItem
+    | «#kxExport2(_)_VERIFICATION-KLEAN-EXPORT_KItem_Strings» (x0 : SortStrings) : SortKItem
+    | «#kxExport3(_,_)_VERIFICATION-KLEAN-EXPORT_KItem_String_Strings» (x0 : SortString) (x1 : SortStrings) : SortKItem
+    | «#kxExport4(_,_)_VERIFICATION-KLEAN-EXPORT_KItem_String_Int» (x0 : SortString) (x1 : SortInt) : SortKItem
+    | «#kxExport5(_,_,_,_)_VERIFICATION-KLEAN-EXPORT_KItem_String_String_Int_Int» (x0 : SortString) (x1 : SortString) (x2 : SortInt) (x3 : SortInt) : SortKItem
+    | «branch(_,_,_)_MPY-SEMANTICS_KItem_Value_Stmts_Stmts» (x0 : SortValue) (x1 : SortStmts) (x2 : SortStmts) : SortKItem
+    | «exec(_)_MPY-SEMANTICS_KItem_Stmts» (x0 : SortStmts) : SortKItem
+    | «execStmt(_)_MPY-SEMANTICS_KItem_Stmt» (x0 : SortStmt) : SortKItem
+    | «forValues(_,_,_)_MPY-SEMANTICS_KItem_String_Value_Stmts» (x0 : SortString) (x1 : SortValue) (x2 : SortStmts) : SortKItem
+    | «functionEnd_MPY-SEMANTICS_KItem» : SortKItem
+    | «invokeEntry_MPY-SEMANTICS_KItem» : SortKItem
+    | «returning(_)_MPY-SEMANTICS_KItem_Value» (x0 : SortValue) : SortKItem
+
+  structure SortMap : Type where
+    coll : List (SortKItem × SortKItem)
+
+  structure SortMpyCell : Type where
+    k : SortKCell
+    args : SortArgsCell
+    env : SortEnvCell
+    function : SortFunctionCell
+    out : SortOutCell
+endFILE /reference/klean-generation/generated/Klean12Longest/Inj.lean
+a30b55a328c7562982f419f36c1e2670a136a68cd644bb238d0c77db2c1a069a  /reference/klean-generation/generated/Klean12Longest/Inj.lean
+import Klean12Longest.Sorts
+
+instance : Inj SortBool SortKItem where
+  inj := SortKItem.inj_SortBool
+  retr
+    | SortKItem.inj_SortBool x => some x
+    | _ => none
+
+instance : Inj SortStmt SortKItem where
+  inj := SortKItem.inj_SortStmt
+  retr
+    | SortKItem.inj_SortStmt x => some x
+    | _ => none
+
+instance : Inj SortFunctionCell SortKItem where
+  inj := SortKItem.inj_SortFunctionCell
+  retr
+    | SortKItem.inj_SortFunctionCell x => some x
+    | _ => none
+
+instance : Inj SortGeneratedTopCell SortKItem where
+  inj := SortKItem.inj_SortGeneratedTopCell
+  retr
+    | SortKItem.inj_SortGeneratedTopCell x => some x
+    | _ => none
+
+instance : Inj SortMpyCell SortKItem where
+  inj := SortKItem.inj_SortMpyCell
+  retr
+    | SortKItem.inj_SortMpyCell x => some x
+    | _ => none
+
+instance : Inj SortMap SortKItem where
+  inj := SortKItem.inj_SortMap
+  retr
+    | SortKItem.inj_SortMap x => some x
+    | _ => none
+
+instance : Inj SortValues SortKItem where
+  inj := SortKItem.inj_SortValues
+  retr
+    | SortKItem.inj_SortValues x => some x
+    | _ => none
+
+instance : Inj SortValue SortKItem where
+  inj := SortKItem.inj_SortValue
+  retr
+    | SortKItem.inj_SortValue x => some x
+    | _ => none
+
+instance : Inj SortGeneratedCounterCell SortKItem where
+  inj := SortKItem.inj_SortGeneratedCounterCell
+  retr
+    | SortKItem.inj_SortGeneratedCounterCell x => some x
+    | _ => none
+
+instance : Inj SortOutCell SortKItem where
+  inj := SortKItem.inj_SortOutCell
+  retr
+    | SortKItem.inj_SortOutCell x => some x
+    | _ => none
+
+instance : Inj SortString SortKItem where
+  inj := SortKItem.inj_SortString
+  retr
+    | SortKItem.inj_SortString x => some x
+    | _ => none
+
+instance : Inj SortEnvCell SortKItem where
+  inj := SortKItem.inj_SortEnvCell
+  retr
+    | SortKItem.inj_SortEnvCell x => some x
+    | _ => none
+
+instance : Inj SortOutput SortKItem where
+  inj
+    | SortOutput.inj_SortValue x => SortKItem.inj_SortValue x
+    | x => SortKItem.inj_SortOutput x
+  retr
+    | SortKItem.inj_SortValue x => some (SortOutput.inj_SortValue x)
+    | SortKItem.inj_SortOutput x => some x
+    | _ => none
+
+instance : Inj SortKCell SortKItem where
+  inj := SortKItem.inj_SortKCell
+  retr
+    | SortKItem.inj_SortKCell x => some x
+    | _ => none
+
+instance : Inj SortArgsCell SortKItem where
+  inj := SortKItem.inj_SortArgsCell
+  retr
+    | SortKItem.inj_SortArgsCell x => some x
+    | _ => none
+
+instance : Inj SortFunction SortKItem where
+  inj := SortKItem.inj_SortFunction
+  retr
+    | SortKItem.inj_SortFunction x => some x
+    | _ => none
+
+instance : Inj SortCmpOps SortKItem where
+  inj := SortKItem.inj_SortCmpOps
+  retr
+    | SortKItem.inj_SortCmpOps x => some x
+    | _ => none
+
+instance : Inj SortStrings SortKItem where
+  inj := SortKItem.inj_SortStrings
+  retr
+    | SortKItem.inj_SortStrings x => some x
+    | _ => none
+
+instance : Inj SortInt SortKItem where
+  inj := SortKItem.inj_SortInt
+  retr
+    | SortKItem.inj_SortInt x => some x
+    | _ => none
+
+instance : Inj SortParams SortKItem where
+  inj := SortKItem.inj_SortParams
+  retr
+    | SortKItem.inj_SortParams x => some x
+    | _ => none
+
+instance : Inj SortExpr SortKItem where
+  inj := SortKItem.inj_SortExpr
+  retr
+    | SortKItem.inj_SortExpr x => some x
+    | _ => none
+
+instance : Inj SortCmpOp SortKItem where
+  inj := SortKItem.inj_SortCmpOp
+  retr
+    | SortKItem.inj_SortCmpOp x => some x
+    | _ => none
+
+instance : Inj SortExprs SortKItem where
+  inj := SortKItem.inj_SortExprs
+  retr
+    | SortKItem.inj_SortExprs x => some x
+    | _ => none
+
+instance : Inj SortStmts SortKItem where
+  inj := SortKItem.inj_SortStmts
+  retr
+    | SortKItem.inj_SortStmts x => some x
+    | _ => none
+
+instance : Inj SortValue SortOutput where
+  inj := SortOutput.inj_SortValue
+  retr
+    | SortOutput.inj_SortValue x => some x
+    | _ => noneFILE /reference/klean-generation/generated/Klean12Longest/Lemmas.lean
+1f02481506663a1bf5014f17a29fc1c3906cab69808674424e1fe8eb46a0609d  /reference/klean-generation/generated/Klean12Longest/Lemmas.lean
+import Klean12Longest.Inj
+
+/- K trust-boundary goals. The second-pass agent must replace every
+   writable opaque stub with an honest definition and prove this
+   immutable proposition in the separate Proof.lean workspace. -/
+
+namespace Klean12Longest.Lemmas
+
+end Klean12Longest.Lemmas
+FILE /reference/klean-generation/generated/Klean12Longest/Func.lean
+dad3890ca60531325e6c49a82c380c585190b89dab8db77d05f5f92355d9453d  /reference/klean-generation/generated/Klean12Longest/Func.lean
+import Klean12Longest.Inj
+
+def _e4f8233 : SortString → SortStrings → Option SortString
+  | BEST, SortStrings.«.List{"_,__MPY-SYNTAX_Strings_String_Strings"}_Strings» => some BEST
+  | _, _ => none
+
+axiom «lengthString(_)_STRING-COMMON_Int_String» (x0 : SortString) : Option SortInt
+
+def _954c33a : SortStrings → Option SortValue
+  | SortStrings.«.List{"_,__MPY-SYNTAX_Strings_String_Strings"}_Strings» => some SortValue.«noneVal_MPY-SEMANTICS_Value»
+  | _ => none
+
+def _61fbef3 : SortBool → SortBool → Option SortBool
+  | false, _Gen0 => some false
+  | _, _ => none
+
+axiom «stringAt(_,_)_VERIFICATION_String_String_Int» (x0 : SortString) (x1 : SortInt) : Option SortString
+
+def _5b9db8d : SortBool → SortBool → Option SortBool
+  | true, B => some B
+  | _, _ => none
+
+axiom «_|->_» (x0 : SortKItem) (x1 : SortKItem) : Option SortMap
+
+def _e744234 : SortStrings → Option SortValues
+  | SortStrings.«.List{"_,__MPY-SYNTAX_Strings_String_Strings"}_Strings» => some SortValues.«.List{"_,__MPY-SEMANTICS_Values_Value_Values"}_Values»
+  | _ => none
+
+axiom _Map_ (x0 : SortMap) (x1 : SortMap) : Option SortMap
+
+axiom «.Map» : Option SortMap
+
+mutual
+  noncomputable def «firstLongest(_,_)_VERIFICATION_String_String_Strings» (x0 : SortString) (x1 : SortStrings) : Option SortString := (_a40ac76 x0 x1) <|> (_ddee8e9 x0 x1) <|> (_e4f8233 x0 x1)
+
+  noncomputable def _a40ac76 : SortString → SortStrings → Option SortString
+    | BEST, SortStrings.«_,__MPY-SYNTAX_Strings_String_Strings» S SS => do
+      let _Val0 <- «lengthString(_)_STRING-COMMON_Int_String» S
+      let _Val1 <- «lengthString(_)_STRING-COMMON_Int_String» BEST
+      let _Val2 <- «_<=Int_» _Val0 _Val1
+      let _Val3 <- «firstLongest(_,_)_VERIFICATION_String_String_Strings» BEST SS
+      guard _Val2
+      return _Val3
+    | _, _ => none
+
+  noncomputable def _ddee8e9 : SortString → SortStrings → Option SortString
+    | BEST, SortStrings.«_,__MPY-SYNTAX_Strings_String_Strings» S SS => do
+      let _Val0 <- «lengthString(_)_STRING-COMMON_Int_String» S
+      let _Val1 <- «lengthString(_)_STRING-COMMON_Int_String» BEST
+      let _Val2 <- «_>Int_» _Val0 _Val1
+      let _Val3 <- «firstLongest(_,_)_VERIFICATION_String_String_Strings» S SS
+      guard _Val2
+      return _Val3
+    | _, _ => none
+end
+
+def _andBool_ (x0 : SortBool) (x1 : SortBool) : Option SortBool := (_5b9db8d x0 x1) <|> (_61fbef3 x0 x1)
+
+def _3003411 : SortString → SortString → SortInt → SortInt → Option SortString
+  | BEST, _ID, _I, N => do
+    let _Val0 <- «_==Int_» N 0
+    guard _Val0
+    return BEST
+
+mutual
+  def _0a9f296 : SortStrings → Option SortValues
+    | SortStrings.«_,__MPY-SYNTAX_Strings_String_Strings» S SS => do
+      let _Val0 <- «stringValues(_)_VERIFICATION_Values_Strings» SS
+      return (SortValues.«_,__MPY-SEMANTICS_Values_Value_Values» (SortValue.«strVal(_)_MPY-SEMANTICS_Value_String» S) _Val0)
+    | _ => none
+
+  def «stringValues(_)_VERIFICATION_Values_Strings» (x0 : SortStrings) : Option SortValues := (_0a9f296 x0) <|> (_e744234 x0)
+end
+
+noncomputable def _5bb79e3 : SortStrings → Option SortValue
+  | SortStrings.«_,__MPY-SYNTAX_Strings_String_Strings» S SS => do
+    let _Val0 <- «firstLongest(_,_)_VERIFICATION_String_String_Strings» S SS
+    return (SortValue.«strVal(_)_MPY-SEMANTICS_Value_String» _Val0)
+  | _ => none
+
+axiom _7cce72c : SortString → SortString → SortInt → SortInt → Option SortString
+axiom «firstInSeq(_,_,_,_)_VERIFICATION_String_String_String_Int_Int» (x0 : SortString) (x1 : SortString) (x2 : SortInt) (x3 : SortInt) : Option SortString
+axiom _be8a39b : SortString → SortString → SortInt → SortInt → Option SortString
+
+def _312168a : SortStrings → Option SortValue
+  | SS => do
+    let _Val0 <- «stringValues(_)_VERIFICATION_Values_Strings» SS
+    return (SortValue.«listVal(_)_MPY-SEMANTICS_Value_Values» _Val0)
+
+noncomputable def «expectedLongest(_)_VERIFICATION_Value_Strings» (x0 : SortStrings) : Option SortValue := (_5bb79e3 x0) <|> (_954c33a x0)
+
+def «stringList(_)_VERIFICATION_Value_Strings» (x0 : SortStrings) : Option SortValue := _312168a x0FILE /reference/klean-generation/generated/Klean12Longest/Rewrite.lean
+91c6d231488aff2ad459a16412659bbbabe56404eae0b7a423906a6b4999263d  /reference/klean-generation/generated/Klean12Longest/Rewrite.lean
+import Klean12Longest.Func
+
+inductive Rewrites : SortGeneratedTopCell → SortGeneratedTopCell → Prop where
+  | tran {s1 s2 s3 : SortGeneratedTopCell} (t1 : Rewrites s1 s2) (t2 : Rewrites s2 s3) : Rewrites s1 s3
+  | VERIFICATION_KLEAN_EXPORT_kxExport0 {V0 : SortStrings} {_DotVar0 : SortGeneratedCounterCell} {_DotVar2 : SortK} {_Gen0 : SortArgsCell} {_Gen1 : SortEnvCell} {_Gen2 : SortFunctionCell} {_Gen3 : SortOutCell} {_Val0 : SortValue} (defn_Val0 : «stringList(_)_VERIFICATION_Value_Strings» V0 = some _Val0) : Rewrites { mpy := { k := { val := SortK.kseq (SortKItem.«#kxExport0(_)_VERIFICATION-KLEAN-EXPORT_KItem_Strings» V0) _DotVar2 }, args := _Gen0, env := _Gen1, function := _Gen2, out := _Gen3 }, generatedCounter := _DotVar0 } { mpy := { k := { val := SortK.kseq ((@inj SortValue SortKItem) _Val0) _DotVar2 }, args := _Gen0, env := _Gen1, function := _Gen2, out := _Gen3 }, generatedCounter := _DotVar0 }
+  | VERIFICATION_KLEAN_EXPORT_kxExport1 {V0 : SortStrings} {_DotVar0 : SortGeneratedCounterCell} {_DotVar2 : SortK} {_Gen0 : SortArgsCell} {_Gen1 : SortEnvCell} {_Gen2 : SortFunctionCell} {_Gen3 : SortOutCell} {_Val0 : SortValues} (defn_Val0 : «stringValues(_)_VERIFICATION_Values_Strings» V0 = some _Val0) : Rewrites { mpy := { k := { val := SortK.kseq (SortKItem.«#kxExport1(_)_VERIFICATION-KLEAN-EXPORT_KItem_Strings» V0) _DotVar2 }, args := _Gen0, env := _Gen1, function := _Gen2, out := _Gen3 }, generatedCounter := _DotVar0 } { mpy := { k := { val := SortK.kseq ((@inj SortValues SortKItem) _Val0) _DotVar2 }, args := _Gen0, env := _Gen1, function := _Gen2, out := _Gen3 }, generatedCounter := _DotVar0 }
+  | VERIFICATION_KLEAN_EXPORT_kxExport2 {V0 : SortStrings} {_DotVar0 : SortGeneratedCounterCell} {_DotVar2 : SortK} {_Gen0 : SortArgsCell} {_Gen1 : SortEnvCell} {_Gen2 : SortFunctionCell} {_Gen3 : SortOutCell} {_Val0 : SortValue} (defn_Val0 : «expectedLongest(_)_VERIFICATION_Value_Strings» V0 = some _Val0) : Rewrites { mpy := { k := { val := SortK.kseq (SortKItem.«#kxExport2(_)_VERIFICATION-KLEAN-EXPORT_KItem_Strings» V0) _DotVar2 }, args := _Gen0, env := _Gen1, function := _Gen2, out := _Gen3 }, generatedCounter := _DotVar0 } { mpy := { k := { val := SortK.kseq ((@inj SortValue SortKItem) _Val0) _DotVar2 }, args := _Gen0, env := _Gen1, function := _Gen2, out := _Gen3 }, generatedCounter := _DotVar0 }
+  | VERIFICATION_KLEAN_EXPORT_kxExport3 {V0 _Val0 : SortString} {V1 : SortStrings} {_DotVar0 : SortGeneratedCounterCell} {_DotVar2 : SortK} {_Gen0 : SortArgsCell} {_Gen1 : SortEnvCell} {_Gen2 : SortFunctionCell} {_Gen3 : SortOutCell} (defn_Val0 : «firstLongest(_,_)_VERIFICATION_String_String_Strings» V0 V1 = some _Val0) : Rewrites { mpy := { k := { val := SortK.kseq (SortKItem.«#kxExport3(_,_)_VERIFICATION-KLEAN-EXPORT_KItem_String_Strings» V0 V1) _DotVar2 }, args := _Gen0, env := _Gen1, function := _Gen2, out := _Gen3 }, generatedCounter := _DotVar0 } { mpy := { k := { val := SortK.kseq ((@inj SortString SortKItem) _Val0) _DotVar2 }, args := _Gen0, env := _Gen1, function := _Gen2, out := _Gen3 }, generatedCounter := _DotVar0 }
+  | VERIFICATION_KLEAN_EXPORT_kxExport4 {V0 _Val0 : SortString} {V1 : SortInt} {_DotVar0 : SortGeneratedCounterCell} {_DotVar2 : SortK} {_Gen0 : SortArgsCell} {_Gen1 : SortEnvCell} {_Gen2 : SortFunctionCell} {_Gen3 : SortOutCell} (defn_Val0 : «stringAt(_,_)_VERIFICATION_String_String_Int» V0 V1 = some _Val0) : Rewrites { mpy := { k := { val := SortK.kseq (SortKItem.«#kxExport4(_,_)_VERIFICATION-KLEAN-EXPORT_KItem_String_Int» V0 V1) _DotVar2 }, args := _Gen0, env := _Gen1, function := _Gen2, out := _Gen3 }, generatedCounter := _DotVar0 } { mpy := { k := { val := SortK.kseq ((@inj SortString SortKItem) _Val0) _DotVar2 }, args := _Gen0, env := _Gen1, function := _Gen2, out := _Gen3 }, generatedCounter := _DotVar0 }
+  | VERIFICATION_KLEAN_EXPORT_kxExport5 {V0 V1 _Val0 : SortString} {V2 V3 : SortInt} {_DotVar0 : SortGeneratedCounterCell} {_DotVar2 : SortK} {_Gen0 : SortArgsCell} {_Gen1 : SortEnvCell} {_Gen2 : SortFunctionCell} {_Gen3 : SortOutCell} (defn_Val0 : «firstInSeq(_,_,_,_)_VERIFICATION_String_String_String_Int_Int» V0 V1 V2 V3 = some _Val0) : Rewrites { mpy := { k := { val := SortK.kseq (SortKItem.«#kxExport5(_,_,_,_)_VERIFICATION-KLEAN-EXPORT_KItem_String_String_Int_Int» V0 V1 V2 V3) _DotVar2 }, args := _Gen0, env := _Gen1, function := _Gen2, out := _Gen3 }, generatedCounter := _DotVar0 } { mpy := { k := { val := SortK.kseq ((@inj SortString SortKItem) _Val0) _DotVar2 }, args := _Gen0, env := _Gen1, function := _Gen2, out := _Gen3 }, generatedCounter := _DotVar0 }FILE /reference/klean-generation/generated/lakefile.toml
+47763fdf9a422bdee1eefefad7f0a886c40e58132f1b1115bf5862d5746d3839  /reference/klean-generation/generated/lakefile.toml
+name = "klean-12-longest"
+version = "0.1.0"
+defaultTargets = ["Klean12Longest"]
+weakLeanArgs = [
+    "-D maxHeartbeats=10000000"
+]
+
+buildDir = "/tmp/klean-generated-build"
+
+[[lean_lib]]
+name = "Klean12Longest"
+FILE /reference/klean-generation/generated/lean-toolchain
+8f6680f8389e8adee06cb2bd44372c6d60dce0e8301630b61a99a5642d1bd71b  /reference/klean-generation/generated/lean-toolchain
+leanprover/lean4:v4.22.0
+
+Script done on 2026-07-28 00:14:20-05:00 [COMMAND_EXIT_CODE="0"]

@@ -1,0 +1,1087 @@
+# Exhaustive K declaration and rule inventory
+
+Generated from the trusted supplied semantics and the candidate's proof/spec sources. Each entry records its complete source span compacted to one line.
+
+## Source manifest
+
+- `/reference/reference-semantics/semantics/assert.k` — sha256 `4258987a261d24b02ab3abfa52b3b2e013ea6323f9d5eb9a59c8f42cbcba030b`
+- `/reference/reference-semantics/semantics/bool.k` — sha256 `8d6cfa9cd1ed776e51d776e4d358c418960c57715a6f9654ef9af41aea29f4fd`
+- `/reference/reference-semantics/semantics/builtins.k` — sha256 `fa43a855b8a4548f305f3dd210c8f6c6e7aa15b8d1cb0b8296977f061310c2dd`
+- `/reference/reference-semantics/semantics/call.k` — sha256 `7e4d6c7cabe7bb4ccff52f21c5d5f30920ccb48d42864146ce53146509f736e4`
+- `/reference/reference-semantics/semantics/comprehension.k` — sha256 `cf7c38aad5cff698ebb05ecbadf00cbf210ddb2f54ae86f22b328311c027c6a7`
+- `/reference/reference-semantics/semantics/concrete.k` — sha256 `1ffea42a32610e9116506d709e9163413aeb5f6deb7824ea554aca8341f2d305`
+- `/reference/reference-semantics/semantics/controls.k` — sha256 `325c73757d5a7ccf541b93240accd590a2cee90d84470efa3a4a0a14165aafae`
+- `/reference/reference-semantics/semantics/core.k` — sha256 `e0fdc11dc2b9cd0acb18fe7c832c1ea1ac0c9e79cadf40c63f34276aca513d7e`
+- `/reference/reference-semantics/semantics/dict.k` — sha256 `779b06e18162464c8422bbd6ac35fa0b9e34ef82807d5c707c6f4552d63c0580`
+- `/reference/reference-semantics/semantics/float.k` — sha256 `5dfeee8700c90c3aa6dc515b15b74283882845fb6cdcc3627d97ef650124b70f`
+- `/reference/reference-semantics/semantics/functions.k` — sha256 `e4c8f67741117b29703c3c61d48a5b0f92cf7bd531e78e25c03e794a910ac193`
+- `/reference/reference-semantics/semantics/int.k` — sha256 `dc2da7d81578370651ecb6905b69cb44443cdd8db3869441242b81420382abe5`
+- `/reference/reference-semantics/semantics/iter.k` — sha256 `5085db2fed67b7bbd39f6289ec275905aaee742690895d7b3f843f73bd62f77f`
+- `/reference/reference-semantics/semantics/list.k` — sha256 `870c72341c25e2c16283726191a71bf5b571ed2995c8ae12e3e2923cdce5a9aa`
+- `/reference/reference-semantics/semantics/methods.k` — sha256 `ff9acc6dab2d1cc99ec4f2d234f27ae4526d752aae62bcfd7f9fd2a0399f7743`
+- `/reference/reference-semantics/semantics/operators.k` — sha256 `f3d1fd85734f5e1757307e606cbfb8d6d4bf0893ee85ce20ec99606ade910e8b`
+- `/reference/reference-semantics/semantics/range.k` — sha256 `810e4c04b757445c03592aef25c97d6b2cc7c6fffa646288bc6cd15a3cae643d`
+- `/reference/reference-semantics/semantics/set.k` — sha256 `b822c3c6944f9940a4477fa6b7a42490c407663f2a314394e9c146e8951f1ac7`
+- `/reference/reference-semantics/semantics/sort.k` — sha256 `df79670e4794a92e96ffc824857fbc34d3a65b6b6a3026d1dcf322128fbaba5a`
+- `/reference/reference-semantics/semantics/str.k` — sha256 `1bf0abf61d7c5df6301433a89c79d2ef4259d47a68d98385ff74618c4c310e0f`
+- `/reference/reference-semantics/semantics/subscript.k` — sha256 `dba04c0acf213bef4f9f7b11243ca00a2b3ca5fa8666c544ede7d382d27d36a7`
+- `/reference/reference-semantics/semantics/syntax.k` — sha256 `1e9e629e5e6e14bdd7f4d530375e8655a89366b5ecd0c24a3c57ad3b5708f2a6`
+- `/reference/reference-semantics/semantics/tuple.k` — sha256 `41395a1ec6a58129c78facb15b44206907c54d79e86ea363ae68cb37bfc64abb`
+- `/reference/reference-semantics/semantics.k` — sha256 `57e8f9f3178639bbb87f95e5cc596bbaa91a6463f965b1965911eff9a0269f97`
+- `/candidate/verification.k` — sha256 `40204e637c95c116d96e031fba8896cffe4170018369184a89384d9648936b3c`
+- `/candidate/spec.k` — sha256 `79dcef60a32c858b723e10269ca8621b1894eecc4768b54dde27deed50624fd0`
+
+## Aggregate counts
+
+- Files: 26
+- Total inventoried declarations/rules/claims/contexts: 952
+- Category `claim`: 2
+- Category `configuration`: 1
+- Category `context`: 5
+- Category `opaque-or-symbolic-syntax`: 27
+- Category `ordinary-rule`: 700
+- Category `simplification-rule`: 11
+- Category `syntax`: 206
+- Attribute marker `concrete`: 35
+- Attribute marker `function`: 148
+- Attribute marker `macro`: 7
+- Attribute marker `macro-rec`: 1
+- Attribute marker `no-evaluators`: 24
+- Attribute marker `owise`: 26
+- Attribute marker `priority`: 45
+- Attribute marker `seqstrict`: 1
+- Attribute marker `simplification`: 11
+- Attribute marker `strict`: 2
+- Attribute marker `symbol`: 27
+- Attribute marker `total`: 109
+
+## /reference/reference-semantics/semantics/assert.k
+
+- `6-7` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Assert(V:Val) => .K ... </k> requires truthy(V)`
+- `8-11` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Assert(V:Val) ~> _ => .K </k> <exc> NoExc => AssertionError </exc> <exit-code> _ => 1 </exit-code> requires notBool truthy(V)`
+- `13-15` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Assert(ref(H:Int)) => Assert(V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## /reference/reference-semantics/semantics/bool.k
+
+- `8` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyUn("not", V:Val) => notBool truthy(V)`
+- `10` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("==", B1:Bool, B2:Bool) => B1 ==Bool B2`
+- `11` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("!=", B1:Bool, B2:Bool) => B1 =/=Bool B2`
+- `16` | `context` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `context BoolOp(_, (HOLE:Expr, _:Exprs))`
+- `17` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> BoolOp(_:String, (V:Val, .Exprs)) => V ... </k>`
+- `18-19` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> BoolOp("and", (V:Val, A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k> requires truthy(V)`
+- `20-21` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> BoolOp("and", (V:Val, _:Expr, _:Exprs)) => V ... </k> requires notBool truthy(V)`
+- `22-23` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> BoolOp("or",  (V:Val, _:Expr, _:Exprs)) => V ... </k> requires truthy(V)`
+- `24-25` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> BoolOp("or",  (V:Val, A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k> requires notBool truthy(V)`
+- `29-30` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> BoolOp(_:String, (ref(H:Int), .Exprs)) => ref(H) ... </k> [priority(40)]`
+- `31-34` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> BoolOp("and", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires truthy(V) [priority(40)]`
+- `35-38` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> BoolOp("and", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool truthy(V) [priority(40)]`
+- `39-42` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> BoolOp("or", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k> <heap> ... H |-> V:Val ... </heap> requires truthy(V) [priority(40)]`
+- `43-46` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> BoolOp("or", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool truthy(V) [priority(40)]`
+
+## /reference/reference-semantics/semantics/builtins.k
+
+- `17` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= applyBuiltin(String, Vals) [function]`
+- `20` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= seqLen(Val) [function]`
+- `21` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("len", OBJ:Val, .Vals) => seqLen(OBJ)`
+- `22` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule seqLen(list(VS:ValSeq))                  => vsLen(VS)`
+- `23` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule seqLen(tuple(VS:ValSeq))                 => vsLen(VS)`
+- `24` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule seqLen(str(IS:IntSeq))                   => isLen(IS)`
+- `25` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule seqLen(setV(DS:IntSeq))                  => isLen(DS)`
+- `26` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule seqLen(rangeObj(LO:Int, HI:Int, ST:Int)) => rangeLen(LO, HI, ST)`
+- `32` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("list")), (list(VS:ValSeq),  .Vals)) => #alloc(list(VS)) ... </k>`
+- `33` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("list")), (tuple(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>`
+- `34` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("list")), .Vals)                     => #alloc(list(.ValSeq)) ... </k>`
+- `35` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("list")), (str(CS:IntSeq), .Vals))   => #alloc(list(charsOf(CS))) ... </k>`
+- `36` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= charsOf(IntSeq) [function, total]`
+- `37` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule charsOf(.IntSeq)                => .ValSeq`
+- `38` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule charsOf(iCons(C:Int, R:IntSeq)) => vCons(str(iCons(C, .IntSeq)), charsOf(R))`
+- `41` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("set", str(CS:IntSeq), .Vals) => setV(dedupCodes(CS))`
+- `44` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("abs", I:Int, .Vals) => absInt(I)`
+- `47` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #sumAcc(Iterable, Int) | #sumCont(Int)`
+- `48` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #sumAcc(IT:Iterable, ACC:Int) => #iterNext(IT) ~> #sumCont(ACC) ... </k>`
+- `49` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterDone ~> #sumCont(ACC:Int) => ACC ... </k>`
+- `50-52` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int) => #sumAcc(R, ACC +Int intOf(V)) ... </k> requires isInt(V) orBool isBool(V)`
+- `54` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= intOf(Val) [function]`
+- `55` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule intOf(I:Int)  => I`
+- `56` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule intOf(B:Bool) => #if B #then 1 #else 0 #fi`
+- `59` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #allAcc(Iterable) | "#allCont"`
+- `60` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #allAcc(IT:Iterable) => #iterNext(IT) ~> #allCont ... </k>`
+- `61` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterDone ~> #allCont => true ... </k>`
+- `62-63` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, R:Iterable) ~> #allCont => #allAcc(R) ... </k> requires truthy(V)`
+- `64-65` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, _:Iterable) ~> #allCont => false ... </k> requires notBool truthy(V)`
+- `67` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #anyAcc(Iterable) | "#anyCont"`
+- `68` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #anyAcc(IT:Iterable) => #iterNext(IT) ~> #anyCont ... </k>`
+- `69` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterDone ~> #anyCont => false ... </k>`
+- `70-71` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, _:Iterable) ~> #anyCont => true ... </k> requires truthy(V)`
+- `72-73` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, R:Iterable) ~> #anyCont => #anyAcc(R) ... </k> requires notBool truthy(V)`
+- `76` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #maxAcc0(Iterable) | "#maxCont0" | #maxAcc(Iterable, Int) | #maxCont(Int)`
+- `77` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #maxAcc0(IT:Iterable) => #iterNext(IT) ~> #maxCont0 ... </k>`
+- `78-79` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAcc(R, {V}:>Int) ... </k> requires isInt(V)`
+- `80` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #maxAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #maxCont(M) ... </k>`
+- `81` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterDone ~> #maxCont(M:Int) => M ... </k>`
+- `82-84` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont(M:Int) => #maxAcc(R, maxInt(M, {V}:>Int)) ... </k> requires isInt(V)`
+- `86` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #minAcc0(Iterable) | "#minCont0" | #minAcc(Iterable, Int) | #minCont(Int)`
+- `87` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #minAcc0(IT:Iterable) => #iterNext(IT) ~> #minCont0 ... </k>`
+- `88-89` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAcc(R, {V}:>Int) ... </k> requires isInt(V)`
+- `90` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #minAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #minCont(M) ... </k>`
+- `91` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterDone ~> #minCont(M:Int) => M ... </k>`
+- `92-94` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont(M:Int) => #minAcc(R, minInt(M, {V}:>Int)) ... </k> requires isInt(V)`
+- `97` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= maxVals(Int, Vals) [function]`
+- `98` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("max", I:Int, REST:Vals) => maxVals(I, REST)`
+- `99` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule maxVals(M:Int, .Vals)           => M`
+- `100` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule maxVals(M:Int, (I:Int, R:Vals)) => maxVals(maxInt(M, I), R)`
+- `102` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= minVals(Int, Vals) [function]`
+- `103` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("min", I:Int, REST:Vals) => minVals(I, REST)`
+- `104` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule minVals(M:Int, .Vals)           => M`
+- `105` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule minVals(M:Int, (I:Int, R:Vals)) => minVals(minInt(M, I), R)`
+- `108-109` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(48, iCons(98, binCodes(N)))) requires N >=Int 0`
+- `111-113` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(45, iCons(48, iCons(98, binCodes(0 -Int N))))) requires N <Int 0`
+- `114` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= binCodes(Int) [function, total]`
+- `115` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule binCodes(0) => iCons(48, .IntSeq)`
+- `116` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule binCodes(N:Int) => binAcc(N, .IntSeq) requires N >Int 0`
+- `117` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= binAcc(Int, IntSeq) [function, total]`
+- `118` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule binAcc(0, ACC:IntSeq) => ACC`
+- `119-121` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule binAcc(N:Int, ACC:IntSeq) => binAcc((N -Int pyMod(N, 2)) /Int 2, iCons(48 +Int pyMod(N, 2), ACC)) requires N >Int 0`
+- `124-125` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("enumerate")), (list(VS:ValSeq), .Vals)) => #alloc(list(enumVS(VS, 0))) ... </k>`
+- `126` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= enumVS(ValSeq, Int) [function, total]`
+- `127` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule enumVS(.ValSeq, _:Int) => .ValSeq`
+- `128-129` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule enumVS(vCons(V:Val, R:ValSeq), I:Int) => vCons(tuple(vCons(I, vCons(V, .ValSeq))), enumVS(R, I +Int 1))`
+- `132-133` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("map")), (typeV("str"), list(VS:ValSeq), .Vals)) => #alloc(list(mapStrVS(VS))) ... </k>`
+- `134` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= mapStrVS(ValSeq) [function, total]`
+- `135` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule mapStrVS(.ValSeq) => .ValSeq`
+- `136` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))`
+- `137` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule mapStrVS(vCons(str(CS:IntSeq), R:ValSeq)) => vCons(str(CS), mapStrVS(R))`
+- `140` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("int", I:Int, .Vals) => I`
+- `143` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("ord", str(iCons(C:Int, .IntSeq)), .Vals) => C`
+- `144-145` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("chr", I:Int, .Vals) => str(iCons(I, .IntSeq)) requires 0 <=Int I andBool I <Int 128`
+- `148` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("str", I:Int, .Vals)       => str(strToCodes(Int2String(I)))`
+- `149` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("str", str(CS:IntSeq), .Vals) => str(CS)`
+- `152-153` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("int", str(iCons(C:Int, .IntSeq)), .Vals) => C -Int 48 requires 48 <=Int C andBool C <=Int 57`
+- `156-157` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("int", str(CS:IntSeq), .Vals) => intDigAcc(CS, 0) requires isLen(CS) >=Int 2`
+- `158` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= intDigAcc(IntSeq, Int) [function, total]`
+- `159` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule intDigAcc(.IntSeq, ACC:Int)             => ACC`
+- `160` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule intDigAcc(iCons(C:Int, R:IntSeq), ACC:Int) => intDigAcc(R, (ACC *Int 10) +Int (C -Int 48))`
+- `163` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("zip", list(A:ValSeq), list(B:ValSeq), .Vals) => zipObj(A, B)`
+- `164` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("zip", str(A:IntSeq), str(B:IntSeq), .Vals)   => zipObjS(A, B)`
+- `167-168` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterNext(zipObj(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq))) => #iterYield(tuple(vCons(A, vCons(B, .ValSeq))), zipObj(As, Bs)) ... </k>`
+- `169` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterNext(zipObj(.ValSeq, _:ValSeq))               => #iterDone ... </k>`
+- `170` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterNext(zipObj(vCons(_:Val, _:ValSeq), .ValSeq)) => #iterDone ... </k>`
+- `171-172` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterNext(zipObjS(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq))) => #iterYield(tuple(vCons(str(iCons(A, .IntSeq)), vCons(str(iCons(B, .IntSeq)), .ValSeq))), zipObjS(As, Bs)) ... </k>`
+- `173` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterNext(zipObjS(.IntSeq, _:IntSeq))              => #iterDone ... </k>`
+- `174` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterNext(zipObjS(iCons(_:Int, _:IntSeq), .IntSeq)) => #iterDone ... </k>`
+- `177` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("range", I:Int, .Vals)               => rangeObj(0, I, 1)`
+- `178` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("range", A:Int, B:Int, .Vals)        => rangeObj(A, B, 1)`
+- `179-180` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("range", A:Int, B:Int, S:Int, .Vals) => rangeObj(A, B, S) requires S =/=Int 0`
+- `187` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("eval", str(CS:IntSeq), .Vals) => evalArith(CS)`
+- `188` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= evalArith(IntSeq) [function]`
+- `189-190` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule evalArith(CS:IntSeq) => firstNdE(passAddE(passMulE(passPowE(tokOps(CS), tokNds(CS)))))`
+- `192` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax OpSeq ::= ".OpSeq" | oCons(String, OpSeq)`
+- `194` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= evDigit(Int) [function, total]`
+- `195` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule evDigit(C:Int) => C >=Int 48 andBool C <=Int 57`
+- `196` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= evHead42(IntSeq) [function, total]`
+- `197` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule evHead42(iCons(42, _:IntSeq)) => true`
+- `198` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule evHead42(_:IntSeq)            => false [owise]`
+- `199` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= evHead47(IntSeq) [function, total]`
+- `200` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule evHead47(iCons(47, _:IntSeq)) => true`
+- `201` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule evHead47(_:IntSeq)            => false [owise]`
+- `203` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax OpSeq ::= tokOps(IntSeq) [function, total]`
+- `204` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokOps(.IntSeq)                 => .OpSeq`
+- `205` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokOps(iCons(32, R:IntSeq))     => tokOps(R)`
+- `206` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokOps(iCons(C:Int, R:IntSeq))  => tokOps(R) requires evDigit(C)`
+- `207` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokOps(iCons(42, iCons(42, R:IntSeq))) => oCons("**", tokOps(R))`
+- `208` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokOps(iCons(42, R:IntSeq))     => oCons("*", tokOps(R)) requires notBool evHead42(R)`
+- `209` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokOps(iCons(47, iCons(47, R:IntSeq))) => oCons("//", tokOps(R))`
+- `210` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokOps(iCons(47, R:IntSeq))     => oCons("/", tokOps(R)) requires notBool evHead47(R)`
+- `211` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokOps(iCons(43, R:IntSeq))     => oCons("+", tokOps(R))`
+- `212` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokOps(iCons(45, R:IntSeq))     => oCons("-", tokOps(R))`
+- `214-215` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= tokNds(IntSeq) [function, total] | tokNdAcc(Int, IntSeq) [function, total]`
+- `216` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokNds(.IntSeq)                => .IntSeq`
+- `217` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokNds(iCons(32, R:IntSeq))    => tokNds(R)`
+- `218` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokNds(iCons(C:Int, R:IntSeq)) => tokNdAcc(C -Int 48, R) requires evDigit(C)`
+- `219-220` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokNds(iCons(C:Int, R:IntSeq)) => tokNds(R) requires notBool evDigit(C) andBool C =/=Int 32`
+- `221-222` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokNdAcc(A:Int, iCons(C:Int, R:IntSeq)) => tokNdAcc(A *Int 10 +Int (C -Int 48), R) requires evDigit(C)`
+- `223` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule tokNdAcc(A:Int, S:IntSeq) => iCons(A, tokNds(S)) [owise]`
+- `225` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax EvPair ::= evp(OpSeq, IntSeq)`
+- `226` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= firstNdE(EvPair) [function, total]`
+- `227` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule firstNdE(evp(_:OpSeq, iCons(N:Int, _:IntSeq))) => N`
+- `228` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule firstNdE(_:EvPair) => 0 [owise]`
+- `230` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= applyOpE(String, Int, Int) [function, total]`
+- `231` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyOpE("+",  A:Int, B:Int) => A +Int B`
+- `232` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyOpE("-",  A:Int, B:Int) => A -Int B`
+- `233` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyOpE("*",  A:Int, B:Int) => A *Int B`
+- `234` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyOpE("//", A:Int, B:Int) => A divInt B`
+- `235` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyOpE("**", A:Int, B:Int) => A ^Int B`
+- `236` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyOpE(_:String, A:Int, _:Int) => A [owise]`
+- `238` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax EvPair ::= passPowE(OpSeq, IntSeq) [function, total]`
+- `239` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule passPowE(.OpSeq, NDS:IntSeq) => evp(.OpSeq, NDS)`
+- `240` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule passPowE(oCons("**", OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCombE(N, passPowE(OPS, NDS))`
+- `241-242` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule passPowE(oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCarryE(O, N, passPowE(OPS, NDS)) requires O =/=String "**"`
+- `243` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule passPowE(_:OpSeq, .IntSeq) => evp(.OpSeq, .IntSeq) [owise]`
+- `244` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax EvPair ::= powCombE(Int, EvPair) [function, total]`
+- `245` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule powCombE(N:Int, evp(OPS:OpSeq, iCons(M:Int, REST:IntSeq))) => evp(OPS, iCons(N ^Int M, REST))`
+- `246` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule powCombE(N:Int, evp(OPS:OpSeq, .IntSeq)) => evp(OPS, iCons(N, .IntSeq))`
+- `247` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax EvPair ::= powCarryE(String, Int, EvPair) [function, total]`
+- `248` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule powCarryE(O:String, N:Int, evp(OPS:OpSeq, NDS:IntSeq)) => evp(oCons(O, OPS), iCons(N, NDS))`
+- `250` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax EvPair ::= passMulE(EvPair) [function, total] | passAddE(EvPair) [function, total]`
+- `251` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule passMulE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("mul", N0, OPS, NDS, .OpSeq, .IntSeq)`
+- `252` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule passMulE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)`
+- `253` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule passAddE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("add", N0, OPS, NDS, .OpSeq, .IntSeq)`
+- `254` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule passAddE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)`
+- `255` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax EvPair ::= passLGoE(String, Int, OpSeq, IntSeq, OpSeq, IntSeq) [function, total]`
+- `256` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule passLGoE(_:String, CUR:Int, .OpSeq, _:IntSeq, OO:OpSeq, ON:IntSeq) => evp(OO, appendIE(ON, CUR))`
+- `257-259` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq) => passLGoE(L, applyOpE(O, CUR, N), OPS, NDS, OO, ON) requires inLevelE(L, O)`
+- `260-262` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq) => passLGoE(L, N, OPS, NDS, appendOpE(OO, O), appendIE(ON, CUR)) requires notBool inLevelE(L, O)`
+- `263-264` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule passLGoE(_:String, CUR:Int, oCons(_:String, _:OpSeq), .IntSeq, OO:OpSeq, ON:IntSeq) => evp(OO, appendIE(ON, CUR)) [owise]`
+- `265` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= inLevelE(String, String) [function, total]`
+- `266` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule inLevelE("mul", O:String) => O ==String "*" orBool O ==String "//" orBool O ==String "/"`
+- `267` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule inLevelE("add", O:String) => O ==String "+" orBool O ==String "-"`
+- `268` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule inLevelE(_:String, _:String) => false [owise]`
+- `269` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax OpSeq ::= appendOpE(OpSeq, String) [function, total]`
+- `270` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule appendOpE(.OpSeq, O:String) => oCons(O, .OpSeq)`
+- `271` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule appendOpE(oCons(H:String, T:OpSeq), O:String) => oCons(H, appendOpE(T, O))`
+- `272` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= appendIE(IntSeq, Int) [function, total]`
+- `273` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule appendIE(.IntSeq, N:Int) => iCons(N, .IntSeq)`
+- `274` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule appendIE(iCons(H:Int, T:IntSeq), N:Int) => iCons(H, appendIE(T, N))`
+- `279` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= "#md5"`
+- `280-281` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Call(Attribute(Name("hashlib"), "md5"), (E:Expr, .Exprs)) => E ~> #md5 ... </k> [priority(40)]`
+- `282` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> str(CS:IntSeq) ~> #md5 => md5Obj(CS) ... </k>`
+- `283` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= md5Obj(IntSeq)`
+- `284` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(md5Obj(CS:IntSeq), "hexdigest", .Vals) => str(md5hexCodes(CS))`
+- `285` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= md5hexCodes(IntSeq) [function, total, symbol(md5hexCodes), no-evaluators]`
+- `291` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("isinstance", V:Val, typeV("int"), .Vals) => isIntV(V)`
+- `292` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("isinstance", V:Val, typeV("str"), .Vals) => isStrV(V)`
+- `293` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= isIntV(Val) [function] | isStrV(Val) [function]`
+- `294` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isIntV(_:Int)         => true`
+- `295` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isIntV(_:Val)         => false [owise]`
+- `296` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isStrV(str(_:IntSeq)) => true`
+- `297` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isStrV(_:Val)         => false [owise]`
+
+## /reference/reference-semantics/semantics/call.k
+
+- `16` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Attribute(V:Val, M:String) => boundMethodV(V, M) ... </k>`
+- `19` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #callee(Exprs)`
+- `20` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]`
+- `21` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>`
+- `24` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>`
+- `26` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>`
+- `27` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ)    ... </k>`
+- `28` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ)    ... </k>`
+- `29` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ)   ... </k>`
+- `30` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ)   ... </k>`
+- `31` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]`
+- `32` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(typeV(T:String)),     ACC:Vals) => applyBuiltin(T, ACC)  ... </k>`
+- `38-41` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV(BN:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(builtinV(BN)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+- `42-46` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV(BN:String)), (A:Val, ref(H:Int), REST:Vals)) => #applyK(toCall(builtinV(BN)), (A, V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(A) [priority(40)]`
+- `47-50` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(typeV(T:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(typeV(T)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+- `52` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= isMutMethod(String) [function, total]`
+- `53-55` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isMutMethod(M:String) => M ==String "append" orBool M ==String "sort" orBool M ==String "extend" orBool M ==String "insert" orBool M ==String "pop" orBool M ==String "remove"`
+- `56-60` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), M:String)), ACC:Vals) => #applyK(toCall(boundMethodV(V, M)), ACC) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isMutMethod(M) [priority(40)]`
+- `63-67` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(boundMethodV(OBJ, M)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isMutMethod(M) andBool notBool isRefV(OBJ) [priority(40)]`
+- `69-74` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT => #bindP(PNS, ACC) ~> BODY ~> #endcall </k> <env>     CALLERL:Int => NEWL </env> <scopes>   STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes> <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc> <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>`
+- `80-85` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(closureValC(PNS:ParamNames, CVS:ParamNames, BODY:Stmts, CM:Map)), ACC:Vals) ~> CONT => #allocCells(CVS) ~> #bindP(PNS, ACC) ~> BODY ~> #endcall </k> <env>     CALLERL:Int => NEWL </env> <scopes>   STORE:Map => STORE [ NEWL <- scope(CM [ "$cells" <- cellsMark(CVS) ], parent(0)) ] </scopes> <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc> <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>`
+- `87` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #allocCells(ParamNames)`
+- `88` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #allocCells(.ParamNames) => .K ... </k>`
+- `89-94` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #allocCells((CV:String, R:ParamNames)) => #allocCells(R) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ CV <- cellRef(N) ], _) ... </scopes> <heap>    H:Map => (N |-> cellV(noneV)) H </heap> <heapLoc> N:Int => N +Int 1 </heapLoc> requires notBool N in_keys(H)`
+
+## /reference/reference-semantics/semantics/comprehension.k
+
+- `11` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule ListComp(ELT:Expr, Gs:CompFors) => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)`
+- `12` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule GenExp(ELT:Expr, Gs:CompFors)   => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)`
+- `14` | `syntax` | attrs `macro` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Stmts ::= compBody(CompFors, Expr) [macro]`
+- `15-16` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule compBody(Gs:CompFors, ELT:Expr) => Assign(Name("$acc"), ListExpr(.Exprs)) compNest(Gs, ELT) Return(Name("$acc"))`
+- `18` | `syntax` | attrs `macro,macro-rec` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Stmt ::= compNest(CompFors, Expr) [macro-rec]`
+- `19-20` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule compNest(.CompFors, ELT:Expr) => Assign(Name("$acc"), BinOp("+", Name("$acc"), ListExpr(ELT)))`
+- `21-22` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule compNest((CompFor(T:Expr, ITER:Expr, Fs:Exprs) GRest:CompFors), ELT:Expr) => For(T, ITER, If(compGuard(Fs), compNest(GRest, ELT), .Stmts))`
+- `24` | `syntax` | attrs `macro` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Expr ::= compGuard(Exprs) [macro]`
+- `25` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule compGuard(.Exprs)             => Bool(true)`
+- `26` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule compGuard((F:Expr, Fs:Exprs)) => BoolOp("and", (F, Fs))`
+
+## /reference/reference-semantics/semantics/concrete.k
+
+- `13-15` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Compare(list(A:ValSeq), CmpOp("==", list(B:ValSeq))) => deepEqVS(A, B, HP) ... </k> <heap> HP:Map </heap> requires hasRefVS(A) orBool hasRefVS(B)`
+- `16-18` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Compare(list(A:ValSeq), CmpOp("!=", list(B:ValSeq))) => notBool deepEqVS(A, B, HP) ... </k> <heap> HP:Map </heap> requires hasRefVS(A) orBool hasRefVS(B)`
+- `25` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= kvP(Val, Val)`
+- `26-27` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #ksort(ValSeq, Val, ValSeq, Bool) | #ksIns(Val, ValSeq, Val, ValSeq, Bool)`
+- `28-30` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals)) => #ksort(VS, KV, .ValSeq, false) ... </k> [priority(40)]`
+- `31-33` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals)) => #ksort(VS, KV, .ValSeq, RB) ... </k> [priority(40)]`
+- `34-35` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #ksort(.ValSeq, _:Val, ACC:ValSeq, RB:Bool) => #alloc(list(condRev(unpairVS(ACC), RB))) ... </k>`
+- `36-37` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #ksort(vCons(V:Val, R:ValSeq), KV:Val, ACC:ValSeq, RB:Bool) => KV ~> #callee((V, .Exprs)) ~> #ksIns(V, R, KV, ACC, RB) ... </k>`
+- `38-40` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> K:Val ~> #ksIns(V:Val, R:ValSeq, KV:Val, ACC:ValSeq, RB:Bool) => #ksort(R, KV, insPair(ACC, K, V), RB) ... </k> requires notBool isKwV(K)`
+- `42` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= insPair(ValSeq, Val, Val) [function]`
+- `43` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule insPair(.ValSeq, K:Val, V:Val) => vCons(kvP(K, V), .ValSeq)`
+- `44-46` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val) => vCons(kvP(K, V), vCons(kvP(K2, V2), R)) requires kLt(K, K2)`
+- `47-49` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val) => vCons(kvP(K2, V2), insPair(R, K, V)) requires notBool kLt(K, K2)`
+- `51` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= kLt(Val, Val) [function]`
+- `52` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule kLt(I1:Int, I2:Int)             => I1 <Int I2`
+- `53` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule kLt(F1:Float, F2:Float)         => F1 <Float F2`
+- `54` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule kLt(str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)`
+- `56` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= unpairVS(ValSeq) [function, total]`
+- `57` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule unpairVS(.ValSeq) => .ValSeq`
+- `58` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule unpairVS(vCons(kvP(_:Val, V:Val), R:ValSeq)) => vCons(V, unpairVS(R))`
+- `59` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule unpairVS(vCons(V:Val, R:ValSeq)) => vCons(V, unpairVS(R)) [owise]`
+
+## /reference/reference-semantics/semantics/controls.k
+
+- `9-11` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Assign(Name(X:String), V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>`
+- `12-18` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool X in_keys(M) andBool isCellRef({M[X]}:>Val) [priority(40)]`
+- `20-23` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes> requires X in_keys(M)`
+- `27-31` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires X in_keys(M) andBool isRefV({M[X]}:>Val) [priority(40)]`
+- `35` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> ImportFrom("math", NS:ParamNames) => #bindImports(NS) ... </k>`
+- `36` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> ImportFrom(_:String, _:ParamNames) => .K ... </k> [owise]`
+- `37` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #bindImports(ParamNames)`
+- `38` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #bindImports(.ParamNames) => .K ... </k>`
+- `39-42` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ N <- builtinV(N) ], _) ... </scopes> requires N ==String "floor" orBool N ==String "ceil"`
+- `43-44` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k> requires notBool (N ==String "floor" orBool N ==String "ceil")`
+- `48` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Expr(_:Val) => .K ... </k>`
+- `51` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #branch(Bool, Stmts, Stmts)`
+- `52` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>`
+- `53` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #branch(true,  T:Stmts, _:Stmts) => T ... </k>`
+- `54` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>`
+- `57-58` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k> requires truthy(V)`
+- `59-60` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k> requires notBool truthy(V)`
+- `65-67` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts) | #while(Expr, Stmts) | #whileCond(Expr, Stmts) | #loopLbl(K) | "#cont" | "#brk"`
+- `69` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>`
+- `71` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>`
+- `72` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>`
+- `73-74` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts) => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>`
+- `77` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>`
+- `78` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>`
+- `79-80` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k> requires truthy(V)`
+- `81-82` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k> requires notBool truthy(V)`
+- `85` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #loopLbl(NEXT:K) => NEXT ... </k>`
+- `86` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Continue => #cont ... </k>`
+- `87` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Break => #brk ... </k>`
+- `88` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>`
+- `89` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]`
+- `90` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>`
+- `91` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]`
+- `95-97` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+- `98-100` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+- `101-103` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+- `106-108` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## /reference/reference-semantics/semantics/core.k
+
+- `13` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)`
+- `14` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)`
+- `15` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Str    ::= str(IntSeq)`
+- `18-23` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Iterable ::= list(ValSeq) | tuple(ValSeq) | Str | rangeObj(Int, Int, Int) | zipObj(ValSeq, ValSeq) | zipObjS(IntSeq, IntSeq)`
+- `25-34` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val      ::= Int | Bool | "noneV" | Iterable | ref(Int)          // a heap object: <heap> holds its list(VS) | cellRef(Int)      // a closure cell: <heap> holds cellV(V) | closureVal(ParamNames, Stmts, Int) | typeV(String)     // a type object (int/str), resolved from the builtins frame | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough) | boundMethodV(Val, String)   // a cooled Attribute: obj.method`
+- `36` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Parent   ::= "root" | parent(Int)`
+- `37` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Scope    ::= scope(Map, Parent)`
+- `38` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KResult  ::= Val`
+- `39` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Expr     ::= Val   // cooling puts results back into expression holes`
+- `40` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Vals     ::= List{Val, ","}`
+- `41` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Exc      ::= "NoExc" | "AssertionError"`
+- `42` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax RetState ::= "noRet" | retV(Val)`
+- `49-60` | `configuration` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `configuration <k>       #loadAll($PGM:Module) </k> <env>     0 </env> <scopes>   0     |-> scope(.Map, parent(-1)) -1    |-> builtinsScope </scopes> <scopeLoc> 1 </scopeLoc> <heap>    .Map </heap> <heapLoc> 0 </heapLoc> <stack>   .List </stack> <ret>     noRet </ret> <exc>     NoExc </exc> <exit-code exit=""> 0 </exit-code>`
+- `68` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= isRefV(Val) [function, total]`
+- `69` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isRefV(ref(_:Int)) => true`
+- `70` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isRefV(_:Val)      => false [owise]`
+- `75` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax HeapVal ::= cellV(Val)`
+- `76` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= isCellRef(Val) [function, total]`
+- `77` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isCellRef(cellRef(_:Int)) => true`
+- `78` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isCellRef(_:Val)          => false [owise]`
+- `85-90` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> cellRef(H:Int) => V ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> <heap> ... H |-> cellV(V:Val) ... </heap> requires "$cells" in_keys(M) [priority(40)]`
+- `95` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= kwV(String, Val)`
+- `96` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #kwTag(String)`
+- `97` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>`
+- `98-99` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k> requires notBool isKwV(V)`
+- `100` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= isKwV(Val) [function, total]`
+- `101` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isKwV(kwV(_:String, _:Val)) => true`
+- `102` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isKwV(_:Val)                => false [owise]`
+- `106` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= cellsMark(ParamNames)`
+- `107` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ParamNames ::= cellsOf(Val) [function]`
+- `108` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule cellsOf(cellsMark(CVS:ParamNames)) => CVS`
+- `109` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= pnMember(String, ParamNames) [function, total]`
+- `110` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule pnMember(_:String, .ParamNames) => false`
+- `111` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)`
+- `113` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #cellW(Val, Val)`
+- `114-115` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k> <heap> ... H |-> cellV(_:Val => V) ... </heap>`
+- `117` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #alloc(Val)`
+- `118-121` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #alloc(V:Val) => ref(N) ... </k> <heap>    H:Map => (N |-> V) H </heap> <heapLoc> N:Int => N +Int 1 </heapLoc> requires notBool N in_keys(H)`
+- `124` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #loadAll(Module)`
+- `125` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>`
+- `126` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>`
+- `127` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> .Stmts => .K ... </k>`
+- `130` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #look(String, Int)`
+- `131` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>`
+- `132-134` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k> <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes> requires X in_keys(M)`
+- `145-151` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #look(X:String, L:Int) => V ... </k> <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes> <heap> ... H |-> cellV(V:Val) ... </heap> requires X in_keys(M) andBool "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool {M[X]}:>Val ==K cellRef(H) [priority(40)]`
+- `152-154` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #look(X:String, L:Int) => #look(X, P) ... </k> <scopes> ... L |-> scope(M:Map, parent(P:Int)) ... </scopes> requires notBool (X in_keys(M))`
+- `157` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Scope ::= "builtinsScope" [function, total]`
+- `158-181` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule builtinsScope => scope(.Map [ "len"    <- builtinV("len")    ] [ "set"    <- builtinV("set")    ] [ "sum"    <- builtinV("sum")    ] [ "abs"    <- builtinV("abs")    ] [ "min"    <- builtinV("min")    ] [ "max"    <- builtinV("max")    ] [ "ord"    <- builtinV("ord")    ] [ "chr"    <- builtinV("chr")    ] [ "range"  <- builtinV("range")  ] [ "all"    <- builtinV("all")    ] [ "any"    <- builtinV("any")    ] [ "zip"    <- builtinV("zip")    ] [ "isinstance" <- builtinV("isinstance") ] [ "sorted" <- builtinV("sorted") ] [ "list"   <- builtinV("list")   ] [ "round"  <- builtinV("round")  ] [ "bin"    <- builtinV("bin")    ] [ "enumerate" <- builtinV("enumerate") ] [ "map"    <- builtinV("map")    ] [ "eval"   <- builtinV("eval")   ] [ "int"    <- typeV("int")       ] [ "str"    <- typeV("str")       ] [ "float"  <- typeV("float")     ], root)`
+- `185` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ApplyK ::= toCall(Val)`
+- `186-188` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem  ::= #evalArgs(Exprs, Vals, ApplyK) | #evalArgCont(Exprs, Vals, ApplyK) | #applyK(ApplyK, Vals)`
+- `189` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>`
+- `190` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>`
+- `191` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>`
+- `194` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Int(I:Int)   => I ... </k>`
+- `195` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Bool(B:Bool) => B ... </k>`
+- `196` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> NoneVal      => noneV ... </k>`
+- `199` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= truthy(Val) [function]`
+- `200` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule truthy(B:Bool)          => B`
+- `201` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule truthy(noneV)           => false`
+- `202` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule truthy(I:Int)           => I =/=Int 0`
+- `203` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)`
+- `204` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)`
+- `205` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)`
+- `208` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val  ::= applyUn(String, Val) [function]`
+- `209` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val  ::= applyBin(String, Val, Val) [function]`
+- `210` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= applyCmp(String, Val, Val) [function]`
+- `213` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Vals ::= appendVal(Vals, Val) [function, total]`
+- `214` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule appendVal(.Vals, V:Val)              => V , .Vals`
+- `215` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)`
+- `217` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= vals2valSeq(Vals) [function, total]`
+- `218` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule vals2valSeq(.Vals)            => .ValSeq`
+- `219` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))`
+- `223` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= vsLen(ValSeq) [function, total]`
+- `224` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule vsLen(.ValSeq)                => 0`
+- `225` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)`
+- `227` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= isLen(IntSeq) [function, total]`
+- `228` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isLen(.IntSeq)                => 0`
+- `229` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)`
+- `233` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]`
+- `234` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq`
+- `235` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val)    => vCons(V, S)`
+- `236-237` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V)) requires I >Int 0`
+- `238-239` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule setVSAt(VS:ValSeq, I:Int, _:Val)             => VS requires I <Int 0`
+
+## /reference/reference-semantics/semantics/dict.k
+
+- `20` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= dictV(ValSeq, ValSeq)`
+- `23-25` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #dictAcc(Entries, ValSeq, ValSeq) | #dictKey(Expr, Entries, ValSeq, ValSeq) | #dictVal(Val, Entries, ValSeq, ValSeq)`
+- `26` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> DictExpr(ES:Entries) => #dictAcc(ES, .ValSeq, .ValSeq) ... </k>`
+- `27` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #dictAcc(.Entries, KS:ValSeq, VS:ValSeq) => dictV(KS, VS) ... </k>`
+- `28-29` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #dictAcc((Entry(K:Expr, V:Expr), REST:Entries), KS:ValSeq, VS:ValSeq) => K ~> #dictKey(V, REST, KS, VS) ... </k>`
+- `30-31` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> KV:Val ~> #dictKey(V:Expr, REST:Entries, KS:ValSeq, VS:ValSeq) => V ~> #dictVal(KV, REST, KS, VS) ... </k>`
+- `32-33` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> VV:Val ~> #dictVal(KV:Val, REST:Entries, KS:ValSeq, VS:ValSeq) => #dictAcc(REST, dPutK(KS, KV), dPutV(KS, VS, KV, VV)) ... </k>`
+- `37` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= dHasKey(ValSeq, Val) [function, total]`
+- `38` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dHasKey(.ValSeq, _:Val)                => false`
+- `39` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dHasKey(vCons(A:Val, _:ValSeq), K:Val) => true          requires A ==K K`
+- `40` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dHasKey(vCons(A:Val, R:ValSeq), K:Val) => dHasKey(R, K) requires notBool (A ==K K)`
+- `43` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= dPutK(ValSeq, Val) [function, total]`
+- `44` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dPutK(KS:ValSeq, K:Val) => KS                                  requires dHasKey(KS, K)`
+- `45` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dPutK(KS:ValSeq, K:Val) => valSeqConcat(KS, vCons(K, .ValSeq)) requires notBool dHasKey(KS, K)`
+- `49` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= dPutV(ValSeq, ValSeq, Val, Val) [function, total]`
+- `50-51` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dPutV(vCons(A:Val, _:ValSeq), vCons(_:Val, VR:ValSeq), K:Val, V:Val)  => vCons(V, VR) requires A ==K K`
+- `52-53` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dPutV(vCons(A:Val, KR:ValSeq), vCons(B:Val, VR:ValSeq), K:Val, V:Val) => vCons(B, dPutV(KR, VR, K, V)) requires notBool (A ==K K)`
+- `54` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dPutV(_KS:ValSeq, VS:ValSeq, _K:Val, V:Val) => valSeqConcat(VS, vCons(V, .ValSeq)) [owise]`
+- `58-60` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(boundMethodV(dictV(KS:ValSeq, _:ValSeq), "keys")), .Vals) => #alloc(list(KS)) ... </k> [priority(40)]`
+- `63` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyIndexD(dictV(KS:ValSeq, VS:ValSeq), K:Val) => dGet(KS, VS, K)`
+- `64` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= applyIndexD(Val, Val) [function]`
+- `65-66` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Subscript(dictV(KS:ValSeq, VS:ValSeq), K:Val) => applyIndexD(dictV(KS, VS), K) ... </k> [priority(45)]`
+- `70` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= dictSet(Val, Val, Val) [function]`
+- `71` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dictSet(dictV(KS:ValSeq, VS:ValSeq), K:Val, V:Val) => dictV(dPutK(KS, K), dPutV(KS, VS, K, V))`
+- `76` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #dsetK(String, Val)`
+- `77` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Assign(Subscript(Name(X:String), K:Expr), VV:Val) => K ~> #dsetK(X, VV) ... </k>`
+- `78-81` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- dictSet({M[X]}:>Val, KV, VV) ], _) ... </scopes> requires X in_keys(M) andBool notBool isRefV({M[X]}:>Val)`
+- `82-85` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => #dsetV({M[X]}:>Val, KV, VV) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires X in_keys(M) andBool isRefV({M[X]}:>Val)`
+- `86` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #dsetV(Val, Val, Val)`
+- `87-88` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #dsetV(ref(H:Int), I:Int, VV:Val) => .K ... </k> <heap> ... H |-> list(VS:ValSeq => setVSAt(VS, normIdxD(I, vsLen(VS)), VV)) ... </heap>`
+- `90` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= normIdxD(Int, Int) [function, total]`
+- `91` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule normIdxD(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0`
+- `92` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule normIdxD(I:Int, _:Int)   => I          requires I >=Int 0`
+- `95-96` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("==", dictV(KS1:ValSeq, VS1:ValSeq), dictV(KS2:ValSeq, VS2:ValSeq)) => (vsLen(KS1) ==Int vsLen(KS2)) andBool dSubset(KS1, VS1, KS2, VS2)`
+- `97` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= dSubset(ValSeq, ValSeq, ValSeq, ValSeq) [function]`
+- `98` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dSubset(.ValSeq, .ValSeq, _:ValSeq, _:ValSeq) => true`
+- `99-100` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dSubset(vCons(K:Val, KR:ValSeq), vCons(V:Val, VR:ValSeq), KS2:ValSeq, VS2:ValSeq) => dHasKey(KS2, K) andBool (dGet(KS2, VS2, K) ==K V) andBool dSubset(KR, VR, KS2, VS2)`
+- `101` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= dGet(ValSeq, ValSeq, Val) [function]`
+- `102` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dGet(vCons(A:Val, _:ValSeq), vCons(B:Val, _:ValSeq), K:Val) => B                requires A ==K K`
+- `103` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dGet(vCons(A:Val, KR:ValSeq), vCons(_:Val, VR:ValSeq), K:Val) => dGet(KR, VR, K) requires notBool (A ==K K)`
+
+## /reference/reference-semantics/semantics/float.k
+
+- `20` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= Float`
+- `21` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Float(F:Float) => F ... </k>`
+- `24` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= intFloatDiv(Int, Float) [function, total, symbol(intFloatDiv), no-evaluators]`
+- `25` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule intFloatDiv(I:Int, F:Float) => Int2Float(I, 53, 11) /Float F [concrete]`
+- `27` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("/", I:Int, F:Float) => intFloatDiv(I, F)`
+- `30` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= divII(Int, Int) [function, total, symbol(divII), no-evaluators]`
+- `31` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule divII(I1:Int, I2:Int) => Int2Float(I1, 53, 11) /Float Int2Float(I2, 53, 11) [concrete]`
+- `32` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("/", I1:Int, I2:Int) => divII(I1, I2)`
+- `37` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= floatMod(Float, Float) [function, total, symbol(floatMod), no-evaluators]`
+- `38` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule floatMod(F1:Float, F2:Float) => F1 -Float (floorFloat(F1 /Float F2) *Float F2) [concrete]`
+- `39` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("%", F1:Float, F2:Float) => floatMod(F1, F2)`
+- `43` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2`
+- `44` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2)`
+- `50` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= floatLt(Float, Float) [function, total, symbol(floatLt), no-evaluators]`
+- `51` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule floatLt(F1:Float, F2:Float) => F1 <Float F2 [concrete]`
+- `52` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("<", F1:Float, F2:Float) => floatLt(F1, F2)`
+- `54` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= absF(Float) [function, total, symbol(absF), no-evaluators]`
+- `55` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule absF(F:Float) => absFloat(F) [concrete]`
+- `56` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("abs", F:Float, .Vals) => absF(F)`
+- `61` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Import(_:String) => .K ... </k>`
+- `65` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= "#mathCeil"`
+- `66` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Call(Attribute(Name("math"), "ceil"), (E:Expr, .Exprs)) => E ~> #mathCeil ... </k> [priority(40)]`
+- `67` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> V:Val ~> #mathCeil => ceilF(V) ... </k>`
+- `70` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= "#mathFloor"`
+- `71` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Call(Attribute(Name("math"), "floor"), (E:Expr, .Exprs)) => E ~> #mathFloor ... </k> [priority(40)]`
+- `72` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> V:Val ~> #mathFloor => floorFI(V) ... </k>`
+- `73` | `opaque-or-symbolic-syntax` | attrs `function,total,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]`
+- `74` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule floorFI(I:Int)   => I                        [concrete]`
+- `75` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule floorFI(F:Float) => Float2Int(floorFloat(F)) [concrete]`
+- `78` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("floor", V:Val, .Vals) => floorFI(V)`
+- `79` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("ceil",  V:Val, .Vals) => ceilF(V)`
+- `82` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #mathPow1(Expr) | #mathPow2(Val)`
+- `83` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Call(Attribute(Name("math"), "pow"), (E1:Expr, E2:Expr, .Exprs)) => E1 ~> #mathPow1(E2) ... </k> [priority(40)]`
+- `84` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> V1:Val ~> #mathPow1(E2:Expr) => E2 ~> #mathPow2(V1) ... </k>`
+- `85` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> V2:Val ~> #mathPow2(V1:Val) => powF(toF(V1), toF(V2)) ... </k>`
+- `86` | `opaque-or-symbolic-syntax` | attrs `function,total,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= toF(Val) [function, total, symbol(toF)]`
+- `87` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule toF(F:Float) => F        [concrete]`
+- `88` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule toF(I:Int)   => intToF(I) [concrete]`
+- `93` | `opaque-or-symbolic-syntax` | attrs `function,total,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= ceilF(Val) [function, total, symbol(ceilF)]`
+- `94` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule ceilF(I:Int)   => I                       [concrete]`
+- `95` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule ceilF(F:Float) => Float2Int(ceilFloat(F)) [concrete]`
+- `99` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyUn("-", F:Float) => 0.0 -Float F`
+- `103` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= subF(Float, Float) [function, total, symbol(subF), no-evaluators]`
+- `104` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule subF(F1:Float, F2:Float) => F1 -Float F2 [concrete]`
+- `105` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("-", F1:Float, F2:Float) => subF(F1, F2)`
+- `107` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= divF(Float, Float) [function, total, symbol(divF), no-evaluators]`
+- `108` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule divF(F1:Float, F2:Float) => F1 /Float F2 [concrete]`
+- `109` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("/", F1:Float, F2:Float) => divF(F1, F2)`
+- `111` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= addF(Float, Float) [function, total, symbol(addF), no-evaluators]`
+- `112` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule addF(F1:Float, F2:Float) => F1 +Float F2 [concrete]`
+- `113` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("+", F1:Float, F2:Float) => addF(F1, F2)`
+- `115` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= mulF(Float, Float) [function, total, symbol(mulF), no-evaluators]`
+- `116` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule mulF(F1:Float, F2:Float) => F1 *Float F2 [concrete]`
+- `117` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("*", F1:Float, F2:Float) => mulF(F1, F2)`
+- `119` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= powF(Float, Float) [function, total, symbol(powF), no-evaluators]`
+- `120` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule powF(F1:Float, F2:Float) => F1 ^Float F2 [concrete]`
+- `121` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("**", F1:Float, F2:Float) => powF(F1, F2)`
+- `125` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= gtF(Float, Float) [function, total, symbol(gtF), no-evaluators]`
+- `126` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule gtF(F1:Float, F2:Float) => F1 >Float F2 [concrete]`
+- `127` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp(">",  F1:Float, F2:Float) => gtF(F1, F2)`
+- `128` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp(">=", F1:Float, F2:Float) => notBool floatLt(F1, F2)`
+- `129` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("<=", F1:Float, F2:Float) => notBool gtF(F1, F2)`
+- `132` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("**", I:Int, F:Float) => powF(intToF(I), F)`
+- `133` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("**", F:Float, I:Int) => powF(F, intToF(I))`
+- `134` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("-",  I:Int, F:Float) => subF(intToF(I), F)`
+- `135` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("-",  F:Float, I:Int) => subF(F, intToF(I))`
+- `136` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("+",  I:Int, F:Float) => addF(intToF(I), F)`
+- `137` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("+",  F:Float, I:Int) => addF(F, intToF(I))`
+- `138` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("*",  I:Int, F:Float) => mulF(intToF(I), F)`
+- `139` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("*",  F:Float, I:Int) => mulF(F, intToF(I))`
+- `142` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= eqF(Float, Float) [function, total, symbol(eqF), no-evaluators]`
+- `143` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule eqF(F1:Float, F2:Float) => F1 ==Float F2 [concrete]`
+- `144` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("==", I:Int, F:Float) => eqF(intToF(I), F)`
+- `145` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("==", F:Float, I:Int) => eqF(F, intToF(I))`
+- `146` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("!=", I:Int, F:Float) => notBool eqF(intToF(I), F)`
+- `147` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("!=", F:Float, I:Int) => notBool eqF(F, intToF(I))`
+- `148` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("<",  I:Int, F:Float) => floatLt(intToF(I), F)`
+- `149` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("<",  F:Float, I:Int) => floatLt(F, intToF(I))`
+- `150` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp(">",  I:Int, F:Float) => gtF(intToF(I), F)`
+- `151` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp(">",  F:Float, I:Int) => gtF(F, intToF(I))`
+- `154` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("==", V:Val, noneV) => V ==K noneV`
+- `155` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("!=", V:Val, noneV) => notBool (V ==K noneV)`
+- `160` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= decStrToF(IntSeq) [function, total, symbol(decStrToF), no-evaluators]`
+- `161` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule decStrToF(iCons(45, CS:IntSeq)) => 0.0 -Float decStrToF(CS) [concrete]`
+- `162-164` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule decStrToF(CS:IntSeq) => intToF(intPart(CS)) +Float (intToF(fracPart(CS)) /Float intToF(fracScale(CS))) requires isLen(CS) >Int 0 andBool headIS(CS) =/=Int 45 [concrete]`
+- `165` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= headIS(IntSeq) [function]`
+- `166` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule headIS(iCons(C:Int, _:IntSeq)) => C`
+- `167` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= intPart(IntSeq) [function, total] | intPartAcc(IntSeq, Int) [function, total]`
+- `168` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule intPart(CS:IntSeq) => intPartAcc(CS, 0)`
+- `169` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule intPartAcc(.IntSeq, A:Int) => A`
+- `170` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule intPartAcc(iCons(46, _:IntSeq), A:Int) => A`
+- `171-172` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule intPartAcc(iCons(C:Int, R:IntSeq), A:Int) => intPartAcc(R, A *Int 10 +Int (C -Int 48)) requires C =/=Int 46`
+- `173` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= fracPart(IntSeq) [function, total] | fracAcc(IntSeq, Int) [function, total]`
+- `174` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule fracPart(.IntSeq) => 0`
+- `175` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule fracPart(iCons(46, R:IntSeq)) => fracAcc(R, 0)`
+- `176` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule fracPart(iCons(C:Int, R:IntSeq)) => fracPart(R) requires C =/=Int 46`
+- `177` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule fracAcc(.IntSeq, A:Int) => A`
+- `178` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule fracAcc(iCons(C:Int, R:IntSeq), A:Int) => fracAcc(R, A *Int 10 +Int (C -Int 48))`
+- `179` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= fracScale(IntSeq) [function, total] | fscAcc(IntSeq, Int) [function, total]`
+- `180` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule fracScale(.IntSeq) => 1`
+- `181` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule fracScale(iCons(46, R:IntSeq)) => fscAcc(R, 1)`
+- `182` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule fracScale(iCons(C:Int, R:IntSeq)) => fracScale(R) requires C =/=Int 46`
+- `183` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule fscAcc(.IntSeq, A:Int) => A`
+- `184` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule fscAcc(iCons(_:Int, R:IntSeq), A:Int) => fscAcc(R, A *Int 10)`
+- `185` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("float", str(CS:IntSeq), .Vals) => decStrToF(CS)`
+- `186` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("float", I:Int, .Vals)          => intToF(I)`
+- `187` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("float", F:Float, .Vals)        => F`
+- `190` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= divFloatIntV(Float, Int) [function, total, symbol(divFloatIntV), no-evaluators]`
+- `191` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule divFloatIntV(F:Float, I:Int) => F /Float Int2Float(I, 53, 11) [concrete]`
+- `192` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("/", F:Float, I:Int) => divFloatIntV(F, I)`
+- `195` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= intToF(Int) [function, total, symbol(intToF), no-evaluators]`
+- `196` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule intToF(I:Int) => Int2Float(I, 53, 11) [concrete]`
+- `197` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("+", I:Int, F:Float) => addF(intToF(I), F)`
+- `198` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("+", F:Float, I:Int) => addF(F, intToF(I))`
+- `199` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("-", I:Int, F:Float) => subF(intToF(I), F)`
+- `200` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("-", F:Float, I:Int) => subF(F, intToF(I))`
+- `201` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("*", I:Int, F:Float) => mulF(intToF(I), F)`
+- `202` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("*", F:Float, I:Int) => mulF(F, intToF(I))`
+- `203` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("<", I:Int, F:Float) => floatLt(intToF(I), F)`
+- `204` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("<", F:Float, I:Int) => floatLt(F, intToF(I))`
+- `205` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp(">", I:Int, F:Float) => gtF(intToF(I), F)`
+- `206` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp(">", F:Float, I:Int) => gtF(F, intToF(I))`
+- `209` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= truncF(Float) [function, total, symbol(truncF), no-evaluators]`
+- `210` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule truncF(F:Float) => #if F >=Float 0.0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi [concrete]`
+- `211` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("int", F:Float, .Vals) => truncF(F)`
+- `213` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("float", I:Int, .Vals)   => intToF(I)`
+- `214` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("float", F:Float, .Vals) => F`
+- `217` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= roundF(Float) [function, total, symbol(roundF), no-evaluators]`
+- `218-222` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule roundF(F:Float) => #if (F -Float floorFloat(F)) ==Float 0.5 #then (#if Float2Int(floorFloat(F)) %Int 2 ==Int 0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi) #else Float2Int(floorFloat(F +Float 0.5)) #fi [concrete]`
+- `223` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= roundFN(Float, Int) [function, total, symbol(roundFN), no-evaluators]`
+- `224-226` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule roundFN(F:Float, N:Int) => Int2Float(roundF(F *Float Int2Float(10 ^Int N, 53, 11)), 53, 11) /Float Int2Float(10 ^Int N, 53, 11) [concrete]`
+- `227` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("round", F:Float, .Vals)        => roundF(F)`
+- `228` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBuiltin("round", F:Float, N:Int, .Vals) => roundFN(F, N)`
+- `230` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Float ::= sqrtF(Float) [function, total, symbol(sqrtF), no-evaluators]`
+- `231` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule sqrtF(F:Float) => sqrtFloat(F) [concrete]`
+- `232` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= "#mathSqrt"`
+- `233` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Call(Attribute(Name("math"), "sqrt"), (E:Expr, .Exprs)) => E ~> #mathSqrt ... </k> [priority(40)]`
+- `234` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> F:Float ~> #mathSqrt => sqrtF(F) ... </k>`
+- `235` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> I:Int ~> #mathSqrt => sqrtF(intToF(I)) ... </k>`
+- `243` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #maxAccF(Iterable, Float) | #maxContF(Float)`
+- `244` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAccF(R, {V}:>Float) ... </k> requires isFloat(V)`
+- `245` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #maxAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #maxContF(M) ... </k>`
+- `246` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterDone ~> #maxContF(M:Float) => M ... </k>`
+- `247-248` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxContF(M:Float) => #maxAccF(R, maxFloat(M, {V}:>Float)) ... </k> requires isFloat(V)`
+- `250` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #minAccF(Iterable, Float) | #minContF(Float)`
+- `251` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAccF(R, {V}:>Float) ... </k> requires isFloat(V)`
+- `252` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #minAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #minContF(M) ... </k>`
+- `253` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterDone ~> #minContF(M:Float) => M ... </k>`
+- `254-255` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, R:Iterable) ~> #minContF(M:Float) => #minAccF(R, minFloat(M, {V}:>Float)) ... </k> requires isFloat(V)`
+- `261` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #sumAccF(Iterable, Float) | #sumContF(Float)`
+- `262-264` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int) => #sumAccF(R, addF(intToF(ACC), {V}:>Float)) ... </k> requires isFloat(V) andBool notBool (isInt(V) orBool isBool(V))`
+- `265` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #sumAccF(IT:Iterable, ACC:Float) => #iterNext(IT) ~> #sumContF(ACC) ... </k>`
+- `266` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterDone ~> #sumContF(ACC:Float) => ACC ... </k>`
+- `267-269` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float) => #sumAccF(R, addF(ACC, {V}:>Float)) ... </k> requires isFloat(V)`
+- `270-272` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float) => #sumAccF(R, addF(ACC, intToF(intOf(V)))) ... </k> requires isInt(V) orBool isBool(V)`
+
+## /reference/reference-semantics/semantics/functions.k
+
+- `8-11` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= frame(continuation: K, callerEnv: Int, savedLoc: Int) | #bindP(ParamNames, Vals) | "#pop" | "#endcall"`
+- `14-16` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ F <- closureVal(PNS, BODY, L) ], _) ... </scopes>`
+- `18` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Expr ::= closureExpr(ParamNames, Stmts)`
+- `19-20` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> closureExpr(PNS:ParamNames, BODY:Stmts) => closureVal(PNS, BODY, L) ... </k> <env> L:Int </env>`
+- `27` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= closureValC(ParamNames, ParamNames, Stmts, Map)`
+- `31-32` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #mkClosure(String, ParamNames, ParamNames, ParamNames, Stmts, Map) | #mkLambda(ParamNames, ParamNames, ParamNames, Stmts, Map)`
+- `33-35` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> FuncDef(F:String, Params(PNS:ParamNames), CellVars(CVS:ParamNames), FreeVars(FVS:ParamNames), BODY:Stmts) => #mkClosure(F, PNS, CVS, FVS, BODY, .Map) ... </k>`
+- `36-41` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames, (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map) => #mkClosure(F, PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires FV in_keys(M)`
+- `42-45` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ F <- closureValC(PNS, CVS, BODY, CM) ], _) ... </scopes>`
+- `47-49` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Lambda(Params(PNS:ParamNames), E:Expr) => closureVal(PNS, Return(E) .Stmts, L) ... </k> <env> L:Int </env>`
+- `50-52` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Lambda(Params(PNS:ParamNames), CellVars(CVS:ParamNames), FreeVars(FVS:ParamNames), E:Expr) => #mkLambda(PNS, CVS, FVS, Return(E) .Stmts, .Map) ... </k>`
+- `53-58` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map) => #mkLambda(PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires FV in_keys(M)`
+- `59-60` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map) => closureValC(PNS, CVS, BODY, CM) ... </k>`
+- `63` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>`
+- `64-66` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ P <- V ], _) ... </scopes>`
+- `68-75` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #cellW({M[P]}:>Val, V) ~> #bindP(PS, VS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(P, cellsOf({M["$cells"]}:>Val)) andBool P in_keys(M) andBool isCellRef({M[P]}:>Val) [priority(40)]`
+- `78-79` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Return(V:Val) ~> _ => #pop </k> <ret> noRet => retV(V) </ret>`
+- `80-81` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #endcall => #pop ... </k> <ret> noRet => retV(noneV) </ret>`
+- `85-90` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #pop => V ~> CONT </k> <ret>   retV(V) => noRet </ret> <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack> <env>   L:Int => CALLERL </env> <scopes> SC:Map => SC [ L <- undef ] </scopes> <scopeLoc> _ => SAVEDL </scopeLoc>`
+
+## /reference/reference-semantics/semantics/int.k
+
+- `7` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyUn("-", I:Int) => 0 -Int I`
+- `9` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2`
+- `11` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi`
+- `12` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I`
+- `13` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2`
+- `14` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2`
+- `15` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)`
+- `16` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2`
+- `17` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0`
+- `19` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= pyMod(Int, Int) [function]`
+- `20` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2`
+- `22` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2`
+- `23` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2`
+- `24` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2`
+- `25` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2`
+- `26` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2`
+- `27` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2`
+
+## /reference/reference-semantics/semantics/iter.k
+
+- `8` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #iterNext(Iterable) | "#iterDone" | #iterYield(Val, Iterable)`
+
+## /reference/reference-semantics/semantics/list.k
+
+- `9` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterNext(list(.ValSeq))                => #iterDone ... </k>`
+- `10` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterNext(list(vCons(V:Val, R:ValSeq))) => #iterYield(V, list(R)) ... </k>`
+- `13` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ApplyK ::= "toList"`
+- `14` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>`
+- `15` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>`
+- `18` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]`
+- `19` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule valSeqConcat(.ValSeq, T:ValSeq)                => T`
+- `20` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))`
+- `24-25` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k> [priority(45)]`
+- `27` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B`
+- `28` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B)`
+- `33` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= hasRefVS(ValSeq) [function, total]`
+- `34` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule hasRefVS(.ValSeq)                => false`
+- `35` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule hasRefVS(vCons(V:Val, R:ValSeq)) => isRefV(V) orBool hasRefVS(R)`
+- `37-38` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= deepEqVS(ValSeq, ValSeq, Map) [function] | deepEqV(Val, Val, Map)        [function]`
+- `39` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule deepEqVS(.ValSeq, .ValSeq, _:Map)                   => true`
+- `40` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule deepEqVS(.ValSeq, vCons(_:Val, _:ValSeq), _:Map)    => false`
+- `41` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule deepEqVS(vCons(_:Val, _:ValSeq), .ValSeq, _:Map)    => false`
+- `42-43` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule deepEqVS(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq), HP:Map) => deepEqV(A, B, HP) andBool deepEqVS(As, Bs, HP)`
+- `45-46` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule deepEqV(ref(H:Int), B:Val, HP:Map) => deepEqV({HP[H]}:>Val, B, HP) requires H in_keys(HP)`
+- `47-48` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule deepEqV(A:Val, ref(H:Int), HP:Map) => deepEqV(A, {HP[H]}:>Val, HP) requires notBool isRefV(A) andBool H in_keys(HP)`
+- `49` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule deepEqV(list(A:ValSeq), list(B:ValSeq), HP:Map) => deepEqVS(A, B, HP)`
+- `50` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule deepEqV(A:Val, B:Val, _:Map) => A ==K B [owise]`
+- `53-55` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "append")), (V:Val, .Vals)) => noneV ... </k> <heap> ... H |-> list(VS:ValSeq => valSeqConcat(VS, vCons(V, .ValSeq))) ... </heap> [priority(40)]`
+- `58` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #memberAcc(Val, Iterable) | #memberCont(Val) | "#notB"`
+- `59` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Compare(LV:Val, CmpOp("in",     list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ... </k>`
+- `60` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Compare(LV:Val, CmpOp("not in", list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ~> #notB ... </k>`
+- `61` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #memberAcc(V:Val, IT:Iterable) => #iterNext(IT) ~> #memberCont(V) ... </k>`
+- `62` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterDone ~> #memberCont(_V:Val) => false ... </k>`
+- `63-64` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(E:Val, _:Iterable) ~> #memberCont(V:Val) => true ... </k> requires E ==K V`
+- `65-66` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterYield(E:Val, R:Iterable) ~> #memberCont(V:Val) => #memberAcc(V, R) ... </k> requires notBool (E ==K V)`
+- `67` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> B:Bool ~> #notB => notBool B ... </k>`
+
+## /reference/reference-semantics/semantics/methods.k
+
+- `10` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= applyMethod(Val, String, Vals) [function]`
+- `13` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)`
+- `14` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)`
+- `15` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)`
+- `16` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS)`
+- `19` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(str(CS:IntSeq), "lower",    .Vals) => str(mapLower(CS))`
+- `20` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(str(CS:IntSeq), "upper",    .Vals) => str(mapUpper(CS))`
+- `21` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(str(CS:IntSeq), "swapcase", .Vals) => str(mapSwap(CS))`
+- `26` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(str(SEP:IntSeq), "join", list(VS:ValSeq), .Vals) => str(joinCodes(SEP, VS))`
+- `27` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]`
+- `28` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule joinCodes(_:IntSeq, .ValSeq) => .IntSeq`
+- `29` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule joinCodes(_:IntSeq, vCons(str(CS:IntSeq), .ValSeq)) => CS`
+- `30-31` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule joinCodes(SEP:IntSeq, vCons(str(CS:IntSeq), vCons(V:Val, R:ValSeq))) => seqConcat(CS, seqConcat(SEP, joinCodes(SEP, vCons(V, R))))`
+- `34` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)`
+- `35` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= cntSub(IntSeq, IntSeq) [function]`
+- `36` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule cntSub(.IntSeq, _:IntSeq) => 0`
+- `37-38` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC) requires strPrefix(PC, iCons(C, R)) andBool isLen(PC) >Int 0`
+- `39-40` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => cntSub(R, PC) requires notBool strPrefix(PC, iCons(C, R)) orBool isLen(PC) <=Int 0`
+- `41` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= dropIS(IntSeq, Int) [function, total]`
+- `42` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dropIS(S:IntSeq, N:Int) => S requires N <=Int 0`
+- `43` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dropIS(.IntSeq, _:Int) => .IntSeq [owise]`
+- `44` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dropIS(iCons(_:Int, R:IntSeq), N:Int) => dropIS(R, N -Int 1) requires N >Int 0`
+- `47` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(str(CS:IntSeq), "strip", .Vals) => str(revIS(trimWS(revIS(trimWS(CS)))))`
+- `48` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= trimWS(IntSeq) [function, total]`
+- `49` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule trimWS(.IntSeq) => .IntSeq`
+- `50` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule trimWS(iCons(C:Int, R:IntSeq)) => trimWS(R) requires isWSC(C)`
+- `51` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule trimWS(iCons(C:Int, R:IntSeq)) => iCons(C, R) requires notBool isWSC(C)`
+- `52` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= revIS(IntSeq) [function, total] | revISAcc(IntSeq, IntSeq) [function, total]`
+- `53` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule revIS(S:IntSeq) => revISAcc(S, .IntSeq)`
+- `54` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule revISAcc(.IntSeq, A:IntSeq) => A`
+- `55` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule revISAcc(iCons(C:Int, R:IntSeq), A:IntSeq) => revISAcc(R, iCons(C, A))`
+- `58` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(str(CS:IntSeq), "encode", str(_:IntSeq), .Vals) => str(CS)`
+- `61` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)`
+- `64` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)`
+- `65` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= cntOccVS(ValSeq, Val) [function, total]`
+- `66` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule cntOccVS(.ValSeq, _:Val)                => 0`
+- `67` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V`
+- `68` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => cntOccVS(R, V)        requires notBool (A ==K V)`
+- `72-74` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals) => #alloc(list(splitWS(CS, .IntSeq, .ValSeq))) ... </k> [priority(40)]`
+- `75` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= splitWS(IntSeq, IntSeq, ValSeq) [function]  // remaining, current token, result`
+- `76` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule splitWS(.IntSeq, CUR:IntSeq, ACC:ValSeq) => flushTok(ACC, CUR)`
+- `77-78` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, .IntSeq, flushTok(ACC, CUR)) requires isWSC(C)`
+- `79-80` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, seqConcat(CUR, iCons(C, .IntSeq)), ACC) requires notBool isWSC(C)`
+- `82` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= flushTok(ValSeq, IntSeq) [function]`
+- `83` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule flushTok(ACC:ValSeq, .IntSeq)            => ACC`
+- `84` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule flushTok(ACC:ValSeq, iCons(C:Int, T:IntSeq)) => valSeqConcat(ACC, vCons(str(iCons(C, T)), .ValSeq))`
+- `85` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= isWSC(Int) [function, total]`
+- `86` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isWSC(C:Int) => C ==Int 32 orBool C ==Int 9 orBool C ==Int 10 orBool C ==Int 13`
+- `89-91` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (kwV("sep", str(S:IntSeq)), .Vals)) => #applyK(toCall(boundMethodV(str(CS), "split")), (str(S), .Vals)) ... </k> [priority(39)]`
+- `94-96` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (str(iCons(SEP:Int, .IntSeq)), .Vals)) => #alloc(list(splitSep(CS, SEP, .IntSeq))) ... </k> [priority(40)]`
+- `97` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= splitSep(IntSeq, Int, IntSeq) [function]  // remaining, sep code, current token`
+- `98` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule splitSep(.IntSeq, _SEP:Int, CUR:IntSeq)              => vCons(str(CUR), .ValSeq)`
+- `99-100` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => vCons(str(CUR), splitSep(R, SEP, .IntSeq)) requires C ==Int SEP`
+- `101-102` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => splitSep(R, SEP, seqConcat(CUR, iCons(C, .IntSeq))) requires notBool (C ==Int SEP)`
+- `104-105` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(str(CS:IntSeq), "replace", str(iCons(A:Int, .IntSeq)), str(iCons(B:Int, .IntSeq)), .Vals) => str(replaceC(CS, A, B))`
+- `106` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= replaceC(IntSeq, Int, Int) [function, total]`
+- `107` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule replaceC(.IntSeq, _:Int, _:Int)             => .IntSeq`
+- `108` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(B, replaceC(R, A, B)) requires C ==Int A`
+- `109` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(C, replaceC(R, A, B)) requires notBool (C ==Int A)`
+- `112` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= isUpperC(Int) [function, total]`
+- `113` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90`
+- `115` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= isLowerC(Int) [function, total]`
+- `116` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122`
+- `118` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= isAlphaC(Int) [function, total]`
+- `119` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)`
+- `121` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= isDigitC(Int) [function, total]`
+- `122` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57`
+- `124` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= hasUpper(IntSeq) [function, total]`
+- `125` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule hasUpper(.IntSeq) => false`
+- `126` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)`
+- `128` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= hasLower(IntSeq) [function, total]`
+- `129` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule hasLower(.IntSeq) => false`
+- `130` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)`
+- `132` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= allAlpha(IntSeq) [function, total]`
+- `133` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule allAlpha(.IntSeq) => true`
+- `134` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)`
+- `136` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= allDigit(IntSeq) [function, total]`
+- `137` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule allDigit(.IntSeq) => true`
+- `138` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)`
+- `140` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= lowerC(Int) [function, total]`
+- `142` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)`
+- `143` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule lowerC(C:Int) => C         [owise]`
+- `145` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= upperC(Int) [function, total]`
+- `146` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule upperC(C:Int) => C -Int 32 requires isLowerC(C)`
+- `147` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule upperC(C:Int) => C         [owise]`
+- `149` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= swapC(Int) [function, total]`
+- `150` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule swapC(C:Int) => C +Int 32 requires isUpperC(C)`
+- `151` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule swapC(C:Int) => C -Int 32 requires isLowerC(C)`
+- `152` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule swapC(C:Int) => C         [owise]`
+- `154` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= mapLower(IntSeq) [function, total]`
+- `155` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule mapLower(.IntSeq) => .IntSeq`
+- `156` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule mapLower(iCons(C:Int, S:IntSeq)) => iCons(lowerC(C), mapLower(S))`
+- `158` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= mapUpper(IntSeq) [function, total]`
+- `159` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule mapUpper(.IntSeq) => .IntSeq`
+- `160` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule mapUpper(iCons(C:Int, S:IntSeq)) => iCons(upperC(C), mapUpper(S))`
+- `162` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= mapSwap(IntSeq) [function, total]`
+- `163` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule mapSwap(.IntSeq) => .IntSeq`
+- `164` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule mapSwap(iCons(C:Int, S:IntSeq)) => iCons(swapC(C), mapSwap(S))`
+- `166` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= startsWith(IntSeq, IntSeq) [function, total]`
+- `167` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule startsWith(.IntSeq, _:IntSeq)               => true`
+- `168` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule startsWith(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+- `169` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule startsWith(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool startsWith(As, Bs)`
+
+## /reference/reference-semantics/semantics/operators.k
+
+- `10` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>`
+- `12` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>`
+- `15` | `context` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `context Compare(HOLE, _)`
+- `16` | `context` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `context Compare(_:Val, CmpOp(_, HOLE))`
+- `17` | `ordinary-rule` | attrs `owise` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]`
+- `19` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("is",     V:Val, noneV) => V ==K noneV`
+- `20` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)`
+- `25-27` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+- `28-31` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(L) [priority(40)]`
+- `34-37` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k> <heap> ... H |-> V:Val ... </heap> requires OP =/=String "in" andBool OP =/=String "not in" [priority(40)]`
+- `38-42` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(L) orBool OP ==String "in" orBool OP ==String "not in" [priority(40)]`
+- `44-46` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> UnaryOp(OP:String, ref(H:Int)) => UnaryOp(OP, V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## /reference/reference-semantics/semantics/range.k
+
+- `9` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= inRange(Int, Int, Int) [function, total]`
+- `10` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule inRange(I:Int, HI:Int, ST:Int) => (ST >Int 0 andBool I <Int HI) orBool (ST <Int 0 andBool I >Int HI)`
+- `12` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= rangeLen(Int, Int, Int) [function]`
+- `13-14` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule rangeLen(LO:Int, HI:Int, ST:Int) => (HI -Int LO +Int ST -Int 1) /Int ST requires ST >Int 0 andBool HI >Int LO`
+- `15-16` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule rangeLen(LO:Int, HI:Int, ST:Int) => (LO -Int HI -Int ST -Int 1) /Int (0 -Int ST) requires ST <Int 0 andBool HI <Int LO`
+- `17-18` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule rangeLen(LO:Int, HI:Int, ST:Int) => 0 requires (ST >Int 0 andBool HI <=Int LO) orBool (ST <Int 0 andBool HI >=Int LO)`
+- `20-22` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterYield(I, rangeObj(I +Int ST, HI, ST)) ... </k> requires inRange(I, HI, ST)`
+- `23-24` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterDone ... </k> requires notBool inRange(I, HI, ST)`
+
+## /reference/reference-semantics/semantics/set.k
+
+- `8` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= setV(IntSeq)`
+- `11` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= codeIn(Int, IntSeq) [function, total]`
+- `12` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule codeIn(_:Int, .IntSeq)                => false`
+- `13` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule codeIn(C:Int, iCons(H:Int, T:IntSeq)) => C ==Int H orBool codeIn(C, T)`
+- `16-17` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= dedupCodes(IntSeq)         [function, total] | dedupFrom(IntSeq, IntSeq)  [function, total]`
+- `18` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dedupCodes(CS:IntSeq) => dedupFrom(CS, .IntSeq)`
+- `19` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dedupFrom(.IntSeq, ACC:IntSeq) => ACC`
+- `20-21` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, ACC) requires codeIn(C, ACC)`
+- `22-23` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, snocCode(ACC, C)) requires notBool codeIn(C, ACC)`
+- `25` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= snocCode(IntSeq, Int) [function, total]`
+- `26` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule snocCode(.IntSeq, C:Int)                => iCons(C, .IntSeq)`
+- `27` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule snocCode(iCons(H:Int, T:IntSeq), C:Int) => iCons(H, snocCode(T, C))`
+- `31` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= subsetCodes(IntSeq, IntSeq) [function, total]`
+- `32` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule subsetCodes(.IntSeq, _:IntSeq)                => true`
+- `33` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule subsetCodes(iCons(C:Int, S:IntSeq), B:IntSeq) => codeIn(C, B) andBool subsetCodes(S, B)`
+- `35` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= sameSet(IntSeq, IntSeq) [function, total]`
+- `36` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule sameSet(A:IntSeq, B:IntSeq) => subsetCodes(A, B) andBool subsetCodes(B, A)`
+- `39` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("==", setV(A:IntSeq), setV(B:IntSeq)) => sameSet(A, B)`
+
+## /reference/reference-semantics/semantics/sort.k
+
+- `18` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= sortVS(ValSeq) [function, total, symbol(sortVS), no-evaluators]`
+- `19` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= insVS(Int, ValSeq) [function]`
+- `20` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule sortVS(.ValSeq)                => .ValSeq          [concrete]`
+- `21` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule sortVS(vCons(X:Int, R:ValSeq)) => insVS(X, sortVS(R)) [concrete]`
+- `22` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule insVS(X:Int, .ValSeq)                => vCons(X, .ValSeq) [concrete]`
+- `23` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]`
+- `24` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X  >Int Y [concrete]`
+- `26` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]`
+- `27` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]`
+- `28` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]`
+- `29-30` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(A), vCons(str(B), R)) requires strLt(A, B) orBool A ==K B [concrete]`
+- `31-32` | `ordinary-rule` | attrs `concrete` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(B), insVSs(A, R)) requires notBool (strLt(A, B) orBool A ==K B) [concrete]`
+- `36-37` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), .Vals)) => #alloc(list(sortVS(VS))) ... </k>`
+- `40-42` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "sort")), .Vals) => noneV ... </k> <heap> ... H |-> list(VS:ValSeq => sortVS(VS)) ... </heap> [priority(40)]`
+- `49` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= sortKeyVS(ValSeq, Val) [function, total, symbol(sortKeyVS), no-evaluators]`
+- `51-52` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= revVS(ValSeq) [function, total] | revVSAcc(ValSeq, ValSeq) [function, total]`
+- `53` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule revVS(S:ValSeq) => revVSAcc(S, .ValSeq)`
+- `54` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule revVSAcc(.ValSeq, A:ValSeq) => A`
+- `55` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule revVSAcc(vCons(V:Val, R:ValSeq), A:ValSeq) => revVSAcc(R, vCons(V, A))`
+- `57` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= condRev(ValSeq, Bool) [function, total]`
+- `58` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule condRev(S:ValSeq, false) => S`
+- `59` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule condRev(S:ValSeq, true)  => revVS(S)`
+- `61-62` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals)) => #alloc(list(sortKeyVS(VS, KV))) ... </k>`
+- `63-64` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals)) => #alloc(list(condRev(sortKeyVS(VS, KV), RB))) ... </k>`
+- `65-66` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("reverse", RB:Bool), .Vals)) => #alloc(list(condRev(sortVS(VS), RB))) ... </k>`
+
+## /reference/reference-semantics/semantics/str.k
+
+- `8` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>`
+- `9-10` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterNext(str(iCons(C:Int, R:IntSeq))) => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>`
+- `13` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= strToCodes(String) [function]`
+- `14` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Str(S:String) => str(strToCodes(S)) ... </k>`
+- `15` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule strToCodes("") => .IntSeq`
+- `16-17` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S)))) requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128`
+- `20` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]`
+- `21` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule seqConcat(.IntSeq, T:IntSeq)                => T`
+- `22` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))`
+- `24` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))`
+- `25` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B`
+- `26` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)`
+- `29` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)`
+- `30` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)`
+- `32` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]`
+- `33` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule strPrefix(.IntSeq, _:IntSeq)               => true`
+- `34` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+- `35` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)`
+- `37` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]`
+- `38` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)`
+- `39` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)`
+- `40-41` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs) requires notBool strPrefix(P, iCons(C, Xs))`
+- `48` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]`
+- `49` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule strLt(.IntSeq, .IntSeq)                => false`
+- `50` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true`
+- `51` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+- `52` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true          requires A  <Int B`
+- `53` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false         requires A  >Int B`
+- `54` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B`
+- `56` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("<",  str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)`
+- `57` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp(">",  str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)`
+- `58` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)`
+- `59` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)`
+
+## /reference/reference-semantics/semantics/subscript.k
+
+- `11` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= valSeqAt(ValSeq, Int) [function, total]`
+- `12` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule valSeqAt(vCons(V:Val, _:ValSeq), 0)     => V`
+- `13-14` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule valSeqAt(vCons(_:Val, S:ValSeq), I:Int) => valSeqAt(S, I -Int 1) requires I >Int 0`
+- `16` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= intSeqAt(IntSeq, Int) [function]`
+- `17` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule intSeqAt(iCons(C:Int, _:IntSeq), 0)     => C`
+- `18-19` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule intSeqAt(iCons(_:Int, S:IntSeq), I:Int) => intSeqAt(S, I -Int 1) requires I >Int 0`
+- `21` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= normIdx(Int, Int) [function, total]`
+- `22` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule normIdx(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0`
+- `23` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule normIdx(I:Int, _:Int)   => I          requires I >=Int 0`
+- `27` | `context` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `context Subscript(HOLE, _)`
+- `28` | `context` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `context Subscript(_:Val, HOLE:Expr)`
+- `31-33` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Subscript(ref(H:Int), IX:Index) => Subscript(V, IX) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+- `35` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Subscript(OBJ:Val, I:Int) => applyIndex(OBJ, I) ... </k>`
+- `37` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= applyIndex(Val, Int) [function]`
+- `38` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyIndex(list(VS:ValSeq),  I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))`
+- `39` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyIndex(tuple(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))`
+- `40-41` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyIndex(str(IS:IntSeq),   I:Int) => str(iCons(intSeqAt(IS, normIdx(I, isLen(IS))), .IntSeq))`
+- `44-47` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #evalB(Bound) | "#toSome" | #slLo(Val, Bound, Bound) | #slHi(Val, OptInt, Bound) | #slStep(Val, OptInt, OptInt)`
+- `49` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax OptInt ::= "noB" | someB(Int)`
+- `50` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #evalB(NoBound)  => noB ... </k>`
+- `51` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #evalB(E:Expr)   => E ~> #toSome ... </k>`
+- `52` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> I:Int ~> #toSome => someB(I) ... </k>`
+- `54` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Subscript(OBJ:Val, Slice(LO:Bound, HI:Bound, ST:Bound)) => #evalB(LO) ~> #slLo(OBJ, HI, ST) ... </k>`
+- `55` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> LO:OptInt ~> #slLo(OBJ:Val, HI:Bound, ST:Bound)   => #evalB(HI) ~> #slHi(OBJ, LO, ST) ... </k>`
+- `56` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> HI:OptInt ~> #slHi(OBJ:Val, LO:OptInt, ST:Bound)  => #evalB(ST) ~> #slStep(OBJ, LO, HI) ... </k>`
+- `58-60` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> ST:OptInt ~> #slStep(list(VS:ValSeq), LO:OptInt, HI:OptInt) => #alloc(doSlice(list(VS), LO, HI, ST)) ... </k> [priority(45)]`
+- `61` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> ST:OptInt ~> #slStep(OBJ:Val, LO:OptInt, HI:OptInt) => doSlice(OBJ, LO, HI, ST) ... </k>`
+- `63` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Val ::= doSlice(Val, OptInt, OptInt, OptInt) [function]`
+- `64-65` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule doSlice(list(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt) => list(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))`
+- `66-67` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule doSlice(tuple(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt) => tuple(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))`
+- `68-69` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule doSlice(str(IS:IntSeq), LO:OptInt, HI:OptInt, ST:OptInt) => str(buildIS(IS, slStart(LO, ST, isLen(IS)), slStop(HI, ST, isLen(IS)), slStep(ST)))`
+- `72` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= slStep(OptInt) [function, total]`
+- `73` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule slStep(noB)          => 1`
+- `74` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule slStep(someB(S:Int)) => S`
+- `76` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= slStart(OptInt, OptInt, Int) [function]`
+- `77-78` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule slStart(noB,          ST:OptInt, _LEN:Int) => 0 requires slStep(ST) >Int 0`
+- `79-80` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule slStart(noB,          ST:OptInt, LEN:Int)  => LEN -Int 1 requires slStep(ST) <Int 0`
+- `81` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule slStart(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))`
+- `83` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= slStop(OptInt, OptInt, Int) [function]`
+- `84-85` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule slStop(noB,          ST:OptInt, LEN:Int)  => LEN requires slStep(ST) >Int 0`
+- `86-87` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule slStop(noB,          ST:OptInt, _LEN:Int) => -1 requires slStep(ST) <Int 0`
+- `88` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule slStop(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))`
+- `90` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= slAdjust(Int, Int, Int) [function, total]`
+- `91-92` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampLo(I +Int LEN, STEP) requires I  <Int 0`
+- `93-94` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampHi(I, LEN, STEP) requires I >=Int 0`
+- `96` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= clampLo(Int, Int) [function, total]`
+- `97-98` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule clampLo(J:Int, _STEP:Int) => J requires J >=Int 0`
+- `99-100` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule clampLo(J:Int, STEP:Int)  => #if STEP <Int 0 #then -1 #else 0 #fi requires J <Int 0`
+- `102` | `syntax` | attrs `function,total` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= clampHi(Int, Int, Int) [function, total]`
+- `103-104` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule clampHi(I:Int, LEN:Int, _STEP:Int) => I requires I  <Int LEN`
+- `105-106` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule clampHi(I:Int, LEN:Int, STEP:Int)  => #if STEP <Int 0 #then LEN -Int 1 #else LEN #fi requires I >=Int LEN`
+- `109` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ValSeq ::= buildVS(ValSeq, Int, Int, Int) [function]`
+- `110-112` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule buildVS(VS:ValSeq, I:Int, STOP:Int, STEP:Int) => vCons(valSeqAt(VS, I), buildVS(VS, I +Int STEP, STOP, STEP)) requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)`
+- `113-114` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule buildVS(_:ValSeq, I:Int, STOP:Int, STEP:Int) => .ValSeq requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))`
+- `116` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax IntSeq ::= buildIS(IntSeq, Int, Int, Int) [function]`
+- `117-119` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule buildIS(IS:IntSeq, I:Int, STOP:Int, STEP:Int) => iCons(intSeqAt(IS, I), buildIS(IS, I +Int STEP, STOP, STEP)) requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)`
+- `120-121` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule buildIS(_:IntSeq, I:Int, STOP:Int, STEP:Int) => .IntSeq requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))`
+
+## /reference/reference-semantics/semantics/syntax.k
+
+- `9-30` | `syntax` | attrs `macro,strict,seqstrict` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Expr ::= "Int"      "(" Int ")" | "Float"    "(" Float ")" | "Bool"     "(" Bool ")" | "Name"     "(" String ")" | "Str"      "(" String ")" | "UnaryOp"  "(" String "," Expr ")" [strict(2)] | "BinOp"    "(" String "," Expr "," Expr ")" [seqstrict(2, 3)] | "BoolOp"    "(" String "," Exprs ")" | "ListExpr"  "(" Exprs ")" | "DictExpr"  "(" Entries ")" | "ListComp"  "(" Expr "," CompFors ")" [macro] | "GenExp"    "(" Expr "," CompFors ")" [macro] | "TupleExpr" "(" Exprs ")" | "Subscript" "(" Expr "," Index ")" | "IfExp"     "(" Expr "," Expr "," Expr ")" [strict(1)] | "Lambda"    "(" Params "," Expr ")" | "KwArg"     "(" String "," Expr ")" | "Lambda"    "(" Params "," CellVars "," FreeVars "," Expr ")" | "NoneVal" | "Call"      "(" Expr "," Exprs ")" | "Attribute" "(" Expr "," String ")" [strict(1)] | "Compare"   "(" Expr "," CmpOp ")"`
+- `32` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax CmpOp    ::= "CmpOp" "(" String "," Expr ")"`
+- `33` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Entry    ::= "Entry" "(" Expr "," Expr ")"`
+- `34` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Entries  ::= List{Entry, ","}`
+- `35` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax CompFor  ::= "CompFor" "(" Expr "," Expr "," Exprs ")"`
+- `36` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax CompFors ::= List{CompFor, ""}`
+- `37` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Exprs    ::= List{Expr, ","}`
+- `38` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Index    ::= Expr | "Slice" "(" Bound "," Bound "," Bound ")"`
+- `39` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Bound    ::= Expr | "NoBound"`
+- `41-54` | `syntax` | attrs `strict` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Stmt ::= "Assign"    "(" Expr "," Expr ")" [strict(2)] | "Import"    "(" String ")" | "ImportFrom" "(" String "," ParamNames ")" | "AugAssign" "(" Expr "," String "," Expr ")" [strict(3)] | "For"       "(" Expr "," Expr "," Stmts ")" [strict(2)] | "While"     "(" Expr "," Stmts ")" | "Break" | "Continue" | "If"        "(" Expr "," Stmts "," Stmts ")" [strict(1)] | "Return"    "(" Expr ")" [strict] | "Assert"    "(" Expr ")" [strict] | "Expr"      "(" Expr ")" [strict] | "FuncDef"   "(" String "," Params "," Stmts ")" | "FuncDef"   "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"`
+- `56` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Stmts      ::= List{Stmt, ""}`
+- `57` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Params     ::= "Params" "(" ParamNames ")"`
+- `58` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax CellVars   ::= "CellVars" "(" ParamNames ")"`
+- `59` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax FreeVars   ::= "FreeVars" "(" ParamNames ")"`
+- `60` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ParamNames ::= List{String, ","}`
+- `61` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Module     ::= "Module" "(" Stmts ")"`
+
+## /reference/reference-semantics/semantics/tuple.k
+
+- `10` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterNext(tuple(.ValSeq))                => #iterDone ... </k>`
+- `11` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #iterNext(tuple(vCons(V:Val, R:ValSeq))) => #iterYield(V, tuple(R)) ... </k>`
+- `14` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax ApplyK ::= "toTuple"`
+- `15` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> TupleExpr(ES:Exprs) => #evalArgs(ES, .Vals, toTuple) ... </k>`
+- `16` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #applyK(toTuple, ACC:Vals) => tuple(vals2valSeq(ACC)) ... </k>`
+- `18` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("==", tuple(A:ValSeq), tuple(B:ValSeq)) => A ==K B`
+- `20` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Compare(LV:Val, CmpOp("in",     tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ... </k>`
+- `21` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Compare(LV:Val, CmpOp("not in", tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ~> #notB ... </k>`
+- `23` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyMethod(tuple(VS:ValSeq), "index", V:Val, .Vals) => idxOfVS(VS, V, 0)`
+- `24` | `syntax` | attrs `function` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax Int ::= idxOfVS(ValSeq, Val, Int) [function]`
+- `25` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule idxOfVS(vCons(A:Val, _:ValSeq), V:Val, I:Int) => I requires A ==K V`
+- `26-27` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule idxOfVS(vCons(A:Val, R:ValSeq), V:Val, I:Int) => idxOfVS(R, V, I +Int 1) requires notBool (A ==K V)`
+- `28` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule applyCmp("!=", tuple(A:ValSeq), tuple(B:ValSeq)) => notBool (A ==K B)`
+- `31` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #bindTgt(Expr, Val)`
+- `32-34` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #bindTgt(Name(X:String), V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>`
+- `35-41` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #bindTgt(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool X in_keys(M) andBool isCellRef({M[X]}:>Val) [priority(40)]`
+- `42` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #bindTgt(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+- `43` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #bindTgt(TupleExpr(TS:Exprs), list(VS:ValSeq))  => #unpackSeq(TS, VS) ... </k>`
+- `44-46` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #bindTgt(TupleExpr(TS:Exprs), ref(H:Int)) => #bindTgt(TupleExpr(TS), V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+- `49` | `syntax` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `syntax KItem ::= #unpackSeq(Exprs, ValSeq)`
+- `50` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Assign(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+- `51` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Assign(TupleExpr(TS:Exprs), list(VS:ValSeq))  => #unpackSeq(TS, VS) ... </k>`
+- `52-54` | `ordinary-rule` | attrs `priority` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> Assign(TupleExpr(TS:Exprs), ref(H:Int)) => Assign(TupleExpr(TS), V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+- `55-56` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #unpackSeq((T:Expr, TS:Exprs), vCons(V:Val, VS:ValSeq)) => #bindTgt(T, V) ~> #unpackSeq(TS, VS) ... </k>`
+- `57` | `ordinary-rule` | attrs `-` | disposition `selected trusted supplied semantics; candidate copy is byte-identical` | `rule <k> #unpackSeq(.Exprs, .ValSeq) => .K ... </k>`
+
+## /reference/reference-semantics/semantics.k
+
+- No local syntax, configuration, context, rule, or claim declarations.
+
+## /candidate/verification.k
+
+- `9-10` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `syntax Int ::= triAt(Int) [function, total, symbol(triAt), no-evaluators]`
+- `12` | `simplification-rule` | attrs `simplification` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule triAt(0) => 1 [simplification]`
+- `13` | `simplification-rule` | attrs `simplification` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule triAt(1) => 3 [simplification]`
+- `15-18` | `simplification-rule` | attrs `simplification` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule 1 +Int ((I:Int -Int pyMod(I, 2)) /Int 2) => triAt(I) requires I >=Int 2 andBool pyMod(I, 2) ==Int 0 [simplification]`
+- `22-25` | `simplification-rule` | attrs `simplification` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule (I:Int /Int 2) +Int 1 => triAt(I) requires I >=Int 2 andBool pyMod(I, 2) ==Int 0 [simplification]`
+- `27-31` | `simplification-rule` | attrs `simplification` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule ((triAt(I -Int 1) +Int triAt(I -Int 2)) +Int 1) +Int (((I +Int 1) -Int pyMod(I +Int 1, 2)) /Int 2) => triAt(I) requires I >=Int 3 andBool pyMod(I, 2) ==Int 1 [simplification]`
+- `34-40` | `simplification-rule` | attrs `simplification` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule ((triAt(I:Int +Int -1) +Int triAt(I +Int -2)) +Int 1) +Int (((I +Int 1) -Int ((((I +Int 1) %Int 2) +Int 2) %Int 2)) /Int 2) => triAt(I) requires I >=Int 3 andBool (((I %Int 2) +Int 2) %Int 2) ==Int 1 [simplification]`
+- `44` | `syntax` | attrs `-` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `syntax ValSeq ::= triPrefix(Int)`
+- `45-46` | `opaque-or-symbolic-syntax` | attrs `function,total,no-evaluators,symbol` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `syntax Int ::= prefixIndex(ValSeq) [function, total, symbol(prefixIndex), no-evaluators]`
+- `48` | `ordinary-rule` | attrs `-` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule vCons(1, .ValSeq) => triPrefix(0)`
+- `49` | `ordinary-rule` | attrs `-` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule vCons(1, vCons(3, .ValSeq)) => triPrefix(1)`
+- `50` | `simplification-rule` | attrs `simplification` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule prefixIndex(vCons(1, .ValSeq)) => 0 [simplification]`
+- `51` | `simplification-rule` | attrs `simplification` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule prefixIndex(vCons(1, vCons(3, .ValSeq))) => 1 [simplification]`
+- `52` | `simplification-rule` | attrs `simplification` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule prefixIndex(triPrefix(J:Int)) => J [simplification]`
+- `53-58` | `simplification-rule` | attrs `simplification` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule prefixIndex( valSeqConcat(VS:ValSeq, vCons(triAt(I:Int), .ValSeq))) => I requires I >=Int 2 andBool prefixIndex(VS) ==Int I +Int -1 [simplification]`
+- `59-62` | `simplification-rule` | attrs `simplification` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule valSeqConcat(triPrefix(I:Int +Int -1), vCons(triAt(I), .ValSeq)) => triPrefix(I) requires I >=Int 2 [simplification]`
+- `66` | `syntax` | attrs `macro` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `syntax Expr ::= "TriLoopCond" [macro]`
+- `67-68` | `ordinary-rule` | attrs `-` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule TriLoopCond => Compare(Name("i"), CmpOp("<=", Name("n")))`
+- `70` | `syntax` | attrs `macro` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `syntax Stmts ::= "TriLoopBody" [macro]`
+- `71-86` | `ordinary-rule` | attrs `-` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule TriLoopBody => If(Compare(BinOp("%", Name("i"), Int(2)), CmpOp("==", Int(0))), Assign(Name("value"), BinOp("+", Int(1), BinOp("//", Name("i"), Int(2)))) .Stmts, Assign(Name("value"), BinOp("+", BinOp("+", BinOp("+", Name("b"), Name("a")), Int(1)), BinOp("//", BinOp("+", Name("i"), Int(1)), Int(2)))) .Stmts) Expr(Call(Attribute(Name("result"), "append"), Name("value"), .Exprs)) Assign(Name("a"), Name("b")) Assign(Name("b"), Name("value")) AugAssign(Name("i"), "+", Int(1)) .Stmts`
+- `88` | `syntax` | attrs `macro` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `syntax Stmts ::= "TriFunctionBody" [macro]`
+- `89-100` | `ordinary-rule` | attrs `-` | disposition `candidate proof extension; individually assessed in REVIEW.md` | `rule TriFunctionBody => If(Compare(Name("n"), CmpOp("==", Int(0))), Return(ListExpr(Int(1), .Exprs)) .Stmts, .Stmts) Assign(Name("result"), ListExpr(Int(1), Int(3), .Exprs)) Assign(Name("a"), Int(1)) Assign(Name("b"), Int(3)) Assign(Name("value"), Int(3)) Assign(Name("i"), Int(2)) While(TriLoopCond, TriLoopBody) Return(Name("result")) .Stmts`
+
+## /candidate/spec.k
+
+- `8-58` | `claim` | attrs `-` | disposition `candidate target claim; adequacy assessed in REVIEW.md` | `claim <k> #while(TriLoopCond, TriLoopBody) ~> KREST:K => KREST </k> <env> 1 </env> <scopes> 0 |-> scope(.Map, parent(-1)) -1 |-> builtinsScope 1 |-> scope( .Map [ "n"      <- I:Int +Int R:Int -Int 1 ] [ "result" <- ref(H:Int) ] [ "a"      <- triAt(I:Int -Int 2) ] [ "b"      <- triAt(I -Int 1) ] [ "value"  <- triAt(I -Int 1) ] [ "i"      <- I ], parent(0)) => 0 |-> scope(.Map, parent(-1)) -1 |-> builtinsScope 1 |-> scope( .Map [ "n"      <- I +Int R -Int 1 ] [ "result" <- ref(H) ] [ "a"      <- ?AFINAL:Int ] [ "b"      <- ?BFINAL:Int ] [ "value"  <- ?VFINAL:Int ] [ "i"      <- ?FINAL:Int ], parent(0)) </scopes> <scopeLoc> 2 </scopeLoc> <heap> H |-> list(VS:ValSeq) => H |-> list(?OUT:ValSeq) </heap> <heapLoc> H +Int 1 </heapLoc> <stack> STACK:List </stack> <ret> noRet </ret> <exc> NoExc </exc> <exit-code> 0 </exit-code> requires I >=Int 2 andBool R >=Int 0 andBool prefixIndex(VS) <=Int I -Int 1 andBool prefixIndex(VS) >=Int I -Int 1 ensures ?FINAL <=Int I +Int R andBool ?FINAL >=Int I +Int R andBool prefixIndex(?OUT) <=Int I +Int R -Int 1 andBool prefixIndex(?OUT) >=Int I +Int R -Int 1 endmodule module TRI-CORRECT-SPEC imports TRI-LOOP-SPEC`
+- `62-82` | `claim` | attrs `-` | disposition `candidate target claim; adequacy assessed in REVIEW.md` | `claim <k> Call(closureVal(("n", .ParamNames), TriFunctionBody, 0), Int(N:Int), .Exprs) => ref(0) </k> <env> 0 </env> <scopes> 0 |-> scope(.Map, parent(-1)) -1 |-> builtinsScope </scopes> <scopeLoc> 1 </scopeLoc> <heap> .Map => 0 |-> list(?RESULT:ValSeq) </heap> <heapLoc> 0 => 1 </heapLoc> <stack> .List </stack> <ret> noRet </ret> <exc> NoExc </exc> <exit-code> 0 </exit-code> requires N >=Int 0 ensures prefixIndex(?RESULT) <=Int N andBool prefixIndex(?RESULT) >=Int N`

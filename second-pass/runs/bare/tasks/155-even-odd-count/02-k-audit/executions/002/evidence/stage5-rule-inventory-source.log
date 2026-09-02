@@ -1,0 +1,317 @@
+$ nl -ba semantic.k; nl -ba verification.k; nl -ba spec.k; nl -ba definition.k
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports STRING-SYNTAX
+     4	
+     5	  syntax Pgm ::= "Module" "(" Stmts ")"
+     6	
+     7	  syntax Stmts ::= List{Stmt, ""}
+     8	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+     9	                | "Assign" "(" Expr "," Expr ")"
+    10	                | "AugAssign" "(" Expr "," String "," Expr ")"
+    11	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    12	                | "While" "(" Expr "," Stmts ")"
+    13	                | "Return" "(" Expr ")"
+    14	
+    15	  syntax Params ::= "Params" "(" Strings ")"
+    16	  syntax Strings ::= List{String, ","}
+    17	
+    18	  syntax Expr ::= "Int" "(" Int ")"
+    19	                | "Name" "(" String ")"
+    20	                | "UnaryOp" "(" String "," Expr ")"
+    21	                | "BinOp" "(" String "," Expr "," Expr ")"
+    22	                | "Compare" "(" Expr "," CmpOps ")"
+    23	                | "TupleExpr" "(" Exprs ")"
+    24	  syntax Exprs ::= List{Expr, ","}
+    25	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    26	  syntax CmpOps ::= List{CmpOp, ","}
+    27	endmodule
+    28	
+    29	module SEMANTIC
+    30	  imports MPY-SYNTAX
+    31	  imports INT
+    32	  imports BOOL
+    33	  imports MAP
+    34	  imports K-EQUAL
+    35	
+    36	  syntax Val ::= "intVal" "(" Int ")"
+    37	               | "boolVal" "(" Bool ")"
+    38	               | "pairVal" "(" Val "," Val ")"
+    39	               | "noResult"
+    40	
+    41	  syntax Val ::= eval(Expr, Map) [function]
+    42	               | envGet(Map, String) [function]
+    43	               | negVal(Val) [function]
+    44	               | addVal(Val, Val) [function]
+    45	               | modVal(Val, Val) [function]
+    46	               | divVal(Val, Val) [function]
+    47	               | ltVal(Val, Val) [function]
+    48	               | gtVal(Val, Val) [function]
+    49	               | eqVal(Val, Val) [function]
+    50	  syntax KItem ::= exec(Stmts)
+    51	                 | loop(Expr, Stmts)
+    52	
+    53	  configuration
+    54	    <mpy>
+    55	      <k> $PGM:Pgm </k>
+    56	      <env> .Map </env>
+    57	      <input> $NUM:Int </input>
+    58	      <result> noResult </result>
+    59	    </mpy>
+    60	
+    61	  rule envGet((X |-> V:Val) _REST, X) => V
+    62	
+    63	  rule eval(Int(I), _) => intVal(I)
+    64	  rule eval(Name(X), ENV) => envGet(ENV, X)
+    65	  rule eval(UnaryOp("-", E), ENV) => negVal(eval(E, ENV))
+    66	  rule eval(BinOp("+", E1, E2), ENV) => addVal(eval(E1, ENV), eval(E2, ENV))
+    67	  rule eval(BinOp("%", E1, E2), ENV) => modVal(eval(E1, ENV), eval(E2, ENV))
+    68	  rule eval(BinOp("//", E1, E2), ENV) => divVal(eval(E1, ENV), eval(E2, ENV))
+    69	  rule eval(Compare(E, CmpOp("<", E2)), ENV) => ltVal(eval(E, ENV), eval(E2, ENV))
+    70	  rule eval(Compare(E, CmpOp(">", E2)), ENV) => gtVal(eval(E, ENV), eval(E2, ENV))
+    71	  rule eval(Compare(E, CmpOp("==", E2)), ENV) => eqVal(eval(E, ENV), eval(E2, ENV))
+    72	  rule eval(TupleExpr(E1, E2), ENV) => pairVal(eval(E1, ENV), eval(E2, ENV))
+    73	
+    74	  rule negVal(intVal(I)) => intVal(0 -Int I)
+    75	  rule addVal(intVal(I1), intVal(I2)) => intVal(I1 +Int I2)
+    76	  rule modVal(intVal(I1), intVal(I2)) => intVal(I1 %Int I2)
+    77	  rule divVal(intVal(I1), intVal(I2)) => intVal(I1 /Int I2)
+    78	  rule ltVal(intVal(I1), intVal(I2)) => boolVal(I1 <Int I2)
+    79	  rule gtVal(intVal(I1), intVal(I2)) => boolVal(I1 >Int I2)
+    80	  rule eqVal(intVal(I1), intVal(I2)) => boolVal(I1 ==Int I2)
+    81	
+    82	  rule <k> Module(FuncDef("even_odd_count", Params("num"), BODY)) => exec(BODY) ... </k>
+    83	       <env> .Map => ("num" |-> intVal(N)
+    84	                      "even" |-> intVal(0)
+    85	                      "odd" |-> intVal(0)) </env>
+    86	       <input> N </input>
+    87	
+    88	  rule <k> exec(.Stmts) => .K ... </k>
+    89	  rule <k> exec((S:Stmt REST:Stmts)) => S ~> exec(REST) ... </k>
+    90	
+    91	  rule <k> Assign(Name(X), E) => .K ... </k>
+    92	       <env> ENV => ENV [ X <- eval(E, ENV) ] </env>
+    93	
+    94	  rule <k> AugAssign(Name(X), "+", E) => .K ... </k>
+    95	       <env> ENV => ENV [ X <- addVal(envGet(ENV, X), eval(E, ENV)) ] </env>
+    96	
+    97	  rule <k> If(E, THEN, _) => exec(THEN) ... </k>
+    98	       <env> ENV </env>
+    99	    requires eval(E, ENV) ==K boolVal(true)
+   100	  rule <k> If(E, _, ELSE) => exec(ELSE) ... </k>
+   101	       <env> ENV </env>
+   102	    requires eval(E, ENV) ==K boolVal(false)
+   103	
+   104	  rule <k> While(E, BODY) => loop(E, BODY) ... </k>
+   105	  rule <k> loop(E, BODY) => exec(BODY) ~> loop(E, BODY) ... </k>
+   106	       <env> ENV </env>
+   107	    requires eval(E, ENV) ==K boolVal(true)
+   108	  rule <k> loop(E, _) => .K ... </k>
+   109	       <env> ENV </env>
+   110	    requires eval(E, ENV) ==K boolVal(false)
+   111	
+   112	  rule <k> Return(E) ~> _REST => .K </k>
+   113	       <env> ENV </env>
+   114	       <result> noResult => eval(E, ENV) </result>
+   115	endmodule
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // Mathematical reference model, defined independently of the program AST.
+     7	  syntax Int ::= absNum(Int) [function, total]
+     8	               | evenDigits(Int) [function, total]
+     9	               | oddDigits(Int) [function, total]
+    10	               | evenFrom(Int, Int) [function, total]
+    11	               | oddFrom(Int, Int) [function, total]
+    12	  syntax Val ::= expected(Int) [function, total]
+    13	
+    14	  rule absNum(N) => 0 -Int N requires N <Int 0
+    15	  rule absNum(N) => N requires N >=Int 0
+    16	
+    17	  rule evenFrom(E, N) => E requires N <=Int 0
+    18	  rule evenFrom(E, N) => evenFrom(E +Int 1, N /Int 10)
+    19	    requires N >Int 0 andBool N %Int 2 ==Int 0
+    20	  rule evenFrom(E, N) => evenFrom(E, N /Int 10)
+    21	    requires N >Int 0 andBool N %Int 2 =/=Int 0
+    22	
+    23	  rule oddFrom(O, N) => O requires N <=Int 0
+    24	  rule oddFrom(O, N) => oddFrom(O, N /Int 10)
+    25	    requires N >Int 0 andBool N %Int 2 ==Int 0
+    26	  rule oddFrom(O, N) => oddFrom(O +Int 1, N /Int 10)
+    27	    requires N >Int 0 andBool N %Int 2 =/=Int 0
+    28	
+    29	  rule evenDigits(N) => evenFrom(0, N)
+    30	  rule oddDigits(N) => oddFrom(0, N)
+    31	
+    32	  rule expected(N) => pairVal(
+    33	                          intVal(evenDigits(absNum(N))),
+    34	                          intVal(oddDigits(absNum(N))))
+    35	
+    36	  // Names for exact subtrees occurring in solution.mpy.  They are functions,
+    37	  // so the proof expands them to the same constructors consumed by SEMANTIC.
+    38	  syntax Expr ::= numPositive() [function, total]
+    39	                | numNegative() [function, total]
+    40	                | digitIsEven() [function, total]
+    41	                | returnedCounts() [function, total]
+    42	  syntax Stmts ::= digitBody() [function, total]
+    43	                 | functionBody() [function, total]
+    44	                 | returnCounts() [function, total]
+    45	  syntax Pgm ::= solutionProgram() [function, total]
+    46	
+    47	  rule numPositive() => Compare(Name("num"), CmpOp(">", Int(0)))
+    48	  rule numNegative() => Compare(Name("num"), CmpOp("<", Int(0)))
+    49	  rule digitIsEven() => Compare(
+    50	                          BinOp("%", Name("num"), Int(2)),
+    51	                          CmpOp("==", Int(0)))
+    52	  rule returnedCounts() => TupleExpr(Name("even"), Name("odd"))
+    53	
+    54	  rule digitBody() =>
+    55	    If(digitIsEven(),
+    56	      AugAssign(Name("even"), "+", Int(1)),
+    57	      AugAssign(Name("odd"), "+", Int(1)))
+    58	    Assign(Name("num"), BinOp("//", Name("num"), Int(10)))
+    59	
+    60	  rule returnCounts() => Return(returnedCounts())
+    61	
+    62	  rule functionBody() =>
+    63	    If(numNegative(),
+    64	      Assign(Name("num"), UnaryOp("-", Name("num"))),
+    65	      .Stmts)
+    66	    Assign(Name("even"), Int(0))
+    67	    Assign(Name("odd"), Int(0))
+    68	    While(numPositive(), digitBody())
+    69	    Return(returnedCounts())
+    70	
+    71	  rule solutionProgram() =>
+    72	    Module(FuncDef("even_odd_count", Params("num"), functionBody()))
+    73	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // The loop invariant: E and O are the counts accumulated so far, while N
+     7	  // is the nonnegative suffix of digits still to consume.
+     8	  claim <mpy>
+     9	          <k> loop(numPositive(), digitBody()) ~> exec(returnCounts())
+    10	              => .K </k>
+    11	          <env> ("num" |-> intVal(N)
+    12	                 "even" |-> intVal(E)
+    13	                 "odd" |-> intVal(O))
+    14	              => ("num" |-> intVal(0)
+    15	                  "even" |-> intVal(evenFrom(E, N))
+    16	                  "odd" |-> intVal(oddFrom(O, N))) </env>
+    17	          <input> _INPUT </input>
+    18	          <result> noResult
+    19	                => pairVal(intVal(evenFrom(E, N)),
+    20	                           intVal(oddFrom(O, N))) </result>
+    21	        </mpy>
+    22	    requires N >=Int 0
+    23	
+    24	  // End-to-end correctness for every mathematical integer input.
+    25	  claim <mpy>
+    26	          <k> solutionProgram() => .K </k>
+    27	          <env> .Map
+    28	              => ("num" |-> intVal(0)
+    29	                  "even" |-> intVal(evenDigits(absNum(N)))
+    30	                  "odd" |-> intVal(oddDigits(absNum(N)))) </env>
+    31	          <input> N </input>
+    32	          <result> noResult => expected(N) </result>
+    33	        </mpy>
+    34	endmodule
+     1	requires "semantic.k"
+     2	requires "verification.k"
+     3	
+     4	module DEFINITION
+     5	  imports SEMANTIC
+     6	  imports VERIFICATION
+     7	endmodule
+$ rg -n "^[[:space:]]*(syntax|configuration|rule|claim)|\[(function|total|functional|simplification|priority|owise|anywhere|macro)" semantic.k verification.k spec.k definition.k
+spec.k:8:  claim <mpy>
+spec.k:25:  claim <mpy>
+verification.k:7:  syntax Int ::= absNum(Int) [function, total]
+verification.k:8:               | evenDigits(Int) [function, total]
+verification.k:9:               | oddDigits(Int) [function, total]
+verification.k:10:               | evenFrom(Int, Int) [function, total]
+verification.k:11:               | oddFrom(Int, Int) [function, total]
+verification.k:12:  syntax Val ::= expected(Int) [function, total]
+verification.k:14:  rule absNum(N) => 0 -Int N requires N <Int 0
+verification.k:15:  rule absNum(N) => N requires N >=Int 0
+verification.k:17:  rule evenFrom(E, N) => E requires N <=Int 0
+verification.k:18:  rule evenFrom(E, N) => evenFrom(E +Int 1, N /Int 10)
+verification.k:20:  rule evenFrom(E, N) => evenFrom(E, N /Int 10)
+verification.k:23:  rule oddFrom(O, N) => O requires N <=Int 0
+verification.k:24:  rule oddFrom(O, N) => oddFrom(O, N /Int 10)
+verification.k:26:  rule oddFrom(O, N) => oddFrom(O +Int 1, N /Int 10)
+verification.k:29:  rule evenDigits(N) => evenFrom(0, N)
+verification.k:30:  rule oddDigits(N) => oddFrom(0, N)
+verification.k:32:  rule expected(N) => pairVal(
+verification.k:38:  syntax Expr ::= numPositive() [function, total]
+verification.k:39:                | numNegative() [function, total]
+verification.k:40:                | digitIsEven() [function, total]
+verification.k:41:                | returnedCounts() [function, total]
+verification.k:42:  syntax Stmts ::= digitBody() [function, total]
+verification.k:43:                 | functionBody() [function, total]
+verification.k:44:                 | returnCounts() [function, total]
+verification.k:45:  syntax Pgm ::= solutionProgram() [function, total]
+verification.k:47:  rule numPositive() => Compare(Name("num"), CmpOp(">", Int(0)))
+verification.k:48:  rule numNegative() => Compare(Name("num"), CmpOp("<", Int(0)))
+verification.k:49:  rule digitIsEven() => Compare(
+verification.k:52:  rule returnedCounts() => TupleExpr(Name("even"), Name("odd"))
+verification.k:54:  rule digitBody() =>
+verification.k:60:  rule returnCounts() => Return(returnedCounts())
+verification.k:62:  rule functionBody() =>
+verification.k:71:  rule solutionProgram() =>
+semantic.k:5:  syntax Pgm ::= "Module" "(" Stmts ")"
+semantic.k:7:  syntax Stmts ::= List{Stmt, ""}
+semantic.k:8:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+semantic.k:15:  syntax Params ::= "Params" "(" Strings ")"
+semantic.k:16:  syntax Strings ::= List{String, ","}
+semantic.k:18:  syntax Expr ::= "Int" "(" Int ")"
+semantic.k:24:  syntax Exprs ::= List{Expr, ","}
+semantic.k:25:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+semantic.k:26:  syntax CmpOps ::= List{CmpOp, ","}
+semantic.k:36:  syntax Val ::= "intVal" "(" Int ")"
+semantic.k:41:  syntax Val ::= eval(Expr, Map) [function]
+semantic.k:42:               | envGet(Map, String) [function]
+semantic.k:43:               | negVal(Val) [function]
+semantic.k:44:               | addVal(Val, Val) [function]
+semantic.k:45:               | modVal(Val, Val) [function]
+semantic.k:46:               | divVal(Val, Val) [function]
+semantic.k:47:               | ltVal(Val, Val) [function]
+semantic.k:48:               | gtVal(Val, Val) [function]
+semantic.k:49:               | eqVal(Val, Val) [function]
+semantic.k:50:  syntax KItem ::= exec(Stmts)
+semantic.k:53:  configuration
+semantic.k:61:  rule envGet((X |-> V:Val) _REST, X) => V
+semantic.k:63:  rule eval(Int(I), _) => intVal(I)
+semantic.k:64:  rule eval(Name(X), ENV) => envGet(ENV, X)
+semantic.k:65:  rule eval(UnaryOp("-", E), ENV) => negVal(eval(E, ENV))
+semantic.k:66:  rule eval(BinOp("+", E1, E2), ENV) => addVal(eval(E1, ENV), eval(E2, ENV))
+semantic.k:67:  rule eval(BinOp("%", E1, E2), ENV) => modVal(eval(E1, ENV), eval(E2, ENV))
+semantic.k:68:  rule eval(BinOp("//", E1, E2), ENV) => divVal(eval(E1, ENV), eval(E2, ENV))
+semantic.k:69:  rule eval(Compare(E, CmpOp("<", E2)), ENV) => ltVal(eval(E, ENV), eval(E2, ENV))
+semantic.k:70:  rule eval(Compare(E, CmpOp(">", E2)), ENV) => gtVal(eval(E, ENV), eval(E2, ENV))
+semantic.k:71:  rule eval(Compare(E, CmpOp("==", E2)), ENV) => eqVal(eval(E, ENV), eval(E2, ENV))
+semantic.k:72:  rule eval(TupleExpr(E1, E2), ENV) => pairVal(eval(E1, ENV), eval(E2, ENV))
+semantic.k:74:  rule negVal(intVal(I)) => intVal(0 -Int I)
+semantic.k:75:  rule addVal(intVal(I1), intVal(I2)) => intVal(I1 +Int I2)
+semantic.k:76:  rule modVal(intVal(I1), intVal(I2)) => intVal(I1 %Int I2)
+semantic.k:77:  rule divVal(intVal(I1), intVal(I2)) => intVal(I1 /Int I2)
+semantic.k:78:  rule ltVal(intVal(I1), intVal(I2)) => boolVal(I1 <Int I2)
+semantic.k:79:  rule gtVal(intVal(I1), intVal(I2)) => boolVal(I1 >Int I2)
+semantic.k:80:  rule eqVal(intVal(I1), intVal(I2)) => boolVal(I1 ==Int I2)
+semantic.k:82:  rule <k> Module(FuncDef("even_odd_count", Params("num"), BODY)) => exec(BODY) ... </k>
+semantic.k:88:  rule <k> exec(.Stmts) => .K ... </k>
+semantic.k:89:  rule <k> exec((S:Stmt REST:Stmts)) => S ~> exec(REST) ... </k>
+semantic.k:91:  rule <k> Assign(Name(X), E) => .K ... </k>
+semantic.k:94:  rule <k> AugAssign(Name(X), "+", E) => .K ... </k>
+semantic.k:97:  rule <k> If(E, THEN, _) => exec(THEN) ... </k>
+semantic.k:100:  rule <k> If(E, _, ELSE) => exec(ELSE) ... </k>
+semantic.k:104:  rule <k> While(E, BODY) => loop(E, BODY) ... </k>
+semantic.k:105:  rule <k> loop(E, BODY) => exec(BODY) ~> loop(E, BODY) ... </k>
+semantic.k:108:  rule <k> loop(E, _) => .K ... </k>
+semantic.k:112:  rule <k> Return(E) ~> _REST => .K </k>
+RG_EXIT_STATUS: 0

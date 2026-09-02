@@ -1,0 +1,123 @@
+Script started on 2026-07-31 07:54:38-05:00 [<not executed on terminal>]
+def expected_target_definition(obligation_map: dict[str, Any]) -> str | None:
+    obligations = obligation_map.get("obligations")
+    parameters = obligation_map.get("trust_parameters")
+    if not isinstance(obligations, list) or not isinstance(parameters, list):
+        raise KleanExportError("generated obligation map is malformed")
+    if not obligations:
+        return None
+    lines = ["def targetStatement"]
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanExportError("target parameter is malformed")
+        name = parameter.get("name")
+        lean_type = parameter.get("type")
+        if not isinstance(name, str) or not isinstance(lean_type, str):
+            raise KleanExportError("target parameter is malformed")
+        lines.append(f"    ({name} : {lean_type})")
+    conjuncts: list[str] = []
+    for obligation in obligations:
+        if not isinstance(obligation, dict):
+            raise KleanExportError("generated obligation is malformed")
+        conjunct = obligation.get("lean_conjunct")
+        if not isinstance(conjunct, str) or not conjunct:
+            raise KleanExportError("generated Lean conjunct is malformed")
+        conjuncts.append(f"({conjunct})")
+    lines.extend(("    : Prop :=", "    " + "\n    ∧ ".join(conjuncts)))
+    return "\n".join(lines)
+
+
+def _write_json(path: Path, document: dict[str, Any]) -> None:
+    path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+
+
+def _domain_source_rules(
+    validated: dict[str, Any],
+    discovery_manifest_sha256: str,
+) -> list[dict[str, Any]]:
+    inventory_sha256 = validated["inventory_sha256"]
+    return [
+        {
+            **rule,
+            "inventory_sha256": inventory_sha256,
+            "discovery_manifest_sha256": discovery_manifest_sha256,
+        }
+        for rule in validated["domain_lemmas"]
+    ]
+
+
+def _klean_source_rules(
+    domain_rules: list[dict[str, Any]],
+    line_offset: int,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "source_rule_id": rule["source_rule_id"],
+            "start_line": rule["start_line"] + line_offset,
+            "end_line": rule["end_line"] + line_offset,
+            "normalized_sha256": rule["normalized_sha256"],
+            "classification": "TRUST_OBLIGATION",
+        }
+        for rule in domain_rules
+    ]
+
+
+def _bind_obligation_provenance(
+    package: Path,
+    domain_rules: list[dict[str, Any]],
+    klean_rules: list[dict[str, Any]],
+) -> dict[str, Any]:
+    path = package / "obligation-map.json"
+    document = _regular_json(path)
+    obligations = document.get("obligations")
+    parameters = document.get("trust_parameters")
+    if not isinstance(obligations, list) or not isinstance(parameters, list):
+        raise KleanExportError("generated obligation map is malformed")
+    expected_ids = [rule["source_rule_id"] for rule in domain_rules]
+    observed_ids = [
+        obligation.get("source_rule_id")
+        if isinstance(obligation, dict)
+        else None
+        for obligation in obligations
+    ]
+    if observed_ids != expected_ids:
+        raise KleanExportError(
+            "validated DOMAIN_LEMMA records and generated obligations "
+            "are not bijective"
+        )
+    enriched: list[dict[str, Any]] = []
+    for obligation, rule, klean_rule in zip(
+        obligations, domain_rules, klean_rules, strict=True
+    ):
+        if obligation.get("source_span") != {
+            "start_line": klean_rule["start_line"],
+            "end_line": klean_rule["end_line"],
+        }:
+            raise KleanExportError(
+                "generated obligation source span differs from Stage 1"
+            )
+        enriched.append(
+            {
+                **obligation,
+                "source_span": {
+                    "start_line": rule["start_line"],
+                    "end_line": rule["end_line"],
+                },
+                "normalized_sha256": rule["normalized_sha256"],
+                "inventory_sha256": rule["inventory_sha256"],
+                "discovery_manifest_sha256": rule[
+                    "discovery_manifest_sha256"
+                ],
+            }
+        )
+    document = {
+        **document,
+        "schema_version": 3,
+        "source_rules": domain_rules,
+        "obligations": enriched,
+    }
+    _write_json(path, document)
+    return document
+
+
+Script done on 2026-07-31 07:54:38-05:00 [COMMAND_EXIT_CODE="0"]

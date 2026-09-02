@@ -1,0 +1,2 @@
+import Klean152Compare.Rewrite
+import Klean152Compare.Lemmas

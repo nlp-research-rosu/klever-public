@@ -1,0 +1,99 @@
++ nl -ba /reference/k-proof/semantic.k
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports BOOL-SYNTAX
+     4	  imports STRING-SYNTAX
+     5	
+     6	  // The source constructors emitted by py2mpy.py for this program.
+     7	  syntax Expr ::= "Int" "(" Int ")"
+     8	                | "Name" "(" String ")"
+     9	                | "BinOp" "(" String "," Expr "," Expr ")"
+    10	                | "Compare" "(" Expr "," CmpOp ")"
+    11	                | "BoolOp" "(" String "," Exprs ")"
+    12	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    13	  syntax Exprs ::= List{Expr, ","}
+    14	
+    15	  syntax Params ::= "Params" "(" Strings ")"
+    16	  syntax Strings ::= List{String, ","}
+    17	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    18	                | "Return" "(" Expr ")"
+    19	  syntax Stmts ::= List{Stmt, ""}
+    20	  syntax Program ::= "Module" "(" Stmts ")"
+    21	
+    22	  syntax Ints ::= List{Int, ","}
+    23	  syntax Arguments ::= "Args" "(" Ints ")"
+    24	  syntax Input ::= Program
+    25	                 | "run" "(" Program "," String "," Arguments ")"
+    26	endmodule
+    27	
+    28	module MPY
+    29	  imports MPY-SYNTAX
+    30	  imports DOMAINS
+    31	  imports MAP
+    32	
+    33	  syntax Value ::= "iVal" "(" Int ")" | "bVal" "(" Bool ")"
+    34	  syntax Result ::= "noResult" | "result" "(" Bool ")"
+    35	
+    36	  syntax KItem ::= "bind" "(" Strings "," Ints ")"
+    37	                 | "eval" "(" Expr ")"
+    38	                 | "binRight" "(" String "," Expr ")"
+    39	                 | "binApply" "(" String "," Int ")"
+    40	                 | "cmpRight" "(" String "," Expr ")"
+    41	                 | "cmpApply" "(" String "," Int ")"
+    42	                 | "boolTail" "(" String "," Exprs ")"
+    43	                 | "boolMerge" "(" String "," Bool "," Exprs ")"
+    44	                 | "publish"
+    45	
+    46	  configuration
+    47	    <mpy>
+    48	      <k> $PGM:Input </k>
+    49	      <env> .Map </env>
+    50	      <result> noResult </result>
+    51	    </mpy>
+    52	
+    53	  // A HumanEval file is a module containing one target definition. Reusing F
+    54	  // in both positions enforces that the requested entry point is that target.
+    55	  rule <k>
+    56	         run(Module(FuncDef(F, Params(PS), Return(E))), F, Args(IS))
+    57	         => bind(PS, IS) ~> eval(E) ~> publish
+    58	       </k>
+    59	
+    60	  rule <k> bind(.Strings, .Ints) => .K ... </k>
+    61	  rule <k> bind((P, PS), (I, IS)) => bind(PS, IS) ... </k>
+    62	       <env> R => R [ P <- I ] </env>
+    63	
+    64	  rule <k> eval(Int(I)) => iVal(I) ... </k>
+    65	  rule <k> eval(Name(X)) => iVal(I) ... </k>
+    66	       <env> ... X |-> I:Int ... </env>
+    67	
+    68	  rule <k> eval(BinOp(OP, L, R)) => eval(L) ~> binRight(OP, R) ... </k>
+    69	  rule <k> iVal(I) ~> binRight(OP, R) => eval(R) ~> binApply(OP, I) ... </k>
+    70	  rule <k> iVal(J) ~> binApply("+", I) => iVal(I +Int J) ... </k>
+    71	  rule <k> iVal(J) ~> binApply("*", I) => iVal(I *Int J) ... </k>
+    72	
+    73	  rule <k> eval(Compare(L, CmpOp(OP, R)))
+    74	           => eval(L) ~> cmpRight(OP, R) ...
+    75	       </k>
+    76	  rule <k> iVal(I) ~> cmpRight(OP, R) => eval(R) ~> cmpApply(OP, I) ... </k>
+    77	  rule <k> iVal(J) ~> cmpApply(">", I) => bVal(I >Int J) ... </k>
+    78	  rule <k> iVal(J) ~> cmpApply("==", I) => bVal(I ==Int J) ... </k>
+    79	
+    80	  // All operands in the translated program are booleans. Evaluating the full
+    81	  // list is observationally equivalent to Python short-circuiting here because
+    82	  // the expression language is pure.
+    83	  rule <k> eval(BoolOp(OP, E, ES)) => eval(E) ~> boolTail(OP, ES) ... </k>
+    84	  rule <k> bVal(B) ~> boolTail(_OP, .Exprs) => bVal(B) ... </k>
+    85	  rule <k> bVal(B) ~> boolTail(OP, E, ES)
+    86	           => eval(E) ~> boolMerge(OP, B, ES) ...
+    87	       </k>
+    88	  rule <k> bVal(C) ~> boolMerge("and", B, ES)
+    89	           => bVal(B andBool C) ~> boolTail("and", ES) ...
+    90	       </k>
+    91	  rule <k> bVal(C) ~> boolMerge("or", B, ES)
+    92	           => bVal(B orBool C) ~> boolTail("or", ES) ...
+    93	       </k>
+    94	
+    95	  rule <k> bVal(B) ~> publish => .K </k>
+    96	       <env> _ => .Map </env>
+    97	       <result> noResult => result(B) </result>
+    98	endmodule

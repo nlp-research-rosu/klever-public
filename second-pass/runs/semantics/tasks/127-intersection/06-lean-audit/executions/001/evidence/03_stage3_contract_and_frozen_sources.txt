@@ -1,0 +1,451 @@
+Script started on 2026-07-28 18:23:23-05:00 [<not executed on terminal>]
+COMMAND: inspect trusted Stage 3 trust-boundary validator
+#!/usr/bin/env python3
+"""Validate Stage 3 classifications against the canonical K rule inventory."""
+
+from __future__ import annotations
+
+import json
+import stat
+from pathlib import Path
+from typing import Any
+
+from tools.k_rule_inventory import KRuleInventoryError, inventory_verification
+
+
+_MANIFEST_KEYS = {"schema_version", "inventory_sha256", "rules"}
+_RULE_KEYS = {"source_rule_id", "classification", "rationale"}
+_CLASSIFICATIONS = {
+    "DEFINITION",
+    "OPERATIONAL_RULE",
+    "PROVED_DERIVED_LEMMA",
+    "DOMAIN_LEMMA",
+}
+
+
+class LemmaDiscoveryContractError(RuntimeError):
+    """Raised when a Stage 3 manifest crosses its trust boundary."""
+
+
+def _regular_json(path: Path) -> dict[str, Any]:
+    path = Path(path)
+    try:
+        mode = path.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest must be a regular file: {path}"
+        ) from error
+    if not stat.S_ISREG(mode):
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest must be a regular file: {path}"
+        )
+    try:
+        document = json.loads(path.read_bytes())
+    except (OSError, UnicodeError, ValueError) as error:
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest is malformed: {path}"
+        ) from error
+    if not isinstance(document, dict):
+        raise LemmaDiscoveryContractError(
+            "lemma discovery manifest must be a JSON object"
+        )
+    return document
+
+
+def _exact_keys(
+    document: dict[str, Any], expected: set[str], label: str
+) -> None:
+    unexpected = sorted(set(document) - expected)
+    if unexpected:
+        raise LemmaDiscoveryContractError(
+            f"{label} has unexpected key: {unexpected[0]}"
+        )
+    missing = sorted(expected - set(document))
+    if missing:
+        raise LemmaDiscoveryContractError(
+            f"{label} is missing key: {missing[0]}"
+        )
+
+
+def validate_trust_boundary(
+    workspace: Path, manifest: Path
+) -> dict[str, Any]:
+    try:
+        inventory = inventory_verification(Path(workspace))
+    except KRuleInventoryError as error:
+        raise LemmaDiscoveryContractError(str(error)) from error
+    document = _regular_json(Path(manifest))
+    _exact_keys(document, _MANIFEST_KEYS, "lemma discovery manifest")
+    schema_version = document["schema_version"]
+    if (
+        not isinstance(schema_version, int)
+        or isinstance(schema_version, bool)
+        or schema_version != 2
+    ):
+        raise LemmaDiscoveryContractError(
+            "lemma discovery schema_version must be 2"
+        )
+    if document["inventory_sha256"] != inventory["inventory_sha256"]:
+        raise LemmaDiscoveryContractError(
+            "lemma discovery inventory_sha256 does not match canonical inventory"
+        )
+    entries = document["rules"]
+    if not isinstance(entries, list):
+        raise LemmaDiscoveryContractError(
+            "lemma discovery rules must be a JSON list"
+        )
+    canonical_rules = inventory["rules"]
+    canonical_by_id = {
+        rule["source_rule_id"]: rule for rule in canonical_rules
+    }
+    classified_by_id: dict[str, dict[str, str]] = {}
+    for index, entry in enumerate(entries):
+        label = f"lemma discovery rule {index}"
+        if not isinstance(entry, dict):
+            raise LemmaDiscoveryContractError(f"{label} must be an object")
+        _exact_keys(entry, _RULE_KEYS, label)
+        source_rule_id = entry["source_rule_id"]
+        if not isinstance(source_rule_id, str) or not source_rule_id:
+            raise LemmaDiscoveryContractError(
+                f"{label} source_rule_id must be a nonempty string"
+            )
+        if source_rule_id in classified_by_id:
+            raise LemmaDiscoveryContractError(
+                f"duplicate lemma discovery source_rule_id: {source_rule_id}"
+            )
+        if source_rule_id not in canonical_by_id:
+            raise LemmaDiscoveryContractError(
+                f"unknown lemma discovery source_rule_id: {source_rule_id}"
+            )
+        classification = entry["classification"]
+        if (
+            not isinstance(classification, str)
+            or classification not in _CLASSIFICATIONS
+        ):
+            raise LemmaDiscoveryContractError(
+                f"{label} classification must be DEFINITION, "
+                "OPERATIONAL_RULE, PROVED_DERIVED_LEMMA, or DOMAIN_LEMMA"
+            )
+        canonical_rule = canonical_by_id[source_rule_id]
+        if (
+            "simplification" in canonical_rule["attributes"]
+            and classification
+            in {"OPERATIONAL_RULE", "PROVED_DERIVED_LEMMA"}
+        ):
+            raise LemmaDiscoveryContractError(
+                f"{label} simplification rule must be classified as "
+                "DEFINITION or DOMAIN_LEMMA"
+            )
+        rationale = entry["rationale"]
+        if not isinstance(rationale, str) or not rationale.strip():
+            raise LemmaDiscoveryContractError(
+                f"{label} rationale must be a nonempty string"
+            )
+        classified_by_id[source_rule_id] = {
+            "classification": classification,
+            "rationale": rationale,
+        }
+    missing = [
+        rule["source_rule_id"]
+        for rule in canonical_rules
+        if rule["source_rule_id"] not in classified_by_id
+    ]
+    if missing:
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest is missing source_rule_id: {missing[0]}"
+        )
+    definitions: list[dict[str, Any]] = []
+    operational_rules: list[dict[str, Any]] = []
+    proved_derived_lemmas: list[dict[str, Any]] = []
+    domain_lemmas: list[dict[str, Any]] = []
+    for rule in canonical_rules:
+        classification = classified_by_id[rule["source_rule_id"]]
+        classified_rule = {**rule, **classification}
+        role = classification["classification"]
+        if role == "DEFINITION":
+            definitions.append(classified_rule)
+        elif role == "OPERATIONAL_RULE":
+            operational_rules.append(classified_rule)
+        elif role == "PROVED_DERIVED_LEMMA":
+            proved_derived_lemmas.append(classified_rule)
+        else:
+            domain_lemmas.append(classified_rule)
+    return {
+        **inventory,
+        "definitions": definitions,
+        "operational_rules": operational_rules,
+        "proved_derived_lemmas": proved_derived_lemmas,
+        "domain_lemmas": domain_lemmas,
+    }
+
+[verification.k]
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION-BASE
+     4	  imports MPY
+     5	
+     6	  // The generic Map update leaves a symbolic tombstone after a call frame is
+     7	  // popped.  This proof-only normalization states the corresponding concrete
+     8	  // map fact: removing a known binding reveals the disjoint remainder.
+     9	  rule (1 |-> _FRAME:Scope REST:Map) [1 <- undef] => REST
+    10	    requires notBool (1 in_keys(REST))
+    11	
+    12	  // These are the exact statement lists emitted in solution.mpy.  Naming the
+    13	  // lists keeps the reachability claims readable; the equations below expand
+    14	  // to ordinary MPY syntax before execution.
+    15	  syntax Stmts ::= "intersectionBody" [function]
+    16	  rule intersectionBody =>
+    17	    Assign(Name("left"),
+    18	           Call(Name("max"),
+    19	                Subscript(Name("interval1"), Int(0)),
+    20	                Subscript(Name("interval2"), Int(0)),
+    21	                .Exprs))
+    22	    Assign(Name("right"),
+    23	           Call(Name("min"),
+    24	                Subscript(Name("interval1"), Int(1)),
+    25	                Subscript(Name("interval2"), Int(1)),
+    26	                .Exprs))
+    27	    Assign(Name("length"), BinOp("-", Name("right"), Name("left")))
+    28	    If(Compare(Name("length"), CmpOp("<=", Int(1))),
+    29	       Return(Str("NO")) .Stmts,
+    30	       .Stmts)
+    31	    Assign(Name("divisor"), Int(2))
+    32	    For(Name("divisor"), Call(Name("range"),
+    33	                              Int(2), Name("length"), .Exprs),
+    34	        divisorBody)
+    35	    Return(Str("YES")) .Stmts
+    36	
+    37	  syntax Stmts ::= "divisorBody" [function]
+    38	  rule divisorBody =>
+    39	    If(Compare(BinOp("%", Name("length"), Name("divisor")),
+    40	               CmpOp("==", Int(0))),
+    41	       Return(Str("NO")) .Stmts,
+    42	       .Stmts)
+    43	    .Stmts
+    44	
+    45	  // ASCII encodings of the two observable answers.
+    46	  syntax Val ::= "yesV" [function]
+    47	               | "noV"  [function]
+    48	  rule yesV => str(iCons(89, iCons(69, iCons(83, .IntSeq))))
+    49	  rule noV  => str(iCons(78, iCons(79, .IntSeq)))
+    50	
+    51	  // A mathematical primality oracle by exhaustive divisor search.
+    52	  // primeFrom(N,D) checks exactly the candidate divisors D .. N-1.
+    53	  syntax Val ::= primeFrom(Int, Int) [function]
+    54	               | primeResult(Int)   [function]
+    55	  rule primeFrom(N:Int, D:Int) => yesV
+    56	    requires D >=Int N
+    57	  rule primeFrom(N:Int, D:Int) => noV
+    58	    requires D <Int N andBool pyMod(N, D) ==Int 0
+    59	  rule primeFrom(N:Int, D:Int) => primeFrom(N, D +Int 1)
+    60	    requires D <Int N andBool pyMod(N, D) =/=Int 0
+    61	
+    62	  rule primeResult(N:Int) => noV
+    63	    requires N <=Int 1
+    64	  rule primeResult(N:Int) => primeFrom(N, 2)
+    65	    requires N >Int 1
+    66	
+    67	  syntax Int ::= overlapLength(Int, Int, Int, Int) [function]
+    68	  rule overlapLength(A:Int, B:Int, C:Int, D:Int)
+    69	    => minInt(B, D) -Int maxInt(A, C)
+    70	endmodule
+    71	
+    72	module VERIFICATION
+    73	  imports VERIFICATION-BASE
+    74	
+    75	  // This is exactly the loop-correct claim in LOOP-SPEC.  The proof workflow
+    76	  // first proves that claim against VERIFICATION-BASE, then installs the
+    77	  // proved result here as a modular summary for the whole-function theorem.
+    78	  rule
+    79	    <k> #loop(rangeObj(DIVISOR:Int, LENGTH:Int, 1),
+    80	              Name("divisor"),
+    81	              If(Compare(BinOp("%", Name("length"), Name("divisor")),
+    82	                         CmpOp("==", Int(0))),
+    83	                 Return(Str("NO")) .Stmts,
+    84	                 .Stmts)
+    85	              .Stmts)
+    86	        ~> (Return(Str("YES")) .Stmts) ~> #endcall
+    87	      => primeFrom(LENGTH, DIVISOR) ~> KONT:K
+    88	    </k>
+    89	    <env> 1 => 0 </env>
+    90	    <scopes>
+    91	      SC:Map
+    92	      1 |-> scope(
+    93	        "interval1" |-> _INTERVAL1:Val
+    94	        "interval2" |-> _INTERVAL2:Val
+    95	        "left"      |-> _LEFT:Int
+    96	        "right"     |-> _RIGHT:Int
+    97	        "length"    |-> LENGTH
+    98	        "divisor"   |-> _OLD:Int,
+    99	        parent(0))
+   100	      => SC
+   101	    </scopes>
+   102	    <scopeLoc> 2 => 1 </scopeLoc>
+   103	    <stack> ListItem(frame(KONT, 0, 1)) => .List </stack>
+   104	    <ret> noRet </ret>
+   105	    requires 2 <=Int DIVISOR andBool DIVISOR <=Int LENGTH
+   106	    [priority(40)]
+   107	endmodule
+
+[prove.sh]
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Regenerate every translated artifact from its Python source.
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	python3 py2mpy.py concrete-tests.py > concrete-tests.mpy
+     7	
+     8	# Ensure the concrete harness executes exactly the delivered implementation.
+     9	python3 - <<'PY'
+    10	import ast
+    11	from pathlib import Path
+    12	
+    13	solution_tree = ast.parse(Path("solution.py").read_text())
+    14	tests_tree = ast.parse(Path("concrete-tests.py").read_text())
+    15	assert ast.dump(solution_tree.body[0]) == ast.dump(tests_tree.body[0])
+    16	PY
+    17	
+    18	# Concrete execution uses the required LLVM main and syntax modules.
+    19	kompile reference-semantics/semantics.k \
+    20	  --backend llvm \
+    21	  --main-module MPY-KRUN \
+    22	  --syntax-module MPY-SYNTAX \
+    23	  --output-definition runtime-kompiled
+    24	krun concrete-tests.mpy \
+    25	  --definition runtime-kompiled \
+    26	  --output pretty
+    27	
+    28	# First prove the recursive loop invariant directly against the supplied MPY
+    29	# semantics plus proof-only mathematical definitions.
+    30	kompile verification.k \
+    31	  --backend haskell \
+    32	  --main-module VERIFICATION-BASE \
+    33	  --syntax-module MPY-SYNTAX \
+    34	  --output-definition verification-base-kompiled
+    35	kprove spec.k \
+    36	  --definition verification-base-kompiled \
+    37	  --spec-module LOOP-SPEC \
+    38	  --claims loop-correct \
+    39	  --output pretty
+    40	
+    41	# Then install precisely that proved invariant as a modular summary and prove
+    42	# the universally quantified end-to-end function contract.
+    43	kompile verification.k \
+    44	  --backend haskell \
+    45	  --main-module VERIFICATION \
+    46	  --syntax-module MPY-SYNTAX \
+    47	  --output-definition verification-kompiled
+    48	kprove spec.k \
+    49	  --definition verification-kompiled \
+    50	  --spec-module SPEC \
+    51	  --claims intersection-correct \
+    52	  --output pretty
+
+[spec.k]
+     1	requires "verification.k"
+     2	
+     3	module LOOP-SPEC
+     4	  imports VERIFICATION-BASE
+     5	
+     6	  // Loop invariant / total-correctness lemma.  Starting at candidate DIVISOR,
+     7	  // the remaining MPY loop returns the same answer as primeFrom.
+     8	  claim
+     9	    <k> #loop(rangeObj(DIVISOR:Int, LENGTH:Int, 1),
+    10	              Name("divisor"), divisorBody)
+    11	        ~> (Return(Str("YES")) .Stmts) ~> #endcall
+    12	      => primeFrom(LENGTH, DIVISOR) ~> KONT:K
+    13	    </k>
+    14	    <env> 1 => 0 </env>
+    15	    <scopes>
+    16	      SC:Map
+    17	       1 |-> scope(
+    18	         "interval1" |-> INTERVAL1:Val
+    19	         "interval2" |-> INTERVAL2:Val
+    20	         "left"      |-> LEFT:Int
+    21	         "right"     |-> RIGHT:Int
+    22	         "length"    |-> LENGTH
+    23	         "divisor"   |-> OLD:Int,
+    24	         parent(0))
+    25	      => SC
+    26	    </scopes>
+    27	    <scopeLoc> 2 => 1 </scopeLoc>
+    28	    <stack> ListItem(frame(KONT, 0, 1)) => .List </stack>
+    29	    <ret> noRet </ret>
+    30	    requires 2 <=Int DIVISOR andBool DIVISOR <=Int LENGTH
+    31	    [label(loop-correct)]
+    32	
+    33	endmodule
+    34	
+    35	module SPEC
+    36	  imports VERIFICATION
+    37	
+    38	  // The complete, universally quantified function contract.  A..B and C..D
+    39	  // are valid closed intervals.  The result is YES exactly when
+    40	  // min(B,D)-max(A,C) is prime according to the divisor definition above.
+    41	  claim
+    42	    <k> Call(Name("intersection"),
+    43	             TupleExpr(Int(A:Int), Int(B:Int), .Exprs),
+    44	             TupleExpr(Int(C:Int), Int(D:Int), .Exprs),
+    45	             .Exprs)
+    46	      => primeResult(overlapLength(A, B, C, D))
+    47	    </k>
+    48	    <env> 0 </env>
+    49	    <scopes>
+    50	      0 |-> scope(
+    51	        "intersection" |->
+    52	          closureVal(("interval1", "interval2", .ParamNames),
+    53	                     intersectionBody, 0),
+    54	        parent(-1))
+    55	      -1 |-> builtinsScope
+    56	    </scopes>
+    57	    <scopeLoc> 1 </scopeLoc>
+    58	    <heap> .Map </heap>
+    59	    <heapLoc> 0 </heapLoc>
+    60	    <stack> .List </stack>
+    61	    <ret> noRet </ret>
+    62	    <exc> NoExc </exc>
+    63	    <exit-code> 0 </exit-code>
+    64	    requires A <=Int B andBool C <=Int D
+    65	    [label(intersection-correct)]
+    66	endmodule
+
+[solution.py]
+     1	def intersection(interval1, interval2):
+     2	    left = max(interval1[0], interval2[0])
+     3	    right = min(interval1[1], interval2[1])
+     4	
+     5	    length = right - left
+     6	    if length <= 1:
+     7	        return "NO"
+     8	
+     9	    divisor = 2
+    10	    for divisor in range(2, length):
+    11	        if length % divisor == 0:
+    12	            return "NO"
+    13	
+    14	    return "YES"
+
+[prompt.py]
+     1	
+     2	def intersection(interval1, interval2):
+     3	    """You are given two intervals,
+     4	    where each interval is a pair of integers. For example, interval = (start, end) = (1, 2).
+     5	    The given intervals are closed which means that the interval (start, end)
+     6	    includes both start and end.
+     7	    For each given interval, it is assumed that its start is less or equal its end.
+     8	    Your task is to determine whether the length of intersection of these two 
+     9	    intervals is a prime number.
+    10	    Example, the intersection of the intervals (1, 3), (2, 4) is (2, 3)
+    11	    which its length is 1, which not a prime number.
+    12	    If the length of the intersection is a prime number, return "YES",
+    13	    otherwise, return "NO".
+    14	    If the two intervals don't intersect, return "NO".
+    15	
+    16	
+    17	    [input/output] samples:
+    18	    intersection((1, 2), (2, 3)) ==> "NO"
+    19	    intersection((-1, 1), (0, 4)) ==> "NO"
+    20	    intersection((-3, -1), (-5, 5)) ==> "YES"
+    21	    """
+
+Script done on 2026-07-28 18:23:23-05:00 [COMMAND_EXIT_CODE="0"]

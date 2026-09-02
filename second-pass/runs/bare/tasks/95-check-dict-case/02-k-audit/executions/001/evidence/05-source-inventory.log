@@ -1,0 +1,484 @@
+COMMAND: /audit-output/evidence/source_inventory.sh
+===== semantic.k (numbered source) =====
+     1	// A small, task-oriented executable semantics for the exact constructor
+     2	// language emitted by py2mpy.py.  The semantics below is not a translation of
+     3	// the answer: it evaluates names, assignment, conditionals, for loops,
+     4	// returns, Boolean operations, calls, dictionaries, and Python's relevant
+     5	// string predicates.
+     6	
+     7	module MPY-SYNTAX
+     8	  imports BOOL-SYNTAX
+     9	  imports INT-SYNTAX
+    10	  imports STRING-SYNTAX
+    11	
+    12	  syntax PyStmt  ::= "Module" "(" PyStmts ")"
+    13	                   | "FuncDef" "(" String "," Params "," PyStmts ")"
+    14	                   | "Assign" "(" PyExpr "," PyExpr ")"
+    15	                   | "If" "(" PyExpr "," PyStmts "," PyStmts ")"
+    16	                   | "If" "(" PyExpr "," PyStmts "," ")" [symbol(IfNoElse)]
+    17	                   | "For" "(" PyExpr "," PyExpr "," PyStmts ")"
+    18	                   | "Return" "(" PyExpr ")"
+    19	  syntax PyStmts ::= PyStmt
+    20	                   | PyStmt PyStmts
+    21	
+    22	  syntax Params   ::= "Params" "(" Strings ")"
+    23	  syntax Strings  ::= NeList{String, ","}
+    24	
+    25	  syntax PyExpr   ::= "Name" "(" String ")"
+    26	                   | "Bool" "(" Bool ")"
+    27	                   | "UnaryOp" "(" String "," PyExpr ")"
+    28	                   | "BoolOp" "(" String "," PyExprs ")"
+    29	                   | "Call" "(" PyExpr "," PyExprs ")"
+    30	                   | "Call" "(" PyExpr "," ")" [symbol(CallNoArgs)]
+    31	                   | "Attribute" "(" PyExpr "," String ")"
+    32	  syntax PyExprs  ::= NeList{PyExpr, ","}
+    33	endmodule
+    34	
+    35	module MPY-VALUES
+    36	  imports BOOL
+    37	  imports INT
+    38	  imports STRING
+    39	
+    40	  // DictVal records dictionary keys in iteration order.  Values are omitted
+    41	  // because this task never observes them.  Repeated keys are harmless for
+    42	  // the property, while a real Python dictionary presents only the last one.
+    43	  syntax Value  ::= "NoneVal"
+    44	                  | "BoolVal" "(" Bool ")"
+    45	                  | "StrVal" "(" String ")"
+    46	                  | "IntVal" "(" Int ")"
+    47	                  | "DictVal" "(" ")" [symbol(EmptyDictVal)]
+    48	                  | "DictVal" "(" Values ")"
+    49	  syntax Values ::= Value
+    50	                  | Value Values
+    51	endmodule
+    52	
+    53	module MPY
+    54	  imports MPY-SYNTAX
+    55	  imports MPY-VALUES
+    56	  imports MAP
+    57	
+    58	  configuration
+    59	    <task>
+    60	      <k> $PGM:PyStmt </k>
+    61	      <input> $INPUT:Value </input>
+    62	      <env> .Map </env>
+    63	      <result> NoneVal </result>
+    64	    </task>
+    65	
+    66	  // Enter the requested top-level function with one fresh local frame.
+    67	  rule <k> Module(FuncDef("check_dict_case", Params("dict"), BODY))
+    68	        => BODY ...</k>
+    69	       <input> ARG </input>
+    70	       <env> .Map => "dict" |-> ARG </env>
+    71	
+    72	  // Statement-list scheduling.
+    73	  rule <k> (S:PyStmt REST:PyStmts) => S ~> REST ...</k>
+    74	
+    75	  syntax KItem ::= eval(PyExpr)
+    76	                 | assignTo(String)
+    77	                 | choose(PyStmts, PyStmts)
+    78	                 | chooseNoElse(PyStmts)
+    79	                 | startFor(String, PyStmts)
+    80	                 | loop(String, Values, PyStmts)
+    81	                 | bind(String, Value)
+    82	                 | "logicalNot"
+    83	                 | logicalOr(PyExpr)
+    84	                 | "returnValue"
+    85	
+    86	  // Statements evaluate their subexpressions before applying effects.
+    87	  rule <k> Assign(Name(X), E) => eval(E) ~> assignTo(X) ...</k>
+    88	  rule <k> V:Value ~> assignTo(X) => .K ...</k>
+    89	       <env> ENV => ENV [ X <- V ] </env>
+    90	
+    91	  rule <k> If(COND, THEN, ELSE) => eval(COND) ~> choose(THEN, ELSE) ...</k>
+    92	  rule <k> BoolVal(true)  ~> choose(THEN, _) => THEN ...</k>
+    93	  rule <k> BoolVal(false) ~> choose(_, ELSE) => ELSE ...</k>
+    94	  rule <k> If(COND, THEN, ) => eval(COND) ~> chooseNoElse(THEN) ...</k>
+    95	  rule <k> BoolVal(true)  ~> chooseNoElse(THEN) => THEN ...</k>
+    96	  rule <k> BoolVal(false) ~> chooseNoElse(_) => .K ...</k>
+    97	
+    98	  rule <k> For(Name(X), ITER, BODY) => eval(ITER) ~> startFor(X, BODY) ...</k>
+    99	  rule <k> DictVal() ~> startFor(_, _) => .K ...</k>
+   100	  rule <k> DictVal(KEYS) ~> startFor(X, BODY) => loop(X, KEYS, BODY) ...</k>
+   101	  rule <k> loop(X, (V:Value VS:Values), BODY)
+   102	        => bind(X, V) ~> BODY ~> loop(X, VS, BODY) ...</k>
+   103	  rule <k> loop(X, V:Value, BODY) => bind(X, V) ~> BODY ...</k>
+   104	  rule <k> bind(X, V) => .K ...</k>
+   105	       <env> ENV => ENV [ X <- V ] </env>
+   106	
+   107	  rule <k> Return(E) => eval(E) ~> returnValue ...</k>
+   108	  rule <k> V:Value ~> returnValue ~> _REST => .K </k>
+   109	       <env> _ => .Map </env>
+   110	       <result> _ => V </result>
+   111	
+   112	  // Literal and local-name expression evaluation.
+   113	  rule <k> eval(Bool(B)) => BoolVal(B) ...</k>
+   114	  rule <k> eval(Name(X)) => V ...</k>
+   115	       <env>... X |-> V ...</env>
+   116	
+   117	  // Python truthiness needed by `not dict`, plus ordinary Boolean negation.
+   118	  rule <k> eval(UnaryOp("not", E)) => eval(E) ~> logicalNot ...</k>
+   119	  rule <k> BoolVal(B) ~> logicalNot => BoolVal(notBool B) ...</k>
+   120	  rule <k> DictVal() ~> logicalNot => BoolVal(true) ...</k>
+   121	  rule <k> DictVal(_V:Value _VS:Values) ~> logicalNot => BoolVal(false) ...</k>
+   122	  rule <k> DictVal(_V:Value) ~> logicalNot => BoolVal(false) ...</k>
+   123	
+   124	  // The solution has a two-operand `or`; this is short-circuit evaluation.
+   125	  rule <k> eval(BoolOp("or", E1, E2)) => eval(E1) ~> logicalOr(E2) ...</k>
+   126	  rule <k> BoolVal(true) ~> logicalOr(_) => BoolVal(true) ...</k>
+   127	  rule <k> BoolVal(false) ~> logicalOr(E) => eval(E) ...</k>
+   128	
+   129	  // Built-in calls used by the source program.  Directly reading the receiver
+   130	  // from the environment preserves the evaluation behavior of these pure,
+   131	  // zero-argument string methods.
+   132	  rule <k> eval(Call(Name("isinstance"), Name(X), Name("str")))
+   133	        => BoolVal(pyIsString(V)) ...</k>
+   134	       <env>... X |-> V ...</env>
+   135	
+   136	  rule <k> eval(Call(Attribute(Name(X), "islower"), ))
+   137	        => BoolVal(pyIsLower(V)) ...</k>
+   138	       <env>... X |-> V ...</env>
+   139	  rule <k> eval(Call(Attribute(Name(X), "isupper"), ))
+   140	        => BoolVal(pyIsUpper(V)) ...</k>
+   141	       <env>... X |-> V ...</env>
+   142	
+   143	  syntax Bool ::= pyIsString(Value) [function, total]
+   144	  rule pyIsString(StrVal(_)) => true
+   145	  rule pyIsString(IntVal(_)) => false
+   146	  rule pyIsString(BoolVal(_)) => false
+   147	  rule pyIsString(DictVal(_)) => false
+   148	  rule pyIsString(DictVal()) => false
+   149	  rule pyIsString(NoneVal) => false
+   150	
+   151	  // CPython's islower/isupper criterion is: at least one cased character and
+   152	  // every cased character has the requested case.  The proof model classifies
+   153	  // ASCII letters explicitly; all other code points are uncased.  This is the
+   154	  // relevant string domain for the HumanEval prompt and avoids K's deprecated
+   155	  // STRING.category hook, which is unavailable to the proof backend.
+   156	  syntax Bool ::= pyIsLower(Value) [function]
+   157	                | pyIsUpper(Value) [function]
+   158	                | lowerScan(String, Int, Bool) [function]
+   159	                | upperScan(String, Int, Bool) [function]
+   160	
+   161	  rule pyIsLower(StrVal(S)) => lowerScan(S, 0, false)
+   162	  rule pyIsUpper(StrVal(S)) => upperScan(S, 0, false)
+   163	
+   164	  rule lowerScan(S, I, SEEN) => SEEN
+   165	    requires I >=Int lengthString(S)
+   166	  rule lowerScan(S, I, _) => false
+   167	    requires I <Int lengthString(S)
+   168	     andBool ordChar(substrString(S, I, I +Int 1)) >=Int 65
+   169	     andBool ordChar(substrString(S, I, I +Int 1)) <=Int 90
+   170	  rule lowerScan(S, I, _) => lowerScan(S, I +Int 1, true)
+   171	    requires I <Int lengthString(S)
+   172	     andBool ordChar(substrString(S, I, I +Int 1)) >=Int 97
+   173	     andBool ordChar(substrString(S, I, I +Int 1)) <=Int 122
+   174	  rule lowerScan(S, I, SEEN) => lowerScan(S, I +Int 1, SEEN)
+   175	    requires I <Int lengthString(S)
+   176	     andBool (ordChar(substrString(S, I, I +Int 1)) <Int 65
+   177	       orBool ordChar(substrString(S, I, I +Int 1)) >Int 122
+   178	       orBool (ordChar(substrString(S, I, I +Int 1)) >Int 90
+   179	         andBool ordChar(substrString(S, I, I +Int 1)) <Int 97))
+   180	
+   181	  rule upperScan(S, I, SEEN) => SEEN
+   182	    requires I >=Int lengthString(S)
+   183	  rule upperScan(S, I, _) => false
+   184	    requires I <Int lengthString(S)
+   185	     andBool ordChar(substrString(S, I, I +Int 1)) >=Int 97
+   186	     andBool ordChar(substrString(S, I, I +Int 1)) <=Int 122
+   187	  rule upperScan(S, I, _) => upperScan(S, I +Int 1, true)
+   188	    requires I <Int lengthString(S)
+   189	     andBool ordChar(substrString(S, I, I +Int 1)) >=Int 65
+   190	     andBool ordChar(substrString(S, I, I +Int 1)) <=Int 90
+   191	  rule upperScan(S, I, SEEN) => upperScan(S, I +Int 1, SEEN)
+   192	    requires I <Int lengthString(S)
+   193	     andBool (ordChar(substrString(S, I, I +Int 1)) <Int 65
+   194	       orBool ordChar(substrString(S, I, I +Int 1)) >Int 122
+   195	       orBool (ordChar(substrString(S, I, I +Int 1)) >Int 90
+   196	         andBool ordChar(substrString(S, I, I +Int 1)) <Int 97))
+   197	endmodule
+===== program.k (numbered source) =====
+     1	requires "semantic.k"
+     2	
+     3	module SOLUTION-PROGRAM
+     4	  imports MPY-SYNTAX
+     5	
+     6	  syntax PyStmt ::= "solutionProgram" [function]
+     7	  rule solutionProgram => Module(
+     8	    FuncDef("check_dict_case", Params("dict"),
+     9	      If(UnaryOp("not", Name("dict")),
+    10	        Return(Bool(false)),
+    11	        )
+    12	      Assign(Name("lower"), Bool(true))
+    13	      Assign(Name("upper"), Bool(true))
+    14	      For(Name("key"), Name("dict"),
+    15	        If(UnaryOp("not", Call(Name("isinstance"), Name("key"), Name("str"))),
+    16	          Return(Bool(false)),
+    17	          )
+    18	        If(UnaryOp("not", Call(Attribute(Name("key"), "islower"), )),
+    19	          Assign(Name("lower"), Bool(false)),
+    20	          )
+    21	        If(UnaryOp("not", Call(Attribute(Name("key"), "isupper"), )),
+    22	          Assign(Name("upper"), Bool(false)),
+    23	          ))
+    24	      Return(BoolOp("or", Name("lower"), Name("upper")))))
+    25	endmodule
+===== verification.k (numbered source) =====
+     1	requires "semantic.k"
+     2	requires "program.k"
+     3	
+     4	module VERIFICATION
+     5	  imports MPY
+     6	  imports SOLUTION-PROGRAM
+     7	
+     8	  // Independent, declarative reading of the prompt.  The implementation is
+     9	  // correct exactly when its result agrees with contract(INPUT).
+    10	  syntax Bool ::= contract(Value) [function]
+    11	                | allStringKeys(Values) [function]
+    12	                | allLowerKeys(Values) [function]
+    13	                | allUpperKeys(Values) [function]
+    14	                | lowerKey(Value) [function, total]
+    15	                | upperKey(Value) [function, total]
+    16	
+    17	  rule contract(DictVal()) => false
+    18	  rule contract(DictVal(KEYS))
+    19	    => allStringKeys(KEYS)
+    20	       andBool (allLowerKeys(KEYS) orBool allUpperKeys(KEYS))
+    21	
+    22	  rule allStringKeys(V:Value VS:Values)
+    23	    => pyIsString(V) andBool allStringKeys(VS)
+    24	  rule allStringKeys(V:Value) => pyIsString(V)
+    25	
+    26	  rule allLowerKeys(V:Value VS:Values)
+    27	    => lowerKey(V) andBool allLowerKeys(VS)
+    28	  rule allLowerKeys(V:Value) => lowerKey(V)
+    29	
+    30	  rule allUpperKeys(V:Value VS:Values)
+    31	    => upperKey(V) andBool allUpperKeys(VS)
+    32	  rule allUpperKeys(V:Value) => upperKey(V)
+    33	
+    34	  rule lowerKey(StrVal(S)) => pyIsLower(StrVal(S))
+    35	  rule lowerKey(IntVal(_)) => false
+    36	  rule lowerKey(BoolVal(_)) => false
+    37	  rule lowerKey(DictVal(_)) => false
+    38	  rule lowerKey(DictVal()) => false
+    39	  rule lowerKey(NoneVal) => false
+    40	
+    41	  rule upperKey(StrVal(S)) => pyIsUpper(StrVal(S))
+    42	  rule upperKey(IntVal(_)) => false
+    43	  rule upperKey(BoolVal(_)) => false
+    44	  rule upperKey(DictVal(_)) => false
+    45	  rule upperKey(DictVal()) => false
+    46	  rule upperKey(NoneVal) => false
+    47	endmodule
+===== spec.k (numbered source) =====
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // The six aggregate partitions below are exhaustive for the contract:
+     7	  // empty; non-string; all-lower; all-upper; mixed lower/upper; and a string
+     8	  // that is neither lower nor upper.  Further claims instantiate every prompt
+     9	  // example and exercise uncased characters.
+    10	
+    11	  claim
+    12	    <task>
+    13	      <k> solutionProgram => .K </k>
+    14	      <input> DictVal() </input>
+    15	      <env> .Map </env>
+    16	      <result> NoneVal => BoolVal(contract(DictVal())) </result>
+    17	    </task>
+    18	
+    19	  claim
+    20	    <task>
+    21	      <k> solutionProgram => .K </k>
+    22	      <input> DictVal(StrVal("a") StrVal("b")) </input>
+    23	      <env> .Map </env>
+    24	      <result> NoneVal => BoolVal(contract(DictVal(StrVal("a") StrVal("b")))) </result>
+    25	    </task>
+    26	
+    27	  claim
+    28	    <task>
+    29	      <k> solutionProgram => .K </k>
+    30	      <input> DictVal(StrVal("a") StrVal("A") StrVal("B")) </input>
+    31	      <env> .Map </env>
+    32	      <result> NoneVal => BoolVal(contract(DictVal(StrVal("a") StrVal("A") StrVal("B")))) </result>
+    33	    </task>
+    34	
+    35	  claim
+    36	    <task>
+    37	      <k> solutionProgram => .K </k>
+    38	      <input> DictVal(StrVal("a") IntVal(8)) </input>
+    39	      <env> .Map </env>
+    40	      <result> NoneVal => BoolVal(contract(DictVal(StrVal("a") IntVal(8)))) </result>
+    41	    </task>
+    42	
+    43	  claim
+    44	    <task>
+    45	      <k> solutionProgram => .K </k>
+    46	      <input> DictVal(StrVal("Name") StrVal("Age") StrVal("City")) </input>
+    47	      <env> .Map </env>
+    48	      <result> NoneVal => BoolVal(contract(DictVal(StrVal("Name") StrVal("Age") StrVal("City")))) </result>
+    49	    </task>
+    50	
+    51	  claim
+    52	    <task>
+    53	      <k> solutionProgram => .K </k>
+    54	      <input> DictVal(StrVal("STATE") StrVal("ZIP")) </input>
+    55	      <env> .Map </env>
+    56	      <result> NoneVal => BoolVal(contract(DictVal(StrVal("STATE") StrVal("ZIP")))) </result>
+    57	    </task>
+    58	
+    59	  claim
+    60	    <task>
+    61	      <k> solutionProgram => .K </k>
+    62	      <input> DictVal(StrVal("abc-123") StrVal("z9")) </input>
+    63	      <env> .Map </env>
+    64	      <result> NoneVal => BoolVal(contract(DictVal(StrVal("abc-123") StrVal("z9")))) </result>
+    65	    </task>
+    66	
+    67	  claim
+    68	    <task>
+    69	      <k> solutionProgram => .K </k>
+    70	      <input> DictVal(StrVal("ABC-123") StrVal("Z9")) </input>
+    71	      <env> .Map </env>
+    72	      <result> NoneVal => BoolVal(contract(DictVal(StrVal("ABC-123") StrVal("Z9")))) </result>
+    73	    </task>
+    74	
+    75	  claim
+    76	    <task>
+    77	      <k> solutionProgram => .K </k>
+    78	      <input> DictVal(StrVal("123")) </input>
+    79	      <env> .Map </env>
+    80	      <result> NoneVal => BoolVal(contract(DictVal(StrVal("123")))) </result>
+    81	    </task>
+    82	
+    83	  claim
+    84	    <task>
+    85	      <k> solutionProgram => .K </k>
+    86	      <input> DictVal(StrVal("aA")) </input>
+    87	      <env> .Map </env>
+    88	      <result> NoneVal => BoolVal(contract(DictVal(StrVal("aA")))) </result>
+    89	    </task>
+    90	
+    91	  claim
+    92	    <task>
+    93	      <k> solutionProgram => .K </k>
+    94	      <input> DictVal(BoolVal(true)) </input>
+    95	      <env> .Map </env>
+    96	      <result> NoneVal => BoolVal(contract(DictVal(BoolVal(true)))) </result>
+    97	    </task>
+    98	endmodule
+===== declarations, rules, claims, and attributes =====
+/tmp/audit-work/candidate-src/spec.k:11:  claim
+/tmp/audit-work/candidate-src/spec.k:19:  claim
+/tmp/audit-work/candidate-src/spec.k:27:  claim
+/tmp/audit-work/candidate-src/spec.k:35:  claim
+/tmp/audit-work/candidate-src/spec.k:43:  claim
+/tmp/audit-work/candidate-src/spec.k:51:  claim
+/tmp/audit-work/candidate-src/spec.k:59:  claim
+/tmp/audit-work/candidate-src/spec.k:67:  claim
+/tmp/audit-work/candidate-src/spec.k:75:  claim
+/tmp/audit-work/candidate-src/spec.k:83:  claim
+/tmp/audit-work/candidate-src/spec.k:91:  claim
+/tmp/audit-work/candidate-src/verification.k:10:  syntax Bool ::= contract(Value) [function]
+/tmp/audit-work/candidate-src/verification.k:11:                | allStringKeys(Values) [function]
+/tmp/audit-work/candidate-src/verification.k:12:                | allLowerKeys(Values) [function]
+/tmp/audit-work/candidate-src/verification.k:13:                | allUpperKeys(Values) [function]
+/tmp/audit-work/candidate-src/verification.k:14:                | lowerKey(Value) [function, total]
+/tmp/audit-work/candidate-src/verification.k:15:                | upperKey(Value) [function, total]
+/tmp/audit-work/candidate-src/verification.k:17:  rule contract(DictVal()) => false
+/tmp/audit-work/candidate-src/verification.k:18:  rule contract(DictVal(KEYS))
+/tmp/audit-work/candidate-src/verification.k:22:  rule allStringKeys(V:Value VS:Values)
+/tmp/audit-work/candidate-src/verification.k:24:  rule allStringKeys(V:Value) => pyIsString(V)
+/tmp/audit-work/candidate-src/verification.k:26:  rule allLowerKeys(V:Value VS:Values)
+/tmp/audit-work/candidate-src/verification.k:28:  rule allLowerKeys(V:Value) => lowerKey(V)
+/tmp/audit-work/candidate-src/verification.k:30:  rule allUpperKeys(V:Value VS:Values)
+/tmp/audit-work/candidate-src/verification.k:32:  rule allUpperKeys(V:Value) => upperKey(V)
+/tmp/audit-work/candidate-src/verification.k:34:  rule lowerKey(StrVal(S)) => pyIsLower(StrVal(S))
+/tmp/audit-work/candidate-src/verification.k:35:  rule lowerKey(IntVal(_)) => false
+/tmp/audit-work/candidate-src/verification.k:36:  rule lowerKey(BoolVal(_)) => false
+/tmp/audit-work/candidate-src/verification.k:37:  rule lowerKey(DictVal(_)) => false
+/tmp/audit-work/candidate-src/verification.k:38:  rule lowerKey(DictVal()) => false
+/tmp/audit-work/candidate-src/verification.k:39:  rule lowerKey(NoneVal) => false
+/tmp/audit-work/candidate-src/verification.k:41:  rule upperKey(StrVal(S)) => pyIsUpper(StrVal(S))
+/tmp/audit-work/candidate-src/verification.k:42:  rule upperKey(IntVal(_)) => false
+/tmp/audit-work/candidate-src/verification.k:43:  rule upperKey(BoolVal(_)) => false
+/tmp/audit-work/candidate-src/verification.k:44:  rule upperKey(DictVal(_)) => false
+/tmp/audit-work/candidate-src/verification.k:45:  rule upperKey(DictVal()) => false
+/tmp/audit-work/candidate-src/verification.k:46:  rule upperKey(NoneVal) => false
+/tmp/audit-work/candidate-src/program.k:6:  syntax PyStmt ::= "solutionProgram" [function]
+/tmp/audit-work/candidate-src/program.k:7:  rule solutionProgram => Module(
+/tmp/audit-work/candidate-src/semantic.k:12:  syntax PyStmt  ::= "Module" "(" PyStmts ")"
+/tmp/audit-work/candidate-src/semantic.k:19:  syntax PyStmts ::= PyStmt
+/tmp/audit-work/candidate-src/semantic.k:22:  syntax Params   ::= "Params" "(" Strings ")"
+/tmp/audit-work/candidate-src/semantic.k:23:  syntax Strings  ::= NeList{String, ","}
+/tmp/audit-work/candidate-src/semantic.k:25:  syntax PyExpr   ::= "Name" "(" String ")"
+/tmp/audit-work/candidate-src/semantic.k:32:  syntax PyExprs  ::= NeList{PyExpr, ","}
+/tmp/audit-work/candidate-src/semantic.k:43:  syntax Value  ::= "NoneVal"
+/tmp/audit-work/candidate-src/semantic.k:49:  syntax Values ::= Value
+/tmp/audit-work/candidate-src/semantic.k:58:  configuration
+/tmp/audit-work/candidate-src/semantic.k:67:  rule <k> Module(FuncDef("check_dict_case", Params("dict"), BODY))
+/tmp/audit-work/candidate-src/semantic.k:73:  rule <k> (S:PyStmt REST:PyStmts) => S ~> REST ...</k>
+/tmp/audit-work/candidate-src/semantic.k:75:  syntax KItem ::= eval(PyExpr)
+/tmp/audit-work/candidate-src/semantic.k:87:  rule <k> Assign(Name(X), E) => eval(E) ~> assignTo(X) ...</k>
+/tmp/audit-work/candidate-src/semantic.k:88:  rule <k> V:Value ~> assignTo(X) => .K ...</k>
+/tmp/audit-work/candidate-src/semantic.k:91:  rule <k> If(COND, THEN, ELSE) => eval(COND) ~> choose(THEN, ELSE) ...</k>
+/tmp/audit-work/candidate-src/semantic.k:92:  rule <k> BoolVal(true)  ~> choose(THEN, _) => THEN ...</k>
+/tmp/audit-work/candidate-src/semantic.k:93:  rule <k> BoolVal(false) ~> choose(_, ELSE) => ELSE ...</k>
+/tmp/audit-work/candidate-src/semantic.k:94:  rule <k> If(COND, THEN, ) => eval(COND) ~> chooseNoElse(THEN) ...</k>
+/tmp/audit-work/candidate-src/semantic.k:95:  rule <k> BoolVal(true)  ~> chooseNoElse(THEN) => THEN ...</k>
+/tmp/audit-work/candidate-src/semantic.k:96:  rule <k> BoolVal(false) ~> chooseNoElse(_) => .K ...</k>
+/tmp/audit-work/candidate-src/semantic.k:98:  rule <k> For(Name(X), ITER, BODY) => eval(ITER) ~> startFor(X, BODY) ...</k>
+/tmp/audit-work/candidate-src/semantic.k:99:  rule <k> DictVal() ~> startFor(_, _) => .K ...</k>
+/tmp/audit-work/candidate-src/semantic.k:100:  rule <k> DictVal(KEYS) ~> startFor(X, BODY) => loop(X, KEYS, BODY) ...</k>
+/tmp/audit-work/candidate-src/semantic.k:101:  rule <k> loop(X, (V:Value VS:Values), BODY)
+/tmp/audit-work/candidate-src/semantic.k:103:  rule <k> loop(X, V:Value, BODY) => bind(X, V) ~> BODY ...</k>
+/tmp/audit-work/candidate-src/semantic.k:104:  rule <k> bind(X, V) => .K ...</k>
+/tmp/audit-work/candidate-src/semantic.k:107:  rule <k> Return(E) => eval(E) ~> returnValue ...</k>
+/tmp/audit-work/candidate-src/semantic.k:108:  rule <k> V:Value ~> returnValue ~> _REST => .K </k>
+/tmp/audit-work/candidate-src/semantic.k:113:  rule <k> eval(Bool(B)) => BoolVal(B) ...</k>
+/tmp/audit-work/candidate-src/semantic.k:114:  rule <k> eval(Name(X)) => V ...</k>
+/tmp/audit-work/candidate-src/semantic.k:118:  rule <k> eval(UnaryOp("not", E)) => eval(E) ~> logicalNot ...</k>
+/tmp/audit-work/candidate-src/semantic.k:119:  rule <k> BoolVal(B) ~> logicalNot => BoolVal(notBool B) ...</k>
+/tmp/audit-work/candidate-src/semantic.k:120:  rule <k> DictVal() ~> logicalNot => BoolVal(true) ...</k>
+/tmp/audit-work/candidate-src/semantic.k:121:  rule <k> DictVal(_V:Value _VS:Values) ~> logicalNot => BoolVal(false) ...</k>
+/tmp/audit-work/candidate-src/semantic.k:122:  rule <k> DictVal(_V:Value) ~> logicalNot => BoolVal(false) ...</k>
+/tmp/audit-work/candidate-src/semantic.k:125:  rule <k> eval(BoolOp("or", E1, E2)) => eval(E1) ~> logicalOr(E2) ...</k>
+/tmp/audit-work/candidate-src/semantic.k:126:  rule <k> BoolVal(true) ~> logicalOr(_) => BoolVal(true) ...</k>
+/tmp/audit-work/candidate-src/semantic.k:127:  rule <k> BoolVal(false) ~> logicalOr(E) => eval(E) ...</k>
+/tmp/audit-work/candidate-src/semantic.k:132:  rule <k> eval(Call(Name("isinstance"), Name(X), Name("str")))
+/tmp/audit-work/candidate-src/semantic.k:136:  rule <k> eval(Call(Attribute(Name(X), "islower"), ))
+/tmp/audit-work/candidate-src/semantic.k:139:  rule <k> eval(Call(Attribute(Name(X), "isupper"), ))
+/tmp/audit-work/candidate-src/semantic.k:143:  syntax Bool ::= pyIsString(Value) [function, total]
+/tmp/audit-work/candidate-src/semantic.k:144:  rule pyIsString(StrVal(_)) => true
+/tmp/audit-work/candidate-src/semantic.k:145:  rule pyIsString(IntVal(_)) => false
+/tmp/audit-work/candidate-src/semantic.k:146:  rule pyIsString(BoolVal(_)) => false
+/tmp/audit-work/candidate-src/semantic.k:147:  rule pyIsString(DictVal(_)) => false
+/tmp/audit-work/candidate-src/semantic.k:148:  rule pyIsString(DictVal()) => false
+/tmp/audit-work/candidate-src/semantic.k:149:  rule pyIsString(NoneVal) => false
+/tmp/audit-work/candidate-src/semantic.k:156:  syntax Bool ::= pyIsLower(Value) [function]
+/tmp/audit-work/candidate-src/semantic.k:157:                | pyIsUpper(Value) [function]
+/tmp/audit-work/candidate-src/semantic.k:158:                | lowerScan(String, Int, Bool) [function]
+/tmp/audit-work/candidate-src/semantic.k:159:                | upperScan(String, Int, Bool) [function]
+/tmp/audit-work/candidate-src/semantic.k:161:  rule pyIsLower(StrVal(S)) => lowerScan(S, 0, false)
+/tmp/audit-work/candidate-src/semantic.k:162:  rule pyIsUpper(StrVal(S)) => upperScan(S, 0, false)
+/tmp/audit-work/candidate-src/semantic.k:164:  rule lowerScan(S, I, SEEN) => SEEN
+/tmp/audit-work/candidate-src/semantic.k:166:  rule lowerScan(S, I, _) => false
+/tmp/audit-work/candidate-src/semantic.k:170:  rule lowerScan(S, I, _) => lowerScan(S, I +Int 1, true)
+/tmp/audit-work/candidate-src/semantic.k:174:  rule lowerScan(S, I, SEEN) => lowerScan(S, I +Int 1, SEEN)
+/tmp/audit-work/candidate-src/semantic.k:181:  rule upperScan(S, I, SEEN) => SEEN
+/tmp/audit-work/candidate-src/semantic.k:183:  rule upperScan(S, I, _) => false
+/tmp/audit-work/candidate-src/semantic.k:187:  rule upperScan(S, I, _) => upperScan(S, I +Int 1, true)
+/tmp/audit-work/candidate-src/semantic.k:191:  rule upperScan(S, I, SEEN) => upperScan(S, I +Int 1, SEEN)
+===== source counts =====
+semantic.k rules=47
+semantic.k claims=semantic.k syntax-statements=11
+program.k rules=1
+program.k claims=program.k syntax-statements=1
+verification.k rules=20
+verification.k claims=verification.k syntax-statements=1
+spec.k rules=spec.k claims=11
+spec.k syntax-statements====== priority/simplification/owise scan =====
+EXIT_STATUS: 0

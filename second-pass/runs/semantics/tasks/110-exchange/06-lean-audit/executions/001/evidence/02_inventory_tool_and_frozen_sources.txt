@@ -1,0 +1,704 @@
+Script started on 2026-07-28 18:15:30-05:00 [<not executed on terminal>]
+k_rule_inventory.py
+#!/usr/bin/env python3
+"""Canonical lexical inventory of simplification rules in verification.k."""
+
+from __future__ import annotations
+
+import dataclasses
+import hashlib
+import json
+import re
+import stat
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+_MODULE_NAME_RE = re.compile(
+    r"^[ \t]+(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"(?:[ \t]+\[[^\]\r\n]*\])?[ \t]*$"
+)
+_TRAILING_ATTRIBUTES_RE = re.compile(
+    r"\[(?P<attributes>[^\[\]]*)\][ \t\r\n]*\Z", re.S
+)
+_CELL_TAG_RE = re.compile(
+    r"<(?P<close>/)?(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"[ \t]*(?P<self_close>/)?>"
+)
+_OUTER_SENTENCE_KEYWORDS = {
+    "imports",
+    "syntax",
+    "rule",
+    "configuration",
+    "context",
+    "claim",
+    "alias",
+}
+
+
+class KRuleInventoryError(RuntimeError):
+    """Raised when verification.k cannot produce a canonical inventory."""
+
+
+@dataclass(frozen=True)
+class KRule:
+    source_rule_id: str
+    module: str
+    start_line: int
+    end_line: int
+    normalized_sha256: str
+    attributes: list[str]
+    text: str
+
+
+@dataclass(frozen=True)
+class _Sentence:
+    keyword: str
+    start: int
+
+
+@dataclass(frozen=True)
+class _Module:
+    name: str
+    content_start: int
+    content_end: int
+    imports: tuple[str, ...]
+    sentences: tuple[_Sentence, ...]
+
+
+@dataclass(frozen=True)
+class _RuleSpan:
+    rule: KRule
+    start_offset: int
+    end_offset: int
+    attribute_start: int | None
+    attribute_end: int | None
+
+
+def canonical_json_sha256(document: Any) -> str:
+    encoded = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _mask_non_code(text: str) -> str:
+    """Mask comments and string bodies without changing source offsets."""
+
+    output = list(text)
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                state = "code"
+            else:
+                output[index] = " "
+            index += 1
+            continue
+        if state == "string":
+            if character == "\\" and following:
+                output[index] = " "
+                output[index + 1] = " "
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            elif character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                output[index] = output[index + 1] = " "
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                output[index] = output[index + 1] = " "
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output[index] = output[index + 1] = " "
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output[index] = output[index + 1] = " "
+            state = "block-comment"
+            block_depth = 1
+            index += 2
+            continue
+        if character == '"':
+            state = "string"
+        index += 1
+    return "".join(output)
+
+
+def _line_ranges(text: str, start: int = 0) -> list[tuple[int, int, int]]:
+    ranges: list[tuple[int, int, int]] = []
+    line_start = start
+    while line_start < len(text):
+        newline = text.find("\n", line_start)
+        next_start = len(text) if newline < 0 else newline + 1
+        line_end = len(text) if newline < 0 else newline
+        content_end = (
+            line_end - 1
+            if line_end > line_start and text[line_end - 1] == "\r"
+            else line_end
+        )
+        ranges.append((line_start, content_end, next_start))
+        if newline < 0:
+            break
+        line_start = next_start
+    return ranges
+
+
+def _line_heads(text: str) -> list[tuple[int, int, str, str]]:
+    """Return physical-line word heads without assigning K grammar meaning."""
+
+    heads: list[tuple[int, int, str, str]] = []
+    for line_start, content_end, _next_start in _line_ranges(text):
+        index = line_start
+        while index < content_end and text[index] in " \t":
+            index += 1
+        word_end = index
+        while word_end < content_end and (
+            text[word_end].isalnum() or text[word_end] in "_'"
+        ):
+            word_end += 1
+        if word_end > index:
+            heads.append(
+                (
+                    line_start,
+                    content_end,
+                    text[index:word_end],
+                    text[word_end:content_end],
+                )
+            )
+    return heads
+
+
+def _line_word(line: str) -> tuple[str, str, int]:
+    stripped = line.lstrip()
+    indent = len(line) - len(stripped)
+    word_end = 0
+    while word_end < len(stripped) and (
+        stripped[word_end].isalnum() or stripped[word_end] in "_'"
+    ):
+        word_end += 1
+    return stripped[:word_end], stripped[word_end:], indent + word_end
+
+
+def _rule_continuation(line: str) -> tuple[str, int] | None:
+    stripped = line.lstrip()
+    if stripped.startswith("["):
+        return "attributes", len(line) - len(stripped)
+    word, rest, word_end = _line_word(line)
+    for keyword in ("requires", "ensures"):
+        if word == keyword and (
+            not rest
+            or not (
+                rest[0].isalnum()
+                or rest[0] in "_'"
+            )
+        ):
+            return keyword, word_end
+    return None
+
+
+def _starts_outer_transition(line: str) -> bool:
+    keyword, rest, _word_end = _line_word(line)
+    separated = bool(rest) and rest[0] in " \t"
+    if keyword == "module":
+        return separated and _MODULE_NAME_RE.fullmatch(rest) is not None
+    if keyword == "endmodule":
+        return not rest.strip()
+    if keyword == "rule":
+        return not rest or separated
+    return keyword in _OUTER_SENTENCE_KEYWORDS and separated
+
+
+def _terminal_attribute_line(line: str) -> bool:
+    match = _TRAILING_ATTRIBUTES_RE.search(line)
+    if match is None:
+        return False
+    start = match.start()
+    return start == 0 or line[start - 1].isspace()
+
+
+def _scan_rule_delimiters(
+    line: str,
+    delimiters: list[str],
+) -> None:
+    closing = {")": "(", "]": "[", "}": "{"}
+    index = 0
+    while index < len(line):
+        if line[index] == "<":
+            cell = _CELL_TAG_RE.match(line, index)
+            if cell is not None:
+                marker = f"<{cell.group('name')}>"
+                if cell.group("close"):
+                    if delimiters and delimiters[-1] == marker:
+                        delimiters.pop()
+                elif not cell.group("self_close"):
+                    delimiters.append(marker)
+                index = cell.end()
+                continue
+        character = line[index]
+        if character in "([{":
+            delimiters.append(character)
+        elif character in closing:
+            if delimiters and delimiters[-1] == closing[character]:
+                delimiters.pop()
+        index += 1
+
+
+def _rule_bubble_end(masked_text: str, start: int) -> int:
+    """Find when an outer rule bubble returns control to outer parsing."""
+
+    seen_rewrite = False
+    clause_has_content = False
+    candidate_end: int | None = None
+    delimiters: list[str] = []
+    ranges = _line_ranges(masked_text, start)
+    for line_start, line_end, next_start in ranges:
+        line = masked_text[line_start:line_end]
+        if not line.strip():
+            continue
+
+        continuation = (
+            _rule_continuation(line)
+            if seen_rewrite and candidate_end is not None
+            else None
+        )
+        if candidate_end is not None:
+            if continuation is None and _starts_outer_transition(line):
+                return candidate_end
+            candidate_end = None
+
+        content_start = 0
+        if continuation is not None:
+            kind, content_start = continuation
+            if kind in {"requires", "ensures"}:
+                clause_has_content = False
+
+        if not seen_rewrite:
+            rewrite = line.find("=>")
+            if rewrite >= 0:
+                seen_rewrite = True
+                content_start = rewrite + 2
+            else:
+                content_start = len(line)
+
+        _scan_rule_delimiters(line, delimiters)
+        if seen_rewrite and line[content_start:].strip():
+            clause_has_content = True
+
+        if (
+            seen_rewrite
+            and clause_has_content
+            and not delimiters
+            and _terminal_attribute_line(line)
+        ):
+            return next_start
+        if seen_rewrite and clause_has_content and not delimiters:
+            candidate_end = next_start
+    if candidate_end is not None:
+        return candidate_end
+
+lemma_discovery_contract.py
+#!/usr/bin/env python3
+"""Validate Stage 3 classifications against the canonical K rule inventory."""
+
+from __future__ import annotations
+
+import json
+import stat
+from pathlib import Path
+from typing import Any
+
+from tools.k_rule_inventory import KRuleInventoryError, inventory_verification
+
+
+_MANIFEST_KEYS = {"schema_version", "inventory_sha256", "rules"}
+_RULE_KEYS = {"source_rule_id", "classification", "rationale"}
+_CLASSIFICATIONS = {
+    "DEFINITION",
+    "OPERATIONAL_RULE",
+    "PROVED_DERIVED_LEMMA",
+    "DOMAIN_LEMMA",
+}
+
+
+class LemmaDiscoveryContractError(RuntimeError):
+    """Raised when a Stage 3 manifest crosses its trust boundary."""
+
+
+def _regular_json(path: Path) -> dict[str, Any]:
+    path = Path(path)
+    try:
+        mode = path.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest must be a regular file: {path}"
+        ) from error
+    if not stat.S_ISREG(mode):
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest must be a regular file: {path}"
+        )
+    try:
+        document = json.loads(path.read_bytes())
+    except (OSError, UnicodeError, ValueError) as error:
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest is malformed: {path}"
+        ) from error
+    if not isinstance(document, dict):
+        raise LemmaDiscoveryContractError(
+            "lemma discovery manifest must be a JSON object"
+        )
+    return document
+
+
+def _exact_keys(
+    document: dict[str, Any], expected: set[str], label: str
+) -> None:
+    unexpected = sorted(set(document) - expected)
+    if unexpected:
+        raise LemmaDiscoveryContractError(
+            f"{label} has unexpected key: {unexpected[0]}"
+        )
+    missing = sorted(expected - set(document))
+    if missing:
+        raise LemmaDiscoveryContractError(
+            f"{label} is missing key: {missing[0]}"
+        )
+
+
+def validate_trust_boundary(
+    workspace: Path, manifest: Path
+) -> dict[str, Any]:
+    try:
+        inventory = inventory_verification(Path(workspace))
+    except KRuleInventoryError as error:
+        raise LemmaDiscoveryContractError(str(error)) from error
+    document = _regular_json(Path(manifest))
+    _exact_keys(document, _MANIFEST_KEYS, "lemma discovery manifest")
+    schema_version = document["schema_version"]
+    if (
+        not isinstance(schema_version, int)
+        or isinstance(schema_version, bool)
+        or schema_version != 2
+    ):
+        raise LemmaDiscoveryContractError(
+            "lemma discovery schema_version must be 2"
+        )
+    if document["inventory_sha256"] != inventory["inventory_sha256"]:
+        raise LemmaDiscoveryContractError(
+            "lemma discovery inventory_sha256 does not match canonical inventory"
+        )
+    entries = document["rules"]
+    if not isinstance(entries, list):
+        raise LemmaDiscoveryContractError(
+            "lemma discovery rules must be a JSON list"
+        )
+    canonical_rules = inventory["rules"]
+    canonical_by_id = {
+        rule["source_rule_id"]: rule for rule in canonical_rules
+    }
+    classified_by_id: dict[str, dict[str, str]] = {}
+    for index, entry in enumerate(entries):
+        label = f"lemma discovery rule {index}"
+        if not isinstance(entry, dict):
+            raise LemmaDiscoveryContractError(f"{label} must be an object")
+        _exact_keys(entry, _RULE_KEYS, label)
+        source_rule_id = entry["source_rule_id"]
+        if not isinstance(source_rule_id, str) or not source_rule_id:
+            raise LemmaDiscoveryContractError(
+                f"{label} source_rule_id must be a nonempty string"
+            )
+        if source_rule_id in classified_by_id:
+            raise LemmaDiscoveryContractError(
+                f"duplicate lemma discovery source_rule_id: {source_rule_id}"
+            )
+        if source_rule_id not in canonical_by_id:
+            raise LemmaDiscoveryContractError(
+                f"unknown lemma discovery source_rule_id: {source_rule_id}"
+            )
+        classification = entry["classification"]
+        if (
+            not isinstance(classification, str)
+            or classification not in _CLASSIFICATIONS
+        ):
+            raise LemmaDiscoveryContractError(
+                f"{label} classification must be DEFINITION, "
+                "OPERATIONAL_RULE, PROVED_DERIVED_LEMMA, or DOMAIN_LEMMA"
+            )
+        canonical_rule = canonical_by_id[source_rule_id]
+        if (
+            "simplification" in canonical_rule["attributes"]
+            and classification
+            in {"OPERATIONAL_RULE", "PROVED_DERIVED_LEMMA"}
+        ):
+            raise LemmaDiscoveryContractError(
+                f"{label} simplification rule must be classified as "
+                "DEFINITION or DOMAIN_LEMMA"
+            )
+        rationale = entry["rationale"]
+        if not isinstance(rationale, str) or not rationale.strip():
+            raise LemmaDiscoveryContractError(
+                f"{label} rationale must be a nonempty string"
+            )
+        classified_by_id[source_rule_id] = {
+            "classification": classification,
+            "rationale": rationale,
+        }
+    missing = [
+        rule["source_rule_id"]
+        for rule in canonical_rules
+        if rule["source_rule_id"] not in classified_by_id
+    ]
+    if missing:
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest is missing source_rule_id: {missing[0]}"
+        )
+    definitions: list[dict[str, Any]] = []
+    operational_rules: list[dict[str, Any]] = []
+    proved_derived_lemmas: list[dict[str, Any]] = []
+    domain_lemmas: list[dict[str, Any]] = []
+    for rule in canonical_rules:
+        classification = classified_by_id[rule["source_rule_id"]]
+        classified_rule = {**rule, **classification}
+        role = classification["classification"]
+        if role == "DEFINITION":
+            definitions.append(classified_rule)
+        elif role == "OPERATIONAL_RULE":
+            operational_rules.append(classified_rule)
+        elif role == "PROVED_DERIVED_LEMMA":
+            proved_derived_lemmas.append(classified_rule)
+        else:
+            domain_lemmas.append(classified_rule)
+    return {
+        **inventory,
+        "definitions": definitions,
+        "operational_rules": operational_rules,
+        "proved_derived_lemmas": proved_derived_lemmas,
+        "domain_lemmas": domain_lemmas,
+    }
+
+verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module EXCHANGE-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // A typed symbolic view of Python integer-list contents.  Its iterator
+     7	  // equations are exactly the two MPY-LIST equations for .ValSeq/vCons.
+     8	  // Concrete execution still uses ordinary list literals and MPY-LIST.
+     9	  syntax ValSeq ::= intVals(IntSeq)
+    10	  rule <k> #iterNext(list(intVals(.IntSeq))) => #iterDone ... </k>
+    11	  rule <k> #iterNext(list(intVals(iCons(I:Int, R:IntSeq))))
+    12	        => #iterYield(I, list(intVals(R))) ... </k>
+    13	
+    14	  // Accumulator-form counts mirror the program's AugAssign exactly.  Besides
+    15	  // avoiding any reliance on algebraic normalization, oddAcc(0, VS) and
+    16	  // evenAcc(0, VS) are the ordinary odd/even element counts.
+    17	  syntax Int ::= oddAcc(Int, IntSeq) [function, total]
+    18	  rule oddAcc(A:Int, .IntSeq) => A
+    19	  rule oddAcc(A:Int, iCons(I:Int, R:IntSeq)) => oddAcc(A, R)
+    20	    requires pyMod(I, 2) ==Int 0
+    21	  rule oddAcc(A:Int, iCons(I:Int, R:IntSeq)) => oddAcc(A +Int 1, R)
+    22	    requires pyMod(I, 2) =/=Int 0
+    23	
+    24	  syntax Int ::= evenAcc(Int, IntSeq) [function, total]
+    25	  rule evenAcc(A:Int, .IntSeq) => A
+    26	  rule evenAcc(A:Int, iCons(I:Int, R:IntSeq)) => evenAcc(A +Int 1, R)
+    27	    requires pyMod(I, 2) ==Int 0
+    28	  rule evenAcc(A:Int, iCons(I:Int, R:IntSeq)) => evenAcc(A, R)
+    29	    requires pyMod(I, 2) =/=Int 0
+    30	
+    31	  syntax Val ::= exchangeResult(IntSeq, IntSeq) [function, total]
+    32	  rule exchangeResult(A:IntSeq, B:IntSeq)
+    33	    => str(iCons(89, iCons(69, iCons(83, .IntSeq))))
+    34	    requires oddAcc(0, A) <=Int evenAcc(0, B)
+    35	  rule exchangeResult(A:IntSeq, B:IntSeq)
+    36	    => str(iCons(78, iCons(79, .IntSeq)))
+    37	    requires oddAcc(0, A) >Int evenAcc(0, B)
+    38	
+    39	  // These macros are the exact constructor form generated in solution.mpy.
+    40	  // Factoring the loop bodies makes the induction claims readable.
+    41	  syntax Stmts ::= "ODD-BODY" [macro]
+    42	  rule ODD-BODY
+    43	    => If(
+    44	         Compare(BinOp("%", Name("number"), Int(2)),
+    45	                 CmpOp("!=", Int(0))),
+    46	         AugAssign(Name("odd"), "+", Int(1)),
+    47	         .Stmts)
+    48	
+    49	  syntax Stmts ::= "EVEN-BODY" [macro]
+    50	  rule EVEN-BODY
+    51	    => If(
+    52	         Compare(BinOp("%", Name("number"), Int(2)),
+    53	                 CmpOp("==", Int(0))),
+    54	         AugAssign(Name("even"), "+", Int(1)),
+    55	         .Stmts)
+    56	
+    57	  syntax Stmt ::= "exchangeDef" [macro]
+    58	  rule exchangeDef
+    59	    => FuncDef(
+    60	         "exchange",
+    61	         Params("lst1", "lst2"),
+    62	         Assign(Name("odd"), Int(0))
+    63	         Assign(Name("even"), Int(0))
+    64	         Assign(Name("number"), Int(0))
+    65	         For(Name("number"), Name("lst1"), ODD-BODY)
+    66	         For(Name("number"), Name("lst2"), EVEN-BODY)
+    67	         If(Compare(Name("odd"), CmpOp("<=", Name("even"))),
+    68	            Return(Str("YES")),
+    69	            .Stmts)
+    70	         Return(Str("NO")))
+    71	endmodule
+
+spec.k
+     1	requires "verification.k"
+     2	
+     3	module EXCHANGE-SPEC
+     4	  imports EXCHANGE-VERIFICATION
+     5	
+     6	  // Induction invariant for the first loop.
+     7	  claim [odd-loop]:
+     8	    <k>
+     9	      #loop(list(intVals(iCons(I:Int, IS:IntSeq))),
+    10	            Name("number"), ODD-BODY) ~> CONT:K
+    11	      =>
+    12	      CONT
+    13	    </k>
+    14	    <env> L:Int </env>
+    15	    <scopes>
+    16	      SC:Map
+    17	      L |-> scope(
+    18	        ( "lst1"  |-> LST1:Val
+    19	          "lst2"  |-> LST2:Val
+    20	          "odd"   |-> O:Int
+    21	          "even"  |-> E:Int
+    22	          "number" |-> N:Int ),
+    23	        P:Parent)
+    24	      =>
+    25	      SC
+    26	      L |-> scope(
+    27	        ( "lst1"  |-> LST1
+    28	          "lst2"  |-> LST2
+    29	          "odd"   |-> oddAcc(O, iCons(I, IS))
+    30	          "even"  |-> E
+    31	          "number" |-> ?ODDLAST:Int ),
+    32	        P)
+    33	    </scopes>
+    34	    requires notBool L in_keys(SC)
+    35	
+    36	  // The analogous invariant for the second loop.
+    37	  claim [even-loop]:
+    38	    <k>
+    39	      #loop(list(intVals(iCons(I:Int, IS:IntSeq))),
+    40	            Name("number"), EVEN-BODY) ~> CONT:K
+    41	      =>
+    42	      CONT
+    43	    </k>
+    44	    <env> L:Int </env>
+    45	    <scopes>
+    46	      SC:Map
+    47	      L |-> scope(
+    48	        ( "lst1"  |-> LST1:Val
+    49	          "lst2"  |-> LST2:Val
+    50	          "odd"   |-> O:Int
+    51	          "even"  |-> E:Int
+    52	          "number" |-> N:Int ),
+    53	        P:Parent)
+    54	      =>
+    55	      SC
+    56	      L |-> scope(
+    57	        ( "lst1"  |-> LST1
+    58	          "lst2"  |-> LST2
+    59	          "odd"   |-> O
+    60	          "even"  |-> evenAcc(E, iCons(I, IS))
+    61	          "number" |-> ?EVENLAST:Int ),
+    62	        P)
+    63	    </scopes>
+    64	    requires notBool L in_keys(SC)
+    65	
+    66	  // End-to-end functional correctness for all non-empty integer lists, the
+    67	  // input domain promised by prompt.py.
+    68	  claim [exchange-correct]:
+    69	    <k>
+    70	      #loadAll(Module(exchangeDef))
+    71	      ~> Call(
+    72	           Name("exchange"),
+    73	           ( list(intVals(iCons(A:Int, AS:IntSeq)))
+    74	           , list(intVals(iCons(B:Int, BS:IntSeq)))
+    75	           , .Exprs))
+    76	      =>
+    77	      exchangeResult(
+    78	        iCons(A, AS),
+    79	        iCons(B, BS))
+    80	    </k>
+    81	    <env> 0 </env>
+    82	    <scopes>
+    83	      ( 0  |-> scope(.Map, parent(-1))
+    84	        -1 |-> builtinsScope )
+    85	      =>
+    86	      ?FINALSCOPES:Map
+    87	    </scopes>
+    88	    <scopeLoc> 1 </scopeLoc>
+    89	    <heap> .Map </heap>
+    90	    <heapLoc> 0 </heapLoc>
+    91	    <stack> .List </stack>
+    92	    <ret> noRet </ret>
+    93	    <exc> NoExc </exc>
+    94	    <exit-code> 0 </exit-code>
+    95	endmodule
+
+solution.py
+     1	def exchange(lst1, lst2):
+     2	    odd = 0
+     3	    even = 0
+     4	    number = 0
+     5	    for number in lst1:
+     6	        if number % 2 != 0:
+     7	            odd += 1
+     8	    for number in lst2:
+     9	        if number % 2 == 0:
+    10	            even += 1
+    11	    if odd <= even:
+    12	        return "YES"
+    13	    return "NO"
+
+prompt.py
+     1	
+     2	def exchange(lst1, lst2):
+     3	    """In this problem, you will implement a function that takes two lists of numbers,
+     4	    and determines whether it is possible to perform an exchange of elements
+     5	    between them to make lst1 a list of only even numbers.
+     6	    There is no limit on the number of exchanged elements between lst1 and lst2.
+     7	    If it is possible to exchange elements between the lst1 and lst2 to make
+     8	    all the elements of lst1 to be even, return "YES".
+     9	    Otherwise, return "NO".
+    10	    For example:
+    11	    exchange([1, 2, 3, 4], [1, 2, 3, 4]) => "YES"
+    12	    exchange([1, 2, 3, 4], [1, 5, 3, 4]) => "NO"
+    13	    It is assumed that the input lists will be non-empty.
+    14	    """
+
+Script done on 2026-07-28 18:15:30-05:00 [COMMAND_EXIT_CODE="0"]

@@ -1,0 +1,105 @@
+COMMAND: bash -c rg\ -n\ \"def\ sha256_tree\|candidate_tree_sha256\|generation_codex_trace_sha256\"\ /opt/humaneval/tools\ /opt/humaneval\ -g\ \"\*.py\"\;\ sed\ -n\ \"120\,220p\"\ /opt/humaneval/tools/pipeline_contract.py
+/opt/humaneval/tools/pipeline_contract.py:190:def sha256_tree(root: Path) -> str:
+/opt/humaneval/tools/pipeline_contract.py:190:def sha256_tree(root: Path) -> str:
+        or "/" in value
+        or "\\" in value
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+    ):
+        raise PipelineContractError(
+            f"{label} must be one safe nonhidden path component: {value!r}"
+        )
+    return value
+
+
+def parse_codex_config(config: str) -> CodexConfig:
+    validate_safe_component(config, "config")
+    match = _CODEX_CONFIG.fullmatch(config)
+    if match is None:
+        raise PipelineContractError(f"invalid Codex config grammar: {config}")
+    condition_name = match.group("condition")
+    condition = next(
+        (
+            Condition(name, kit, semantics, prompt)
+            for name, kit, semantics, prompt in _CONDITIONS
+            if name == condition_name
+        ),
+        None,
+    )
+    if condition is None:
+        raise PipelineContractError(f"unsupported benchmark condition: {condition_name}")
+    return CodexConfig(
+        name=config,
+        model=match.group("model"),
+        effort="xhigh",
+        condition=condition,
+    )
+
+
+def _lstat(path: Path, label: str) -> os.stat_result:
+    try:
+        return path.lstat()
+    except OSError as error:
+        raise PipelineContractError(f"{label} is missing: {path}") from error
+
+
+def require_real_directory(path: Path, label: str) -> Path:
+    if not stat.S_ISDIR(_lstat(path, label).st_mode):
+        raise PipelineContractError(f"{label} must be a real directory: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise PipelineContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def require_regular_file(path: Path, label: str) -> Path:
+    if not stat.S_ISREG(_lstat(path, label).st_mode):
+        raise PipelineContractError(f"{label} must be a real regular file: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise PipelineContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise PipelineContractError(f"cannot hash file {path}: {error}") from error
+    return digest.hexdigest()
+
+
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, "tree root")
+    digest = hashlib.sha256()
+    pending = [root]
+    entries: list[tuple[str, str, Path]] = []
+    while pending:
+        directory = pending.pop()
+        try:
+            children = list(os.scandir(directory))
+        except OSError as error:
+            raise PipelineContractError(f"cannot scan tree {directory}: {error}") from error
+        for child in children:
+            path = Path(child.path)
+            try:
+                mode = child.stat(follow_symlinks=False).st_mode
+            except OSError as error:
+                raise PipelineContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise PipelineContractError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    for relative, kind, path in sorted(entries):
+        encoded = relative.encode()
+EXIT_STATUS: 0

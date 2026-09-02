@@ -1,0 +1,532 @@
+Script started on 2026-07-26 12:23:13-05:00 [<not executed on terminal>]
++ nl -ba /candidate/semantic.k
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports BOOL-SYNTAX
+     4	  imports STRING-SYNTAX
+     5	
+     6	  syntax Pgm ::= Module(Stmts)
+     7	  syntax Stmts ::= List{Stmt, ""}
+     8	  syntax Stmt ::= FuncDef(String, Params, Stmts)
+     9	                | Return(Expr)
+    10	
+    11	  syntax Params ::= Params(Ids)
+    12	  syntax CellVars ::= CellVars(Ids)
+    13	  syntax FreeVars ::= FreeVars(Ids)
+    14	  syntax Ids ::= List{String, ","}
+    15	
+    16	  syntax Expr ::= Name(String)
+    17	                | Int(Int)
+    18	                | ListExpr(Exprs)
+    19	                | Call(Expr, Exprs)
+    20	                | KwArg(String, Expr)
+    21	                | Lambda(Params, CellVars, FreeVars, Expr)
+    22	                | BinOp(String, Expr, Expr)
+    23	                | IfExp(Expr, Expr, Expr)
+    24	                | Compare(Expr, CmpOps)
+    25	                | Subscript(Expr, Expr)
+    26	  syntax Exprs ::= List{Expr, ","}
+    27	  syntax CmpOp ::= CmpOp(String, Expr)
+    28	  syntax CmpOps ::= List{CmpOp, ","}
+    29	endmodule
+    30	
+    31	module MPY-SEMANTICS
+    32	  imports MPY-SYNTAX
+    33	  imports INT
+    34	  imports BOOL
+    35	  imports STRING
+    36	  imports MAP
+    37	
+    38	  syntax KItem ::= "init"
+    39	
+    40	  syntax Val ::= IntVal(Int)
+    41	               | BoolVal(Bool)
+    42	               | ListVal(Vals)
+    43	               | Builtin(String)
+    44	               | "PointKey"
+    45	               | Closure(Params, CellVars, FreeVars, Expr, Map)
+    46	               | KeywordVal(String, Val)
+    47	               | DecimalVal(Int)
+    48	               | MappedDigits(Int)
+    49	               | DigitVal(Int)
+    50	               | "NoValue"
+    51	  syntax Vals ::= List{Val, ","}
+    52	
+    53	  configuration
+    54	    <py>
+    55	      <k> init </k>
+    56	      <program> $PGM:Pgm </program>
+    57	      <input> $INPUT:Expr </input>
+    58	      <output> NoValue </output>
+    59	    </py>
+    60	
+    61	  syntax Val ::= eval(Expr, Map, Stmts) [function]
+    62	               | evalCall(Val, Vals, Stmts) [function]
+    63	               | invokeOrder(Val, Stmts) [function]
+    64	               | invokeOrderScan(Val, Stmts, Stmts) [function]
+    65	               | exec(Stmts, Map, Stmts) [function]
+    66	               | subscript(Val, Val) [function]
+    67	               | asVal(KItem) [function]
+    68	  syntax Vals ::= evalExprs(Exprs, Map, Stmts) [function]
+    69	                | sortWith(Vals, Val, Stmts) [function]
+    70	                | insertWith(Val, Vals, Val, Stmts) [function]
+    71	  syntax Int ::= keyInt(Val, Int, Stmts) [function]
+    72	               | asInt(Val) [function]
+    73	               | digitSum(Int) [function]
+    74	               | leadingDigit(Int) [function]
+    75	               | pointScore(Int) [function]
+    76	  syntax Bool ::= asBool(Val) [function]
+    77	
+    78	  rule <k> init => .K </k>
+    79	       <program> Module(DEFS) </program>
+    80	       <input> INPUT </input>
+    81	       <output> NoValue => invokeOrder(eval(INPUT, .Map, DEFS), DEFS) </output>
+    82	
+    83	  rule eval(Int(N), _, _) => IntVal(N)
+    84	  rule eval(ListExpr(ES), ENV, DEFS) => ListVal(evalExprs(ES, ENV, DEFS))
+    85	  rule eval(Name(X), ENV, _) => asVal(ENV[X])
+    86	    requires X in_keys(ENV)
+    87	  rule eval(Name("sorted"), _, _) => Builtin("sorted")
+    88	  rule eval(Name("sum"), _, _) => Builtin("sum")
+    89	  rule eval(Name("map"), _, _) => Builtin("map")
+    90	  rule eval(Name("int"), _, _) => Builtin("int")
+    91	  rule eval(Name("str"), _, _) => Builtin("str")
+    92	  rule eval(Name("abs"), _, _) => Builtin("abs")
+    93	  rule eval(KwArg(X, E), ENV, DEFS)
+    94	    => KeywordVal(X, eval(E, ENV, DEFS))
+    95	  rule eval(
+    96	         Lambda(
+    97	           Params("n"), CellVars(.Ids), FreeVars(.Ids),
+    98	           BinOp(
+    99	             "-",
+   100	             Call(
+   101	               Name("sum"),
+   102	               Call(
+   103	                 Name("map"), Name("int"),
+   104	                 Call(Name("str"), Call(Name("abs"), Name("n"))))),
+   105	             IfExp(
+   106	               Compare(Name("n"), CmpOp("<", Int(0))),
+   107	               BinOp(
+   108	                 "*", Int(2),
+   109	                 Call(
+   110	                   Name("int"),
+   111	                   Subscript(
+   112	                     Call(Name("str"), Call(Name("abs"), Name("n"))),
+   113	                     Int(0)))),
+   114	               Int(0)))),
+   115	         _, _)
+   116	    => PointKey
+   117	  rule eval(Call(F, ES), ENV, DEFS)
+   118	    => evalCall(eval(F, ENV, DEFS), evalExprs(ES, ENV, DEFS), DEFS)
+   119	
+   120	  rule eval(BinOp("-", L, R), ENV, DEFS)
+   121	    => IntVal(asInt(eval(L, ENV, DEFS)) -Int asInt(eval(R, ENV, DEFS)))
+   122	  rule eval(BinOp("*", L, R), ENV, DEFS)
+   123	    => IntVal(asInt(eval(L, ENV, DEFS)) *Int asInt(eval(R, ENV, DEFS)))
+   124	  rule eval(IfExp(C, T, _), ENV, DEFS) => eval(T, ENV, DEFS)
+   125	    requires asBool(eval(C, ENV, DEFS))
+   126	  rule eval(IfExp(C, _, F), ENV, DEFS) => eval(F, ENV, DEFS)
+   127	    requires notBool asBool(eval(C, ENV, DEFS))
+   128	  rule eval(Compare(L, CmpOp("<", R)), ENV, DEFS)
+   129	    => BoolVal(asInt(eval(L, ENV, DEFS)) <Int asInt(eval(R, ENV, DEFS)))
+   130	  rule eval(Subscript(E, I), ENV, DEFS)
+   131	    => subscript(eval(E, ENV, DEFS), eval(I, ENV, DEFS))
+   132	
+   133	  rule evalExprs(.Exprs, _, _) => .Vals
+   134	  rule evalExprs((E, ES), ENV, DEFS)
+   135	    => eval(E, ENV, DEFS), evalExprs(ES, ENV, DEFS)
+   136	
+   137	  rule evalCall(Builtin("abs"), IntVal(N), _)
+   138	    => IntVal(absInt(N))
+   139	  rule evalCall(Builtin("str"), IntVal(N), _)
+   140	    => DecimalVal(N)
+   141	    requires N >=Int 0
+   142	  rule evalCall(Builtin("map"), (Builtin("int"), DecimalVal(N)), _)
+   143	    => MappedDigits(N)
+   144	  rule evalCall(Builtin("sum"), MappedDigits(N), _)
+   145	    => IntVal(digitSum(N))
+   146	  rule evalCall(Builtin("int"), DigitVal(N), _)
+   147	    => IntVal(N)
+   148	  rule evalCall(Builtin("sorted"),
+   149	                (ListVal(VS), KeywordVal("key", KEY)), DEFS)
+   150	    => ListVal(sortWith(VS, KEY, DEFS))
+   151	
+   152	  rule subscript(DecimalVal(N), IntVal(0)) => DigitVal(leadingDigit(N))
+   153	
+   154	  rule invokeOrder(V, DEFS) => invokeOrderScan(V, DEFS, DEFS)
+   155	  rule invokeOrderScan(V,
+   156	         (FuncDef("order_by_points", Params("nums"), BODY) _REST), ALL)
+   157	    => exec(BODY, "nums" |-> V, ALL)
+   158	  rule invokeOrderScan(V, (FuncDef(X, _, _) REST), ALL)
+   159	    => invokeOrderScan(V, REST, ALL)
+   160	    requires X =/=String "order_by_points"
+   161	  rule exec((Return(E) _REST), ENV, DEFS) => eval(E, ENV, DEFS)
+   162	
+   163	  rule asInt(IntVal(N)) => N
+   164	  rule asBool(BoolVal(B)) => B
+   165	  rule asVal(V:Val) => V
+   166	  rule keyInt(PointKey, N, _) => pointScore(N)
+   167	
+   168	  rule sortWith(.Vals, _, _) => .Vals
+   169	  rule sortWith((IntVal(N), VS), KEY, DEFS)
+   170	    => insertWith(IntVal(N), sortWith(VS, KEY, DEFS), KEY, DEFS)
+   171	
+   172	  rule insertWith(V, .Vals, _, _) => V
+   173	  rule insertWith(IntVal(N), (IntVal(M), VS), KEY, DEFS)
+   174	    => IntVal(N), IntVal(M), VS
+   175	    requires keyInt(KEY, N, DEFS) <=Int keyInt(KEY, M, DEFS)
+   176	  rule insertWith(IntVal(N), (IntVal(M), VS), KEY, DEFS)
+   177	    => IntVal(M), insertWith(IntVal(N), VS, KEY, DEFS)
+   178	    requires keyInt(KEY, N, DEFS) >Int keyInt(KEY, M, DEFS)
+   179	
+   180	  rule digitSum(0) => 0
+   181	  rule digitSum(N) => (N %Int 10) +Int digitSum(N /Int 10)
+   182	    requires N >Int 0
+   183	
+   184	  rule leadingDigit(0) => 0
+   185	  rule leadingDigit(N) => N
+   186	    requires N >Int 0 andBool N <Int 10
+   187	  rule leadingDigit(N) => leadingDigit(N /Int 10)
+   188	    requires N >=Int 10
+   189	
+   190	  rule pointScore(N) => digitSum(N)
+   191	    requires N >=Int 0
+   192	  rule pointScore(N)
+   193	    => digitSum(0 -Int N) -Int (2 *Int leadingDigit(0 -Int N))
+   194	    requires N <Int 0
+   195	endmodule
++ semantic_numbering_rc=0
++ nl -ba /candidate/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY-SEMANTICS
+     5	  imports K-EQUAL
+     6	
+     7	  // A closed K representation of the AST emitted in solution.mpy.  The
+     8	  // execution claims use this term, while prove.sh separately regenerates and
+     9	  // executes solution.mpy through the parser.
+    10	  syntax Pgm ::= "solutionProgram" [function]
+    11	  syntax Stmts ::= "solutionDefs" [function]
+    12	
+    13	  rule solutionProgram => Module(solutionDefs)
+    14	  rule solutionDefs
+    15	    => FuncDef(
+    16	         "order_by_points", Params("nums"),
+    17	         Return(
+    18	           Call(
+    19	             Name("sorted"),
+    20	             Name("nums"),
+    21	             KwArg(
+    22	               "key",
+    23	               Lambda(
+    24	                 Params("n"), CellVars(.Ids), FreeVars(.Ids),
+    25	                 BinOp(
+    26	                   "-",
+    27	                   Call(
+    28	                     Name("sum"),
+    29	                     Call(
+    30	                       Name("map"), Name("int"),
+    31	                       Call(Name("str"), Call(Name("abs"), Name("n"))))),
+    32	                   IfExp(
+    33	                     Compare(Name("n"), CmpOp("<", Int(0))),
+    34	                     BinOp(
+    35	                       "*", Int(2),
+    36	                       Call(
+    37	                         Name("int"),
+    38	                         Subscript(
+    39	                           Call(
+    40	                             Name("str"), Call(Name("abs"), Name("n"))),
+    41	                           Int(0)))),
+    42	                     Int(0))))))))
+    43	
+    44	  // Independent, declarative reference sort.  Inserting the head before an
+    45	  // equal-score element makes this stable with respect to original position.
+    46	  syntax Vals ::= specSort(Vals) [function]
+    47	                | specInsert(Val, Vals) [function]
+    48	
+    49	  rule specSort(.Vals) => .Vals
+    50	  rule specSort((IntVal(N), VS))
+    51	    => specInsert(IntVal(N), specSort(VS))
+    52	
+    53	  rule specInsert(V, .Vals) => V
+    54	  rule specInsert(IntVal(N), (IntVal(M), VS))
+    55	    => IntVal(N), IntVal(M), VS
+    56	    requires pointScore(N) <=Int pointScore(M)
+    57	  rule specInsert(IntVal(N), (IntVal(M), VS))
+    58	    => IntVal(M), specInsert(IntVal(N), VS)
+    59	    requires pointScore(N) >Int pointScore(M)
+    60	
+    61	  syntax Bool ::= isOrdered(Vals) [function]
+    62	  rule isOrdered(.Vals) => true
+    63	  rule isOrdered(IntVal(_)) => true
+    64	  rule isOrdered((IntVal(N), IntVal(M), VS)) => isOrdered((IntVal(M), VS))
+    65	    requires pointScore(N) <=Int pointScore(M)
+    66	  rule isOrdered((IntVal(N), IntVal(M), _)) => false
+    67	    requires pointScore(N) >Int pointScore(M)
+    68	endmodule
++ verification_numbering_rc=0
++ nl -ba /candidate/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // The prompt's signed-leading-digit scoring convention.
+     7	  claim <py>
+     8	          <k> pointScore(-12) => 1 </k>
+     9	          <program> solutionProgram </program>
+    10	          <input> ListExpr(.Exprs) </input>
+    11	          <output> NoValue </output>
+    12	        </py>
+    13	  claim <py>
+    14	          <k> pointScore(-11) => 0 </k>
+    15	          <program> solutionProgram </program>
+    16	          <input> ListExpr(.Exprs) </input>
+    17	          <output> NoValue </output>
+    18	        </py>
+    19	  claim <py>
+    20	          <k> pointScore(-1) => -1 </k>
+    21	          <program> solutionProgram </program>
+    22	          <input> ListExpr(.Exprs) </input>
+    23	          <output> NoValue </output>
+    24	        </py>
+    25	  claim <py>
+    26	          <k> pointScore(11) => 2 </k>
+    27	          <program> solutionProgram </program>
+    28	          <input> ListExpr(.Exprs) </input>
+    29	          <output> NoValue </output>
+    30	        </py>
+    31	
+    32	  // For every list of integer values, the translated function selects the
+    33	  // semantics' stable key-sort with precisely the PointKey denotation.
+    34	  claim <py>
+    35	          <k>
+    36	            invokeOrder(ListVal(VS:Vals), solutionDefs)
+    37	            => ListVal(sortWith(VS, PointKey, solutionDefs))
+    38	          </k>
+    39	          <program> solutionProgram </program>
+    40	          <input> ListExpr(.Exprs) </input>
+    41	          <output> NoValue </output>
+    42	        </py>
+    43	
+    44	  // Base cases and both exhaustive comparison branches relate the executable
+    45	  // sorter to the independent stable-sort equations in verification.k.
+    46	  claim <py>
+    47	          <k> sortWith(.Vals, PointKey, solutionDefs) => specSort(.Vals) </k>
+    48	          <program> solutionProgram </program>
+    49	          <input> ListExpr(.Exprs) </input>
+    50	          <output> NoValue </output>
+    51	        </py>
+    52	
+    53	  claim <py>
+    54	          <k>
+    55	            sortWith(IntVal(N:Int), PointKey, solutionDefs)
+    56	            => specSort(IntVal(N))
+    57	          </k>
+    58	          <program> solutionProgram </program>
+    59	          <input> ListExpr(.Exprs) </input>
+    60	          <output> NoValue </output>
+    61	        </py>
+    62	
+    63	  claim <py>
+    64	          <k>
+    65	            insertWith(
+    66	              IntVal(N:Int), (IntVal(M:Int), .Vals), PointKey, solutionDefs)
+    67	            => specInsert(IntVal(N), (IntVal(M), .Vals))
+    68	          </k>
+    69	          <program> solutionProgram </program>
+    70	          <input> ListExpr(.Exprs) </input>
+    71	          <output> NoValue </output>
+    72	        </py>
+    73	    requires pointScore(N) <=Int pointScore(M)
+    74	
+    75	  claim <py>
+    76	          <k>
+    77	            insertWith(
+    78	              IntVal(N:Int), (IntVal(M:Int), .Vals), PointKey, solutionDefs)
+    79	            => specInsert(IntVal(N), (IntVal(M), .Vals))
+    80	          </k>
+    81	          <program> solutionProgram </program>
+    82	          <input> ListExpr(.Exprs) </input>
+    83	          <output> NoValue </output>
+    84	        </py>
+    85	    requires pointScore(N) >Int pointScore(M)
+    86	
+    87	  // End-to-end examples from the prompt plus boundary and stability cases.
+    88	  claim <py>
+    89	          <k> init => .K </k>
+    90	          <program> solutionProgram </program>
+    91	          <input>
+    92	            ListExpr(Int(1), Int(11), Int(-1), Int(-11), Int(-12))
+    93	          </input>
+    94	          <output>
+    95	            NoValue =>
+    96	            ListVal(IntVal(-1), IntVal(-11), IntVal(1), IntVal(-12), IntVal(11))
+    97	          </output>
+    98	        </py>
+    99	
+   100	  claim <py>
+   101	          <k> init => .K </k>
+   102	          <program> solutionProgram </program>
+   103	          <input> ListExpr(.Exprs) </input>
+   104	          <output> NoValue => ListVal(.Vals) </output>
+   105	        </py>
+   106	
+   107	  claim <py>
+   108	          <k> init => .K </k>
+   109	          <program> solutionProgram </program>
+   110	          <input> ListExpr(Int(12), Int(21), Int(-12), Int(3)) </input>
+   111	          <output>
+   112	            NoValue => ListVal(IntVal(-12), IntVal(12), IntVal(21), IntVal(3))
+   113	          </output>
+   114	        </py>
+   115	
+   116	  claim <py>
+   117	          <k>
+   118	            isOrdered(
+   119	              IntVal(-1), IntVal(-11), IntVal(1), IntVal(-12), IntVal(11))
+   120	            => true
+   121	          </k>
+   122	          <program> solutionProgram </program>
+   123	          <input> ListExpr(.Exprs) </input>
+   124	          <output> NoValue </output>
+   125	        </py>
+   126	endmodule
++ spec_numbering_rc=0
++ rg -n '^[[:space:]]*(syntax|configuration|rule|claim)([[:space:]]|$)' /candidate/semantic.k /candidate/verification.k /candidate/spec.k
+/candidate/spec.k
+7:  claim <py>
+13:  claim <py>
+19:  claim <py>
+25:  claim <py>
+34:  claim <py>
+46:  claim <py>
+53:  claim <py>
+63:  claim <py>
+75:  claim <py>
+88:  claim <py>
+100:  claim <py>
+107:  claim <py>
+116:  claim <py>
+
+/candidate/verification.k
+10:  syntax Pgm ::= "solutionProgram" [function]
+11:  syntax Stmts ::= "solutionDefs" [function]
+13:  rule solutionProgram => Module(solutionDefs)
+14:  rule solutionDefs
+46:  syntax Vals ::= specSort(Vals) [function]
+49:  rule specSort(.Vals) => .Vals
+50:  rule specSort((IntVal(N), VS))
+53:  rule specInsert(V, .Vals) => V
+54:  rule specInsert(IntVal(N), (IntVal(M), VS))
+57:  rule specInsert(IntVal(N), (IntVal(M), VS))
+61:  syntax Bool ::= isOrdered(Vals) [function]
+62:  rule isOrdered(.Vals) => true
+63:  rule isOrdered(IntVal(_)) => true
+64:  rule isOrdered((IntVal(N), IntVal(M), VS)) => isOrdered((IntVal(M), VS))
+66:  rule isOrdered((IntVal(N), IntVal(M), _)) => false
+
+/candidate/semantic.k
+6:  syntax Pgm ::= Module(Stmts)
+7:  syntax Stmts ::= List{Stmt, ""}
+8:  syntax Stmt ::= FuncDef(String, Params, Stmts)
+11:  syntax Params ::= Params(Ids)
+12:  syntax CellVars ::= CellVars(Ids)
+13:  syntax FreeVars ::= FreeVars(Ids)
+14:  syntax Ids ::= List{String, ","}
+16:  syntax Expr ::= Name(String)
+26:  syntax Exprs ::= List{Expr, ","}
+27:  syntax CmpOp ::= CmpOp(String, Expr)
+28:  syntax CmpOps ::= List{CmpOp, ","}
+38:  syntax KItem ::= "init"
+40:  syntax Val ::= IntVal(Int)
+51:  syntax Vals ::= List{Val, ","}
+53:  configuration
+61:  syntax Val ::= eval(Expr, Map, Stmts) [function]
+68:  syntax Vals ::= evalExprs(Exprs, Map, Stmts) [function]
+71:  syntax Int ::= keyInt(Val, Int, Stmts) [function]
+76:  syntax Bool ::= asBool(Val) [function]
+78:  rule <k> init => .K </k>
+83:  rule eval(Int(N), _, _) => IntVal(N)
+84:  rule eval(ListExpr(ES), ENV, DEFS) => ListVal(evalExprs(ES, ENV, DEFS))
+85:  rule eval(Name(X), ENV, _) => asVal(ENV[X])
+87:  rule eval(Name("sorted"), _, _) => Builtin("sorted")
+88:  rule eval(Name("sum"), _, _) => Builtin("sum")
+89:  rule eval(Name("map"), _, _) => Builtin("map")
+90:  rule eval(Name("int"), _, _) => Builtin("int")
+91:  rule eval(Name("str"), _, _) => Builtin("str")
+92:  rule eval(Name("abs"), _, _) => Builtin("abs")
+93:  rule eval(KwArg(X, E), ENV, DEFS)
+95:  rule eval(
+117:  rule eval(Call(F, ES), ENV, DEFS)
+120:  rule eval(BinOp("-", L, R), ENV, DEFS)
+122:  rule eval(BinOp("*", L, R), ENV, DEFS)
+124:  rule eval(IfExp(C, T, _), ENV, DEFS) => eval(T, ENV, DEFS)
+126:  rule eval(IfExp(C, _, F), ENV, DEFS) => eval(F, ENV, DEFS)
+128:  rule eval(Compare(L, CmpOp("<", R)), ENV, DEFS)
+130:  rule eval(Subscript(E, I), ENV, DEFS)
+133:  rule evalExprs(.Exprs, _, _) => .Vals
+134:  rule evalExprs((E, ES), ENV, DEFS)
+137:  rule evalCall(Builtin("abs"), IntVal(N), _)
+139:  rule evalCall(Builtin("str"), IntVal(N), _)
+142:  rule evalCall(Builtin("map"), (Builtin("int"), DecimalVal(N)), _)
+144:  rule evalCall(Builtin("sum"), MappedDigits(N), _)
+146:  rule evalCall(Builtin("int"), DigitVal(N), _)
+148:  rule evalCall(Builtin("sorted"),
+152:  rule subscript(DecimalVal(N), IntVal(0)) => DigitVal(leadingDigit(N))
+154:  rule invokeOrder(V, DEFS) => invokeOrderScan(V, DEFS, DEFS)
+155:  rule invokeOrderScan(V,
+158:  rule invokeOrderScan(V, (FuncDef(X, _, _) REST), ALL)
+161:  rule exec((Return(E) _REST), ENV, DEFS) => eval(E, ENV, DEFS)
+163:  rule asInt(IntVal(N)) => N
+164:  rule asBool(BoolVal(B)) => B
+165:  rule asVal(V:Val) => V
+166:  rule keyInt(PointKey, N, _) => pointScore(N)
+168:  rule sortWith(.Vals, _, _) => .Vals
+169:  rule sortWith((IntVal(N), VS), KEY, DEFS)
+172:  rule insertWith(V, .Vals, _, _) => V
+173:  rule insertWith(IntVal(N), (IntVal(M), VS), KEY, DEFS)
+176:  rule insertWith(IntVal(N), (IntVal(M), VS), KEY, DEFS)
+180:  rule digitSum(0) => 0
+181:  rule digitSum(N) => (N %Int 10) +Int digitSum(N /Int 10)
+184:  rule leadingDigit(0) => 0
+185:  rule leadingDigit(N) => N
+187:  rule leadingDigit(N) => leadingDigit(N /Int 10)
+190:  rule pointScore(N) => digitSum(N)
+192:  rule pointScore(N)
++ declaration_scan_rc=0
++ rg -n '\[(function|total|functional|simplification|concrete|priority|owise|symbol|anywhere)' /candidate/semantic.k /candidate/verification.k /candidate/spec.k
+/candidate/verification.k
+10:  syntax Pgm ::= "solutionProgram" [function]
+11:  syntax Stmts ::= "solutionDefs" [function]
+46:  syntax Vals ::= specSort(Vals) [function]
+47:                | specInsert(Val, Vals) [function]
+61:  syntax Bool ::= isOrdered(Vals) [function]
+
+/candidate/semantic.k
+61:  syntax Val ::= eval(Expr, Map, Stmts) [function]
+62:               | evalCall(Val, Vals, Stmts) [function]
+63:               | invokeOrder(Val, Stmts) [function]
+64:               | invokeOrderScan(Val, Stmts, Stmts) [function]
+65:               | exec(Stmts, Map, Stmts) [function]
+66:               | subscript(Val, Val) [function]
+67:               | asVal(KItem) [function]
+68:  syntax Vals ::= evalExprs(Exprs, Map, Stmts) [function]
+69:                | sortWith(Vals, Val, Stmts) [function]
+70:                | insertWith(Val, Vals, Val, Stmts) [function]
+71:  syntax Int ::= keyInt(Val, Int, Stmts) [function]
+72:               | asInt(Val) [function]
+73:               | digitSum(Int) [function]
+74:               | leadingDigit(Int) [function]
+75:               | pointScore(Int) [function]
+76:  syntax Bool ::= asBool(Val) [function]
++ attribute_scan_rc=0
++ set +x
+semantic_numbering_exit=0
+verification_numbering_exit=0
+spec_numbering_exit=0
+declaration_scan_exit=0
+attribute_scan_exit=0
+
+Script done on 2026-07-26 12:23:13-05:00 [COMMAND_EXIT_CODE="0"]

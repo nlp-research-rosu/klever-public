@@ -1,0 +1,219 @@
+Script started on 2026-07-28 17:11:58-05:00 [<not executed on terminal>]
++ nl -ba /reference/k-proof/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // The exact statement body emitted in solution.mpy.  Naming it keeps the
+     7	  // reachability claims readable; this equation is only syntactic sharing.
+     8	  syntax Stmts ::= largestDivisorBody() [function]
+     9	  rule largestDivisorBody()
+    10	    => Expr(Str("Return the largest positive divisor of n that is smaller than n."))
+    11	       Assign(Name("divisor"), BinOp("-", Name("n"), Int(1)))
+    12	       While(
+    13	         Compare(
+    14	           BinOp("%", Name("n"), Name("divisor")),
+    15	           CmpOp("!=", Int(0))),
+    16	         AugAssign(Name("divisor"), "-", Int(1)))
+    17	       Return(Name("divisor"))
+    18	
+    19	  // Mathematical reference result: scan the positive candidates strictly
+    20	  // below N in descending order and select the first divisor.  Thus the
+    21	  // result divides N, is below N, and no larger candidate below N divides N.
+    22	  syntax Int ::= largestProperDivisor(Int) [function]
+    23	               | firstDivisorAtOrBelow(Int, Int) [function]
+    24	
+    25	  rule largestProperDivisor(N:Int)
+    26	    => firstDivisorAtOrBelow(N, N -Int 1)
+    27	
+    28	  rule firstDivisorAtOrBelow(N:Int, D:Int) => D
+    29	    requires D >Int 0 andBool pyMod(N, D) ==Int 0
+    30	
+    31	  rule firstDivisorAtOrBelow(N:Int, D:Int)
+    32	    => firstDivisorAtOrBelow(N, D -Int 1)
+    33	    requires D >Int 1 andBool pyMod(N, D) =/=Int 0
+    34	
+    35	  // The symbolic Map backend leaves deletion of a symbolic frame as an
+    36	  // update term.  This extensional simplification is the Map fact used by
+    37	  // #pop: deleting the fresh key 1 restores the untouched remainder.
+    38	  rule
+    39	    (1 |-> _S:Scope SC:Map) [1 <- undef] => SC
+    40	    requires notBool 1 in_keys(SC)
+    41	    [simplification, label(deleteFreshFrame)]
+    42	endmodule
++ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module LOOP-SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Loop invariant/circularity: D is a positive candidate below N.  The
+     7	  // semantics and reference scan both either return D when it divides N or
+     8	  // continue with D - 1.  At D = 1 the non-divisor branch is impossible.
+     9	  claim
+    10	    <k>
+    11	      #while(
+    12	        Compare(
+    13	          BinOp("%", Name("n"), Name("divisor")),
+    14	          CmpOp("!=", Int(0))),
+    15	        AugAssign(Name("divisor"), "-", Int(1)))
+    16	      ~> Return(Name("divisor")) .Stmts
+    17	      ~> #endcall
+    18	      => firstDivisorAtOrBelow(N, D) ~> .K
+    19	    </k>
+    20	    <env> 1 => 0 </env>
+    21	    <scopes>
+    22	      SC:Map
+    23	      1 |-> scope(
+    24	        "n" |-> N
+    25	        "divisor" |-> D,
+    26	        parent(0))
+    27	      =>
+    28	      SC
+    29	    </scopes>
+    30	    <scopeLoc> 2 => 1 </scopeLoc>
+    31	    <heap> .Map </heap>
+    32	    <heapLoc> 0 </heapLoc>
+    33	    <stack> ListItem(frame(.K, 0, 1)) => .List </stack>
+    34	    <ret> noRet </ret>
+    35	    <exc> NoExc </exc>
+    36	    <exit-code> 0 </exit-code>
+    37	    requires N >Int 1 andBool D >=Int 1 andBool D <Int N
+    38	    [label(loopCorrect)]
+    39	endmodule
+    40	
+    41	module INIT-SPEC
+    42	  imports VERIFICATION
+    43	
+    44	  claim
+    45	    <k>
+    46	      Assign(Name("divisor"), BinOp("-", Name("n"), Int(1)))
+    47	      While(
+    48	        Compare(
+    49	          BinOp("%", Name("n"), Name("divisor")),
+    50	          CmpOp("!=", Int(0))),
+    51	        AugAssign(Name("divisor"), "-", Int(1)))
+    52	      Return(Name("divisor"))
+    53	      ~> #endcall
+    54	      =>
+    55	      #while(
+    56	        Compare(
+    57	          BinOp("%", Name("n"), Name("divisor")),
+    58	          CmpOp("!=", Int(0))),
+    59	        AugAssign(Name("divisor"), "-", Int(1)))
+    60	      ~> Return(Name("divisor")) .Stmts
+    61	      ~> #endcall
+    62	    </k>
+    63	    <env> 1 </env>
+    64	    <scopes>
+    65	      SC:Map
+    66	      1 |-> scope("n" |-> N, parent(0))
+    67	      =>
+    68	      SC
+    69	      1 |-> scope(
+    70	        "n" |-> N
+    71	        "divisor" |-> ?D:Int,
+    72	        parent(0))
+    73	    </scopes>
+    74	    <scopeLoc> 2 </scopeLoc>
+    75	    <heap> .Map </heap>
+    76	    <heapLoc> 0 </heapLoc>
+    77	    <stack> ListItem(frame(.K, 0, 1)) </stack>
+    78	    <ret> noRet </ret>
+    79	    <exc> NoExc </exc>
+    80	    <exit-code> 0 </exit-code>
+    81	    ensures ?D ==Int N -Int 1
+    82	    [label(initCorrect)]
+    83	endmodule
+    84	
+    85	module PREFIX-SPEC
+    86	  imports VERIFICATION
+    87	
+    88	  // Finite public-entry prefix: load the exact translated function, call it,
+    89	  // bind n, skip its docstring, initialize divisor, and reach the loop head.
+    90	  // LOOP-SPEC starts at precisely this state (with SC equal to the two global
+    91	  // scopes), so the two claims compose into the end-to-end result.
+    92	  claim
+    93	    <k>
+    94	      #loadAll(
+    95	        Module(
+    96	          FuncDef(
+    97	            "largest_divisor",
+    98	            Params("n"),
+    99	            largestDivisorBody())))
+   100	      ~> Call(Name("largest_divisor"), Int(N))
+   101	      =>
+   102	      #while(
+   103	        Compare(
+   104	          BinOp("%", Name("n"), Name("divisor")),
+   105	          CmpOp("!=", Int(0))),
+   106	        AugAssign(Name("divisor"), "-", Int(1)))
+   107	      ~> Return(Name("divisor")) .Stmts
+   108	      ~> #endcall
+   109	      ~> .K
+   110	    </k>
+   111	    <env> 0 => 1 </env>
+   112	    <scopes>
+   113	      0 |-> scope(.Map, parent(-1))
+   114	      -1 |-> builtinsScope
+   115	      =>
+   116	      0 |-> scope(
+   117	        "largest_divisor" |->
+   118	          closureVal("n", largestDivisorBody(), 0),
+   119	        parent(-1))
+   120	      -1 |-> builtinsScope
+   121	      1 |-> scope(
+   122	        "n" |-> N
+   123	        "divisor" |-> ?D:Int,
+   124	        parent(0))
+   125	    </scopes>
+   126	    <scopeLoc> 1 => 2 </scopeLoc>
+   127	    <heap> .Map </heap>
+   128	    <heapLoc> 0 </heapLoc>
+   129	    <stack> .List => ListItem(frame(.K, 0, 1)) </stack>
+   130	    <ret> noRet </ret>
+   131	    <exc> NoExc </exc>
+   132	    <exit-code> 0 </exit-code>
+   133	    requires N >Int 1
+   134	    ensures ?D ==Int N -Int 1
+   135	    [label(prefixCorrect)]
+   136	endmodule
++ nl -ba /reference/k-proof/solution.py
+     1	def largest_divisor(n: int) -> int:
+     2	    """Return the largest positive divisor of n that is smaller than n."""
+     3	    divisor = n - 1
+     4	    while n % divisor != 0:
+     5	        divisor -= 1
+     6	    return divisor
++ nl -ba /reference/k-proof/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Translate the submitted implementation and the concrete assertion program.
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	python3 py2mpy.py concrete-tests.py > concrete-tests.mpy
+     7	
+     8	# Mandated concrete LLVM definition and execution.
+     9	kompile reference-semantics/semantics.k \
+    10	  --backend llvm \
+    11	  --main-module MPY-KRUN \
+    12	  --syntax-module MPY-SYNTAX \
+    13	  --output-definition runtime-kompiled
+    14	krun concrete-tests.mpy --definition runtime-kompiled
+    15	
+    16	# Base symbolic definition: imports MPY, but never MPY-CONCRETE.
+    17	kompile verification.k \
+    18	  --backend haskell \
+    19	  --main-module VERIFICATION \
+    20	  --syntax-module MPY-SYNTAX \
+    21	  --output-definition verification-kompiled
+    22	
+    23	# Every positive proof command below must print #Top and exit zero.
+    24	kprove spec.k --definition verification-kompiled --spec-module PREFIX-SPEC
+    25	kprove spec.k --definition verification-kompiled --spec-module INIT-SPEC
+    26	kprove spec.k --definition verification-kompiled --spec-module LOOP-SPEC
++ nl -ba /reference/k-proof/init-spec.json
+     1	{"format":"KAST","version":3,"term":{"node":"KFlatModuleList","mainModule":"INIT-SPEC","term":[{"node":"KFlatModule","name":"INIT-SPEC","imports":[{"node":"KImport","name":"VERIFICATION","isPublic":true}],"localSentences":[{"node":"KClaim","body":{"node":"KApply","label":{"node":"KLabel","name":"<generatedTop>","params":[]},"arity":11,"args":[{"node":"KApply","label":{"node":"KLabel","name":"<k>","params":[]},"arity":1,"args":[{"node":"KRewrite","lhs":{"node":"KSequence","arity":2,"items":[{"node":"KApply","label":{"node":"KLabel","name":"___MPY-SYNTAX_Stmts_Stmt_Stmts","params":[]},"arity":2,"args":[{"node":"KApply","label":{"node":"KLabel","name":"Assign(_,_)_MPY-SYNTAX_Stmt_Expr_Expr","params":[]},"arity":2,"args":[{"node":"KApply","label":{"node":"KLabel","name":"Name(_)_MPY-SYNTAX_Expr_String","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"divisor\""}]},{"node":"KApply","label":{"node":"KLabel","name":"BinOp(_,_,_)_MPY-SYNTAX_Expr_String_Expr_Expr","params":[]},"arity":3,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"-\""},{"node":"KApply","label":{"node":"KLabel","name":"Name(_)_MPY-SYNTAX_Expr_String","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"n\""}]},{"node":"KApply","label":{"node":"KLabel","name":"Int(_)_MPY-SYNTAX_Expr_Int","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"1"}]}]}]},{"node":"KApply","label":{"node":"KLabel","name":"___MPY-SYNTAX_Stmts_Stmt_Stmts","params":[]},"arity":2,"args":[{"node":"KApply","label":{"node":"KLabel","name":"While(_,_)_MPY-SYNTAX_Stmt_Expr_Stmts","params":[]},"arity":2,"args":[{"node":"KApply","label":{"node":"KLabel","name":"Compare(_,_)_MPY-SYNTAX_Expr_Expr_CmpOp","params":[]},"arity":2,"args":[{"node":"KApply","label":{"node":"KLabel","name":"BinOp(_,_,_)_MPY-SYNTAX_Expr_String_Expr_Expr","params":[]},"arity":3,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"%\""},{"node":"KApply","label":{"node":"KLabel","name":"Name(_)_MPY-SYNTAX_Expr_String","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"n\""}]},{"node":"KApply","label":{"node":"KLabel","name":"Name(_)_MPY-SYNTAX_Expr_String","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"divisor\""}]}]},{"node":"KApply","label":{"node":"KLabel","name":"CmpOp(_,_)_MPY-SYNTAX_CmpOp_String_Expr","params":[]},"arity":2,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"!=\""},{"node":"KApply","label":{"node":"KLabel","name":"Int(_)_MPY-SYNTAX_Expr_Int","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"0"}]}]}]},{"node":"KApply","label":{"node":"KLabel","name":"___MPY-SYNTAX_Stmts_Stmt_Stmts","params":[]},"arity":2,"args":[{"node":"KApply","label":{"node":"KLabel","name":"AugAssign(_,_,_)_MPY-SYNTAX_Stmt_Expr_String_Expr","params":[]},"arity":3,"args":[{"node":"KApply","label":{"node":"KLabel","name":"Name(_)_MPY-SYNTAX_Expr_String","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"divisor\""}]},{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"-\""},{"node":"KApply","label":{"node":"KLabel","name":"Int(_)_MPY-SYNTAX_Expr_Int","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"1"}]}]},{"node":"KApply","label":{"node":"KLabel","name":".List{\"___MPY-SYNTAX_Stmts_Stmt_Stmts\"}_Stmts","params":[]},"arity":0,"args":[]}]}]},{"node":"KApply","label":{"node":"KLabel","name":"___MPY-SYNTAX_Stmts_Stmt_Stmts","params":[]},"arity":2,"args":[{"node":"KApply","label":{"node":"KLabel","name":"Return(_)_MPY-SYNTAX_Stmt_Expr","params":[]},"arity":1,"args":[{"node":"KApply","label":{"node":"KLabel","name":"Name(_)_MPY-SYNTAX_Expr_String","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"divisor\""}]}]},{"node":"KApply","label":{"node":"KLabel","name":".List{\"___MPY-SYNTAX_Stmts_Stmt_Stmts\"}_Stmts","params":[]},"arity":0,"args":[]}]}]}]},{"node":"KApply","label":{"node":"KLabel","name":"#endcall_MPY-FUNCTIONS_KItem","params":[]},"arity":0,"args":[]}]},"rhs":{"node":"KSequence","arity":3,"items":[{"node":"KApply","label":{"node":"KLabel","name":"#while(_,_)_MPY-CONTROLS_KItem_Expr_Stmts","params":[]},"arity":2,"args":[{"node":"KApply","label":{"node":"KLabel","name":"Compare(_,_)_MPY-SYNTAX_Expr_Expr_CmpOp","params":[]},"arity":2,"args":[{"node":"KApply","label":{"node":"KLabel","name":"BinOp(_,_,_)_MPY-SYNTAX_Expr_String_Expr_Expr","params":[]},"arity":3,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"%\""},{"node":"KApply","label":{"node":"KLabel","name":"Name(_)_MPY-SYNTAX_Expr_String","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"n\""}]},{"node":"KApply","label":{"node":"KLabel","name":"Name(_)_MPY-SYNTAX_Expr_String","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"divisor\""}]}]},{"node":"KApply","label":{"node":"KLabel","name":"CmpOp(_,_)_MPY-SYNTAX_CmpOp_String_Expr","params":[]},"arity":2,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"!=\""},{"node":"KApply","label":{"node":"KLabel","name":"Int(_)_MPY-SYNTAX_Expr_Int","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"0"}]}]}]},{"node":"KApply","label":{"node":"KLabel","name":"___MPY-SYNTAX_Stmts_Stmt_Stmts","params":[]},"arity":2,"args":[{"node":"KApply","label":{"node":"KLabel","name":"AugAssign(_,_,_)_MPY-SYNTAX_Stmt_Expr_String_Expr","params":[]},"arity":3,"args":[{"node":"KApply","label":{"node":"KLabel","name":"Name(_)_MPY-SYNTAX_Expr_String","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"divisor\""}]},{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"-\""},{"node":"KApply","label":{"node":"KLabel","name":"Int(_)_MPY-SYNTAX_Expr_Int","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"1"}]}]},{"node":"KApply","label":{"node":"KLabel","name":".List{\"___MPY-SYNTAX_Stmts_Stmt_Stmts\"}_Stmts","params":[]},"arity":0,"args":[]}]}]},{"node":"KApply","label":{"node":"KLabel","name":"Return(_)_MPY-SYNTAX_Stmt_Expr","params":[]},"arity":1,"args":[{"node":"KApply","label":{"node":"KLabel","name":"Name(_)_MPY-SYNTAX_Expr_String","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"divisor\""}]}]},{"node":"KApply","label":{"node":"KLabel","name":"#endcall_MPY-FUNCTIONS_KItem","params":[]},"arity":0,"args":[]}]}}]},{"node":"KApply","label":{"node":"KLabel","name":"<env>","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"1"}]},{"node":"KApply","label":{"node":"KLabel","name":"<scopes>","params":[]},"arity":1,"args":[{"node":"KRewrite","lhs":{"node":"KApply","label":{"node":"KLabel","name":"_Map_","params":[]},"arity":2,"args":[{"node":"KVariable","name":"SC","sort":{"node":"KSort","name":"Map"}},{"node":"KApply","label":{"node":"KLabel","name":"_|->_","params":[]},"arity":2,"args":[{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"1"},{"node":"KApply","label":{"node":"KLabel","name":"scope(_,_)_MPY-CORE_Scope_Map_Parent","params":[]},"arity":2,"args":[{"node":"KApply","label":{"node":"KLabel","name":"_|->_","params":[]},"arity":2,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"n\""},{"node":"KVariable","name":"N","sort":{"node":"KSort","name":"Int"}}]},{"node":"KApply","label":{"node":"KLabel","name":"parent(_)_MPY-CORE_Parent_Int","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"0"}]}]}]}]},"rhs":{"node":"KApply","label":{"node":"KLabel","name":"_Map_","params":[]},"arity":2,"args":[{"node":"KVariable","name":"SC","sort":{"node":"KSort","name":"Map"}},{"node":"KApply","label":{"node":"KLabel","name":"_|->_","params":[]},"arity":2,"args":[{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"1"},{"node":"KApply","label":{"node":"KLabel","name":"scope(_,_)_MPY-CORE_Scope_Map_Parent","params":[]},"arity":2,"args":[{"node":"KApply","label":{"node":"KLabel","name":"_Map_","params":[]},"arity":2,"args":[{"node":"KApply","label":{"node":"KLabel","name":"_|->_","params":[]},"arity":2,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"n\""},{"node":"KVariable","name":"N","sort":{"node":"KSort","name":"Int"}}]},{"node":"KApply","label":{"node":"KLabel","name":"_|->_","params":[]},"arity":2,"args":[{"node":"KToken","sort":{"node":"KSort","name":"String"},"token":"\"divisor\""},{"node":"KVariable","name":"?D","sort":{"node":"KSort","name":"Int"}}]}]},{"node":"KApply","label":{"node":"KLabel","name":"parent(_)_MPY-CORE_Parent_Int","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"0"}]}]}]}]}}]},{"node":"KApply","label":{"node":"KLabel","name":"<scopeLoc>","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"2"}]},{"node":"KApply","label":{"node":"KLabel","name":"<heap>","params":[]},"arity":1,"args":[{"node":"KApply","label":{"node":"KLabel","name":".Map","params":[]},"arity":0,"args":[]}]},{"node":"KApply","label":{"node":"KLabel","name":"<heapLoc>","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"0"}]},{"node":"KApply","label":{"node":"KLabel","name":"<stack>","params":[]},"arity":1,"args":[{"node":"KApply","label":{"node":"KLabel","name":"ListItem","params":[]},"arity":1,"args":[{"node":"KApply","label":{"node":"KLabel","name":"frame(_,_,_)_MPY-FUNCTIONS_KItem_K_Int_Int","params":[]},"arity":3,"args":[{"node":"KSequence","arity":0,"items":[]},{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"0"},{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"1"}]}]}]},{"node":"KApply","label":{"node":"KLabel","name":"<ret>","params":[]},"arity":1,"args":[{"node":"KApply","label":{"node":"KLabel","name":"noRet_MPY-CORE_RetState","params":[]},"arity":0,"args":[]}]},{"node":"KApply","label":{"node":"KLabel","name":"<exc>","params":[]},"arity":1,"args":[{"node":"KApply","label":{"node":"KLabel","name":"NoExc_MPY-CORE_Exc","params":[]},"arity":0,"args":[]}]},{"node":"KApply","label":{"node":"KLabel","name":"<exit-code>","params":[]},"arity":1,"args":[{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"0"}]},{"node":"KApply","label":{"node":"KLabel","name":"<generatedCounter>","params":[]},"arity":1,"args":[{"node":"KRewrite","lhs":{"node":"KVariable","name":"_Gen0","sort":{"node":"KSort","name":"Int"}},"rhs":{"node":"KVariable","name":"?_Gen1","sort":{"node":"KSort","name":"Int"}}}]}]},"requires":{"node":"KToken","sort":{"node":"KSort","name":"Bool"},"token":"true"},"ensures":{"node":"KApply","label":{"node":"KLabel","name":"_==Int_","params":[]},"arity":2,"args":[{"node":"KVariable","name":"?D","sort":{"node":"KSort","name":"Int"}},{"node":"KApply","label":{"node":"KLabel","name":"_-Int_","params":[]},"arity":2,"args":[{"node":"KVariable","name":"N","sort":{"node":"KSort","name":"Int"}},{"node":"KToken","sort":{"node":"KSort","name":"Int"},"token":"1"}]}]},"att":{"node":"KAtt","att":{"org.kframework.definition.Production":{"node":"KProduction","klabel":{"node":"KLabel","name":"#ruleEnsures","params":[]},"productionItems":[{"node":"KNonTerminal","sort":{"node":"KSort","name":"#RuleBody"}},{"node":"KTerminal","value":"ensures"},{"node":"KNonTerminal","sort":{"node":"KSort","name":"Bool"}}],"params":[],"sort":{"node":"KSort","name":"#RuleContent"},"att":{"node":"KAtt","att":{"symbol":"#ruleEnsures","org.kframework.attributes.Location":[347,27,347,93],"org.kframework.attributes.Source":"/usr/include/kframework/builtin/kast.md"}}},"UNIQUE_ID":"7c0e49255896a9f927179eac65c668083403db519ca86ac9bb16080587024f4d","label":"initCorrect","org.kframework.attributes.Source":"/work/spec.k","org.kframework.attributes.Location":[45,5,81,30]}}}],"att":{"node":"KAtt","att":{"org.kframework.attributes.Location":[41,1,83,10],"org.kframework.attributes.Source":"/work/spec.k","digest":"9aJAngbPNLrD4EU01xyoZxlTsWa2piGkymOa0ZqEqCk="}}}]}}
+
+Script done on 2026-07-28 17:11:59-05:00 [COMMAND_EXIT_CODE="0"]

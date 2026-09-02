@@ -1,0 +1,104 @@
+Script started on 2026-07-31 07:45:48-05:00 [<not executed on terminal>]
+            )
+    elif existing:
+        raise AuditContractError(
+            "unselected Stage 2 execution exists; recover or select it before retry"
+        )
+    number = len(existing) + 1
+    name = f"{number:03d}"
+    destination = executions / name
+    try:
+        destination.mkdir()
+        (destination / "evidence").mkdir()
+    except OSError as error:
+        if destination.exists():
+            try:
+                destination.rmdir()
+            except OSError:
+                pass
+        raise AuditContractError(
+            f"cannot allocate Stage 2 execution {name}"
+        ) from error
+    return destination.resolve(strict=True)
+
+
+def stage2_eligibility(
+    repo: Path, run_id: str, problem: str
+) -> dict[str, object]:
+    pipeline_contract = _pipeline_contract_module()
+    try:
+        task, _state, _run = pipeline_contract._resolve_task_state(
+            repo, run_id, problem
+        )
+        pipeline_contract.require_task_unblocked(task, "Stage 2")
+    except pipeline_contract.PipelineContractError as error:
+        raise AuditContractError(str(error)) from error
+    stage = require_real_directory(task / "02-k-audit", "Stage 2")
+    selected = read_regular_json(
+        require_regular_file(stage / "selected.json", "Stage 2 selection")
+    )
+    relative = selected.get("relative_path")
+    if not isinstance(relative, str):
+        raise AuditContractError("Stage 2 selected path is malformed")
+    parts = Path(relative).parts
+    if len(parts) != 2 or parts[0] != "executions":
+        raise AuditContractError("Stage 2 selected path escapes executions")
+    execution = require_direct_child(
+        require_real_directory(stage / "executions", "Stage 2 executions"),
+        parts[1],
+        "selected Stage 2 execution",
+    )
+    try:
+        current_hash = pipeline_contract.sha256_tree(execution)
+    except pipeline_contract.PipelineContractError as error:
+        raise AuditContractError(str(error)) from error
+    if current_hash != selected.get("artifact_sha256"):
+        raise AuditContractError(
+            "selected Stage 2 audit changed after selection"
+        )
+    verdict = read_regular_json(
+        require_regular_file(execution / "verdict.json", "Stage 2 verdict")
+    )
+    if verdict.get("audit_status") != "COMPLETE":
+        raise AuditContractError("Stage 2 selected audit is not complete")
+    value = verdict.get("verdict")
+    legitimacy = verdict.get("legitimacy")
+    if (value, legitimacy) not in VALID_PAIRS:
+        raise AuditContractError("Stage 2 verdict is inconsistent")
+    if selected.get("status") != value:
+        raise AuditContractError(
+            "Stage 2 selection status differs from its verdict"
+        )
+    return {
+        "eligible": legitimacy == "LEGIT",
+        "verdict": value,
+        "legitimacy": legitimacy,
+        "selected_relative_path": relative,
+        "selected_artifact_sha256": current_hash,
+        "selected_verdict_sha256": pipeline_contract.sha256_file(
+            execution / "verdict.json"
+        ),
+    }
+
+
+def _audit_error(message: str) -> dict[str, object]:
+    return {
+        "audit_status": "AUDIT_ERROR",
+        "verdict": None,
+        "legitimacy": None,
+        "error": message,
+    }
+
+
+def normalize_verdict(
+    review_text: str,
+    model_exit_code: int,
+    harness_exit_code: int,
+    timed_out: bool,
+) -> dict[str, object]:
+    if harness_exit_code != 0:
+        return _audit_error(
+            f"audit harness exited with status {harness_exit_code}"
+        )
+
+Script done on 2026-07-31 07:45:48-05:00 [COMMAND_EXIT_CODE="0"]

@@ -1,0 +1,402 @@
+Script started on 2026-07-28 17:11:37-05:00 [<not executed on terminal>]
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // A declarative fold used only on claim right-hand sides.  It describes
+     7	  // the mathematical result of consuming a valid suffix from loop state
+     8	  // (CUR, DEPTH, ACC), independently of Python control-flow machinery.
+     9	  syntax ValSeq ::= scanGroups(IntSeq, IntSeq, Int, ValSeq) [function, total]
+    10	  rule scanGroups(.IntSeq, _CUR:IntSeq, _DEPTH:Int, ACC:ValSeq)
+    11	    => ACC
+    12	  rule scanGroups(iCons(32, REST:IntSeq), CUR:IntSeq,
+    13	                  DEPTH:Int, ACC:ValSeq)
+    14	    => scanGroups(REST, CUR, DEPTH, ACC)
+    15	  rule scanGroups(iCons(40, REST:IntSeq), CUR:IntSeq,
+    16	                  DEPTH:Int, ACC:ValSeq)
+    17	    => scanGroups(REST,
+    18	                  seqConcat(CUR, iCons(40, .IntSeq)),
+    19	                  DEPTH +Int 1,
+    20	                  ACC)
+    21	  rule scanGroups(iCons(C:Int, REST:IntSeq), CUR:IntSeq,
+    22	                  DEPTH:Int, ACC:ValSeq)
+    23	    => scanClose(C, REST, CUR, DEPTH, ACC)
+    24	    [owise]
+    25	
+    26	  syntax ValSeq ::= scanClose(Int, IntSeq, IntSeq, Int, ValSeq)
+    27	                    [function, total]
+    28	  rule scanClose(C:Int, REST:IntSeq, CUR:IntSeq,
+    29	                 DEPTH:Int, ACC:ValSeq)
+    30	    => scanGroups(
+    31	         REST,
+    32	         .IntSeq,
+    33	         0,
+    34	         valSeqConcat(
+    35	           ACC,
+    36	           vCons(str(seqConcat(CUR, iCons(C, .IntSeq))), .ValSeq)))
+    37	    requires DEPTH -Int 1 ==Int 0
+    38	  rule scanClose(C:Int, REST:IntSeq, CUR:IntSeq,
+    39	                 DEPTH:Int, ACC:ValSeq)
+    40	    => scanGroups(REST,
+    41	                  seqConcat(CUR, iCons(C, .IntSeq)),
+    42	                  DEPTH -Int 1,
+    43	                  ACC)
+    44	    requires DEPTH -Int 1 =/=Int 0
+    45	
+    46	  // balancedTail(CODES, DEPTH) is the contract domain: only spaces and
+    47	  // parentheses occur, no suffix prefix underflows DEPTH, and final depth is
+    48	  // zero. This admits spaces anywhere and adjacent top-level groups.
+    49	  syntax Bool ::= balancedTail(IntSeq, Int) [function, total]
+    50	  rule balancedTail(.IntSeq, DEPTH:Int) => DEPTH ==Int 0
+    51	  rule balancedTail(iCons(32, REST:IntSeq), DEPTH:Int)
+    52	    => balancedTail(REST, DEPTH)
+    53	  rule balancedTail(iCons(40, REST:IntSeq), DEPTH:Int)
+    54	    => balancedTail(REST, DEPTH +Int 1)
+    55	  rule balancedTail(iCons(C:Int, REST:IntSeq), DEPTH:Int)
+    56	    => C ==Int 41 andBool DEPTH >Int 0
+    57	       andBool balancedTail(REST, DEPTH -Int 1)
+    58	    requires C =/=Int 32 andBool C =/=Int 40
+    59	
+    60	  syntax Bool ::= parenSpaceOnly(IntSeq) [function, total]
+    61	  rule parenSpaceOnly(.IntSeq) => true
+    62	  rule parenSpaceOnly(iCons(C:Int, REST:IntSeq))
+    63	    => (C ==Int 32 orBool C ==Int 40 orBool C ==Int 41)
+    64	       andBool parenSpaceOnly(REST)
+    65	
+    66	  // The closure below is the exact FuncDef body emitted in solution.mpy.
+    67	  // Naming it keeps the claims readable; the macro adds no behavior.
+    68	  syntax Val ::= "solutionClosure" [macro]
+    69	  rule solutionClosure
+    70	    => closureVal(
+    71	         ("paren_string", .ParamNames),
+    72	         Assign(Name("groups"), ListExpr(.Exprs))
+    73	         Assign(Name("current"), Str(""))
+    74	         Assign(Name("depth"), Int(0))
+    75	         For(Name("character"), Name("paren_string"),
+    76	           If(Compare(Name("character"), CmpOp("==", Str(" "))),
+    77	             Continue .Stmts,
+    78	             .Stmts)
+    79	           AugAssign(Name("current"), "+", Name("character"))
+    80	           If(Compare(Name("character"), CmpOp("==", Str("("))),
+    81	             AugAssign(Name("depth"), "+", Int(1)) .Stmts,
+    82	             AugAssign(Name("depth"), "-", Int(1)) .Stmts)
+    83	           If(Compare(Name("depth"), CmpOp("==", Int(0))),
+    84	             Expr(Call(Attribute(Name("groups"), "append"),
+    85	                       (Name("current"), .Exprs)))
+    86	             Assign(Name("current"), Str(""))
+    87	             .Stmts,
+    88	             .Stmts)
+    89	           .Stmts)
+    90	         Return(Name("groups"))
+    91	         .Stmts,
+    92	         0)
+    93	
+    94	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Universal loop invariant.  Symbolic execution narrows CODES one
+     7	  // constructor at a time and uses this claim circularly on the remaining
+     8	  // suffix.  It covers every contract-valid input, not just the examples.
+     9	  claim [all-balanced-inputs]:
+    10	    <k>
+    11	      #loop(
+    12	        str(CODES:IntSeq),
+    13	        Name("character"),
+    14	        If(Compare(Name("character"), CmpOp("==", Str(" "))),
+    15	          Continue .Stmts,
+    16	          .Stmts)
+    17	        AugAssign(Name("current"), "+", Name("character"))
+    18	        If(Compare(Name("character"), CmpOp("==", Str("("))),
+    19	          AugAssign(Name("depth"), "+", Int(1)) .Stmts,
+    20	          AugAssign(Name("depth"), "-", Int(1)) .Stmts)
+    21	        If(Compare(Name("depth"), CmpOp("==", Int(0))),
+    22	          Expr(Call(Attribute(Name("groups"), "append"),
+    23	                    (Name("current"), .Exprs)))
+    24	          Assign(Name("current"), Str(""))
+    25	          .Stmts,
+    26	          .Stmts)
+    27	        .Stmts)
+    28	      ~> KONT:K
+    29	      => KONT
+    30	    </k>
+    31	    <env> 1 </env>
+    32	    <scopes>
+    33	      RESTSCOPES:Map
+    34	      1 |-> scope(
+    35	             "character" |-> (OLD:Val => ?FINAL:Val)
+    36	             "current"   |-> (str(CUR:IntSeq) => str(.IntSeq))
+    37	             "depth"     |-> (DEPTH:Int => 0)
+    38	             "groups"    |-> ref(H:Int)
+    39	             "paren_string" |-> INPUT:Val,
+    40	             parent(0))
+    41	    </scopes>
+    42	    <heap>
+    43	      H |-> list(ACC:ValSeq)
+    44	      => H |-> list(scanGroups(CODES, CUR, DEPTH, ACC))
+    45	    </heap>
+    46	    requires balancedTail(CODES, DEPTH)
+    47	     andBool parenSpaceOnly(CODES)
+    48	     andBool DEPTH >=Int 0
+    49	     andBool (DEPTH >Int 0 orBool CUR ==K .IntSeq)
+    50	
+    51	  // End-to-end public-entry proof.  The universal loop claim discharges the
+    52	  // recursive phase after the ordinary call/allocation prefix has executed.
+    53	  claim [all-balanced-calls]:
+    54	    <k> Call(Name("separate_paren_groups"),
+    55	             (str(CODES:IntSeq), .Exprs))
+    56	        => ref(0) </k>
+    57	    <env> 0 </env>
+    58	    <scopes>
+    59	      -1 |-> builtinsScope
+    60	      0  |-> scope("separate_paren_groups" |-> solutionClosure,
+    61	                   parent(-1))
+    62	    </scopes>
+    63	    <scopeLoc> 1 </scopeLoc>
+    64	    <heap>
+    65	      .Map
+    66	      => 0 |-> list(scanGroups(CODES, .IntSeq, 0, .ValSeq))
+    67	    </heap>
+    68	    <heapLoc> 0 => 1 </heapLoc>
+    69	    <stack> .List </stack>
+    70	    <ret> noRet </ret>
+    71	    <exc> NoExc </exc>
+    72	    requires balancedTail(CODES, 0)
+    73	     andBool parenSpaceOnly(CODES)
+    74	
+    75	  claim [empty]:
+    76	    <k> Call(Name("separate_paren_groups"),
+    77	             (str(.IntSeq), .Exprs))
+    78	        => ref(0) </k>
+    79	    <env> 0 </env>
+    80	    <scopes>
+    81	      -1 |-> builtinsScope
+    82	      0  |-> scope("separate_paren_groups" |-> solutionClosure,
+    83	                   parent(-1))
+    84	    </scopes>
+    85	    <scopeLoc> 1 </scopeLoc>
+    86	    <heap> .Map => 0 |-> list(.ValSeq) </heap>
+    87	    <heapLoc> 0 => 1 </heapLoc>
+    88	    <stack> .List </stack>
+    89	    <ret> noRet </ret>
+    90	    <exc> NoExc </exc>
+    91	
+    92	  claim [prompt-example]:
+    93	    <k> Call(Name("separate_paren_groups"),
+    94	             (str(strToCodes("( ) (( )) (( )( ))")), .Exprs))
+    95	        => ref(0) </k>
+    96	    <env> 0 </env>
+    97	    <scopes>
+    98	      -1 |-> builtinsScope
+    99	      0  |-> scope("separate_paren_groups" |-> solutionClosure,
+   100	                   parent(-1))
+   101	    </scopes>
+   102	    <scopeLoc> 1 </scopeLoc>
+   103	    <heap>
+   104	      .Map
+   105	      => 0 |-> list(
+   106	           vCons(str(strToCodes("()")),
+   107	           vCons(str(strToCodes("(())")),
+   108	           vCons(str(strToCodes("(()())")), .ValSeq))))
+   109	    </heap>
+   110	    <heapLoc> 0 => 1 </heapLoc>
+   111	    <stack> .List </stack>
+   112	    <ret> noRet </ret>
+   113	    <exc> NoExc </exc>
+   114	
+   115	  claim [adjacent-and-spaced]:
+   116	    <k> Call(Name("separate_paren_groups"),
+   117	             (str(strToCodes("  (()())() ")), .Exprs))
+   118	        => ref(0) </k>
+   119	    <env> 0 </env>
+   120	    <scopes>
+   121	      -1 |-> builtinsScope
+   122	      0  |-> scope("separate_paren_groups" |-> solutionClosure,
+   123	                   parent(-1))
+   124	    </scopes>
+   125	    <scopeLoc> 1 </scopeLoc>
+   126	    <heap>
+   127	      .Map
+   128	      => 0 |-> list(
+   129	           vCons(str(strToCodes("(()())")),
+   130	           vCons(str(strToCodes("()")), .ValSeq)))
+   131	    </heap>
+   132	    <heapLoc> 0 => 1 </heapLoc>
+   133	    <stack> .List </stack>
+   134	    <ret> noRet </ret>
+   135	    <exc> NoExc </exc>
+   136	
+   137	  claim [deep-nesting]:
+   138	    <k> Call(Name("separate_paren_groups"),
+   139	             (str(strToCodes("(((())))")), .Exprs))
+   140	        => ref(0) </k>
+   141	    <env> 0 </env>
+   142	    <scopes>
+   143	      -1 |-> builtinsScope
+   144	      0  |-> scope("separate_paren_groups" |-> solutionClosure,
+   145	                   parent(-1))
+   146	    </scopes>
+   147	    <scopeLoc> 1 </scopeLoc>
+   148	    <heap>
+   149	      .Map
+   150	      => 0 |-> list(vCons(str(strToCodes("(((())))")), .ValSeq))
+   151	    </heap>
+   152	    <heapLoc> 0 => 1 </heapLoc>
+   153	    <stack> .List </stack>
+   154	    <ret> noRet </ret>
+   155	    <exc> NoExc </exc>
+   156	
+   157	endmodule
+     1	from typing import List
+     2	
+     3	
+     4	def separate_paren_groups(paren_string: str) -> List[str]:
+     5	    groups = []
+     6	    current = ""
+     7	    depth = 0
+     8	
+     9	    for character in paren_string:
+    10	        if character == " ":
+    11	            continue
+    12	
+    13	        current += character
+    14	        if character == "(":
+    15	            depth += 1
+    16	        else:
+    17	            depth -= 1
+    18	
+    19	        if depth == 0:
+    20	            groups.append(current)
+    21	            current = ""
+    22	
+    23	    return groups
+     1	from typing import List
+     2	
+     3	
+     4	def separate_paren_groups(paren_string: str) -> List[str]:
+     5	    """ Input to this function is a string containing multiple groups of nested parentheses. Your goal is to
+     6	    separate those group into separate strings and return the list of those.
+     7	    Separate groups are balanced (each open brace is properly closed) and not nested within each other
+     8	    Ignore any spaces in the input string.
+     9	    >>> separate_paren_groups('( ) (( )) (( )( ))')
+    10	    ['()', '(())', '(()())']
+    11	    """
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Translate the submitted implementation and the concrete assertion harness.
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	python3 py2mpy.py concrete_tests.py > concrete_tests.mpy
+     7	
+     8	# Concrete execution uses the required LLVM main/syntax modules.
+     9	kompile reference-semantics/semantics.k \
+    10	  --backend llvm \
+    11	  --main-module MPY-KRUN \
+    12	  --syntax-module MPY-SYNTAX \
+    13	  --output-definition runtime-kompiled \
+    14	  --warnings none
+    15	krun concrete_tests.mpy --definition runtime-kompiled > concrete-run.out
+    16	grep -q "NoExc" concrete-run.out
+    17	if grep -q "AssertionError" concrete-run.out; then
+    18	  exit 1
+    19	fi
+    20	
+    21	# The proof definition imports MPY (not the concrete-only MPY-KRUN module).
+    22	kompile verification.k \
+    23	  --backend haskell \
+    24	  --main-module VERIFICATION \
+    25	  --syntax-module MPY-SYNTAX \
+    26	  --output-definition verification-kompiled \
+    27	  --warnings none
+    28	
+    29	# First prove the universal recursive invariant. Then use that proved claim as
+    30	# a modular lemma while proving the public-entry claim and all concrete claims.
+    31	kprove spec.k \
+    32	  --definition verification-kompiled \
+    33	  --spec-module SPEC \
+    34	  --claims SPEC.all-balanced-inputs \
+    35	  --warnings none | tee proof-invariant.out
+    36	grep -qx "#Top" proof-invariant.out
+    37	
+    38	kprove spec.k \
+    39	  --definition verification-kompiled \
+    40	  --spec-module SPEC \
+    41	  --trusted SPEC.all-balanced-inputs \
+    42	  --warnings none | tee proof-entry-and-examples.out
+    43	grep -qx "#Top" proof-entry-and-examples.out
+{
+  "inventory_sha256": "a63ea6ae5214bc83213ff7696c9cb7bc80ce9cf4144781e6a22ab175be497a0f",
+  "rules": [
+    {
+      "classification": "DEFINITION",
+      "rationale": "Base equation for the declarative scanGroups fold: consuming an empty suffix returns the accumulated output sequence.",
+      "source_rule_id": "rule-b171bbb955f7651b57177d9cf1f07a66354aea7dd245779160b3153ed3292907"
+    },
+    {
+      "classification": "DEFINITION",
+      "rationale": "Recursive scanGroups equation defining that a space is ignored while the current group, depth, and accumulator are preserved.",
+      "source_rule_id": "rule-f27a3018eb5f87fd0722c980e2edee73c173a8e8492734b1750d72bfa03f03d7"
+    },
+    {
+      "classification": "DEFINITION",
+      "rationale": "Recursive scanGroups equation for an opening parenthesis, defining current-group extension and depth increment.",
+      "source_rule_id": "rule-77e06410332620fe751a74099095be60fd529ac2ce38246b38c2bfb1874c8ff9"
+    },
+    {
+      "classification": "DEFINITION",
+      "rationale": "Owise structural dispatch equation completing scanGroups by delegating its remaining character case to the scanClose helper.",
+      "source_rule_id": "rule-c4cf973db2aaba3fa41818b2cfd375063581ac7e7537dfa6b0d800172fd94fb4"
+    },
+    {
+      "classification": "DEFINITION",
+      "rationale": "Conditional scanClose equation defining the group-completion case: reset current/depth and append the completed group when closing reaches depth zero.",
+      "source_rule_id": "rule-88b07135647f77b2ac45688ab13a9417020cd89887e9e61126e95361f18e27b4"
+    },
+    {
+      "classification": "DEFINITION",
+      "rationale": "Complementary scanClose recurrence defining a nested close that extends the current group and decrements depth without emitting a group.",
+      "source_rule_id": "rule-de94016a500f0ae3a476b66b9867344d68f11feef7679f0217b6957f3232d51e"
+    },
+    {
+      "classification": "DEFINITION",
+      "rationale": "Base equation defining balancedTail on an empty suffix as exactly the zero-final-depth condition.",
+      "source_rule_id": "rule-1f4dd256c8a442d51a26d58d45aaf94e320834d70065a9839ef1f815ed669a1f"
+    },
+    {
+      "classification": "DEFINITION",
+      "rationale": "Recursive balancedTail equation defining spaces as depth-neutral and ignored by the contract predicate.",
+      "source_rule_id": "rule-b806ffef368f4e8bcc51c8e8656c94e314678616cac1047c4e46d7e45301569c"
+    },
+    {
+      "classification": "DEFINITION",
+      "rationale": "Recursive balancedTail equation defining an opening parenthesis as increasing the tracked depth.",
+      "source_rule_id": "rule-052713095a835e62065e1b83ded02956cd6447c7a07ccaea089f8297100dde9a"
+    },
+    {
+      "classification": "DEFINITION",
+      "rationale": "Recursive balancedTail equation defining the remaining character case as a closing parenthesis with a positive-depth guard and depth decrement.",
+      "source_rule_id": "rule-78cb55fdec63f3a267deff3351b4e0da41dc0fcb3e70055bfdd7882890bcaae7"
+    },
+    {
+      "classification": "DEFINITION",
+      "rationale": "Base equation defining the empty code sequence to satisfy the parenthesis-or-space alphabet predicate.",
+      "source_rule_id": "rule-7122c1187dac6e0965cb40c98d018fda272ad1906e10604ba8bc64658613e8f4"
+    },
+    {
+      "classification": "DEFINITION",
+      "rationale": "Recursive parenSpaceOnly equation defining the accepted character codes and recurring over the remaining sequence.",
+      "source_rule_id": "rule-c1624dec045d7c2ed281b57c318598c2382d51c39e423e0ef43da3abdcb5bfeb"
+    },
+    {
+      "classification": "DEFINITION",
+      "rationale": "Macro expansion defining the named solutionClosure proof term as the exact translated function closure; it introduces no execution fact.",
+      "source_rule_id": "rule-84cd94932504b251c7285a2db82a43300e5031597cd250eb17bafd0f77c108af"
+    }
+  ],
+  "schema_version": 2
+}
+
+Script done on 2026-07-28 17:11:37-05:00 [COMMAND_EXIT_CODE="0"]

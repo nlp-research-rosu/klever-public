@@ -1,0 +1,367 @@
+Script started on 2026-07-23 07:38:21-05:00 [<not executed on terminal>]
+Complete numbered local K sources
+
+$ nl -ba /tmp/audit-work/38-decode-cyclic-audit/candidate-src/semantic.k
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports STRING-SYNTAX
+     6	
+     7	  syntax Py ::= "Module" "(" Stmts ")"
+     8	
+     9	  syntax Stmts ::= List{Stmt, ""}
+    10	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    11	                | "Assign" "(" Expr "," Expr ")"
+    12	                | "While" "(" Expr "," Stmts ")"
+    13	                | "Return" "(" Expr ")"
+    14	
+    15	  syntax Params ::= "Params" "(" String ")"
+    16	
+    17	  syntax Expr ::= "Name" "(" String ")"
+    18	                | "Str" "(" String ")"
+    19	                | "Int" "(" Int ")"
+    20	                | "BinOp" "(" String "," Expr "," Expr ")"
+    21	                | "Compare" "(" Expr "," CmpOp ")"
+    22	                | "Call" "(" Expr "," Expr ")"
+    23	                | "Subscript" "(" Expr "," Index ")"
+    24	
+    25	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    26	  syntax Index ::= Expr | Slice
+    27	  syntax Slice ::= "Slice" "(" Bound "," Bound "," Bound ")"
+    28	  syntax Bound ::= Expr | "NoBound"
+    29	endmodule
+    30	
+    31	module MPY
+    32	  imports MPY-SYNTAX
+    33	  imports INT
+    34	  imports STRING
+    35	  imports BOOL
+    36	  imports MAP
+    37	
+    38	  syntax Val ::= pyInt(Int) | pyStr(String) | pyBool(Bool)
+    39	  syntax Result ::= "noResult" | Val
+    40	
+    41	  syntax KItem ::= run(Py, String)
+    42	                 | exec(Stmts)
+    43	                 | eval(Expr)
+    44	                 | store(String)
+    45	                 | binRight(String, Expr)
+    46	                 | binApply(String, Val)
+    47	                 | cmpRight(String, Expr)
+    48	                 | cmpApply(String, Val)
+    49	                 | "builtinLen"
+    50	                 | indexRight(Expr)
+    51	                 | indexApply(Val)
+    52	                 | sliceLower(Expr, Expr)
+    53	                 | sliceUpper(Expr, Val)
+    54	                 | sliceApply(String, Val)
+    55	                 | tailLower(Expr)
+    56	                 | tailApply(String)
+    57	                 | whileLoop(Expr, Stmts)
+    58	                 | whileGuard(Expr, Stmts)
+    59	                 | "doReturn"
+    60	
+    61	  configuration
+    62	    <k> run($PGM:Py, $S:String) </k>
+    63	    <env> .Map </env>
+    64	    <result> noResult </result>
+    65	
+    66	  rule <k> run(Module(FuncDef("decode_cyclic", Params("s"), BODY)), S)
+    67	        => exec(BODY) ... </k>
+    68	       <env> _ => "s" |-> pyStr(S) </env>
+    69	
+    70	  rule <k> exec(.Stmts) => .K ... </k>
+    71	  rule <k> exec((STMT:Stmt) REST:Stmts) => STMT ~> exec(REST) ... </k>
+    72	
+    73	  rule <k> Assign(Name(X), E) => eval(E) ~> store(X) ... </k>
+    74	  rule <k> V:Val ~> store(X) => .K ... </k>
+    75	       <env> ENV => ENV [ X <- V ] </env>
+    76	
+    77	  rule <k> While(TEST, BODY) => whileLoop(TEST, BODY) ... </k>
+    78	  rule <k> whileLoop(TEST, BODY) => eval(TEST) ~> whileGuard(TEST, BODY) ... </k>
+    79	  rule <k> pyBool(true) ~> whileGuard(TEST, BODY)
+    80	        => exec(BODY) ~> whileLoop(TEST, BODY) ... </k>
+    81	  rule <k> pyBool(false) ~> whileGuard(_, _) => .K ... </k>
+    82	
+    83	  rule <k> Return(E) => eval(E) ~> doReturn ... </k>
+    84	  rule <k> V:Val ~> doReturn ~> _REST => .K </k>
+    85	       <env> _ => .Map </env>
+    86	       <result> _ => V </result>
+    87	
+    88	  rule <k> eval(Str(S)) => pyStr(S) ... </k>
+    89	  rule <k> eval(Int(I)) => pyInt(I) ... </k>
+    90	  rule <k> eval(Name(X)) => V ... </k>
+    91	       <env> ... X |-> V:Val ... </env>
+    92	
+    93	  rule <k> eval(BinOp(OP, L, R)) => eval(L) ~> binRight(OP, R) ... </k>
+    94	  rule <k> V:Val ~> binRight(OP, R) => eval(R) ~> binApply(OP, V) ... </k>
+    95	  rule <k> pyInt(B) ~> binApply("+", pyInt(A)) => pyInt(A +Int B) ... </k>
+    96	  rule <k> pyStr(B) ~> binApply("+", pyStr(A)) => pyStr(A +String B) ... </k>
+    97	
+    98	  rule <k> eval(Compare(L, CmpOp(OP, R)))
+    99	        => eval(L) ~> cmpRight(OP, R) ... </k>
+   100	  rule <k> V:Val ~> cmpRight(OP, R) => eval(R) ~> cmpApply(OP, V) ... </k>
+   101	  rule <k> pyInt(B) ~> cmpApply("<", pyInt(A)) => pyBool(true) ... </k>
+   102	       requires A <Int B
+   103	  rule <k> pyInt(B) ~> cmpApply("<", pyInt(A)) => pyBool(false) ... </k>
+   104	       requires A >=Int B
+   105	
+   106	  rule <k> eval(Call(Name("len"), E)) => eval(E) ~> builtinLen ... </k>
+   107	  rule <k> pyStr(S) ~> builtinLen => pyInt(lengthString(S)) ... </k>
+   108	
+   109	  rule <k> eval(Subscript(BASE, IDX:Expr))
+   110	        => eval(BASE) ~> indexRight(IDX) ... </k>
+   111	  rule <k> V:Val ~> indexRight(IDX) => eval(IDX) ~> indexApply(V) ... </k>
+   112	  rule <k> pyInt(I) ~> indexApply(pyStr(S))
+   113	        => pyStr(substrString(S, I, I +Int 1)) ... </k>
+   114	        requires 0 <=Int I andBool I <Int lengthString(S)
+   115	
+   116	  rule <k> eval(Subscript(BASE, Slice(L:Expr, U:Expr, NoBound)))
+   117	        => eval(BASE) ~> sliceLower(L, U) ... </k>
+   118	  rule <k> pyStr(S) ~> sliceLower(L, U) => eval(L) ~> sliceUpper(U, pyStr(S)) ... </k>
+   119	  rule <k> LV:Val ~> sliceUpper(U, pyStr(S)) => eval(U) ~> sliceApply(S, LV) ... </k>
+   120	  rule <k> pyInt(U) ~> sliceApply(S, pyInt(L))
+   121	        => pyStr(substrString(S, L, U)) ... </k>
+   122	        requires 0 <=Int L andBool L <=Int U andBool U <=Int lengthString(S)
+   123	
+   124	  rule <k> eval(Subscript(BASE, Slice(L:Expr, NoBound, NoBound)))
+   125	        => eval(BASE) ~> tailLower(L) ... </k>
+   126	  rule <k> pyStr(S) ~> tailLower(L) => eval(L) ~> tailApply(S) ... </k>
+   127	  rule <k> pyInt(L) ~> tailApply(S)
+   128	        => pyStr(substrString(S, L, lengthString(S))) ... </k>
+   129	        requires 0 <=Int L andBool L <=Int lengthString(S)
+   130	
+   131	  // Named terms used by the proof to state the exact translated program and
+   132	  // its loop invariant without duplicating a large AST in every claim.
+   133	  syntax Py ::= "solutionProgram" [function, total]
+   134	  rule solutionProgram =>
+   135	    Module(
+   136	      FuncDef("decode_cyclic", Params("s"),
+   137	        Assign(Name("result"), Str(""))
+   138	        Assign(Name("i"), Int(0))
+   139	        While(Compare(
+   140	          BinOp("+", Name("i"), Int(2)),
+   141	          CmpOp("<", Call(Name("len"), Name("s")))),
+   142	          Assign(
+   143	            Name("result"),
+   144	            BinOp(
+   145	              "+",
+   146	              BinOp(
+   147	                "+",
+   148	                Name("result"),
+   149	                Subscript(Name("s"), BinOp("+", Name("i"), Int(2)))),
+   150	              Subscript(
+   151	                Name("s"),
+   152	                Slice(Name("i"), BinOp("+", Name("i"), Int(2)), NoBound))))
+   153	          Assign(Name("i"), BinOp("+", Name("i"), Int(3))))
+   154	        Return(
+   155	          BinOp(
+   156	            "+",
+   157	            Name("result"),
+   158	            Subscript(Name("s"), Slice(Name("i"), NoBound, NoBound))))))
+   159	
+   160	  // Independent accumulator specification: consume complete 3-character
+   161	  // blocks by rotating each block right; append a short suffix unchanged.
+   162	  syntax String ::= decodeFrom(String, Int, String) [function]
+   163	  rule decodeFrom(S, I, ACC) =>
+   164	       decodeFrom(
+   165	         S,
+   166	         I +Int 3,
+   167	         ACC
+   168	           +String substrString(S, I +Int 2, I +Int 3)
+   169	           +String substrString(S, I, I +Int 2))
+   170	       requires 0 <=Int I
+   171	        andBool I +Int 2 <Int lengthString(S)
+   172	
+   173	  rule decodeFrom(S, I, ACC) =>
+   174	       ACC +String substrString(S, I, lengthString(S))
+   175	       requires 0 <=Int I
+   176	        andBool I <=Int lengthString(S)
+   177	        andBool I +Int 2 >=Int lengthString(S)
+   178	
+   179	  syntax Stmts ::= "decodeBody" [function, total]
+   180	  rule decodeBody =>
+   181	    Assign(
+   182	      Name("result"),
+   183	      BinOp(
+   184	        "+",
+   185	        BinOp(
+   186	          "+",
+   187	          Name("result"),
+   188	          Subscript(Name("s"), BinOp("+", Name("i"), Int(2)))),
+   189	        Subscript(
+   190	          Name("s"),
+   191	          Slice(Name("i"), BinOp("+", Name("i"), Int(2)), NoBound))))
+   192	    Assign(Name("i"), BinOp("+", Name("i"), Int(3)))
+   193	
+   194	  syntax Expr ::= "decodeTest" [function, total]
+   195	  rule decodeTest =>
+   196	    Compare(
+   197	      BinOp("+", Name("i"), Int(2)),
+   198	      CmpOp("<", Call(Name("len"), Name("s"))))
+   199	
+   200	  syntax Stmts ::= "decodeReturn" [function, total]
+   201	  rule decodeReturn =>
+   202	    Return(
+   203	      BinOp(
+   204	        "+",
+   205	        Name("result"),
+   206	        Subscript(Name("s"), Slice(Name("i"), NoBound, NoBound))))
+   207	endmodule
+[exit 0]
+
+$ nl -ba /tmp/audit-work/38-decode-cyclic-audit/candidate-src/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	  imports MAP-SYMBOLIC
+     6	
+     7	  // Proof-only symbolic support.  The executable rules remain in MPY;
+     8	  // MAP-SYMBOLIC supplies map reasoning needed by reachability claims.
+     9	  rule { M:Map [ K <- V ] #Equals M [ K <- V' ] }
+    10	    => { V #Equals V' }
+    11	    [simplification]
+    12	
+    13	  rule 0 <=Int lengthString(_S) => true [simplification]
+    14	  rule substrString(S, 0, lengthString(S)) => S [simplification]
+    15	endmodule
+[exit 0]
+
+$ nl -ba /tmp/audit-work/38-decode-cyclic-audit/candidate-src/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Loop invariant/circularity: ACC is exactly the already-decoded prefix,
+     7	  // and decodeFrom specifies the remaining work from index I.
+     8	  claim [loop-correct]:
+     9	    <k>
+    10	      whileLoop(decodeTest, decodeBody) ~> exec(decodeReturn)
+    11	      => .K
+    12	    </k>
+    13	    <env>
+    14	      "s" |-> pyStr(S)
+    15	      "i" |-> pyInt(I)
+    16	      "result" |-> pyStr(ACC)
+    17	      => .Map
+    18	    </env>
+    19	    <result>
+    20	      noResult => pyStr(decodeFrom(S, I, ACC))
+    21	    </result>
+    22	    requires 0 <=Int I andBool I <=Int lengthString(S)
+    23	
+    24	  // End-to-end theorem for every input string.
+    25	  claim [program-correct]:
+    26	    <k> run(solutionProgram, S) => .K </k>
+    27	    <env> .Map => .Map </env>
+    28	    <result> noResult => pyStr(decodeFrom(S, 0, "")) </result>
+    29	endmodule
+[exit 0]
+
+Declaration/rule/claim index
+$ rg -n declarations-and-attributes /tmp/audit-work/38-decode-cyclic-audit/candidate-src
+/tmp/audit-work/38-decode-cyclic-audit/candidate-src/spec.k
+8:  claim [loop-correct]:
+25:  claim [program-correct]:
+
+/tmp/audit-work/38-decode-cyclic-audit/candidate-src/verification.k
+9:  rule { M:Map [ K <- V ] #Equals M [ K <- V' ] }
+11:    [simplification]
+13:  rule 0 <=Int lengthString(_S) => true [simplification]
+14:  rule substrString(S, 0, lengthString(S)) => S [simplification]
+
+/tmp/audit-work/38-decode-cyclic-audit/candidate-src/semantic.k
+7:  syntax Py ::= "Module" "(" Stmts ")"
+9:  syntax Stmts ::= List{Stmt, ""}
+10:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+15:  syntax Params ::= "Params" "(" String ")"
+17:  syntax Expr ::= "Name" "(" String ")"
+25:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+26:  syntax Index ::= Expr | Slice
+27:  syntax Slice ::= "Slice" "(" Bound "," Bound "," Bound ")"
+28:  syntax Bound ::= Expr | "NoBound"
+38:  syntax Val ::= pyInt(Int) | pyStr(String) | pyBool(Bool)
+39:  syntax Result ::= "noResult" | Val
+41:  syntax KItem ::= run(Py, String)
+61:  configuration
+66:  rule <k> run(Module(FuncDef("decode_cyclic", Params("s"), BODY)), S)
+70:  rule <k> exec(.Stmts) => .K ... </k>
+71:  rule <k> exec((STMT:Stmt) REST:Stmts) => STMT ~> exec(REST) ... </k>
+73:  rule <k> Assign(Name(X), E) => eval(E) ~> store(X) ... </k>
+74:  rule <k> V:Val ~> store(X) => .K ... </k>
+77:  rule <k> While(TEST, BODY) => whileLoop(TEST, BODY) ... </k>
+78:  rule <k> whileLoop(TEST, BODY) => eval(TEST) ~> whileGuard(TEST, BODY) ... </k>
+79:  rule <k> pyBool(true) ~> whileGuard(TEST, BODY)
+81:  rule <k> pyBool(false) ~> whileGuard(_, _) => .K ... </k>
+83:  rule <k> Return(E) => eval(E) ~> doReturn ... </k>
+84:  rule <k> V:Val ~> doReturn ~> _REST => .K </k>
+88:  rule <k> eval(Str(S)) => pyStr(S) ... </k>
+89:  rule <k> eval(Int(I)) => pyInt(I) ... </k>
+90:  rule <k> eval(Name(X)) => V ... </k>
+93:  rule <k> eval(BinOp(OP, L, R)) => eval(L) ~> binRight(OP, R) ... </k>
+94:  rule <k> V:Val ~> binRight(OP, R) => eval(R) ~> binApply(OP, V) ... </k>
+95:  rule <k> pyInt(B) ~> binApply("+", pyInt(A)) => pyInt(A +Int B) ... </k>
+96:  rule <k> pyStr(B) ~> binApply("+", pyStr(A)) => pyStr(A +String B) ... </k>
+98:  rule <k> eval(Compare(L, CmpOp(OP, R)))
+100:  rule <k> V:Val ~> cmpRight(OP, R) => eval(R) ~> cmpApply(OP, V) ... </k>
+101:  rule <k> pyInt(B) ~> cmpApply("<", pyInt(A)) => pyBool(true) ... </k>
+103:  rule <k> pyInt(B) ~> cmpApply("<", pyInt(A)) => pyBool(false) ... </k>
+106:  rule <k> eval(Call(Name("len"), E)) => eval(E) ~> builtinLen ... </k>
+107:  rule <k> pyStr(S) ~> builtinLen => pyInt(lengthString(S)) ... </k>
+109:  rule <k> eval(Subscript(BASE, IDX:Expr))
+111:  rule <k> V:Val ~> indexRight(IDX) => eval(IDX) ~> indexApply(V) ... </k>
+112:  rule <k> pyInt(I) ~> indexApply(pyStr(S))
+116:  rule <k> eval(Subscript(BASE, Slice(L:Expr, U:Expr, NoBound)))
+118:  rule <k> pyStr(S) ~> sliceLower(L, U) => eval(L) ~> sliceUpper(U, pyStr(S)) ... </k>
+119:  rule <k> LV:Val ~> sliceUpper(U, pyStr(S)) => eval(U) ~> sliceApply(S, LV) ... </k>
+120:  rule <k> pyInt(U) ~> sliceApply(S, pyInt(L))
+124:  rule <k> eval(Subscript(BASE, Slice(L:Expr, NoBound, NoBound)))
+126:  rule <k> pyStr(S) ~> tailLower(L) => eval(L) ~> tailApply(S) ... </k>
+127:  rule <k> pyInt(L) ~> tailApply(S)
+133:  syntax Py ::= "solutionProgram" [function, total]
+134:  rule solutionProgram =>
+162:  syntax String ::= decodeFrom(String, Int, String) [function]
+163:  rule decodeFrom(S, I, ACC) =>
+173:  rule decodeFrom(S, I, ACC) =>
+179:  syntax Stmts ::= "decodeBody" [function, total]
+180:  rule decodeBody =>
+194:  syntax Expr ::= "decodeTest" [function, total]
+195:  rule decodeTest =>
+200:  syntax Stmts ::= "decodeReturn" [function, total]
+201:  rule decodeReturn =>
+[exit 0]
+
+Counts (multi-line rule and claim headers only)
+/tmp/audit-work/38-decode-cyclic-audit/candidate-src/semantic.k syntax_headers=17 rule_headers=40 claim_headers=0
+/tmp/audit-work/38-decode-cyclic-audit/candidate-src/verification.k syntax_headers=0 rule_headers=3 claim_headers=0
+/tmp/audit-work/38-decode-cyclic-audit/candidate-src/spec.k syntax_headers=0 rule_headers=0 claim_headers=2
+
+Constructors present in submitted solution.mpy
+$ rg -o constructor-pattern solution.mpy | sort | uniq -c
+      4 Assign
+      7 BinOp
+      1 Call
+      1 CmpOp
+      1 Compare
+      1 FuncDef
+      5 Int
+      1 Module
+     17 Name
+      1 Params
+      1 Return
+      2 Slice
+      1 Str
+      3 Subscript
+      1 While
+[exit 0]
+
+Forbidden/exceptional proof-extension attributes (empty is expected)
+$ rg -n priority-or-opaque-or-trusted local K sources
+[exit 1; exit 1 means no matches]
+
+Overall inventory script status: 0
+
+Script done on 2026-07-23 07:38:21-05:00 [COMMAND_EXIT_CODE="0"]

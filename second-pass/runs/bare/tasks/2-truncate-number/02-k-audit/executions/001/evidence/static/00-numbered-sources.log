@@ -1,0 +1,180 @@
+cwd: /audit-output
+command: bash -lc $'\nset -e\nprintf "solution.mpy\\n"; nl -ba /tmp/audit-work/source/solution.mpy\nprintf "semantic.k\\n"; nl -ba /tmp/audit-work/source/semantic.k\nprintf "verification.k\\n"; nl -ba /tmp/audit-work/source/verification.k\nprintf "spec.k\\n"; nl -ba /tmp/audit-work/source/spec.k\nprintf "declaration_inventory_matches\\n"\nrg -n "^(\\s*(syntax|configuration|rule|claim)|requires|module|endmodule)|\\[(function|total|functional|simplification|priority|owise|opaque|symbol)" /tmp/audit-work/source/semantic.k /tmp/audit-work/source/verification.k /tmp/audit-work/source/spec.k\n'
+started_utc: 2026-07-23T05:05:25Z
+solution.mpy
+     1	Module(
+     2	  FuncDef("truncate_number", Params("number"),
+     3	    Return(
+     4	      BinOp("-", Name("number"), Call(Name("int"), Name("number"))))))
+semantic.k
+     1	requires "domains.md"
+     2	
+     3	module SEMANTIC-SYNTAX
+     4	  imports INT
+     5	  imports STRING
+     6	  imports MAP
+     7	
+     8	  // The source fragment needed by solution.mpy.  These productions parse the
+     9	  // constructors emitted by py2mpy.py; no meaning is hidden in the front end.
+    10	  syntax Program ::= "Module" "(" Stmt ")"                     [symbol(Module)]
+    11	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")" [symbol(FuncDef)]
+    12	                | "Return" "(" Expr ")"                         [symbol(Return)]
+    13	  syntax Params ::= "Params" "(" String ")"                    [symbol(Params)]
+    14	  syntax Expr ::= "Name" "(" String ")"                        [symbol(Name)]
+    15	                | "BinOp" "(" String "," Expr "," Expr ")"    [symbol(BinOp)]
+    16	                | "Call" "(" Expr "," Expr ")"                 [symbol(Call)]
+    17	
+    18	  // num(I,F,S) denotes the exact rational I + F/S.  Positive finite binary
+    19	  // Python floats are included because they are exact dyadic rationals.
+    20	  syntax Value ::= "num" "(" Int "," Int "," Int ")"         [symbol(num)]
+    21	                 | "intValue" "(" Int ")"                     [symbol(intValue)]
+    22	  syntax Result ::= "noResult" | Value
+    23	
+    24	  syntax KItem ::= "invoke" "(" String "," Value ")"          [symbol(invoke)]
+    25	                 | "eval" "(" Expr ")"                        [symbol(eval)]
+    26	                 | "subtractLeft" "(" Expr ")"                [symbol(subtractLeft)]
+    27	                 | "subtractRight" "(" Value ")"              [symbol(subtractRight)]
+    28	                 | "applyInt"                                  [symbol(applyInt)]
+    29	                 | "finishReturn"                              [symbol(finishReturn)]
+    30	endmodule
+    31	
+    32	module SEMANTIC
+    33	  imports SEMANTIC-SYNTAX
+    34	
+    35	  configuration
+    36	    <python>
+    37	      <k> $PGM:Program ~> invoke("truncate_number", num($IPART:Int, $FRAC:Int, $SCALE:Int)) </k>
+    38	      <env> .Map </env>
+    39	      <result> noResult </result>
+    40	    </python>
+    41	
+    42	  // Function entry binds the sole parameter.  The equality of F on the two
+    43	  // pending terms also checks that the requested function is the defined one.
+    44	  rule <k> Module(FuncDef(F, Params(P), BODY)) ~> invoke(F, V) => BODY </k>
+    45	       <env> .Map => P |-> V </env>
+    46	
+    47	  rule <k> Return(E) => eval(E) ~> finishReturn ... </k>
+    48	
+    49	  rule <k> eval(Name(X)) => V ... </k>
+    50	       <env>... X |-> V ...</env>
+    51	
+    52	  rule <k> eval(BinOp("-", LEFT, RIGHT))
+    53	        => eval(LEFT) ~> subtractLeft(RIGHT) ... </k>
+    54	  rule <k> V:Value ~> subtractLeft(RIGHT)
+    55	        => eval(RIGHT) ~> subtractRight(V) ... </k>
+    56	  rule <k> intValue(J) ~> subtractRight(num(I, F, S))
+    57	        => num(I -Int J, F, S) ... </k>
+    58	
+    59	  rule <k> eval(Call(Name("int"), ARG)) => eval(ARG) ~> applyInt ... </k>
+    60	  // The task's precondition is positive, so Python int truncation extracts I.
+    61	  rule <k> num(I, _F, _S) ~> applyInt => intValue(I) ... </k>
+    62	
+    63	  rule <k> V:Value ~> finishReturn => .K </k>
+    64	       <result> noResult => V </result>
+    65	endmodule
+verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	  imports BOOL
+     6	
+     7	  // A canonical positive number has a nonnegative integer component and a
+     8	  // proper nonnegative fractional numerator.
+     9	  syntax Bool ::= "validPositive" "(" Value ")" [function, total]
+    10	  rule validPositive(num(I, F, S))
+    11	    => S >Int 0
+    12	       andBool I >=Int 0
+    13	       andBool F >=Int 0
+    14	       andBool F <Int S
+    15	       andBool (I >Int 0 orBool F >Int 0)
+    16	  rule validPositive(intValue(_)) => false
+    17	
+    18	  syntax Bool ::= "validFraction" "(" Value ")" [function, total]
+    19	  rule validFraction(num(I, F, S))
+    20	    => I ==Int 0 andBool S >Int 0 andBool F >=Int 0 andBool F <Int S
+    21	  rule validFraction(intValue(_)) => false
+    22	endmodule
+spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // This is exactly the constructor tree generated in solution.mpy.  The
+     7	  // symbolic claim covers every positive exact rational, hence every positive
+     8	  // finite Python float, and computes its fractional part without rounding.
+     9	  claim
+    10	    <k>
+    11	      Module(FuncDef("truncate_number", Params("number"),
+    12	        Return(BinOp("-", Name("number"),
+    13	          Call(Name("int"), Name("number"))))))
+    14	      ~> invoke("truncate_number", num(I, F, S))
+    15	      => .K
+    16	    </k>
+    17	    <env> .Map => "number" |-> num(I, F, S) </env>
+    18	    <result> noResult => num(0, F, S) </result>
+    19	    requires validPositive(num(I, F, S))
+    20	    ensures validFraction(num(0, F, S))
+    21	
+    22	  // Prompt example: 3.5 = 3 + 5/10 and the result is 0.5.
+    23	  claim
+    24	    <k>
+    25	      Module(FuncDef("truncate_number", Params("number"),
+    26	        Return(BinOp("-", Name("number"),
+    27	          Call(Name("int"), Name("number"))))))
+    28	      ~> invoke("truncate_number", num(3, 5, 10))
+    29	      => .K
+    30	    </k>
+    31	    <env> .Map => "number" |-> num(3, 5, 10) </env>
+    32	    <result> noResult => num(0, 5, 10) </result>
+    33	endmodule
+declaration_inventory_matches
+/tmp/audit-work/source/spec.k:1:requires "verification.k"
+/tmp/audit-work/source/spec.k:3:module SPEC
+/tmp/audit-work/source/spec.k:9:  claim
+/tmp/audit-work/source/spec.k:23:  claim
+/tmp/audit-work/source/spec.k:33:endmodule
+/tmp/audit-work/source/semantic.k:1:requires "domains.md"
+/tmp/audit-work/source/semantic.k:3:module SEMANTIC-SYNTAX
+/tmp/audit-work/source/semantic.k:10:  syntax Program ::= "Module" "(" Stmt ")"                     [symbol(Module)]
+/tmp/audit-work/source/semantic.k:11:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")" [symbol(FuncDef)]
+/tmp/audit-work/source/semantic.k:12:                | "Return" "(" Expr ")"                         [symbol(Return)]
+/tmp/audit-work/source/semantic.k:13:  syntax Params ::= "Params" "(" String ")"                    [symbol(Params)]
+/tmp/audit-work/source/semantic.k:14:  syntax Expr ::= "Name" "(" String ")"                        [symbol(Name)]
+/tmp/audit-work/source/semantic.k:15:                | "BinOp" "(" String "," Expr "," Expr ")"    [symbol(BinOp)]
+/tmp/audit-work/source/semantic.k:16:                | "Call" "(" Expr "," Expr ")"                 [symbol(Call)]
+/tmp/audit-work/source/semantic.k:20:  syntax Value ::= "num" "(" Int "," Int "," Int ")"         [symbol(num)]
+/tmp/audit-work/source/semantic.k:21:                 | "intValue" "(" Int ")"                     [symbol(intValue)]
+/tmp/audit-work/source/semantic.k:22:  syntax Result ::= "noResult" | Value
+/tmp/audit-work/source/semantic.k:24:  syntax KItem ::= "invoke" "(" String "," Value ")"          [symbol(invoke)]
+/tmp/audit-work/source/semantic.k:25:                 | "eval" "(" Expr ")"                        [symbol(eval)]
+/tmp/audit-work/source/semantic.k:26:                 | "subtractLeft" "(" Expr ")"                [symbol(subtractLeft)]
+/tmp/audit-work/source/semantic.k:27:                 | "subtractRight" "(" Value ")"              [symbol(subtractRight)]
+/tmp/audit-work/source/semantic.k:28:                 | "applyInt"                                  [symbol(applyInt)]
+/tmp/audit-work/source/semantic.k:29:                 | "finishReturn"                              [symbol(finishReturn)]
+/tmp/audit-work/source/semantic.k:30:endmodule
+/tmp/audit-work/source/semantic.k:32:module SEMANTIC
+/tmp/audit-work/source/semantic.k:35:  configuration
+/tmp/audit-work/source/semantic.k:44:  rule <k> Module(FuncDef(F, Params(P), BODY)) ~> invoke(F, V) => BODY </k>
+/tmp/audit-work/source/semantic.k:47:  rule <k> Return(E) => eval(E) ~> finishReturn ... </k>
+/tmp/audit-work/source/semantic.k:49:  rule <k> eval(Name(X)) => V ... </k>
+/tmp/audit-work/source/semantic.k:52:  rule <k> eval(BinOp("-", LEFT, RIGHT))
+/tmp/audit-work/source/semantic.k:54:  rule <k> V:Value ~> subtractLeft(RIGHT)
+/tmp/audit-work/source/semantic.k:56:  rule <k> intValue(J) ~> subtractRight(num(I, F, S))
+/tmp/audit-work/source/semantic.k:59:  rule <k> eval(Call(Name("int"), ARG)) => eval(ARG) ~> applyInt ... </k>
+/tmp/audit-work/source/semantic.k:61:  rule <k> num(I, _F, _S) ~> applyInt => intValue(I) ... </k>
+/tmp/audit-work/source/semantic.k:63:  rule <k> V:Value ~> finishReturn => .K </k>
+/tmp/audit-work/source/semantic.k:65:endmodule
+/tmp/audit-work/source/verification.k:1:requires "semantic.k"
+/tmp/audit-work/source/verification.k:3:module VERIFICATION
+/tmp/audit-work/source/verification.k:9:  syntax Bool ::= "validPositive" "(" Value ")" [function, total]
+/tmp/audit-work/source/verification.k:10:  rule validPositive(num(I, F, S))
+/tmp/audit-work/source/verification.k:16:  rule validPositive(intValue(_)) => false
+/tmp/audit-work/source/verification.k:18:  syntax Bool ::= "validFraction" "(" Value ")" [function, total]
+/tmp/audit-work/source/verification.k:19:  rule validFraction(num(I, F, S))
+/tmp/audit-work/source/verification.k:21:  rule validFraction(intValue(_)) => false
+/tmp/audit-work/source/verification.k:22:endmodule
+
+exit_status: 0
+finished_utc: 2026-07-23T05:05:25Z

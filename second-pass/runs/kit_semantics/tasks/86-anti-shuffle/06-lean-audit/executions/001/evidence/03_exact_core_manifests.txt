@@ -1,0 +1,303 @@
+Script started on 2026-07-31 06:55:52-05:00 [<not executed on terminal>]
+                start_offset=start_offset,
+                end_offset=start_offset + len(rule_text),
+                attribute_start=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.start()
+                ),
+                attribute_end=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.end()
+                ),
+            )
+        )
+    return rules
+
+
+def _rule_documents(
+    text: str, modules: tuple[_Module, ...]
+) -> list[dict[str, Any]]:
+    spans = [span for module in modules for span in _rule_spans(text, module)]
+    spans.sort(key=lambda span: span.start_offset)
+    return [dataclasses.asdict(span.rule) for span in spans]
+
+
+def _attribute_token_spans(
+    text: str,
+    masked_text: str,
+) -> list[tuple[int, int, str]]:
+    spans: list[tuple[int, int, str]] = []
+    start = 0
+    depth = 0
+    for index, character in enumerate(masked_text):
+        if character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth = max(depth - 1, 0)
+        elif character == "," and depth == 0:
+            spans.append(
+                (
+                    start,
+                    index,
+                    _without_comments(text[start:index]).strip(),
+                )
+            )
+            start = index + 1
+    spans.append(
+        (
+            start,
+            len(text),
+            _without_comments(text[start:]).strip(),
+        )
+    )
+    return spans
+
+
+def _blank_non_newlines(text: str) -> str:
+    return "".join(
+        character if character in "\r\n" else " "
+        for character in text
+    )
+
+
+def desimplify_rule_ids(
+    text: str,
+    source_rule_ids: list[str],
+) -> str:
+    """Remove simplification from exactly the selected canonical rule IDs."""
+
+    if len(source_rule_ids) != len(set(source_rule_ids)):
+        raise KRuleInventoryError(
+            "exact rule transformation contains a duplicate source rule ID"
+        )
+    selected = set(source_rule_ids)
+    modules = _modules(_mask_non_code(text))
+    spans = [
+        span
+        for local_module in modules
+        for span in _rule_spans(text, local_module)
+    ]
+    by_id = {span.rule.source_rule_id: span for span in spans}
+    unknown = sorted(selected - set(by_id))
+    if unknown:
+        raise KRuleInventoryError(
+            "exact rule transformation names an unknown source rule ID: "
+            + ", ".join(unknown)
+        )
+
+    edits: list[tuple[int, int]] = []
+    for source_rule_id in source_rule_ids:
+        span = by_id[source_rule_id]
+        if span.attribute_start is None or span.attribute_end is None:
+            raise KRuleInventoryError(
+                "selected source rule has no simplification attribute: "
+                f"{source_rule_id}"
+            )
+        attribute_text = text[
+            span.attribute_start + 1 : span.attribute_end - 1
+        ]
+        masked_attributes = _mask_non_code(attribute_text)
+        tokens = _attribute_token_spans(
+            attribute_text,
+            masked_attributes,
+        )
+        matches = [
+            index
+            for index, (_start, _end, token) in enumerate(tokens)
+            if token == "simplification"
+        ]
+        if len(matches) != 1:
+            raise KRuleInventoryError(
+                "selected source rule has ambiguous simplification "
+                f"attributes: {source_rule_id}"
+            )
+        token_index = matches[0]
+        if len(tokens) == 1:
+            edit_start = span.attribute_start
+            edit_end = span.attribute_end
+        elif token_index < len(tokens) - 1:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index][0]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index + 1][0]
+            )
+        else:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index - 1][1]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index][1]
+            )
+        edits.append((edit_start, edit_end))
+
+    transformed = text
+    for start, end in sorted(edits, reverse=True):
+        transformed = (
+            transformed[:start]
+            + _blank_non_newlines(transformed[start:end])
+            + transformed[end:]
+        )
+    return transformed
+
+
+def inventory_verification(workspace: Path) -> dict[str, Any]:
+    workspace = Path(workspace)
+    try:
+        workspace_mode = workspace.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        ) from error
+    if not stat.S_ISDIR(workspace_mode):
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        )
+    verification = workspace / "verification.k"
+    try:
+        verification_mode = verification.stat(
+            follow_symlinks=False
+        ).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace has no regular verification.k: {verification}"
+        ) from error
+    if not stat.S_ISREG(verification_mode):
+        raise KRuleInventoryError(
+            f"workspace has no regular verification.k: {verification}"
+        )
+    try:
+        verification_bytes = verification.read_bytes()
+        text = verification_bytes.decode()
+    except (OSError, UnicodeError) as error:
+        raise KRuleInventoryError(
+            f"cannot read verification.k: {verification}"
+        ) from error
+    masked_text = _mask_non_code(text)
+    modules = _modules(masked_text)
+    module = _verification_module(
+        modules, _last_verification_main_module(workspace)
+    )
+    closure = _verification_closure(modules, module)
+    rule_documents = _rule_documents(text, closure)
+    return {
+        "schema_version": 2,
+        "verification_file": "verification.k",
+        "verification_sha256": hashlib.sha256(verification_bytes).hexdigest(),
+        "verification_module": module.name,
+        "verification_modules": [module.name for module in closure],
+        "rules": rule_documents,
+        "inventory_sha256": canonical_json_sha256(rule_documents),
+    }
+
+### discovery manifest exact
+{
+    "schema_version": 2,
+    "inventory_sha256": "b6a5c8a6de1f4db5b68d5cc26578cacf31fb03dfb7b59d122c3544c81b30760c",
+    "rules": [
+        {
+            "source_rule_id": "rule-8035a5d5e2dd908c685b0f3f6b47722aade54582ecf7e781dfd68bc1469d72b1",
+            "classification": "DEFINITION",
+            "rationale": "This simplification equation defines the singleton-string case of strLt as integer-code comparison. Stage 1 separately proves the correspondence against MPY without VERIFICATION, so it is not a trusted DOMAIN_LEMMA; the required simplification-class constraint places it under DEFINITION."
+        },
+        {
+            "source_rule_id": "rule-dc6f73badfec4f23e1af1f381ddb673851960f3a7dd453b5a529e29eea13dbc1",
+            "classification": "DEFINITION",
+            "rationale": "This is a zero-argument macro expansion naming the exact translated AST of the inner insertion-loop body; it constructs syntax and does not execute or assert a mathematical fact."
+        },
+        {
+            "source_rule_id": "rule-d8c6975c42f7acfdc026a371bbd271bff09144d250d960f6b474f010e3a77c91",
+            "classification": "DEFINITION",
+            "rationale": "This is a zero-argument macro expansion naming the exact translated AST statements after the inner loop; it is a structural proof-term definition."
+        },
+        {
+            "source_rule_id": "rule-0f9f3b5d7e5349a6b9e4e08ae6ff00e9b64d8642453a18a90ada8eea2bfa6d08",
+            "classification": "DEFINITION",
+            "rationale": "This rule expands antiOuterBody to the exact translated conditional and insertion-loop AST, making it a named syntax definition rather than an execution rule."
+        },
+        {
+            "source_rule_id": "rule-5075fc023e8cdbd37d170a98412b835adec6946ebd2141dee39edbea6eb0d8ad",
+            "classification": "DEFINITION",
+            "rationale": "This rule is the structural macro definition of the function tail AST containing the final append and return."
+        },
+        {
+            "source_rule_id": "rule-c4913eca7f7a04a7ced779f502220f126d5ee7b0ee403b488e8b7e5329129ccb",
+            "classification": "DEFINITION",
+            "rationale": "This is the empty-input recurrence equation for the mathematical insertion summary insertGo, returning the accumulator or appending the pending character according to the insertion flag."
+        },
+        {
+            "source_rule_id": "rule-f0184627a2c4a3d544b5b84141379073793a96b835d2753217df57bda16c9883",
+            "classification": "DEFINITION",
+            "rationale": "This is the structurally recursive nonempty-input equation for insertGo; it consumes one old character and defines the summary's next accumulator and insertion flag."
+        },
+        {
+            "source_rule_id": "rule-652e6e29910efceeca6a31b0b63ec16bfe1d38ac2b9054d6d2a69a37ba8dcec4",
+            "classification": "DEFINITION",
+            "rationale": "This is the base recurrence equation for antiGo, defining the completed result when no input characters remain."
+        },
+        {
+            "source_rule_id": "rule-6e83d7b52d40fb31d78ba87b9b7e825cf4ae9515a0fa193cce3b0b083ee08657",
+            "classification": "DEFINITION",
+            "rationale": "This is the structurally recursive nonempty-input equation for antiGo, defining the space and non-space transitions while consuming one input character."
+        }
+    ]
+}
+
+### generator manifest exact
+{
+    "exporter_sha256": "bbd11ce0fe6ac12ea89d4bdc70c260044bc9f87c987ff310684b637ea6464a07",
+    "generated_tree_sha256": "1674b1db22fed880156b73d95f892508ff3681d5cb4484d12dab1fe1e5bbe61e",
+    "klean_py_sha256": "42a38e6d65b74af3536acc49947b7cfbac809406bdfe5549841e3132af5a5c4d",
+    "modeled_collection_hooks": [
+        ".List",
+        ".Map",
+        "ListItem",
+        "_List_",
+        "_Map_",
+        "_|->_"
+    ],
+    "modeled_operational_hooks": [],
+    "modeled_recursive_functions": [],
+    "obligation_count": 0,
+    "obligation_map_sha256": "cf331f312938e04436a60d1dc49b5a1f6f60b03f3283415439a7c175e9812048",
+    "provenance": {
+        "generator_image_id": "sha256:f884238cea5ab1ed0da0a75d0c9a29ac4abe988616c3f493ba60e74ca3290cf7",
+        "inventory_sha256": "b6a5c8a6de1f4db5b68d5cc26578cacf31fb03dfb7b59d122c3544c81b30760c",
+        "stage1_workspace_sha256": "30ee607e4db2c763d3a61fbd783e6d1d4e23c5f2e1d49916ea0f428d024add1d",
+        "stage3_discovery_manifest_sha256": "f9beba61b82ac748b1a73e5cfdddddd1e187a043aa7b8538d3b585540f0b3ccf"
+    },
+    "schema_version": 3,
+    "target": null,
+    "toolchain": {
+        "codex_cli_version": "0.144.6",
+        "k_base_image": "runtimeverificationinc/kframework-k:ubuntu-jammy-7.1.293@sha256:f3f64ab72bd7b560082d50e4c6c23e107025cf217ca62ab73700104fc45de09a",
+        "k_version": "7.1.293",
+        "lean_commit": "ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05",
+        "lean_toolchain": "leanprover/lean4:v4.22.0",
+        "pyk_project": "pyk@runtimeverification/k",
+        "pyk_version": "7.1.293",
+        "runtimeverification_k_commit": "ff15baac9e66426612ec45ff912af7f14965b64a"
+    }
+}
+
+### source manifest exact
+{
+    "files": {
+        "klean.py": "42a38e6d65b74af3536acc49947b7cfbac809406bdfe5549841e3132af5a5c4d",
+        "klean_export.py": "bbd11ce0fe6ac12ea89d4bdc70c260044bc9f87c987ff310684b637ea6464a07"
+    },
+    "generator_image_id": "sha256:f884238cea5ab1ed0da0a75d0c9a29ac4abe988616c3f493ba60e74ca3290cf7",
+    "schema_version": 1
+}
+
+### obligation map exact
+{
+    "obligations": [],
+    "schema_version": 3,
+    "source_rules": [],
+    "trust_parameters": []
+}
+
+Script done on 2026-07-31 06:55:52-05:00 [COMMAND_EXIT_CODE="0"]

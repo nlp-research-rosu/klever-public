@@ -1,0 +1,268 @@
+AUDIT_STAGE: 5 local declaration and rule inventory
+
+COMMAND: nl -ba /tmp/audit-work/92-any-int/src/semantic.k
+     1	module MPY-SYNTAX
+     2	  imports INT
+     3	  imports FLOAT
+     4	  imports BOOL
+     5	  imports STRING
+     6	  imports MAP
+     7	
+     8	  // The constructor grammar used by the portion of py2mpy.py exercised by
+     9	  // solution.py.  The constructors retain the structure of the CPython AST.
+    10	  syntax Program ::= "Module" "(" Stmts ")"
+    11	  syntax Stmts  ::= Stmt
+    12	  syntax Stmt   ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    13	                  | "Return" "(" Expr ")"
+    14	  syntax Params ::= "Params" "(" String "," String "," String ")"
+    15	
+    16	  syntax Expr ::= "Name" "(" String ")"
+    17	                | "Int" "(" Int ")"
+    18	                | "Bool" "(" Bool ")"
+    19	                | "BinOp" "(" String "," Expr "," Expr ")"
+    20	                | "Call" "(" Expr "," Expr ")"
+    21	                | "Compare" "(" Expr "," CmpOp ")"
+    22	                | "BoolOp" "(" String "," Expr "," Expr "," Expr ")"
+    23	                | "BoolOp" "(" String "," Expr "," Expr "," Expr "," Expr ")"
+    24	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    25	
+    26	  // Runtime values distinguish Python integers from every modeled
+    27	  // non-integer number.  Bool is deliberately non-integer here because the
+    28	  // solution uses exact type(x) == int, not isinstance(x, int).
+    29	  syntax IntVal    ::= "intVal" "(" Int ")"
+    30	  syntax NonIntVal ::= "floatVal" "(" Float ")"
+    31	                     | "boolVal" "(" Bool ")"
+    32	                     | "otherNumberVal" "(" String ")"
+    33	  syntax Val ::= IntVal | NonIntVal
+    34	               | "typeVal" "(" String ")"
+    35	
+    36	  syntax KItem ::= "Invoke" "(" Program "," Val "," Val "," Val ")"
+    37	endmodule
+    38	
+    39	module MPY-SEMANTICS
+    40	  imports MPY-SYNTAX
+    41	
+    42	  configuration
+    43	    <mpy>
+    44	      <k> $PGM:K </k>
+    45	      <env> .Map </env>
+    46	    </mpy>
+    47	
+    48	  syntax KItem ::= "exec" "(" Stmts ")"
+    49	                 | "eval" "(" Expr ")"
+    50	                 | "finishCall"
+    51	                 | "typeOf"
+    52	                 | "binLeft" "(" String "," Expr ")"
+    53	                 | "binRight" "(" String "," Val ")"
+    54	                 | "compareLeft" "(" String "," Expr ")"
+    55	                 | "compareRight" "(" String "," Val ")"
+    56	                 | "andThen" "(" Expr ")"
+    57	                 | "orThen" "(" Expr ")"
+    58	
+    59	  // Module/function entry and return.  The local environment is cleared when
+    60	  // the call finishes, making each invocation independent.
+    61	  rule <k> Invoke(Module(FuncDef(_F, Params(X, Y, Z), BODY)), V1, V2, V3)
+    62	           => exec(BODY) ~> finishCall ... </k>
+    63	       <env> .Map => X |-> V1 Y |-> V2 Z |-> V3 </env>
+    64	  rule <k> exec(Return(E)) => eval(E) ... </k>
+    65	  rule <k> V:Val ~> finishCall => V ... </k>
+    66	       <env> _ => .Map </env>
+    67	
+    68	  // Literals, local names, and the built-in int type object.
+    69	  rule <k> eval(Int(I)) => intVal(I) ... </k>
+    70	  rule <k> eval(Bool(B)) => boolVal(B) ... </k>
+    71	  rule <k> eval(Name("int")) => typeVal("int") ... </k>
+    72	  rule <k> eval(Name(X)) => V ... </k>
+    73	       <env>... X |-> V ...</env>
+    74	
+    75	  // The only built-in call emitted by solution.py: exact Python type.
+    76	  rule <k> eval(Call(Name("type"), E)) => eval(E) ~> typeOf ... </k>
+    77	  rule <k> _I:IntVal ~> typeOf => typeVal("int") ... </k>
+    78	  rule <k> _N:NonIntVal ~> typeOf => typeVal("non-int") ... </k>
+    79	
+    80	  // Left-to-right integer addition.
+    81	  rule <k> eval(BinOp(OP, E1, E2)) => eval(E1) ~> binLeft(OP, E2) ... </k>
+    82	  rule <k> V1:Val ~> binLeft(OP, E2) => eval(E2) ~> binRight(OP, V1) ... </k>
+    83	  rule <k> intVal(I2) ~> binRight("+", intVal(I1))
+    84	           => intVal(I1 +Int I2) ... </k>
+    85	
+    86	  // The target uses one-element comparison chains.  Both integer equality
+    87	  // and equality of type objects return a Python boolean value.
+    88	  rule <k> eval(Compare(E1, CmpOp(OP, E2)))
+    89	           => eval(E1) ~> compareLeft(OP, E2) ... </k>
+    90	  rule <k> V1:Val ~> compareLeft(OP, E2)
+    91	           => eval(E2) ~> compareRight(OP, V1) ... </k>
+    92	  rule <k> intVal(I2) ~> compareRight("==", intVal(I1))
+    93	           => boolVal(I1 ==Int I2) ... </k>
+    94	  rule <k> typeVal(T2) ~> compareRight("==", typeVal(T1))
+    95	           => boolVal(T1 ==String T2) ... </k>
+    96	
+    97	  // Python's and/or are evaluated left-to-right and short circuit.  The
+    98	  // continuation rules skip, rather than evaluate, remaining operands once
+    99	  // their result is determined.
+   100	  rule <k> eval(BoolOp("and", E1, E2, E3))
+   101	           => eval(E1) ~> andThen(E2) ~> andThen(E3) ... </k>
+   102	  rule <k> eval(BoolOp("and", E1, E2, E3, E4))
+   103	           => eval(E1) ~> andThen(E2) ~> andThen(E3) ~> andThen(E4) ... </k>
+   104	  rule <k> boolVal(true) ~> andThen(E) => eval(E) ... </k>
+   105	  rule <k> boolVal(false) ~> andThen(_E) => boolVal(false) ... </k>
+   106	
+   107	  rule <k> eval(BoolOp("or", E1, E2, E3))
+   108	           => eval(E1) ~> orThen(E2) ~> orThen(E3) ... </k>
+   109	  rule <k> boolVal(false) ~> orThen(E) => eval(E) ... </k>
+   110	  rule <k> boolVal(true) ~> orThen(_E) => boolVal(true) ... </k>
+   111	endmodule
+EXIT_STATUS: 0
+
+COMMAND: nl -ba /tmp/audit-work/92-any-int/src/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module ANY-INT-VERIFICATION
+     4	  imports MPY-SEMANTICS
+     5	
+     6	  // This macro is the exact constructor tree in solution.mpy.  Keeping the
+     7	  // program separate from the semantics prevents the operational rules from
+     8	  // baking in the answer to the task.
+     9	  syntax Program ::= "solutionProgram" [macro]
+    10	  rule solutionProgram =>
+    11	    Module(
+    12	      FuncDef("any_int", Params("x", "y", "z"),
+    13	        Return(
+    14	          BoolOp(
+    15	            "and",
+    16	            Compare(Call(Name("type"), Name("x")), CmpOp("==", Name("int"))),
+    17	            Compare(Call(Name("type"), Name("y")), CmpOp("==", Name("int"))),
+    18	            Compare(Call(Name("type"), Name("z")), CmpOp("==", Name("int"))),
+    19	            BoolOp(
+    20	              "or",
+    21	              Compare(BinOp("+", Name("x"), Name("y")), CmpOp("==", Name("z"))),
+    22	              Compare(BinOp("+", Name("x"), Name("z")), CmpOp("==", Name("y"))),
+    23	              Compare(BinOp("+", Name("y"), Name("z")), CmpOp("==", Name("x"))))))))
+    24	
+    25	  syntax KItem ::= "RunAnyInt" "(" Val "," Val "," Val ")" [macro]
+    26	  rule RunAnyInt(X, Y, Z) => Invoke(solutionProgram, X, Y, Z)
+    27	endmodule
+EXIT_STATUS: 0
+
+COMMAND: nl -ba /tmp/audit-work/92-any-int/src/spec.k
+     1	requires "verification.k"
+     2	
+     3	module ANY-INT-SPEC
+     4	  imports ANY-INT-VERIFICATION
+     5	
+     6	  // Together these four claims partition all integer triples according to
+     7	  // the first true sum equality.  Thus they prove the complete positive and
+     8	  // negative behavior on Python integers, not just concrete examples.
+     9	  claim <k> RunAnyInt(intVal(X), intVal(Y), intVal(Z))
+    10	             => boolVal(true) </k>
+    11	        <env> .Map </env>
+    12	    requires X +Int Y ==Int Z
+    13	
+    14	  claim <k> RunAnyInt(intVal(X), intVal(Y), intVal(Z))
+    15	             => boolVal(true) </k>
+    16	        <env> .Map </env>
+    17	    requires notBool (X +Int Y ==Int Z)
+    18	     andBool X +Int Z ==Int Y
+    19	
+    20	  claim <k> RunAnyInt(intVal(X), intVal(Y), intVal(Z))
+    21	             => boolVal(true) </k>
+    22	        <env> .Map </env>
+    23	    requires notBool (X +Int Y ==Int Z)
+    24	     andBool notBool (X +Int Z ==Int Y)
+    25	     andBool Y +Int Z ==Int X
+    26	
+    27	  claim <k> RunAnyInt(intVal(X), intVal(Y), intVal(Z))
+    28	             => boolVal(false) </k>
+    29	        <env> .Map </env>
+    30	    requires notBool (X +Int Y ==Int Z)
+    31	     andBool notBool (X +Int Z ==Int Y)
+    32	     andBool notBool (Y +Int Z ==Int X)
+    33	
+    34	  // These claims partition every call containing a non-integer according to
+    35	  // the position of its first non-integer argument.  Later arguments remain
+    36	  // fully symbolic because short-circuiting prevents their arithmetic use.
+    37	  claim <k> RunAnyInt(_N:NonIntVal, _Y:Val, _Z:Val)
+    38	             => boolVal(false) </k>
+    39	        <env> .Map </env>
+    40	
+    41	  claim <k> RunAnyInt(_X:IntVal, _N:NonIntVal, _Z:Val)
+    42	             => boolVal(false) </k>
+    43	        <env> .Map </env>
+    44	
+    45	  claim <k> RunAnyInt(_X:IntVal, _Y:IntVal, _N:NonIntVal)
+    46	             => boolVal(false) </k>
+    47	        <env> .Map </env>
+    48	endmodule
+EXIT_STATUS: 0
+
+COMMAND: bash -c set\ -o\ pipefail\;\ rg\ -n\ \"\^\[\[:space:\]\]\*\(module\|imports\|configuration\|syntax\|rule\|claim\)\|\\\\\[\(function\|total\|functional\|simplification\|concrete\|priority\|macro\|anywhere\|owise\)\"\ \"\$1\"\ \"\$2\"\ \"\$3\" _ /tmp/audit-work/92-any-int/src/semantic.k /tmp/audit-work/92-any-int/src/verification.k /tmp/audit-work/92-any-int/src/spec.k
+/tmp/audit-work/92-any-int/src/spec.k:3:module ANY-INT-SPEC
+/tmp/audit-work/92-any-int/src/spec.k:4:  imports ANY-INT-VERIFICATION
+/tmp/audit-work/92-any-int/src/spec.k:9:  claim <k> RunAnyInt(intVal(X), intVal(Y), intVal(Z))
+/tmp/audit-work/92-any-int/src/spec.k:14:  claim <k> RunAnyInt(intVal(X), intVal(Y), intVal(Z))
+/tmp/audit-work/92-any-int/src/spec.k:20:  claim <k> RunAnyInt(intVal(X), intVal(Y), intVal(Z))
+/tmp/audit-work/92-any-int/src/spec.k:27:  claim <k> RunAnyInt(intVal(X), intVal(Y), intVal(Z))
+/tmp/audit-work/92-any-int/src/spec.k:37:  claim <k> RunAnyInt(_N:NonIntVal, _Y:Val, _Z:Val)
+/tmp/audit-work/92-any-int/src/spec.k:41:  claim <k> RunAnyInt(_X:IntVal, _N:NonIntVal, _Z:Val)
+/tmp/audit-work/92-any-int/src/spec.k:45:  claim <k> RunAnyInt(_X:IntVal, _Y:IntVal, _N:NonIntVal)
+/tmp/audit-work/92-any-int/src/verification.k:3:module ANY-INT-VERIFICATION
+/tmp/audit-work/92-any-int/src/verification.k:4:  imports MPY-SEMANTICS
+/tmp/audit-work/92-any-int/src/verification.k:9:  syntax Program ::= "solutionProgram" [macro]
+/tmp/audit-work/92-any-int/src/verification.k:10:  rule solutionProgram =>
+/tmp/audit-work/92-any-int/src/verification.k:25:  syntax KItem ::= "RunAnyInt" "(" Val "," Val "," Val ")" [macro]
+/tmp/audit-work/92-any-int/src/verification.k:26:  rule RunAnyInt(X, Y, Z) => Invoke(solutionProgram, X, Y, Z)
+/tmp/audit-work/92-any-int/src/semantic.k:1:module MPY-SYNTAX
+/tmp/audit-work/92-any-int/src/semantic.k:2:  imports INT
+/tmp/audit-work/92-any-int/src/semantic.k:3:  imports FLOAT
+/tmp/audit-work/92-any-int/src/semantic.k:4:  imports BOOL
+/tmp/audit-work/92-any-int/src/semantic.k:5:  imports STRING
+/tmp/audit-work/92-any-int/src/semantic.k:6:  imports MAP
+/tmp/audit-work/92-any-int/src/semantic.k:10:  syntax Program ::= "Module" "(" Stmts ")"
+/tmp/audit-work/92-any-int/src/semantic.k:11:  syntax Stmts  ::= Stmt
+/tmp/audit-work/92-any-int/src/semantic.k:12:  syntax Stmt   ::= "FuncDef" "(" String "," Params "," Stmts ")"
+/tmp/audit-work/92-any-int/src/semantic.k:14:  syntax Params ::= "Params" "(" String "," String "," String ")"
+/tmp/audit-work/92-any-int/src/semantic.k:16:  syntax Expr ::= "Name" "(" String ")"
+/tmp/audit-work/92-any-int/src/semantic.k:24:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+/tmp/audit-work/92-any-int/src/semantic.k:29:  syntax IntVal    ::= "intVal" "(" Int ")"
+/tmp/audit-work/92-any-int/src/semantic.k:30:  syntax NonIntVal ::= "floatVal" "(" Float ")"
+/tmp/audit-work/92-any-int/src/semantic.k:33:  syntax Val ::= IntVal | NonIntVal
+/tmp/audit-work/92-any-int/src/semantic.k:36:  syntax KItem ::= "Invoke" "(" Program "," Val "," Val "," Val ")"
+/tmp/audit-work/92-any-int/src/semantic.k:39:module MPY-SEMANTICS
+/tmp/audit-work/92-any-int/src/semantic.k:40:  imports MPY-SYNTAX
+/tmp/audit-work/92-any-int/src/semantic.k:42:  configuration
+/tmp/audit-work/92-any-int/src/semantic.k:48:  syntax KItem ::= "exec" "(" Stmts ")"
+/tmp/audit-work/92-any-int/src/semantic.k:61:  rule <k> Invoke(Module(FuncDef(_F, Params(X, Y, Z), BODY)), V1, V2, V3)
+/tmp/audit-work/92-any-int/src/semantic.k:64:  rule <k> exec(Return(E)) => eval(E) ... </k>
+/tmp/audit-work/92-any-int/src/semantic.k:65:  rule <k> V:Val ~> finishCall => V ... </k>
+/tmp/audit-work/92-any-int/src/semantic.k:69:  rule <k> eval(Int(I)) => intVal(I) ... </k>
+/tmp/audit-work/92-any-int/src/semantic.k:70:  rule <k> eval(Bool(B)) => boolVal(B) ... </k>
+/tmp/audit-work/92-any-int/src/semantic.k:71:  rule <k> eval(Name("int")) => typeVal("int") ... </k>
+/tmp/audit-work/92-any-int/src/semantic.k:72:  rule <k> eval(Name(X)) => V ... </k>
+/tmp/audit-work/92-any-int/src/semantic.k:76:  rule <k> eval(Call(Name("type"), E)) => eval(E) ~> typeOf ... </k>
+/tmp/audit-work/92-any-int/src/semantic.k:77:  rule <k> _I:IntVal ~> typeOf => typeVal("int") ... </k>
+/tmp/audit-work/92-any-int/src/semantic.k:78:  rule <k> _N:NonIntVal ~> typeOf => typeVal("non-int") ... </k>
+/tmp/audit-work/92-any-int/src/semantic.k:81:  rule <k> eval(BinOp(OP, E1, E2)) => eval(E1) ~> binLeft(OP, E2) ... </k>
+/tmp/audit-work/92-any-int/src/semantic.k:82:  rule <k> V1:Val ~> binLeft(OP, E2) => eval(E2) ~> binRight(OP, V1) ... </k>
+/tmp/audit-work/92-any-int/src/semantic.k:83:  rule <k> intVal(I2) ~> binRight("+", intVal(I1))
+/tmp/audit-work/92-any-int/src/semantic.k:88:  rule <k> eval(Compare(E1, CmpOp(OP, E2)))
+/tmp/audit-work/92-any-int/src/semantic.k:90:  rule <k> V1:Val ~> compareLeft(OP, E2)
+/tmp/audit-work/92-any-int/src/semantic.k:92:  rule <k> intVal(I2) ~> compareRight("==", intVal(I1))
+/tmp/audit-work/92-any-int/src/semantic.k:94:  rule <k> typeVal(T2) ~> compareRight("==", typeVal(T1))
+/tmp/audit-work/92-any-int/src/semantic.k:100:  rule <k> eval(BoolOp("and", E1, E2, E3))
+/tmp/audit-work/92-any-int/src/semantic.k:102:  rule <k> eval(BoolOp("and", E1, E2, E3, E4))
+/tmp/audit-work/92-any-int/src/semantic.k:104:  rule <k> boolVal(true) ~> andThen(E) => eval(E) ... </k>
+/tmp/audit-work/92-any-int/src/semantic.k:105:  rule <k> boolVal(false) ~> andThen(_E) => boolVal(false) ... </k>
+/tmp/audit-work/92-any-int/src/semantic.k:107:  rule <k> eval(BoolOp("or", E1, E2, E3))
+/tmp/audit-work/92-any-int/src/semantic.k:109:  rule <k> boolVal(false) ~> orThen(E) => eval(E) ... </k>
+/tmp/audit-work/92-any-int/src/semantic.k:110:  rule <k> boolVal(true) ~> orThen(_E) => boolVal(true) ... </k>
+EXIT_STATUS: 0
+
+COMMAND: bash -c printf\ \"semantic_rule_count=\"\;\ rg\ -c\ \"\^\[\[:space:\]\]\*rule\ \"\ \"\$1\"\;\ printf\ \"verification_rule_count=\"\;\ rg\ -c\ \"\^\[\[:space:\]\]\*rule\ \"\ \"\$2\"\;\ printf\ \"spec_claim_count=\"\;\ rg\ -c\ \"\^\[\[:space:\]\]\*claim\ \"\ \"\$3\" _ /tmp/audit-work/92-any-int/src/semantic.k /tmp/audit-work/92-any-int/src/verification.k /tmp/audit-work/92-any-int/src/spec.k
+semantic_rule_count=24
+verification_rule_count=2
+spec_claim_count=7
+EXIT_STATUS: 0
+
+COMMAND: bash -c if\ rg\ -n\ \"\\\\\[\(function\|total\|functional\|simplification\|concrete\|priority\|anywhere\|owise\|opaque\)\"\ \"\$1\"\ \"\$2\"\ \"\$3\"\;\ then\ exit\ 1\;\ else\ echo\ \"NO_LOCAL_FUNCTION_TOTAL_FUNCTIONAL_SIMPLIFICATION_PRIORITY_OR_OPAQUE_ATTRIBUTES\"\;\ fi _ /tmp/audit-work/92-any-int/src/semantic.k /tmp/audit-work/92-any-int/src/verification.k /tmp/audit-work/92-any-int/src/spec.k
+NO_LOCAL_FUNCTION_TOTAL_FUNCTIONAL_SIMPLIFICATION_PRIORITY_OR_OPAQUE_ATTRIBUTES
+EXIT_STATUS: 0

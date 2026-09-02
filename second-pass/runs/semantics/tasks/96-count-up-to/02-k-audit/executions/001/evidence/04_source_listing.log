@@ -1,0 +1,285 @@
+WORKDIR: /audit-output
+COMMAND: bash -lc for\ f\ in\ /reference/prompt.py\ /reference/canonical.py\ /reference/py2mpy.py\ /candidate/solution.py\ /candidate/solution.mpy\ /candidate/spec.k\ /candidate/verification.k\ /candidate/prove.sh\ /candidate/concrete_assertions.py\;\ do\ echo\ \"=====\ \$f\ =====\"\;\ nl\ -ba\ \"\$f\"\;\ done
+EXIT_STATUS: 0
+--- OUTPUT (first 240 lines) ---
+===== /reference/prompt.py =====
+     1	
+     2	def count_up_to(n):
+     3	    """Implement a function that takes an non-negative integer and returns an array of the first n
+     4	    integers that are prime numbers and less than n.
+     5	    for example:
+     6	    count_up_to(5) => [2,3]
+     7	    count_up_to(11) => [2,3,5,7]
+     8	    count_up_to(0) => []
+     9	    count_up_to(20) => [2,3,5,7,11,13,17,19]
+    10	    count_up_to(1) => []
+    11	    count_up_to(18) => [2,3,5,7,11,13,17]
+    12	    """
+===== /reference/canonical.py =====
+     1	# canonical.py — the UNMODIFIED HumanEval/96 reference solution (from the dataset).
+     2	# Co-located with solution.py (the proof rewrite) to make the original<->rewrite link
+     3	# explicit & auditable.  entry point: count_up_to
+     4	
+     5	
+     6	def count_up_to(n):
+     7	    """Implement a function that takes an non-negative integer and returns an array of the first n
+     8	    integers that are prime numbers and less than n.
+     9	    for example:
+    10	    count_up_to(5) => [2,3]
+    11	    count_up_to(11) => [2,3,5,7]
+    12	    count_up_to(0) => []
+    13	    count_up_to(20) => [2,3,5,7,11,13,17,19]
+    14	    count_up_to(1) => []
+    15	    count_up_to(18) => [2,3,5,7,11,13,17]
+    16	    """
+    17	    primes = []
+    18	    for i in range(2, n):
+    19	        is_prime = True
+    20	        for j in range(2, i):
+    21	            if i % j == 0:
+    22	                is_prime = False
+    23	                break
+    24	        if is_prime:
+    25	            primes.append(i)
+    26	    return primes
+    27	
+===== /reference/py2mpy.py =====
+     1	#!/usr/bin/env python3
+     2	"""py2mpy — a *pure* CPython-AST -> K-constructor transliterator.
+     3	
+     4	Reads a .py file and prints the matching `.mpy` term: a Lisp-indented tree of K
+     5	constructors that a (future) K semantics will parse. The design rule is strict:
+     6	
+     7	    PURE TRANSLITERATION. Every Python AST node maps to exactly one K
+     8	    constructor with the same structure. The front-end makes NO semantic
+     9	    decisions — it does not desugar, simplify, normalize, or "interpret"
+    10	    anything. All meaning lives in the K semantics that consumes the term.
+    11	
+    12	Consequences of that rule (vs. a "helpful" front-end):
+    13	
+    14	  * `is` / `is not` transliterate to `CmpOp("is", ...)` / `CmpOp("is not", ...)`
+    15	    — NOT to `==` / `!=`. K decides what identity means.
+    16	  * a chained comparison `a < b < c` stays a single `Compare` carrying the
+    17	    chain (`Compare(a, CmpOp("<", b), CmpOp("<", c))`) — it is NOT pre-expanded
+    18	    into `a < b and b < c`.
+    19	  * a method call `x.append(v)` stays `Call(Attribute(Name("x"), "append"), v)`
+    20	    — there is no special `MethodCall` constructor folding the receiver in.
+    21	  * `a[i] = v` stays `Assign(Subscript(Name("a"), Name("i")), v)` — the target
+    22	    is just an expression in store position; no special `SubscriptAssign`.
+    23	
+    24	The only choices the transliterator makes are unavoidably *syntactic* — e.g. a
+    25	`bool` literal becomes `Bool(...)` not `Int(...)`, because that is the literal's
+    26	actual Python type as read off the AST, not a semantic judgement.
+    27	
+    28	Anything outside the covered subset raises `Unsupported`, naming the node, so
+    29	coverage gaps fail loudly instead of being silently dropped.
+    30	
+    31	Usage:
+    32	    python scripts/py2mpy.py FILE.py          # print the .mpy term (default)
+    33	    python scripts/py2mpy.py FILE.py --ast    # print the Python AST (ast.dump)
+    34	"""
+    35	from __future__ import annotations
+    36	
+    37	import argparse
+    38	import symtable
+    39	import ast
+    40	import json
+    41	import sys
+    42	
+    43	
+    44	class Unsupported(Exception):
+    45	    """Raised for any AST node the transliterator does not cover."""
+    46	
+    47	
+    48	# ---------------------------------------------------------------------------
+    49	# Term model: a .mpy term is a tree of these three node kinds.
+    50	#   Ctor(name, *args)  -> `name(arg, arg, ...)`  (comma-separated args)
+    51	#   Seq([item, ...])   -> a statement list: juxtaposed, no parens, no commas
+    52	#   str                -> a leaf token already in K surface form
+    53	#                         (a quoted string `"op"`, a number `0`, `true`, `Break`)
+    54	# ---------------------------------------------------------------------------
+    55	class Ctor:
+    56	    __slots__ = ("name", "args")
+    57	
+    58	    def __init__(self, name: str, *args):
+    59	        self.name = name
+    60	        self.args = list(args)
+    61	
+    62	
+    63	class Seq:
+    64	    __slots__ = ("items",)
+    65	
+    66	    def __init__(self, items):
+    67	        self.items = list(items)
+    68	
+    69	
+    70	def q(s: str) -> str:
+    71	    """A Python string as a K String token (double-quoted, escaped)."""
+    72	    return json.dumps(s)
+    73	
+    74	
+    75	# --- Operator spellings (string tokens carried inside constructors) ----------
+    76	# These are transliterations of the operator *symbol*, not its meaning.
+    77	_BINOP = {
+    78	    ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
+    79	    ast.FloorDiv: "//", ast.Mod: "%", ast.Pow: "**",
+    80	    ast.BitOr: "|", ast.BitAnd: "&", ast.BitXor: "^",
+    81	    ast.LShift: "<<", ast.RShift: ">>", ast.MatMult: "@",
+    82	}
+    83	_UNARY = {ast.USub: "-", ast.UAdd: "+", ast.Not: "not", ast.Invert: "~"}
+    84	_BOOLOP = {ast.And: "and", ast.Or: "or"}
+    85	_CMPOP = {
+    86	    ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
+    87	    ast.Gt: ">", ast.GtE: ">=", ast.Is: "is", ast.IsNot: "is not",
+    88	    ast.In: "in", ast.NotIn: "not in",
+    89	}
+    90	
+    91	
+    92	# ---------------------------------------------------------------------------
+    93	# Closure scopes (Python's own symtable, faithfully exposed)
+    94	# ---------------------------------------------------------------------------
+    95	# (name, lineno) -> (cellvars, freevars, nested). A def/lambda gets the
+    96	# ANNOTATED node form iff it is nested inside a function or has cells/frees;
+    97	# module-level capture-free defs keep the old shape (zero churn).
+    98	SCOPES: dict = {}
+    99	
+   100	
+   101	def _frees(table):
+   102	    return set(table.get_frees()) if isinstance(table, symtable.Function) else set()
+   103	
+   104	
+   105	def _deep_frees(table):
+   106	    out = _frees(table)
+   107	    for g in table.get_children():
+   108	        out |= _deep_frees(g) - set(table.get_locals())
+   109	    return out
+   110	
+   111	
+   112	def _walk_symtable(table, depth=0):
+   113	    for child in table.get_children():
+   114	        if child.get_type() in ("function", "lambda"):
+   115	            frees = sorted(_frees(child))
+   116	            cells = sorted(
+   117	                s for s in child.get_locals()
+   118	                if any(s in _deep_frees(g) for g in child.get_children())
+   119	            )
+   120	            SCOPES[(child.get_name(), child.get_lineno())] = (
+   121	                cells, frees, depth > 0 or table.get_type() != "module")
+   122	        _walk_symtable(child, depth + (1 if child.get_type() in ("function", "lambda") else 0))
+   123	
+   124	
+   125	def scope_info(name, lineno):
+   126	    return SCOPES.get((name, lineno))
+   127	
+   128	
+   129	# ---------------------------------------------------------------------------
+   130	# Expressions
+   131	# ---------------------------------------------------------------------------
+   132	def emit_expr(node: ast.expr):
+   133	    if isinstance(node, ast.Constant):
+   134	        v = node.value
+   135	        if v is None:
+   136	            return "NoneVal"
+   137	        if isinstance(v, bool):                 # MUST precede int (bool ⊂ int)
+   138	            return Ctor("Bool", "true" if v else "false")
+   139	        if isinstance(v, int):
+   140	            return Ctor("Int", str(v))
+   141	        if isinstance(v, float):
+   142	            return Ctor("Float", repr(v))
+   143	        if isinstance(v, str):
+   144	            return Ctor("Str", q(v))
+   145	        raise Unsupported(f"Constant {type(v).__name__}")
+   146	
+   147	    if isinstance(node, ast.Name):
+   148	        return Ctor("Name", q(node.id))
+   149	
+   150	    if isinstance(node, ast.Lambda):
+   151	        a = node.args
+   152	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   153	            raise Unsupported("complex lambda signature")
+   154	        names = [p.arg for p in (a.posonlyargs + a.args)]
+   155	        params = Ctor("Params", *(q(n) for n in names))
+   156	        info = scope_info("lambda", node.lineno)
+   157	        if info and (info[0] or info[1] or info[2]):
+   158	            cells, frees, _ = info
+   159	            return Ctor("Lambda", params,
+   160	                        Ctor("CellVars", *(q(n) for n in cells)),
+   161	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   162	                        emit_expr(node.body))
+   163	        return Ctor("Lambda", params, emit_expr(node.body))
+   164	
+   165	    if isinstance(node, ast.BinOp):
+   166	        op = _BINOP.get(type(node.op))
+   167	        if op is None:
+   168	            raise Unsupported(f"BinOp {type(node.op).__name__}")
+   169	        return Ctor("BinOp", q(op), emit_expr(node.left), emit_expr(node.right))
+   170	
+   171	    if isinstance(node, ast.UnaryOp):
+   172	        op = _UNARY.get(type(node.op))
+   173	        if op is None:
+   174	            raise Unsupported(f"UnaryOp {type(node.op).__name__}")
+   175	        return Ctor("UnaryOp", q(op), emit_expr(node.operand))
+   176	
+   177	    if isinstance(node, ast.BoolOp):
+   178	        op = _BOOLOP[type(node.op)]
+   179	        return Ctor("BoolOp", q(op), *(emit_expr(v) for v in node.values))
+   180	
+   181	    if isinstance(node, ast.Compare):
+   182	        # Faithful, non-desugared: left operand + a chain of (op, comparator).
+   183	        # Single comparison => one CmpOp; `a < b < c` => two CmpOps.
+   184	        chain = [
+   185	            Ctor("CmpOp", q(_op_or_raise(_CMPOP, op, "Compare")), emit_expr(c))
+   186	            for op, c in zip(node.ops, node.comparators)
+   187	        ]
+   188	        return Ctor("Compare", emit_expr(node.left), *chain)
+   189	
+   190	    if isinstance(node, ast.List):
+   191	        return Ctor("ListExpr", *(emit_expr(e) for e in node.elts))
+   192	
+   193	    if isinstance(node, ast.Tuple):
+   194	        return Ctor("TupleExpr", *(emit_expr(e) for e in node.elts))
+   195	
+   196	    if isinstance(node, ast.Set):
+   197	        return Ctor("SetExpr", *(emit_expr(e) for e in node.elts))
+   198	
+--- OUTPUT TRUNCATED: 912 total lines; last 40 lines follow ---
+    31	# Prove the divisor-loop lemma without either loop summary available.
+    32	kompile verification.k \
+    33	  --backend haskell \
+    34	  --main-module COUNT-UP-TO-BASE \
+    35	  --syntax-module MPY-SYNTAX \
+    36	  --output-definition "$proof_build/inner-proof-kompiled"
+    37	kprove spec.k \
+    38	  --definition "$proof_build/inner-proof-kompiled" \
+    39	  --spec-module COUNT-UP-TO-INNER-LOOP-SPEC
+    40	
+    41	# Prove the candidate-loop lemma using only the proved divisor-loop lemma.
+    42	kompile verification.k \
+    43	  --backend haskell \
+    44	  --main-module COUNT-UP-TO-WITH-INNER \
+    45	  --syntax-module MPY-SYNTAX \
+    46	  --output-definition "$proof_build/outer-proof-kompiled"
+    47	kprove spec.k \
+    48	  --definition "$proof_build/outer-proof-kompiled" \
+    49	  --spec-module COUNT-UP-TO-OUTER-LOOP-SPEC
+    50	
+    51	# Prove the entry body for N >= 2 and the non-negative boundary 0 <= N < 2
+    52	# using the two independently proved loop lemmas.
+    53	kompile verification.k \
+    54	  --backend haskell \
+    55	  --main-module COUNT-UP-TO-WITH-OUTER \
+    56	  --syntax-module MPY-SYNTAX \
+    57	  --output-definition "$proof_build/entry-proof-kompiled"
+    58	kprove spec.k \
+    59	  --definition "$proof_build/entry-proof-kompiled" \
+    60	  --spec-module COUNT-UP-TO-ENTRY-SPEC
+    61	kprove spec.k \
+    62	  --definition "$proof_build/entry-proof-kompiled" \
+    63	  --spec-module COUNT-UP-TO-BOUNDARY-SPEC
+===== /candidate/concrete_assertions.py =====
+     1	assert count_up_to(5) == [2, 3]
+     2	assert count_up_to(11) == [2, 3, 5, 7]
+     3	assert count_up_to(0) == []
+     4	assert count_up_to(20) == [2, 3, 5, 7, 11, 13, 17, 19]
+     5	assert count_up_to(1) == []
+     6	assert count_up_to(18) == [2, 3, 5, 7, 11, 13, 17]

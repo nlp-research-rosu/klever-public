@@ -1,0 +1,127 @@
+WORKDIR: /audit-output
+COMMAND: nl -ba /candidate/verification.k
+EXIT_STATUS: 0
+--- OUTPUT (first 240 lines) ---
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	// Mathematical definitions and the unmodified Python semantics.
+     4	module COUNT-UP-TO-BASE
+     5	  imports MPY
+     6	
+     7	  // noDivisor(C, D, HI) says that none of D, D+1, ..., HI-1
+     8	  // divides C.  All calls made by the program satisfy 2 <= D <= HI.
+     9	  syntax Bool ::= noDivisor(Int, Int, Int)
+    10	    [function, total, symbol(noDivisor), no-evaluators]
+    11	  rule noDivisor(_:Int, D:Int, HI:Int) => true
+    12	    requires D >=Int HI
+    13	  rule noDivisor(C:Int, D:Int, HI:Int) => false
+    14	    requires D <Int HI andBool pyMod(C, D) ==Int 0
+    15	  rule noDivisor(C:Int, D:Int, HI:Int)
+    16	    => noDivisor(C, D +Int 1, HI)
+    17	    requires D <Int HI andBool pyMod(C, D) =/=Int 0
+    18	
+    19	  // Append I exactly when the divisor scan establishes that I is prime.
+    20	  syntax ValSeq ::= appendIfPrime(ValSeq, Int, Bool)
+    21	    [function, total, symbol(appendIfPrime), no-evaluators]
+    22	  rule appendIfPrime(VS:ValSeq, _:Int, false) => VS
+    23	  rule appendIfPrime(VS:ValSeq, I:Int, true)
+    24	    => valSeqConcat(VS, vCons(I, .ValSeq))
+    25	
+    26	  // primesAcc(VS, I, N) is VS followed by every prime in [I, N), in
+    27	  // increasing order.  Since all reachable I are at least 2, primality is
+    28	  // exactly noDivisor(I, 2, I).
+    29	  syntax ValSeq ::= primesAcc(ValSeq, Int, Int)
+    30	    [function, total, symbol(primesAcc), no-evaluators]
+    31	  rule primesAcc(VS:ValSeq, I:Int, N:Int) => VS
+    32	    requires I >=Int N
+    33	  rule primesAcc(VS:ValSeq, I:Int, N:Int)
+    34	    => primesAcc(
+    35	         appendIfPrime(VS, I, noDivisor(I, 2, I)),
+    36	         I +Int 1,
+    37	         N)
+    38	    requires I <Int N
+    39	endmodule
+    40	
+    41	// This module adds the inner-loop theorem as a reusable semantic rule.  The
+    42	// corresponding claim is proved against COUNT-UP-TO-BASE alone in spec.k.
+    43	module COUNT-UP-TO-WITH-INNER
+    44	  imports COUNT-UP-TO-BASE
+    45	
+    46	  rule <k>
+    47	         #while(
+    48	           Compare(Name("divisor"), CmpOp("<", Name("candidate"))),
+    49	           If(
+    50	             Compare(
+    51	               BinOp("%", Name("candidate"), Name("divisor")),
+    52	               CmpOp("==", Int(0))),
+    53	             Assign(Name("is_prime"), Bool(false)),
+    54	             .Stmts)
+    55	           AugAssign(Name("divisor"), "+", Int(1)))
+    56	         => .K
+    57	         ...
+    58	       </k>
+    59	       <env> 1 </env>
+    60	       <scopes>
+    61	         0 |-> scope(MOD:Map, parent(-1))
+    62	         -1 |-> scope(BI:Map, root)
+    63	         1 |-> scope(
+    64	           ("candidate" |-> C:Int
+    65	            "divisor" |-> (D:Int => C)
+    66	            "is_prime" |-> (B:Bool => B andBool noDivisor(C, D, C))
+    67	            "n" |-> N:Int
+    68	            "result" |-> ref(0)),
+    69	           parent(0))
+    70	       </scopes>
+    71	       <heap> 0 |-> list(VS:ValSeq) </heap>
+    72	       requires 2 <=Int D andBool D <=Int C
+    73	       [priority(40)]
+    74	endmodule
+    75	
+    76	// This module adds the outer-loop theorem as a reusable semantic rule.  Its
+    77	// claim is proved against COUNT-UP-TO-WITH-INNER, so the only trusted layer at
+    78	// that stage is the already-proved inner-loop theorem.
+    79	module COUNT-UP-TO-WITH-OUTER
+    80	  imports COUNT-UP-TO-WITH-INNER
+    81	
+    82	  rule <k>
+    83	         #while(
+    84	           Compare(Name("candidate"), CmpOp("<", Name("n"))),
+    85	           While(
+    86	             Compare(Name("divisor"), CmpOp("<", Name("candidate"))),
+    87	             If(
+    88	               Compare(
+    89	                 BinOp("%", Name("candidate"), Name("divisor")),
+    90	                 CmpOp("==", Int(0))),
+    91	               Assign(Name("is_prime"), Bool(false)),
+    92	               .Stmts)
+    93	             AugAssign(Name("divisor"), "+", Int(1)))
+    94	           If(
+    95	             Name("is_prime"),
+    96	             Expr(Call(
+    97	               Attribute(Name("result"), "append"),
+    98	               Name("candidate"))),
+    99	             .Stmts)
+   100	           AugAssign(Name("candidate"), "+", Int(1))
+   101	           Assign(Name("is_prime"), Bool(true))
+   102	           Assign(Name("divisor"), Int(2)))
+   103	         => .K
+   104	         ...
+   105	       </k>
+   106	       <env> 1 </env>
+   107	       <scopes>
+   108	         0 |-> scope(MOD:Map, parent(-1))
+   109	         -1 |-> scope(BI:Map, root)
+   110	         1 |-> scope(
+   111	           ("n" |-> N:Int
+   112	            "candidate" |-> (I:Int => N)
+   113	            "is_prime" |-> true
+   114	            "divisor" |-> 2
+   115	            "result" |-> ref(0)),
+   116	           parent(0))
+   117	       </scopes>
+   118	       <heap>
+   119	         0 |-> (list(VS:ValSeq) => list(primesAcc(VS, I, N)))
+   120	       </heap>
+   121	       requires 2 <=Int I andBool I <=Int N
+   122	       [priority(40)]
+   123	endmodule

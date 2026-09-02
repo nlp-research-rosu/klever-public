@@ -1,0 +1,465 @@
+// reference/src/semantics/core.k — MPY-CORE
+
+module MPY-CORE
+  imports MPY-SYNTAX
+  imports INT
+  imports BOOL
+  imports STRING
+  imports MAP
+  imports LIST
+  imports K-EQUAL
+
+  // ==== values, the algebraic lists, and the scope heap =====================
+  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+  syntax Str    ::= str(IntSeq)
+
+  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+  syntax Iterable ::= list(ValSeq)
+                    | tuple(ValSeq)
+                    | Str
+                    | rangeObj(Int, Int, Int)
+                    | zipObj(ValSeq, ValSeq)
+                    | zipObjS(IntSeq, IntSeq)
+
+  syntax Val      ::= Int
+                    | Bool
+                    | "noneV"
+                    | Iterable
+                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+                    | closureVal(ParamNames, Stmts, Int)
+                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+
+  syntax Parent   ::= "root" | parent(Int)
+  syntax Scope    ::= scope(Map, Parent)
+  syntax KResult  ::= Val
+  syntax Expr     ::= Val   // cooling puts results back into expression holes
+  syntax Vals     ::= List{Val, ","}
+  syntax Exc      ::= "NoExc" | "AssertionError"
+  syntax RetState ::= "noRet" | retV(Val)
+
+  // ==== configuration =======================================================
+  // The builtins namespace is a real scope at reserved location -1 (the bottom of every
+  // chain; scopeLoc only allocates >=1, so -1 never collides). The module scope (loc 0)
+  // has it as parent, so an unbound name resolves there last — exactly LEGB. `int`/`str`
+  // resolve to their type objects; any local/global binding shadows them via normal lookup.
+  configuration
+    <k>       #loadAll($PGM:Module) </k>
+    <env>     0 </env>
+    <scopes>   0     |-> scope(.Map, parent(-1))
+              -1    |-> builtinsScope </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap>    .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack>   .List </stack>
+    <ret>     noRet </ret>
+    <exc>     NoExc </exc>
+    <exit-code exit=""> 0 </exit-code>
+
+  // ==== heap allocation (constructed lists become objects) ==================
+  // Cons-form emission with a freshness guard (the heap-list-probe discipline:
+  // an update-form H[N <- _] never re-normalizes symbolically). heapLoc is
+  // monotonic — it does NOT wind back at #pop: returned lists escape by ref.
+  // A bare list(VS) Val stays legal (read-only inputs in claims flow unboxed);
+  // only CONSTRUCTORS in program syntax allocate.
+  syntax Bool ::= isRefV(Val) [function, total]
+  rule isRefV(ref(_:Int)) => true
+  rule isRefV(_:Val)      => false [owise]
+
+  // closure cells (Python-faithful capture): the heap holds cellV(V); a
+  // cellRef surfacing as the k-redex reads through (lookup is the only use —
+  // cellRefs never escape to user-visible values)
+  syntax HeapVal ::= cellV(Val)
+  syntax Bool ::= isCellRef(Val) [function, total]
+  rule isCellRef(cellRef(_:Int)) => true
+  rule isCellRef(_:Val)          => false [owise]
+  // k-top deref for cell-bound reads surfacing INSIDE the annotated frame
+  // (AugAssign's in-place read and friends). The "$cells" guard keeps this
+  // DECIDABLY inapplicable in plain frames — an unguarded rule lets the
+  // prover narrow abstract k-top values into cellRef junk (probed on
+  // 26-remove-duplicates). Cross-frame reads (a comprehension closure
+  // reading the enclosing function's cellvar) deref inside #look instead.
+  rule <k> cellRef(H:Int) => V ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       <heap> ... H |-> cellV(V:Val) ... </heap>
+       requires "$cells" in_keys(M)
+       [priority(40)]
+
+  // write through a cell (Assign / #bindP / #bindTgt dispatch here on
+  // cell-bound names)
+  // a keyword argument cools to a TAGGED value (consumed by kw-aware builtins)
+  syntax Val ::= kwV(String, Val)
+  syntax KItem ::= #kwTag(String)
+  rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>
+  rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k>
+       requires notBool isKwV(V)
+  syntax Bool ::= isKwV(Val) [function, total]
+  rule isKwV(kwV(_:String, _:Val)) => true
+  rule isKwV(_:Val)                => false [owise]
+
+  // the frame marker carries the CONCRETE cellvar list, so cell-write dispatch
+  // decides by pnMember even over an abstract frame rest (no prover branching)
+  syntax Val ::= cellsMark(ParamNames)
+  syntax ParamNames ::= cellsOf(Val) [function]
+  rule cellsOf(cellsMark(CVS:ParamNames)) => CVS
+  syntax Bool ::= pnMember(String, ParamNames) [function, total]
+  rule pnMember(_:String, .ParamNames) => false
+  rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)
+
+  syntax KItem ::= #cellW(Val, Val)
+  rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k>
+       <heap> ... H |-> cellV(_:Val => V) ... </heap>
+
+  syntax KItem ::= #alloc(Val)
+  rule <k> #alloc(V:Val) => ref(N) ... </k>
+       <heap>    H:Map => (N |-> V) H </heap>
+       <heapLoc> N:Int => N +Int 1 </heapLoc>
+       requires notBool N in_keys(H)
+
+  // ==== module load + statement sequencing ==================================
+  syntax KItem ::= #loadAll(Module)
+  rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>
+  rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>
+  rule <k> .Stmts => .K ... </k>
+
+  // ==== Name lookup (walk the scope chain; builtins live in the -1 scope) ====
+  syntax KItem ::= #look(String, Int)
+  rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>
+  rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k>
+       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+       requires X in_keys(M)
+  // a SYNTACTICALLY cell-bound name reads through the heap cell AT THE
+  // LOOKUP (higher priority beats the plain return above on concrete cell
+  // bindings; abstract claim values take the plain rule unchanged) — this
+  // covers cross-frame cell reads (a comprehension closure reading the
+  // enclosing function's cellvar) without a narrowing-prone k-top redex
+  // guarded on the FOUND frame's DECLARED cellvars (pnMember over the
+  // cellsMark): decidable for every concrete frame pin — plain frames and
+  // non-cell names prune outright, so an abstract looked-up value never
+  // drags a narrowing cellV heap match along (probed on 5-intersperse and
+  // Q4's abstract `numbers` in the annotated frame)
+  rule <k> #look(X:String, L:Int) => V ... </k>
+       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+       <heap> ... H |-> cellV(V:Val) ... </heap>
+       requires X in_keys(M) andBool "$cells" in_keys(M)
+        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+        andBool {M[X]}:>Val ==K cellRef(H)
+       [priority(40)]
+  rule <k> #look(X:String, L:Int) => #look(X, P) ... </k>
+       <scopes> ... L |-> scope(M:Map, parent(P:Int)) ... </scopes>
+       requires notBool (X in_keys(M))
+
+  // the ONE predefined builtins scope (the -1 frame; claims write `-1 |-> builtinsScope`)
+  syntax Scope ::= "builtinsScope" [function, total]
+  rule builtinsScope
+    => scope(.Map [ "len"    <- builtinV("len")    ]
+                  [ "set"    <- builtinV("set")    ]
+                  [ "sum"    <- builtinV("sum")    ]
+                  [ "abs"    <- builtinV("abs")    ]
+                  [ "min"    <- builtinV("min")    ]
+                  [ "max"    <- builtinV("max")    ]
+                  [ "ord"    <- builtinV("ord")    ]
+                  [ "chr"    <- builtinV("chr")    ]
+                  [ "range"  <- builtinV("range")  ]
+                  [ "all"    <- builtinV("all")    ]
+                  [ "any"    <- builtinV("any")    ]
+                  [ "zip"    <- builtinV("zip")    ]
+                  [ "isinstance" <- builtinV("isinstance") ]
+                  [ "sorted" <- builtinV("sorted") ]
+                  [ "list"   <- builtinV("list")   ]
+                  [ "round"  <- builtinV("round")  ]
+                  [ "bin"    <- builtinV("bin")    ]
+                  [ "enumerate" <- builtinV("enumerate") ]
+                  [ "map"    <- builtinV("map")    ]
+                  [ "eval"   <- builtinV("eval")   ]
+                  [ "int"    <- typeV("int")       ]
+                  [ "str"    <- typeV("str")       ]
+                  [ "float"  <- typeV("float")     ], root)
+
+  // ==== argument/element evaluation: ONE left-to-right loop, tagged by destination ==
+  // (list/tuple literals and calls all use it; modules extend ApplyK with their tags)
+  syntax ApplyK ::= toCall(Val)
+  syntax KItem  ::= #evalArgs(Exprs, Vals, ApplyK)
+                  | #evalArgCont(Exprs, Vals, ApplyK)
+                  | #applyK(ApplyK, Vals)
+  rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>
+  rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>
+  rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>
+
+  // ==== Int / Bool / None literals ==========================================
+  rule <k> Int(I:Int)   => I ... </k>
+  rule <k> Bool(B:Bool) => B ... </k>
+  rule <k> NoneVal      => noneV ... </k>
+
+  // ==== truthy (If, Assert, BoolOp, IfExp, not, While) ======================
+  syntax Bool ::= truthy(Val) [function]
+  rule truthy(B:Bool)          => B
+  rule truthy(noneV)           => false
+  rule truthy(I:Int)           => I =/=Int 0
+  rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)
+  rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)
+  rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)
+
+  // ==== extensible operator dispatch (cases added by the construct modules) ==
+  syntax Val  ::= applyUn(String, Val) [function]
+  syntax Val  ::= applyBin(String, Val, Val) [function]
+  syntax Bool ::= applyCmp(String, Val, Val) [function]
+
+  // ==== bool-is-a-subtype-of-int: numeric promotion helpers =================
+  // Python: `bool` derives from `int`; True/False act as 1/0 in arithmetic and
+  // comparison. boolAsInt is the total 0/1 coercion; the op-class predicates gate
+  // the generic Bool-operand promotion rules in int.k / bool.k / float.k (they
+  // re-dispatch to the existing Int / Float cases after coercion, so no numeric
+  // logic is duplicated). == and != over Bool x Bool stay in bool.k unchanged.
+  syntax Int ::= boolAsInt(Bool) [function, total]
+  rule boolAsInt(true)  => 1
+  rule boolAsInt(false) => 0
+
+  syntax Bool ::= isArithOp(String) [function, total]
+  rule isArithOp(OP:String)
+    => OP ==String "+"  orBool OP ==String "-"  orBool OP ==String "*"
+       orBool OP ==String "/" orBool OP ==String "//" orBool OP ==String "%"
+       orBool OP ==String "**"
+  // the six comparison operators (== != < <= > >=)
+  syntax Bool ::= isEqOrdOp(String) [function, total]
+  rule isEqOrdOp(OP:String)
+    => OP ==String "==" orBool OP ==String "!=" orBool OP ==String "<"
+       orBool OP ==String "<=" orBool OP ==String ">" orBool OP ==String ">="
+  // the four ordering operators only (< <= > >=)
+  syntax Bool ::= isOrdOp(String) [function, total]
+  rule isOrdOp(OP:String)
+    => OP ==String "<" orBool OP ==String "<=" orBool OP ==String ">" orBool OP ==String ">="
+
+  // ==== shared list helpers =================================================
+  syntax Vals ::= appendVal(Vals, Val) [function, total]
+  rule appendVal(.Vals, V:Val)              => V , .Vals
+  rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+
+  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+  rule vals2valSeq(.Vals)            => .ValSeq
+  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+
+  // ==== shared sequence length (len / summaries across many modules) ========
+  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+  syntax Int ::= vsLen(ValSeq) [function, total]
+  rule vsLen(.ValSeq)                => 0
+  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+
+  syntax Int ::= isLen(IntSeq) [function, total]
+  rule isLen(.IntSeq)                => 0
+  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+
+  // in-bounds positional write (list subscript-assign); OOB leaves the seq unchanged
+  // (valid programs write in-bounds — mirrors valSeqAt's total-but-underspecified stance)
+  syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]
+  rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq
+  rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val)    => vCons(V, S)
+  rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V))
+       requires I >Int 0
+  rule setVSAt(VS:ValSeq, I:Int, _:Val)             => VS
+       requires I <Int 0
+endmodule
+// reference/src/semantics/iter.k — MPY-ITER
+// The iterator protocol, DECLARATION ONLY. Each iterable's #iterNext case lives in that
+// iterable's own module (list/tuple/str in their modules, rangeObj in range.k, zip in
+// builtins.k). Consumers (the for-loop, `x in _`, sum/all/any/max/min) import this.
+
+module MPY-ITER
+  imports MPY-CORE
+  syntax KItem ::= #iterNext(Iterable) | "#iterDone" | #iterYield(Val, Iterable)
+endmodule
+// reference/src/semantics/list.k — MPY-LIST
+
+module MPY-LIST
+  imports MPY-CORE
+  imports MPY-ITER
+  imports MPY-OPERATORS
+
+  // ==== iteration (the iterator protocol's list case) =======================
+  rule <k> #iterNext(list(.ValSeq))                => #iterDone ... </k>
+  rule <k> #iterNext(list(vCons(V:Val, R:ValSeq))) => #iterYield(V, list(R)) ... </k>
+
+  // ==== ListExpr: [...] literal -> a fresh heap object =======================
+  syntax ApplyK ::= "toList"
+  rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>
+  rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>
+
+  // ==== list ops: + / == / != ===============================================
+  syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]
+  rule valSeqConcat(.ValSeq, T:ValSeq)                => T
+  rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))
+
+  // list + list constructs a NEW object (k-cell — it allocates; operands land here
+  // already deref'd). priority(45) beats the generic BinOp dispatch.
+  rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k>
+       [priority(45)]
+
+  rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B
+  rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B)
+
+  // ==== deep equality when elements are heap objects (list-of-lists) ========
+  // Python == is structural at every depth. Fires ONLY when a ref is present
+  // (the guard decides on concrete seqs); the plain ==K path above is unchanged.
+  syntax Bool ::= hasRefVS(ValSeq) [function, total]
+  rule hasRefVS(.ValSeq)                => false
+  rule hasRefVS(vCons(V:Val, R:ValSeq)) => isRefV(V) orBool hasRefVS(R)
+
+  syntax Bool ::= deepEqVS(ValSeq, ValSeq, Map) [function]
+                | deepEqV(Val, Val, Map)        [function]
+  rule deepEqVS(.ValSeq, .ValSeq, _:Map)                   => true
+  rule deepEqVS(.ValSeq, vCons(_:Val, _:ValSeq), _:Map)    => false
+  rule deepEqVS(vCons(_:Val, _:ValSeq), .ValSeq, _:Map)    => false
+  rule deepEqVS(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq), HP:Map)
+    => deepEqV(A, B, HP) andBool deepEqVS(As, Bs, HP)
+
+  rule deepEqV(ref(H:Int), B:Val, HP:Map) => deepEqV({HP[H]}:>Val, B, HP)
+       requires H in_keys(HP)
+  rule deepEqV(A:Val, ref(H:Int), HP:Map) => deepEqV(A, {HP[H]}:>Val, HP)
+       requires notBool isRefV(A) andBool H in_keys(HP)
+  rule deepEqV(list(A:ValSeq), list(B:ValSeq), HP:Map) => deepEqVS(A, B, HP)
+  rule deepEqV(A:Val, B:Val, _:Map) => A ==K B [owise]
+
+  // ==== mutator: xs.append(v) — an in-place heap write ======================
+  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "append")), (V:Val, .Vals)) => noneV ... </k>
+       <heap> ... H |-> list(VS:ValSeq => valSeqConcat(VS, vCons(V, .ValSeq))) ... </heap>
+       [priority(40)]
+
+  // ==== `x in list` — a <k>-cell fold over #iterNext ========================
+  syntax KItem ::= #memberAcc(Val, Iterable) | #memberCont(Val) | "#notB"
+  rule <k> Compare(LV:Val, CmpOp("in",     list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ... </k>
+  rule <k> Compare(LV:Val, CmpOp("not in", list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ~> #notB ... </k>
+  rule <k> #memberAcc(V:Val, IT:Iterable) => #iterNext(IT) ~> #memberCont(V) ... </k>
+  rule <k> #iterDone ~> #memberCont(_V:Val) => false ... </k>
+  rule <k> #iterYield(E:Val, _:Iterable) ~> #memberCont(V:Val) => true ... </k>
+       requires E ==K V
+  rule <k> #iterYield(E:Val, R:Iterable) ~> #memberCont(V:Val) => #memberAcc(V, R) ... </k>
+       requires notBool (E ==K V)
+  rule <k> B:Bool ~> #notB => notBool B ... </k>
+endmodule
+// reference/src/semantics/str.k — MPY-STR
+
+module MPY-STR
+  imports MPY-CORE
+  imports MPY-ITER
+
+  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+
+  // ==== str literal (ASCII-only) ============================================
+  syntax IntSeq ::= strToCodes(String) [function]
+  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+  rule strToCodes("") => .IntSeq
+  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+
+  // ==== operators: + / == / != / in =========================================
+  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+  rule seqConcat(.IntSeq, T:IntSeq)                => T
+  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+
+  rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+  rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+  rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)
+
+  // substring membership: `P in X` iff the code-seq P occurs contiguously in X
+  rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)
+  rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)
+
+  syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]
+  rule strPrefix(.IntSeq, _:IntSeq)               => true
+  rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false
+  rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)
+
+  syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]
+  rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)
+  rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)
+  rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs)
+       requires notBool strPrefix(P, iCons(C, Xs))
+
+  // ==== lexicographic order: < / <= / > / >= by code point (= Python str order on the code
+  // model). strLt reduces on GROUND code-seqs (krun) but is inert/OPAQUE on symbolic ones
+  // (a proof's codesProj(V) is an abstract IntSeq — no constructor rule matches), so a symbolic
+  // str `<` stays a trusted opaque term the way sortVS / intFloatDiv do. Additive: fires only on
+  // str </<=/>/>= comparisons.
+  syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]
+  rule strLt(.IntSeq, .IntSeq)                => false
+  rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true
+  rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true          requires A  <Int B
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false         requires A  >Int B
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B
+
+  rule applyCmp("<",  str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+  rule applyCmp(">",  str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)
+  rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)
+  rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)
+endmodule
+/reference/k-proof/reference-semantics/semantics/methods.k-8-
+/reference/k-proof/reference-semantics/semantics/methods.k-9-  // method-call routing + arg-eval live in call.k; this module owns applyMethod.
+/reference/k-proof/reference-semantics/semantics/methods.k-10-  syntax Val ::= applyMethod(Val, String, Vals) [function]
+/reference/k-proof/reference-semantics/semantics/methods.k-11-
+/reference/k-proof/reference-semantics/semantics/methods.k-12-  // ==== string predicates (Python semantics) =================================
+/reference/k-proof/reference-semantics/semantics/methods.k:13:  rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)
+/reference/k-proof/reference-semantics/semantics/methods.k:14:  rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)
+/reference/k-proof/reference-semantics/semantics/methods.k-15-  rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)
+/reference/k-proof/reference-semantics/semantics/methods.k-16-  rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS)
+/reference/k-proof/reference-semantics/semantics/methods.k-17-
+/reference/k-proof/reference-semantics/semantics/methods.k-18-  // ==== case maps ============================================================
+/reference/k-proof/reference-semantics/semantics/methods.k-19-  rule applyMethod(str(CS:IntSeq), "lower",    .Vals) => str(mapLower(CS))
+--
+/reference/k-proof/reference-semantics/semantics/methods.k-107-  rule replaceC(.IntSeq, _:Int, _:Int)             => .IntSeq
+/reference/k-proof/reference-semantics/semantics/methods.k-108-  rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(B, replaceC(R, A, B)) requires C ==Int A
+/reference/k-proof/reference-semantics/semantics/methods.k-109-  rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(C, replaceC(R, A, B)) requires notBool (C ==Int A)
+/reference/k-proof/reference-semantics/semantics/methods.k-110-
+/reference/k-proof/reference-semantics/semantics/methods.k-111-  // ==== char helpers =========================================================
+/reference/k-proof/reference-semantics/semantics/methods.k:112:  syntax Bool ::= isUpperC(Int) [function, total]
+/reference/k-proof/reference-semantics/semantics/methods.k:113:  rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90
+/reference/k-proof/reference-semantics/semantics/methods.k-114-
+/reference/k-proof/reference-semantics/semantics/methods.k:115:  syntax Bool ::= isLowerC(Int) [function, total]
+/reference/k-proof/reference-semantics/semantics/methods.k:116:  rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122
+/reference/k-proof/reference-semantics/semantics/methods.k-117-
+/reference/k-proof/reference-semantics/semantics/methods.k-118-  syntax Bool ::= isAlphaC(Int) [function, total]
+/reference/k-proof/reference-semantics/semantics/methods.k:119:  rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)
+/reference/k-proof/reference-semantics/semantics/methods.k-120-
+/reference/k-proof/reference-semantics/semantics/methods.k-121-  syntax Bool ::= isDigitC(Int) [function, total]
+/reference/k-proof/reference-semantics/semantics/methods.k-122-  rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57
+/reference/k-proof/reference-semantics/semantics/methods.k-123-
+/reference/k-proof/reference-semantics/semantics/methods.k-124-  syntax Bool ::= hasUpper(IntSeq) [function, total]
+/reference/k-proof/reference-semantics/semantics/methods.k-125-  rule hasUpper(.IntSeq) => false
+/reference/k-proof/reference-semantics/semantics/methods.k:126:  rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)
+/reference/k-proof/reference-semantics/semantics/methods.k-127-
+/reference/k-proof/reference-semantics/semantics/methods.k-128-  syntax Bool ::= hasLower(IntSeq) [function, total]
+/reference/k-proof/reference-semantics/semantics/methods.k-129-  rule hasLower(.IntSeq) => false
+/reference/k-proof/reference-semantics/semantics/methods.k:130:  rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)
+/reference/k-proof/reference-semantics/semantics/methods.k-131-
+/reference/k-proof/reference-semantics/semantics/methods.k-132-  syntax Bool ::= allAlpha(IntSeq) [function, total]
+/reference/k-proof/reference-semantics/semantics/methods.k-133-  rule allAlpha(.IntSeq) => true
+/reference/k-proof/reference-semantics/semantics/methods.k-134-  rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)
+/reference/k-proof/reference-semantics/semantics/methods.k-135-
+--
+/reference/k-proof/reference-semantics/semantics/methods.k-137-  rule allDigit(.IntSeq) => true
+/reference/k-proof/reference-semantics/semantics/methods.k-138-  rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)
+/reference/k-proof/reference-semantics/semantics/methods.k-139-
+/reference/k-proof/reference-semantics/semantics/methods.k-140-  syntax Int ::= lowerC(Int) [function, total]
+/reference/k-proof/reference-semantics/semantics/methods.k-141-
+/reference/k-proof/reference-semantics/semantics/methods.k:142:  rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)
+/reference/k-proof/reference-semantics/semantics/methods.k-143-  rule lowerC(C:Int) => C         [owise]
+/reference/k-proof/reference-semantics/semantics/methods.k-144-
+/reference/k-proof/reference-semantics/semantics/methods.k-145-  syntax Int ::= upperC(Int) [function, total]
+/reference/k-proof/reference-semantics/semantics/methods.k:146:  rule upperC(C:Int) => C -Int 32 requires isLowerC(C)
+/reference/k-proof/reference-semantics/semantics/methods.k-147-  rule upperC(C:Int) => C         [owise]
+/reference/k-proof/reference-semantics/semantics/methods.k-148-
+/reference/k-proof/reference-semantics/semantics/methods.k-149-  syntax Int ::= swapC(Int) [function, total]
+/reference/k-proof/reference-semantics/semantics/methods.k:150:  rule swapC(C:Int) => C +Int 32 requires isUpperC(C)
+/reference/k-proof/reference-semantics/semantics/methods.k:151:  rule swapC(C:Int) => C -Int 32 requires isLowerC(C)
+/reference/k-proof/reference-semantics/semantics/methods.k-152-  rule swapC(C:Int) => C         [owise]
+/reference/k-proof/reference-semantics/semantics/methods.k-153-
+/reference/k-proof/reference-semantics/semantics/methods.k-154-  syntax IntSeq ::= mapLower(IntSeq) [function, total]
+/reference/k-proof/reference-semantics/semantics/methods.k-155-  rule mapLower(.IntSeq) => .IntSeq
+/reference/k-proof/reference-semantics/semantics/methods.k-156-  rule mapLower(iCons(C:Int, S:IntSeq)) => iCons(lowerC(C), mapLower(S))

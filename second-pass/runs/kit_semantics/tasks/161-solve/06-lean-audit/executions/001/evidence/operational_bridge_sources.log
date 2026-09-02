@@ -1,0 +1,294 @@
+Script started on 2026-07-31 03:02:58-05:00 [<not executed on terminal>]
++ nl -ba /reference/k-proof/verification.k
++ sed -n 1,100p
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Constructor disjointness needed to simplify the reference isalpha rule
+     7	  // after string iteration has produced a one-character string.
+     8	  rule iCons(C:Int, .IntSeq) ==K .IntSeq => false
+     9	    [simplification]
+    10	
+    11	  // Compile-time aliases for the exact AST emitted in solution.mpy.
+    12	  syntax Stmts ::= "loopBody" [macro]
+    13	  rule loopBody
+    14	    => Assign(
+    15	         Name("reversed_s"),
+    16	         BinOp("+", Name("c"), Name("reversed_s")))
+    17	       If(
+    18	         Call(Attribute(Name("c"), "isalpha"), .Exprs),
+    19	         AugAssign(
+    20	           Name("swapped"),
+    21	           "+",
+    22	           Call(Attribute(Name("c"), "swapcase"), .Exprs))
+    23	         Assign(Name("has_letter"), Bool(true))
+    24	         .Stmts,
+    25	         AugAssign(Name("swapped"), "+", Name("c"))
+    26	         .Stmts)
+    27	       .Stmts
+    28	
+    29	  syntax Stmts ::= "solveBody" [macro]
+    30	  rule solveBody
+    31	    => Expr(
+    32	         Str("Toggle letter case, or reverse a string containing no letters."))
+    33	       Assign(Name("swapped"), Str(""))
+    34	       Assign(Name("reversed_s"), Str(""))
+    35	       Assign(Name("has_letter"), Bool(false))
+    36	       Assign(Name("c"), Str(""))
+    37	       For(Name("c"), Name("s"), loopBody)
+    38	       If(
+    39	         Name("has_letter"),
+    40	         Return(Name("swapped")) .Stmts,
+    41	         .Stmts)
+    42	       Return(Name("reversed_s"))
+    43	       .Stmts
+    44	
+    45	  // Accumulator form of "some character is alphabetic".
+    46	  syntax Bool ::= charAlpha(Int) [function, total]
+    47	  rule charAlpha(C:Int)
+    48	    => notBool (iCons(C, .IntSeq) ==K .IntSeq)
+    49	       andBool allAlpha(iCons(C, .IntSeq))
+    50	
+    51	  syntax Bool ::= alphaAcc(IntSeq, Bool) [function, total]
+    52	  rule alphaAcc(.IntSeq, FOUND:Bool) => FOUND
+    53	  rule alphaAcc(iCons(C:Int, REST:IntSeq), FOUND:Bool)
+    54	    => alphaAcc(REST, true)
+    55	    requires charAlpha(C)
+    56	    [simplification]
+    57	  rule alphaAcc(iCons(C:Int, REST:IntSeq), FOUND:Bool)
+    58	    => alphaAcc(REST, FOUND)
+    59	    requires notBool charAlpha(C)
+    60	    [simplification]
+    61	
+    62	  // Accumulator form of the exact per-character transformation.
+    63	  syntax IntSeq ::= toggleAcc(IntSeq, IntSeq) [function, total]
+    64	  rule toggleAcc(.IntSeq, OUT:IntSeq) => OUT
+    65	  rule toggleAcc(iCons(C:Int, REST:IntSeq), OUT:IntSeq)
+    66	    => toggleAcc(
+    67	         REST,
+    68	         seqConcat(OUT, iCons(swapC(C), .IntSeq)))
+    69	    requires charAlpha(C)
+    70	    [simplification]
+    71	  rule toggleAcc(iCons(C:Int, REST:IntSeq), OUT:IntSeq)
+    72	    => toggleAcc(
+    73	         REST,
+    74	         seqConcat(OUT, iCons(C, .IntSeq)))
+    75	    requires notBool charAlpha(C)
+    76	    [simplification]
+    77	
+    78	  // Exact final value of Python's for-loop target (initialized before the loop).
+    79	  syntax Str ::= lastChar(IntSeq, Str) [function, total]
+    80	  rule lastChar(.IntSeq, INITIAL:Str) => INITIAL
+    81	  rule lastChar(iCons(C:Int, REST:IntSeq), _:Str)
+    82	    => lastChar(REST, str(iCons(C, .IntSeq)))
+    83	
+    84	  // The HumanEval result over the reference semantics' character model.
+    85	  syntax Str ::= solveResult(IntSeq) [function, total]
+    86	  rule solveResult(INPUT:IntSeq) => str(toggleAcc(INPUT, .IntSeq))
+    87	    requires alphaAcc(INPUT, false)
+    88	  rule solveResult(INPUT:IntSeq) => str(revIS(INPUT))
+    89	    requires notBool alphaAcc(INPUT, false)
+    90	endmodule
++ nl -ba /reference/k-proof/prove.sh
++ sed -n 12,32p
+    12	krun smoke.mpy --definition runtime-kompiled
+    13	
+    14	kompile --backend haskell verification.k \
+    15	  --main-module VERIFICATION \
+    16	  --syntax-module MPY-SYNTAX \
+    17	  --output-definition verification-kompiled
+    18	
+    19	kprove spec.k \
+    20	  --definition verification-kompiled \
+    21	  --spec-module SPEC
+    22	
+    23	kompile --backend haskell lemma-verification.k \
+    24	  --main-module LEMMA-VERIFICATION \
+    25	  --syntax-module MPY-SYNTAX \
+    26	  --output-definition lemma-kompiled
+    27	
+    28	kprove lemma-spec.k \
+    29	  --definition lemma-kompiled \
+    30	  --spec-module LEMMA-SPEC
+    31	
+    32	if kprove spec-vacuity.k \
++ nl -ba /reference/k-proof/reference-semantics/semantics/core.k
++ sed -n 6,18p
+     6	  imports BOOL
+     7	  imports STRING
+     8	  imports MAP
+     9	  imports LIST
+    10	  imports K-EQUAL
+    11	
+    12	  // ==== values, the algebraic lists, and the scope heap =====================
+    13	  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+    14	  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+    15	  syntax Str    ::= str(IntSeq)
+    16	
+    17	  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+    18	  syntax Iterable ::= list(ValSeq)
++ nl -ba /reference/k-proof/reference-semantics/semantics/str.k
++ sed -n 7,27p
+     7	  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+     8	  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+     9	  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+    10	        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+    11	
+    12	  // ==== str literal (ASCII-only) ============================================
+    13	  syntax IntSeq ::= strToCodes(String) [function]
+    14	  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+    15	  rule strToCodes("") => .IntSeq
+    16	  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    17	    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+    18	
+    19	  // ==== operators: + / == / != / in =========================================
+    20	  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+    21	  rule seqConcat(.IntSeq, T:IntSeq)                => T
+    22	  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+    23	
+    24	  rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+    25	  rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+    26	  rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)
+    27	
++ nl -ba /reference/k-proof/reference-semantics/semantics/methods.k
++ sed -n 12,22p
+    12	  // ==== string predicates (Python semantics) =================================
+    13	  rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)
+    14	  rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)
+    15	  rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)
+    16	  rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS)
+    17	
+    18	  // ==== case maps ============================================================
+    19	  rule applyMethod(str(CS:IntSeq), "lower",    .Vals) => str(mapLower(CS))
+    20	  rule applyMethod(str(CS:IntSeq), "upper",    .Vals) => str(mapUpper(CS))
+    21	  rule applyMethod(str(CS:IntSeq), "swapcase", .Vals) => str(mapSwap(CS))
+    22	
++ nl -ba /reference/k-proof/reference-semantics/semantics/methods.k
++ sed -n 111,165p
+   111	  // ==== char helpers =========================================================
+   112	  syntax Bool ::= isUpperC(Int) [function, total]
+   113	  rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90
+   114	
+   115	  syntax Bool ::= isLowerC(Int) [function, total]
+   116	  rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122
+   117	
+   118	  syntax Bool ::= isAlphaC(Int) [function, total]
+   119	  rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)
+   120	
+   121	  syntax Bool ::= isDigitC(Int) [function, total]
+   122	  rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57
+   123	
+   124	  syntax Bool ::= hasUpper(IntSeq) [function, total]
+   125	  rule hasUpper(.IntSeq) => false
+   126	  rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)
+   127	
+   128	  syntax Bool ::= hasLower(IntSeq) [function, total]
+   129	  rule hasLower(.IntSeq) => false
+   130	  rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)
+   131	
+   132	  syntax Bool ::= allAlpha(IntSeq) [function, total]
+   133	  rule allAlpha(.IntSeq) => true
+   134	  rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)
+   135	
+   136	  syntax Bool ::= allDigit(IntSeq) [function, total]
+   137	  rule allDigit(.IntSeq) => true
+   138	  rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)
+   139	
+   140	  syntax Int ::= lowerC(Int) [function, total]
+   141	
+   142	  rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)
+   143	  rule lowerC(C:Int) => C         [owise]
+   144	
+   145	  syntax Int ::= upperC(Int) [function, total]
+   146	  rule upperC(C:Int) => C -Int 32 requires isLowerC(C)
+   147	  rule upperC(C:Int) => C         [owise]
+   148	
+   149	  syntax Int ::= swapC(Int) [function, total]
+   150	  rule swapC(C:Int) => C +Int 32 requires isUpperC(C)
+   151	  rule swapC(C:Int) => C -Int 32 requires isLowerC(C)
+   152	  rule swapC(C:Int) => C         [owise]
+   153	
+   154	  syntax IntSeq ::= mapLower(IntSeq) [function, total]
+   155	  rule mapLower(.IntSeq) => .IntSeq
+   156	  rule mapLower(iCons(C:Int, S:IntSeq)) => iCons(lowerC(C), mapLower(S))
+   157	
+   158	  syntax IntSeq ::= mapUpper(IntSeq) [function, total]
+   159	  rule mapUpper(.IntSeq) => .IntSeq
+   160	  rule mapUpper(iCons(C:Int, S:IntSeq)) => iCons(upperC(C), mapUpper(S))
+   161	
+   162	  syntax IntSeq ::= mapSwap(IntSeq) [function, total]
+   163	  rule mapSwap(.IntSeq) => .IntSeq
+   164	  rule mapSwap(iCons(C:Int, S:IntSeq)) => iCons(swapC(C), mapSwap(S))
+   165	
++ nl -ba /opt/runtimeverification-k/k-distribution/include/kframework/builtin/domains.md
++ sed -n 2320,2355p
+  2320	module K-EQUAL-SYNTAX
+  2321	  imports private BOOL
+  2322	  imports private BASIC-K
+  2323	
+  2324	  syntax Bool ::= left:
+  2325	                  K "==K" K           [function, total, comm, smt-hook(=), hook(KEQUAL.eq), symbol(_==K_), group(equalEqualK)]
+  2326	                | K "=/=K" K          [function, total, comm, smt-hook(distinct), hook(KEQUAL.ne), symbol(_=/=K_), group(notEqualEqualK)]
+  2327	
+  2328	  syntax priority equalEqualK notEqualEqualK > boolOperation mlOp
+  2329	
+  2330	  syntax {Sort} Sort ::= "#if" Bool "#then" Sort "#else" Sort "#fi" [function, total, symbol(ite), smt-hook(ite), hook(KEQUAL.ite)]
+  2331	
+  2332	endmodule
+  2333	
+  2334	module K-EQUAL-KORE [symbolic]
+  2335	  imports private BOOL
+  2336	  imports K-EQUAL-SYNTAX
+  2337	
+  2338	  rule K1:Bool ==K K2:Bool => K1 ==Bool K2 [simplification]
+  2339	  rule {K1 ==K K2 #Equals true} => {K1 #Equals K2} [simplification]
+  2340	  rule {true #Equals K1 ==K K2} => {K1 #Equals K2} [simplification]
+  2341	  rule {K1 ==K K2 #Equals false} => #Not({K1 #Equals K2}) [simplification]
+  2342	  rule {false #Equals K1 ==K K2} => #Not({K1 #Equals K2}) [simplification]
+  2343	  rule {K1 =/=K K2 #Equals true} => #Not({K1 #Equals K2}) [simplification]
+  2344	  rule {true #Equals K1 =/=K K2} => #Not({K1 #Equals K2}) [simplification]
+  2345	  rule {K1 =/=K K2 #Equals false} => {K1 #Equals K2} [simplification]
+  2346	  rule {false #Equals K1 =/=K K2} => {K1 #Equals K2} [simplification]
+  2347	
+  2348	endmodule
+  2349	
+  2350	module K-EQUAL
+  2351	  imports private BOOL
+  2352	  imports K-EQUAL-SYNTAX
+  2353	  imports K-EQUAL-KORE
+  2354	
+  2355	  rule K1:K =/=K K2:K => notBool (K1 ==K K2)
++ nl -ba /candidate/Proof.lean
+     1	import Klean161Solve.Lemmas
+     2	
+     3	namespace Proof
+     4	
+     5	/- KORE symbol: Lbl'UndsEqlsEqls'K'Unds'; frozen source obligations: rule-387d11f8474864387ce45c90f1ba7bc44da2dcb0e552a8b7845434062e527a49. Replace this stub with its honest total meaning from the frozen K semantics. -/
+     6	noncomputable def «_==K_» (lhs rhs : SortK) : SortBool := by
+     7	  classical
+     8	  exact if lhs = rhs then true else false
+     9	
+    10	theorem final :
+    11	    Klean161Solve.Lemmas.targetStatement «_==K_» := by
+    12	  simp [Klean161Solve.Lemmas.targetStatement, «_==K_»]
+    13	
+    14	end Proof
++ nl -ba /reference/klean-generation/generated/Klean161Solve/Lemmas.lean
+     1	import Klean161Solve.Inj
+     2	
+     3	/- K trust-boundary goals. The second-pass agent must replace every
+     4	   writable opaque stub with an honest definition and prove this
+     5	   immutable proposition in the separate Proof.lean workspace. -/
+     6	
+     7	namespace Klean161Solve.Lemmas
+     8	
+     9	def targetStatement
+    10	    («_==K_» : SortK → SortK → SortBool)
+    11	    : Prop :=
+    12	    (∀ (C : SortInt), («_==K_» (SortK.kseq (SortKItem.inj_SortIntSeq (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» C SortIntSeq.«.IntSeq_MPY-CORE_IntSeq»)) SortK.dotk) (SortK.kseq (SortKItem.inj_SortIntSeq SortIntSeq.«.IntSeq_MPY-CORE_IntSeq») SortK.dotk) : SortBool) = (false : SortBool))
+    13	
+    14	end Klean161Solve.Lemmas
+
+Script done on 2026-07-31 03:02:58-05:00 [COMMAND_EXIT_CODE="0"]

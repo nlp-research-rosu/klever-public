@@ -1,0 +1,482 @@
+Script started on 2026-07-31 07:44:30-05:00 [<not executed on terminal>]
+VERIFICATION.K
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION-SYNTAX
+     4	  imports MPY
+     5	
+     6	  syntax ValSeq ::= collect(ValSeq, ValSeq) [function]
+     7	                  | appendCandidate(ValSeq, Val) [function]
+     8	
+     9	  syntax Bool ::= integerVals(ValSeq) [function, total]
+    10	
+    11	  syntax Int ::= scanBad(Int, Int) [function, total]
+    12	               | scanNumber(Int) [function, total]
+    13	               | afterNumber(ValSeq, Int) [function]
+    14	               | afterBad(ValSeq, Int) [function]
+    15	
+    16	  syntax Val ::= afterValue(ValSeq, Val) [function, total]
+    17	endmodule
+    18	
+    19	module VERIFICATION
+    20	  imports VERIFICATION-SYNTAX
+    21	  imports MPY
+    22	
+    23	  // The theorem covers all integer lists; the HumanEval positive-integer
+    24	  // domain is a subset.
+    25	  rule integerVals(.ValSeq) => true
+    26	  rule integerVals(vCons(V:Val, VS:ValSeq))
+    27	    => isInt(V) andBool integerVals(VS)
+    28	
+    29	  // Exact final bad-counter value of the decimal digit loop.
+    30	  rule scanBad(B:Int, N:Int) => B
+    31	    requires N <=Int 0
+    32	  rule scanBad(B:Int, N:Int)
+    33	    => scanBad(
+    34	         B +Int (#if pyMod(N, 2) ==Int 0 #then 1 #else 0 #fi),
+    35	         (N -Int pyMod(N, 10)) /Int 10)
+    36	    requires N >Int 0
+    37	
+    38	  rule scanNumber(N:Int)
+    39	    => #if N >Int 0 #then 0 #else N #fi
+    40	
+    41	  rule appendCandidate(VS:ValSeq, V:Val)
+    42	    => valSeqConcat(VS, vCons(V, .ValSeq))
+    43	    requires isInt(V)
+    44	     andBool scanBad(0, intOf(V)) ==Int 0
+    45	  rule appendCandidate(VS:ValSeq, V:Val) => VS
+    46	    requires isInt(V)
+    47	     andBool scanBad(0, intOf(V)) =/=Int 0
+    48	
+    49	  // Exact accumulator fold for the outer loop over the admitted input domain.
+    50	  rule collect(ACC:ValSeq, .ValSeq) => ACC
+    51	  rule collect(ACC:ValSeq, vCons(V:Val, VS:ValSeq))
+    52	    => collect(appendCandidate(ACC, V), VS)
+    53	    requires isInt(V)
+    54	
+    55	  // Python for-loop targets and body locals persist after the loop.
+    56	  rule afterValue(.ValSeq, V:Val) => V
+    57	  rule afterValue(vCons(V:Val, VS:ValSeq), _:Val)
+    58	    => afterValue(VS, V)
+    59	
+    60	  rule afterNumber(.ValSeq, N:Int) => N
+    61	  rule afterNumber(vCons(V:Val, VS:ValSeq), _:Int)
+    62	    => afterNumber(VS, scanNumber(intOf(V)))
+    63	    requires isInt(V)
+    64	
+    65	  rule afterBad(.ValSeq, B:Int) => B
+    66	  rule afterBad(vCons(V:Val, VS:ValSeq), _:Int)
+    67	    => afterBad(VS, scanBad(0, intOf(V)))
+    68	    requires isInt(V)
+    69	endmodule
+
+PROVE.SH
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Translation identity and executable evidence.
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	cmp <(python3 py2mpy.py solution.py) solution.mpy
+     7	python3 validate.py
+     8	python3 py2mpy.py concrete.py > concrete.mpy
+     9	
+    10	kompile reference-semantics/semantics.k \
+    11	  --backend llvm \
+    12	  --main-module MPY-KRUN \
+    13	  --syntax-module MPY-SYNTAX \
+    14	  --output-definition runtime-kompiled
+    15	
+    16	krun concrete.mpy --definition runtime-kompiled | tee concrete.krun
+    17	python3 validate_krun.py
+    18	
+    19	# Positive symbolic proof.
+    20	kompile --backend haskell verification.k \
+    21	  --main-module VERIFICATION \
+    22	  --syntax-module VERIFICATION-SYNTAX \
+    23	  --output-definition verification-kompiled
+    24	
+    25	kprove spec.k \
+    26	  --definition verification-kompiled \
+    27	  --spec-module SPEC
+    28	
+    29	# Gate A body-sensitivity and result non-vacuity probes.
+    30	sed -e 's/module SPEC/module SPEC-BODY-MUTATION/' \
+    31	    -e 's/Int(2)/Int(3)/g' \
+    32	    spec.k > spec-body-mutation.k
+    33	
+    34	if kprove spec-body-mutation.k \
+    35	     --definition verification-kompiled \
+    36	     --spec-module SPEC-BODY-MUTATION \
+    37	     --claims SPEC-BODY-MUTATION.digit-loop; then
+    38	  echo "ERROR: body mutation unexpectedly proved"
+    39	  exit 1
+    40	else
+    41	  echo "EXPECTED FAILURE: body mutation rejected"
+    42	fi
+    43	
+    44	sed -e 's/module SPEC/module SPEC-VACUITY/' \
+    45	    -e 's/=> ref(1)/=> ref(0)/' \
+    46	    spec.k > spec-vacuity.k
+    47	
+    48	if kprove spec-vacuity.k \
+    49	     --definition verification-kompiled \
+    50	     --spec-module SPEC-VACUITY \
+    51	     --claims SPEC-VACUITY.digit-loop,SPEC-VACUITY.outer-loop,SPEC-VACUITY.program; then
+    52	  echo "ERROR: false result mutation unexpectedly proved"
+    53	  exit 1
+    54	else
+    55	  echo "EXPECTED FAILURE: false result mutation rejected"
+    56	fi
+
+SPEC.K
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Inner decimal digit-loop circularity.
+     7	  claim [digit-loop]:
+     8	    <k>
+     9	      #while(
+    10	        Compare(Name("number"), CmpOp(">", Int(0))),
+    11	        AugAssign(
+    12	          Name("bad"),
+    13	          "+",
+    14	          Compare(
+    15	            BinOp("%", Name("number"), Int(2)),
+    16	            CmpOp("==", Int(0))))
+    17	        AugAssign(Name("number"), "//", Int(10))
+    18	        .Stmts)
+    19	      => .K
+    20	      ...
+    21	    </k>
+    22	    <env> L:Int </env>
+    23	    <scopes>
+    24	      ...
+    25	      L |-> scope(
+    26	        "x"      |-> X:Val
+    27	        "result" |-> R:Val
+    28	        "value"  |-> V:Val
+    29	        "number" |-> (N:Int => scanNumber(N))
+    30	        "bad"    |-> (B:Int => scanBad(B, N)),
+    31	        parent(0))
+    32	      ...
+    33	    </scopes>
+    34	
+    35	  // Outer list-loop circularity.  The loop consumes the exact embedded suffix
+    36	  // XS and updates every persistent local and the result heap object.
+    37	  claim [outer-loop]:
+    38	    <k>
+    39	      #loop(
+    40	        list(XS:ValSeq),
+    41	        Name("value"),
+    42	        Assign(
+    43	          Name("number"),
+    44	          Call(
+    45	            Name("sum"),
+    46	            (TupleExpr((Name("value"), .Exprs)), .Exprs)))
+    47	        Assign(Name("bad"), Int(0))
+    48	        While(
+    49	          Compare(Name("number"), CmpOp(">", Int(0))),
+    50	          AugAssign(
+    51	            Name("bad"),
+    52	            "+",
+    53	            Compare(
+    54	              BinOp("%", Name("number"), Int(2)),
+    55	              CmpOp("==", Int(0))))
+    56	          AugAssign(Name("number"), "//", Int(10))
+    57	          .Stmts)
+    58	        If(
+    59	          Compare(Name("bad"), CmpOp("==", Int(0))),
+    60	          Expr(
+    61	            Call(
+    62	              Attribute(Name("result"), "append"),
+    63	              (Name("value"), .Exprs)))
+    64	          .Stmts,
+    65	          .Stmts)
+    66	        .Stmts)
+    67	      => .K
+    68	      ...
+    69	    </k>
+    70	    <env> 1 </env>
+    71	    <scopes>
+    72	      0 |-> scope(
+    73	        "unique_digits" |->
+    74	          closureVal(
+    75	            "x", .ParamNames,
+    76	            Assign(Name("result"), ListExpr(.Exprs))
+    77	            Assign(Name("value"), Int(0))
+    78	            Assign(Name("number"), Int(0))
+    79	            Assign(Name("bad"), Int(0))
+    80	            For(
+    81	              Name("value"), Name("x"),
+    82	              Assign(
+    83	                Name("number"),
+    84	                Call(
+    85	                  Name("sum"),
+    86	                  (TupleExpr((Name("value"), .Exprs)), .Exprs)))
+    87	              Assign(Name("bad"), Int(0))
+    88	              While(
+    89	                Compare(Name("number"), CmpOp(">", Int(0))),
+    90	                AugAssign(
+    91	                  Name("bad"),
+    92	                  "+",
+    93	                  Compare(
+    94	                    BinOp("%", Name("number"), Int(2)),
+    95	                    CmpOp("==", Int(0))))
+    96	                AugAssign(Name("number"), "//", Int(10))
+    97	                .Stmts)
+    98	              If(
+    99	                Compare(Name("bad"), CmpOp("==", Int(0))),
+   100	                Expr(
+   101	                  Call(
+   102	                    Attribute(Name("result"), "append"),
+   103	                    (Name("value"), .Exprs)))
+   104	                .Stmts,
+   105	                .Stmts)
+   106	              .Stmts)
+   107	            Return(Call(Name("sorted"), (Name("result"), .Exprs)))
+   108	            .Stmts,
+   109	            0),
+   110	        parent(-1))
+   111	      1 |-> scope(
+   112	        "x"      |-> list(ALL:ValSeq)
+   113	        "result" |-> ref(0)
+   114	        "value"  |-> (V:Val => afterValue(XS, V))
+   115	        "number" |-> (N:Int => afterNumber(XS, N))
+   116	        "bad"    |-> (B:Int => afterBad(XS, B)),
+   117	        parent(0))
+   118	      -1 |-> builtinsScope
+   119	    </scopes>
+   120	    <scopeLoc> 2 </scopeLoc>
+   121	    <heap>
+   122	      0 |-> list(ACC:ValSeq => collect(ACC, XS))
+   123	    </heap>
+   124	    <heapLoc> 1 </heapLoc>
+   125	    <stack> ListItem(frame(CALLER:K, 0, 1)) </stack>
+   126	    <ret> noRet </ret>
+   127	    <exc> NoExc </exc>
+   128	    <exit-code> 0 </exit-code>
+   129	    requires integerVals(XS)
+   130	
+   131	  // Whole-program entry claim: execute the exact translated function body,
+   132	  // call it on an arbitrary finite list of positive integers, and constrain
+   133	  // both the retained accumulator and the returned sorted list.
+   134	  claim [program]:
+   135	    <k>
+   136	      FuncDef(
+   137	        "unique_digits", Params("x"),
+   138	        Assign(Name("result"), ListExpr(.Exprs))
+   139	        Assign(Name("value"), Int(0))
+   140	        Assign(Name("number"), Int(0))
+   141	        Assign(Name("bad"), Int(0))
+   142	        For(
+   143	          Name("value"), Name("x"),
+   144	          Assign(
+   145	            Name("number"),
+   146	            Call(
+   147	              Name("sum"),
+   148	              (TupleExpr((Name("value"), .Exprs)), .Exprs)))
+   149	          Assign(Name("bad"), Int(0))
+   150	          While(
+   151	            Compare(Name("number"), CmpOp(">", Int(0))),
+   152	            AugAssign(
+   153	              Name("bad"),
+   154	              "+",
+   155	              Compare(
+   156	                BinOp("%", Name("number"), Int(2)),
+   157	                CmpOp("==", Int(0))))
+   158	            AugAssign(Name("number"), "//", Int(10))
+   159	            .Stmts)
+   160	          If(
+   161	            Compare(Name("bad"), CmpOp("==", Int(0))),
+   162	            Expr(
+   163	              Call(
+   164	                Attribute(Name("result"), "append"),
+   165	                (Name("value"), .Exprs)))
+   166	            .Stmts,
+   167	            .Stmts)
+   168	          .Stmts)
+   169	        Return(Call(Name("sorted"), (Name("result"), .Exprs)))
+   170	        .Stmts)
+   171	      ~> Call(
+   172	           Name("unique_digits"),
+   173	           (list(XS:ValSeq), .Exprs))
+   174	      => ref(1)
+   175	    </k>
+   176	    <env> 0 </env>
+   177	    <scopes>
+   178	      0 |-> (scope(.Map, parent(-1))
+   179	             =>
+   180	             scope(
+   181	               "unique_digits" |->
+   182	                 closureVal(
+   183	                   "x", .ParamNames,
+   184	                   Assign(Name("result"), ListExpr(.Exprs))
+   185	                   Assign(Name("value"), Int(0))
+   186	                   Assign(Name("number"), Int(0))
+   187	                   Assign(Name("bad"), Int(0))
+   188	                   For(
+   189	                     Name("value"), Name("x"),
+   190	                     Assign(
+   191	                       Name("number"),
+   192	                       Call(
+   193	                         Name("sum"),
+   194	                         (TupleExpr((Name("value"), .Exprs)), .Exprs)))
+   195	                     Assign(Name("bad"), Int(0))
+   196	                     While(
+   197	                       Compare(Name("number"), CmpOp(">", Int(0))),
+   198	                       AugAssign(
+   199	                         Name("bad"),
+   200	                         "+",
+   201	                         Compare(
+   202	                           BinOp("%", Name("number"), Int(2)),
+   203	                           CmpOp("==", Int(0))))
+   204	                       AugAssign(Name("number"), "//", Int(10))
+   205	                       .Stmts)
+   206	                     If(
+   207	                       Compare(Name("bad"), CmpOp("==", Int(0))),
+   208	                       Expr(
+   209	                         Call(
+   210	                           Attribute(Name("result"), "append"),
+   211	                           (Name("value"), .Exprs)))
+   212	                       .Stmts,
+   213	                       .Stmts)
+   214	                     .Stmts)
+   215	                   Return(
+   216	                     Call(Name("sorted"), (Name("result"), .Exprs)))
+   217	                   .Stmts,
+   218	                   0),
+   219	               parent(-1)))
+   220	      -1 |-> builtinsScope
+   221	    </scopes>
+   222	    <scopeLoc> 1 </scopeLoc>
+   223	    <heap>
+   224	      .Map
+   225	      =>
+   226	      0 |-> list(collect(.ValSeq, XS))
+   227	      1 |-> list(sortVS(collect(.ValSeq, XS)))
+   228	    </heap>
+   229	    <heapLoc> 0 => 2 </heapLoc>
+   230	    <stack> .List </stack>
+   231	    <ret> noRet </ret>
+   232	    <exc> NoExc </exc>
+   233	    <exit-code> 0 </exit-code>
+   234	    requires integerVals(XS)
+   235	endmodule
+
+SOLUTION.PY
+     1	def unique_digits(x):
+     2	    result = []
+     3	    value = 0
+     4	    number = 0
+     5	    bad = 0
+     6	    for value in x:
+     7	        number = sum((value,))
+     8	        bad = 0
+     9	        while number > 0:
+    10	            bad += number % 2 == 0
+    11	            number //= 10
+    12	        if bad == 0:
+    13	            result.append(value)
+    14	    return sorted(result)
+
+PROMPT.PY
+     1	
+     2	def unique_digits(x):
+     3	    """Given a list of positive integers x. return a sorted list of all 
+     4	    elements that hasn't any even digit.
+     5	
+     6	    Note: Returned list should be sorted in increasing order.
+     7	    
+     8	    For example:
+     9	    >>> unique_digits([15, 33, 1422, 1])
+    10	    [1, 15, 33]
+    11	    >>> unique_digits([152, 323, 1422, 10])
+    12	    []
+    13	    """
+
+LEMMA_DISCOVERY
+{
+  "schema_version": 2,
+  "inventory_sha256": "32bb0f36be98d96562f1768dc23748ba3c4cda812d63bfd210f22e1017c522c7",
+  "rules": [
+    {
+      "source_rule_id": "rule-fb45f6c21602bcf45c317e9243ab74c0e4d150dfe3405c24eac94cb927907858",
+      "classification": "DEFINITION",
+      "rationale": "Base equation defining the integerVals predicate on the empty ValSeq; it names the input-domain test and does not model an execution step."
+    },
+    {
+      "source_rule_id": "rule-0fdf311e95699768f6653655fbcb75f1495794a6f4af7637ef16c68028a6dec8",
+      "classification": "DEFINITION",
+      "rationale": "Constructor-recursive equation defining integerVals on a nonempty ValSeq from isInt of the head and integerVals of the tail."
+    },
+    {
+      "source_rule_id": "rule-198caddd4e44844a4182afdc12cbe8b847068f235ba70560ca4acbb72b403a9c",
+      "classification": "DEFINITION",
+      "rationale": "Guarded base equation defining scanBad to return its accumulator when the scanned integer is nonpositive."
+    },
+    {
+      "source_rule_id": "rule-deac1092831d0f56a57b5d50d5bb50905bd4181b70079af78ff6c94b96c9b9ed",
+      "classification": "DEFINITION",
+      "rationale": "Guarded recurrence defining scanBad for a positive integer by updating the counter and recurring on the decimal quotient."
+    },
+    {
+      "source_rule_id": "rule-0c8212d872266a65f9628509b5e1ac121627dcc197e58d169331630d950d6ea4",
+      "classification": "DEFINITION",
+      "rationale": "Unconditional equation defining the named scanNumber summary with a conditional expression."
+    },
+    {
+      "source_rule_id": "rule-d0916ab1075ee30abc9bb69f741540c1aba4289fd887a7bf3041fd19926825f4",
+      "classification": "DEFINITION",
+      "rationale": "Guarded equation defining appendCandidate's append branch for an integer whose scanBad summary is zero."
+    },
+    {
+      "source_rule_id": "rule-9e5adb33c787aab59ead767c0c33455c05defb2160117d4c0940e26577caf9a6",
+      "classification": "DEFINITION",
+      "rationale": "Complementary guarded equation defining appendCandidate's unchanged-accumulator branch for a nonzero scanBad summary."
+    },
+    {
+      "source_rule_id": "rule-282ed41406ab13eb82b75217914e68692e6094a01c85eeb1866659cbe295ca65",
+      "classification": "DEFINITION",
+      "rationale": "Base equation defining the collect fold over an empty ValSeq."
+    },
+    {
+      "source_rule_id": "rule-68f7dc46d6f6ba285ff86612d5bf5920c4bb5b391b302eec660c347e42802807",
+      "classification": "DEFINITION",
+      "rationale": "Constructor-recursive equation defining collect by applying appendCandidate to the head and folding over the tail."
+    },
+    {
+      "source_rule_id": "rule-e86655f5dac9607527040fcf3e3137fe2eb24adeced3f6ce55069aa63d8b3976",
+      "classification": "DEFINITION",
+      "rationale": "Base equation defining afterValue on an empty remaining sequence."
+    },
+    {
+      "source_rule_id": "rule-20b0fef7038d8a2ae37d334bd943372f2de264539aa1fa5c7adfe7f6332d1325",
+      "classification": "DEFINITION",
+      "rationale": "Constructor-recursive equation defining afterValue by carrying the current head while consuming the remaining sequence."
+    },
+    {
+      "source_rule_id": "rule-7dbd72f534f8827fae1ca749560e74c0b2851f710376eaaf6b43468df83bf7dd",
+      "classification": "DEFINITION",
+      "rationale": "Base equation defining afterNumber on an empty remaining sequence."
+    },
+    {
+      "source_rule_id": "rule-2cdae319e0d7f6b8ee7164bab66368ec7935956f067feb5fa8959dff5b035d0b",
+      "classification": "DEFINITION",
+      "rationale": "Constructor-recursive equation defining afterNumber from scanNumber of each integer head."
+    },
+    {
+      "source_rule_id": "rule-3b5df8b88e16b28463ee3c71c8e6ccbb3f47c567782514a03d885de4a71144d9",
+      "classification": "DEFINITION",
+      "rationale": "Base equation defining afterBad on an empty remaining sequence."
+    },
+    {
+      "source_rule_id": "rule-1dc1bf365d06a0db8dd6cb05935a8779e9b0e53ff37f93aba8d009b0cf224660",
+      "classification": "DEFINITION",
+      "rationale": "Constructor-recursive equation defining afterBad from scanBad of each integer head."
+    }
+  ]
+}
+
+Script done on 2026-07-31 07:44:30-05:00 [COMMAND_EXIT_CODE="0"]

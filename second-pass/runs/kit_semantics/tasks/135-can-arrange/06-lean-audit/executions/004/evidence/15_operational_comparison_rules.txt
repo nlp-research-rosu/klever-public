@@ -1,0 +1,332 @@
+CORE APPLYCMP SIGNATURE
+207-  // ==== extensible operator dispatch (cases added by the construct modules) ==
+208-  syntax Val  ::= applyUn(String, Val) [function]
+209-  syntax Val  ::= applyBin(String, Val, Val) [function]
+210:  syntax Bool ::= applyCmp(String, Val, Val) [function]
+211-
+212-  // ==== bool-is-a-subtype-of-int: numeric promotion helpers =================
+213-  // Python: `bool` derives from `int`; True/False act as 1/0 in arithmetic and
+
+BOOL RULES
+     1	// reference/src/semantics/bool.k — MPY-BOOL
+     2	// Bool operator cases + the truthy boolean operations (not / and / or; and-or are
+     3	// value-returning short-circuit over any Vals, per Python).
+     4	
+     5	module MPY-BOOL
+     6	  imports MPY-CORE
+     7	
+     8	  rule applyUn("not", V:Val) => notBool truthy(V)
+     9	
+    10	  rule applyCmp("==", B1:Bool, B2:Bool) => B1 ==Bool B2
+    11	  rule applyCmp("!=", B1:Bool, B2:Bool) => B1 =/=Bool B2
+    12	
+    13	  // bool is a subtype of int: a Bool compared with an Int promotes to 0/1 and
+    14	  // re-dispatches to the Int comparison cases (True==1, False==0, True<2, ...).
+    15	  // The == / != Bool x Bool cases above are kept; only the four ordering ops are
+    16	  // promoted for Bool x Bool (to avoid duplicating the two rules above).
+    17	  rule applyCmp(OP:String, B:Bool, I:Int) => applyCmp(OP, boolAsInt(B), I)
+    18	       requires isEqOrdOp(OP)
+    19	  rule applyCmp(OP:String, I:Int, B:Bool) => applyCmp(OP, I, boolAsInt(B))
+    20	       requires isEqOrdOp(OP)
+    21	  rule applyCmp(OP:String, B1:Bool, B2:Bool) => applyCmp(OP, boolAsInt(B1), boolAsInt(B2))
+    22	       requires isOrdOp(OP)
+    23	
+    24	  // ==== BoolOp: short-circuit, value-returning and / or =====================
+    25	  // the node is its own accumulator: heat the HEAD element only, then either return it
+    26	  // (short-circuit) or drop it and continue
+    27	  context BoolOp(_, (HOLE:Expr, _:Exprs))
+    28	  rule <k> BoolOp(_:String, (V:Val, .Exprs)) => V ... </k>
+    29	  rule <k> BoolOp("and", (V:Val, A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>
+    30	       requires truthy(V)
+    31	  rule <k> BoolOp("and", (V:Val, _:Expr, _:Exprs)) => V ... </k>
+    32	       requires notBool truthy(V)
+    33	  rule <k> BoolOp("or",  (V:Val, _:Expr, _:Exprs)) => V ... </k>
+    34	       requires truthy(V)
+    35	  rule <k> BoolOp("or",  (V:Val, A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>
+    36	       requires notBool truthy(V)
+    37	
+    38	  // ==== heap-object head: decide truthiness THROUGH the heap, never rewrite the
+    39	  // operand — and/or return the OBJECT itself (Python identity), not its structure
+    40	  rule <k> BoolOp(_:String, (ref(H:Int), .Exprs)) => ref(H) ... </k>
+    41	       [priority(40)]
+    42	  rule <k> BoolOp("and", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>
+    43	       <heap> ... H |-> V:Val ... </heap>
+    44	       requires truthy(V)
+    45	       [priority(40)]
+    46	  rule <k> BoolOp("and", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k>
+    47	       <heap> ... H |-> V:Val ... </heap>
+    48	       requires notBool truthy(V)
+    49	       [priority(40)]
+    50	  rule <k> BoolOp("or", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k>
+    51	       <heap> ... H |-> V:Val ... </heap>
+    52	       requires truthy(V)
+    53	       [priority(40)]
+    54	  rule <k> BoolOp("or", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>
+    55	       <heap> ... H |-> V:Val ... </heap>
+    56	       requires notBool truthy(V)
+    57	       [priority(40)]
+    58	endmodule
+
+INT RULES
+     1	// reference/src/semantics/int.k — MPY-INT
+     2	// Int cases of the operator dispatch; Python // and % are floored (pyMod).
+     3	
+     4	module MPY-INT
+     5	  imports MPY-CORE
+     6	
+     7	  rule applyUn("-", I:Int) => 0 -Int I
+     8	
+     9	  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    10	  // Bool participates in int arithmetic (x += (a == b))
+    11	  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+    12	  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+    13	  // bool is a subtype of int: any Bool operand promotes to 0/1 and re-dispatches
+    14	  // to the Int cases (the "+" mixed cases above are kept, so "+" is excluded here
+    15	  // to avoid a duplicate rule — Bool + Bool still promotes via the Bool x Bool rule).
+    16	  rule applyBin(OP:String, B1:Bool, B2:Bool) => applyBin(OP, boolAsInt(B1), boolAsInt(B2))
+    17	       requires isArithOp(OP)
+    18	  rule applyBin(OP:String, B:Bool, I:Int)    => applyBin(OP, boolAsInt(B), I)
+    19	       requires isArithOp(OP) andBool OP =/=String "+"
+    20	  rule applyBin(OP:String, I:Int, B:Bool)    => applyBin(OP, I, boolAsInt(B))
+    21	       requires isArithOp(OP) andBool OP =/=String "+"
+    22	  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+    23	  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+    24	  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+    25	  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+    26	  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+    27	
+    28	  syntax Int ::= pyMod(Int, Int) [function]
+    29	  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+    30	
+    31	  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+    32	  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+    33	  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+    34	  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+    35	  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+    36	  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+    37	endmodule
+
+FLOAT RULES RELEVANT
+    40	
+    41	  // float equality — for concrete krun asserts (e.g. `area == 7.5`); the FLOAT.eq hook is fine on
+    42	  // concrete floats. kprove proofs return floats structurally and do not compare them.
+    43	  rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2
+    44	  rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2)
+    45	
+    46	  // float `<` and abs — OPAQUE for kprove ([no-evaluators], so a SYMBOLIC float compare stays an
+    47	  // uninterpreted Bool a proof case-splits on — a SINGLE compare per branch, not a nonlinear cascade),
+    48	  // [concrete] for krun. Additive, sort-disjoint from the Int rules. (has_close_elements: the pairwise
+    49	  // `abs(a-b) < t` proximity test.)
+    50	  syntax Bool ::= floatLt(Float, Float) [function, total, symbol(floatLt), no-evaluators]
+    51	  rule floatLt(F1:Float, F2:Float) => F1 <Float F2 [concrete]
+    52	  rule applyCmp("<", F1:Float, F2:Float) => floatLt(F1, F2)
+    53	
+    54	  syntax Float ::= absF(Float) [function, total, symbol(absF), no-evaluators]
+    55	  rule absF(F:Float) => absFloat(F) [concrete]
+    56	  rule applyBuiltin("abs", F:Float, .Vals) => absF(F)
+    57	
+    58	  // ==== math.ceil ===========================================================
+    59	  // `import X` is a no-op (we intercept the specific math functions syntactically; `math` itself is
+    60	  // never bound as a value).
+    61	  rule <k> Import(_:String) => .K ... </k>
+    62	
+    63	  // math.ceil(x): ceiling to an int. Intercepted at the Call BEFORE `math` is looked up (higher
+    64	  // priority than the generic Attribute/method dispatch in call.k).
+    65	  syntax KItem ::= "#mathCeil"
+    66	  rule <k> Call(Attribute(Name("math"), "ceil"), (E:Expr, .Exprs)) => E ~> #mathCeil ... </k> [priority(40)]
+    67	  rule <k> V:Val ~> #mathCeil => ceilF(V) ... </k>
+    68	
+    69	  // math.floor(x) — same interception shape as math.ceil
+    70	  syntax KItem ::= "#mathFloor"
+    71	  rule <k> Call(Attribute(Name("math"), "floor"), (E:Expr, .Exprs)) => E ~> #mathFloor ... </k> [priority(40)]
+    72	  rule <k> V:Val ~> #mathFloor => floorFI(V) ... </k>
+    73	  syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]
+    74	  rule floorFI(I:Int)   => I                        [concrete]
+    75	  rule floorFI(F:Float) => Float2Int(floorFloat(F)) [concrete]
+    76	
+    77	  // bare floor/ceil (bound by `from math import floor, ceil`)
+    78	  rule applyBuiltin("floor", V:Val, .Vals) => floorFI(V)
+    79	  rule applyBuiltin("ceil",  V:Val, .Vals) => ceilF(V)
+    80	
+    81	  // math.pow(x, y) — a two-arg interception onto powF (ints promote)
+    82	  syntax KItem ::= #mathPow1(Expr) | #mathPow2(Val)
+    83	  rule <k> Call(Attribute(Name("math"), "pow"), (E1:Expr, E2:Expr, .Exprs)) => E1 ~> #mathPow1(E2) ... </k> [priority(40)]
+    84	  rule <k> V1:Val ~> #mathPow1(E2:Expr) => E2 ~> #mathPow2(V1) ... </k>
+    85	  rule <k> V2:Val ~> #mathPow2(V1:Val) => powF(toF(V1), toF(V2)) ... </k>
+    86	  syntax Float ::= toF(Val) [function, total, symbol(toF)]
+    87	  rule toF(F:Float) => F        [concrete]
+    88	  rule toF(I:Int)   => intToF(I) [concrete]
+    89	
+    90	  // ceilF: math.ceil as an Int. TOTAL (K trusts it; a symbolic list element stays opaque for
+    91	  // kprove — structural). [concrete] so the Int2Float/ceilFloat hooks only run for krun (llvm).
+    92	  // Matches Python incl. negatives: ceil(-2.4) = -2 = Float2Int(ceilFloat(-2.4)).
+    93	  syntax Int ::= ceilF(Val) [function, total, symbol(ceilF)]
+    94	  rule ceilF(I:Int)   => I                       [concrete]
+    95	  rule ceilF(F:Float) => Float2Int(ceilFloat(F)) [concrete]
+    96	
+    97	  // unary minus on a float (e.g. the literal -2.4 = UnaryOp("-", Float(2.4))). Concrete for krun;
+    98	  // proofs use symbolic elements, never a float literal.
+    99	  rule applyUn("-", F:Float) => 0.0 -Float F
+   100	
+   101	  // ---- float - / / / + (OPAQUE for kprove [no-evaluators], concrete for krun) — for float-list
+   102	  // element maps (x - lo) / (hi - lo). Mirror intFloatDiv: additive, sort-disjoint from the Int rules.
+   103	  syntax Float ::= subF(Float, Float) [function, total, symbol(subF), no-evaluators]
+   104	  rule subF(F1:Float, F2:Float) => F1 -Float F2 [concrete]
+   105	  rule applyBin("-", F1:Float, F2:Float) => subF(F1, F2)
+   106	
+   107	  syntax Float ::= divF(Float, Float) [function, total, symbol(divF), no-evaluators]
+   108	  rule divF(F1:Float, F2:Float) => F1 /Float F2 [concrete]
+   109	  rule applyBin("/", F1:Float, F2:Float) => divF(F1, F2)
+   110	
+   111	  syntax Float ::= addF(Float, Float) [function, total, symbol(addF), no-evaluators]
+   112	  rule addF(F1:Float, F2:Float) => F1 +Float F2 [concrete]
+   113	  rule applyBin("+", F1:Float, F2:Float) => addF(F1, F2)
+   114	
+   115	  syntax Float ::= mulF(Float, Float) [function, total, symbol(mulF), no-evaluators]
+   116	  rule mulF(F1:Float, F2:Float) => F1 *Float F2 [concrete]
+   117	  rule applyBin("*", F1:Float, F2:Float) => mulF(F1, F2)
+   118	
+   119	  syntax Float ::= powF(Float, Float) [function, total, symbol(powF), no-evaluators]
+   120	  rule powF(F1:Float, F2:Float) => F1 ^Float F2 [concrete]
+   121	  rule applyBin("**", F1:Float, F2:Float) => powF(F1, F2)
+   122	
+   123	  // ---- the remaining comparisons (gtF promoted from find_zero — its summaries
+   124	  //      case-split on the atom; >= / <= derive from the two opaque compares) ----
+   125	  syntax Bool ::= gtF(Float, Float) [function, total, symbol(gtF), no-evaluators]
+   126	  rule gtF(F1:Float, F2:Float) => F1 >Float F2 [concrete]
+   127	  rule applyCmp(">",  F1:Float, F2:Float) => gtF(F1, F2)
+   128	  rule applyCmp(">=", F1:Float, F2:Float) => notBool floatLt(F1, F2)
+   129	  rule applyCmp("<=", F1:Float, F2:Float) => notBool gtF(F1, F2)
+   130	
+   131	  // ---- mixed Int/Float operators promote the Int side (n ** 0.5 etc.) ----
+   132	  rule applyBin("**", I:Int, F:Float) => powF(intToF(I), F)
+   133	  rule applyBin("**", F:Float, I:Int) => powF(F, intToF(I))
+   134	  rule applyBin("-",  I:Int, F:Float) => subF(intToF(I), F)
+   135	  rule applyBin("-",  F:Float, I:Int) => subF(F, intToF(I))
+   136	  rule applyBin("+",  I:Int, F:Float) => addF(intToF(I), F)
+   137	  rule applyBin("+",  F:Float, I:Int) => addF(F, intToF(I))
+   138	  rule applyBin("*",  I:Int, F:Float) => mulF(intToF(I), F)
+   139	  rule applyBin("*",  F:Float, I:Int) => mulF(F, intToF(I))
+   140	
+   141	  // ---- exact mixed Int/Float comparison ------------------------------------
+   142	  // The old rules compared via intToF(I), which ROUNDS ints >= 2^53 to a nearby
+   143	  // double (so e.g. 9007199254740993 > 9007199254740992.0 came out false). Compare
+   144	  // the REAL values instead: for a finite float F and an integer I,
+   145	  //     F <  I   <=>   floor(F) <  I
+   146	  //     F >  I   <=>   ceil(F)  >  I
+   147	  //     F == I   <=>   F is integral  AND  floor(F) == I
+   148	  // floorFloat/ceilFloat are exact and Float2Int yields the EXACT integer of an
+   149	  // integral float (no rounding), so this is exact for every finite F. Non-finite
+   150	  // F keeps the old intToF path (rounding is irrelevant to +/-inf and NaN, and
+   151	  // inf/NaN have no integer floor). Opaque for kprove, [concrete] for krun.
+   152	  syntax Bool ::= eqF(Float, Float) [function, total, symbol(eqF), no-evaluators]
+   153	  rule eqF(F1:Float, F2:Float) => F1 ==Float F2 [concrete]
+   154	
+   155	  syntax Bool ::= floatFinite(Float) [function, total, symbol(floatFinite), no-evaluators]
+   156	  rule floatFinite(F:Float) => notBool isNaN(F) andBool notBool isInfinite(F) [concrete]
+   157	
+   158	  syntax Bool ::= ltFI(Float, Int) [function, total, symbol(ltFI), no-evaluators]   // F <  I
+   159	                | ltIF(Int, Float) [function, total, symbol(ltIF), no-evaluators]   // I <  F
+   160	                | eqIF(Int, Float) [function, total, symbol(eqIF), no-evaluators]   // I == F
+   161	  rule ltFI(F:Float, I:Int) => Float2Int(floorFloat(F)) <Int I  requires floatFinite(F)          [concrete]
+   162	  rule ltFI(F:Float, I:Int) => floatLt(F, intToF(I))            requires notBool floatFinite(F)   [concrete]
+   163	  rule ltIF(I:Int, F:Float) => Float2Int(ceilFloat(F))  >Int I  requires floatFinite(F)          [concrete]
+   164	  rule ltIF(I:Int, F:Float) => floatLt(intToF(I), F)            requires notBool floatFinite(F)   [concrete]
+   165	  rule eqIF(I:Int, F:Float)
+   166	    => (floorFloat(F) ==Float ceilFloat(F)) andBool (Float2Int(floorFloat(F)) ==Int I)
+   167	       requires floatFinite(F) [concrete]
+   168	  rule eqIF(I:Int, F:Float) => eqF(intToF(I), F) requires notBool floatFinite(F) [concrete]
+   169	
+   170	  rule applyCmp("==", I:Int, F:Float) => eqIF(I, F)
+   171	  rule applyCmp("==", F:Float, I:Int) => eqIF(I, F)
+   172	  rule applyCmp("!=", I:Int, F:Float) => notBool eqIF(I, F)
+   173	  rule applyCmp("!=", F:Float, I:Int) => notBool eqIF(I, F)
+   174	  rule applyCmp("<",  I:Int, F:Float) => ltIF(I, F)
+   175	  rule applyCmp("<",  F:Float, I:Int) => ltFI(F, I)
+   176	  rule applyCmp(">",  I:Int, F:Float) => ltFI(F, I)          // I >  F  <=>  F <  I
+   177	  rule applyCmp(">",  F:Float, I:Int) => ltIF(I, F)          // F >  I  <=>  I <  F
+   178	  rule applyCmp("<=", I:Int, F:Float) => notBool ltFI(F, I)  // I <= F  <=>  not (F < I)
+   179	  rule applyCmp("<=", F:Float, I:Int) => notBool ltIF(I, F)  // F <= I  <=>  not (I < F)
+   180	  rule applyCmp(">=", I:Int, F:Float) => notBool ltIF(I, F)  // I >= F  <=>  not (I < F)
+   181	  rule applyCmp(">=", F:Float, I:Int) => notBool ltFI(F, I)  // F >= I  <=>  not (F < I)
+   182	
+   183	  // ---- bool is a subtype of int: a Bool operand with a Float promotes to 0/1 --
+   184	  rule applyBin(OP:String, B:Bool, F:Float) => applyBin(OP, boolAsInt(B), F) requires isArithOp(OP)
+   185	  rule applyBin(OP:String, F:Float, B:Bool) => applyBin(OP, F, boolAsInt(B)) requires isArithOp(OP)
+   186	  rule applyCmp(OP:String, B:Bool, F:Float) => applyCmp(OP, boolAsInt(B), F) requires isEqOrdOp(OP)
+   187	  rule applyCmp(OP:String, F:Float, B:Bool) => applyCmp(OP, F, boolAsInt(B)) requires isEqOrdOp(OP)
+   188	
+   189	  // ---- x == None (promoted from 137; `is` cases live in operators.k) ----
+   190	  rule applyCmp("==", V:Val, noneV) => V ==K noneV
+   191	  rule applyCmp("!=", V:Val, noneV) => notBool (V ==K noneV)
+   192	
+   193	  // ---- float(str): decimal parse (promoted from 137's defined chain) ----
+   194	  // digits '.' digits, optional leading '-'; concrete evaluation only (the
+   195	  // symbolic side stays an opaque decStrToF term a proof case-splits on).
+   196	  syntax Float ::= decStrToF(IntSeq) [function, total, symbol(decStrToF), no-evaluators]
+   197	  rule decStrToF(iCons(45, CS:IntSeq)) => 0.0 -Float decStrToF(CS) [concrete]
+   198	  rule decStrToF(CS:IntSeq)
+   199	    => intToF(intPart(CS)) +Float (intToF(fracPart(CS)) /Float intToF(fracScale(CS)))
+   200	       requires isLen(CS) >Int 0 andBool headIS(CS) =/=Int 45 [concrete]
+
+STRING RULES
+     1	// reference/src/semantics/str.k — MPY-STR
+     2	
+     3	module MPY-STR
+     4	  imports MPY-CORE
+     5	  imports MPY-ITER
+     6	
+     7	  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+     8	  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+     9	  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+    10	        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+    11	
+    12	  // ==== str literal (ASCII-only) ============================================
+    13	  syntax IntSeq ::= strToCodes(String) [function]
+    14	  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+    15	  rule strToCodes("") => .IntSeq
+    16	  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    17	    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+    18	
+    19	  // ==== operators: + / == / != / in =========================================
+    20	  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+    21	  rule seqConcat(.IntSeq, T:IntSeq)                => T
+    22	  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+    23	
+    24	  rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+    25	  rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+    26	  rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)
+    27	
+    28	  // substring membership: `P in X` iff the code-seq P occurs contiguously in X
+    29	  rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)
+    30	  rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)
+    31	
+    32	  syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]
+    33	  rule strPrefix(.IntSeq, _:IntSeq)               => true
+    34	  rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false
+    35	  rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)
+    36	
+    37	  syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]
+    38	  rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)
+    39	  rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)
+    40	  rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs)
+    41	       requires notBool strPrefix(P, iCons(C, Xs))
+    42	
+    43	  // ==== lexicographic order: < / <= / > / >= by code point (= Python str order on the code
+    44	  // model). strLt reduces on GROUND code-seqs (krun) but is inert/OPAQUE on symbolic ones
+    45	  // (a proof's codesProj(V) is an abstract IntSeq — no constructor rule matches), so a symbolic
+    46	  // str `<` stays a trusted opaque term the way sortVS / intFloatDiv do. Additive: fires only on
+    47	  // str </<=/>/>= comparisons.
+    48	  syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]
+    49	  rule strLt(.IntSeq, .IntSeq)                => false
+    50	  rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true
+    51	  rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false
+    52	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true          requires A  <Int B
+    53	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false         requires A  >Int B
+    54	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B
+    55	
+    56	  rule applyCmp("<",  str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+    57	  rule applyCmp(">",  str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)
+    58	  rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)
+    59	  rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)
+    60	endmodule

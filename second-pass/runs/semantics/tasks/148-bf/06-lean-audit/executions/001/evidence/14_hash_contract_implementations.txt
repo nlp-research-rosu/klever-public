@@ -1,0 +1,251 @@
+$ sed -n producer-source authentication contract
+                "Stage 5 invocation evidence changed after success"
+            )
+        return workspace, invocation, result
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _stage1_source_hashes(workspace: Path) -> dict[str, str]:
+    try:
+        return {
+            path.relative_to(workspace).as_posix(): (
+                pipeline_contract.sha256_file(path)
+            )
+            for path in pipeline_contract._walk_regular_files(
+                workspace, "Stage 1 source workspace"
+            )
+        }
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _generation_producer_sources(
+    repo: Path, generator_manifest: dict[str, Any]
+) -> tuple[Path, str]:
+    provenance = generator_manifest.get("provenance")
+    image_id = (
+        provenance.get("generator_image_id")
+        if isinstance(provenance, dict)
+        else None
+    )
+    if not isinstance(image_id, str) or not image_id.startswith("sha256:"):
+        raise KleanAuditContractError(
+            "generator image ID is missing from Stage 4 provenance"
+        )
+    image_key = image_id.removeprefix("sha256:")
+    try:
+        image_key = pipeline_contract.validate_safe_component(
+            image_key, "generator image ID"
+        )
+        bundle = pipeline_contract._require_direct_directory(
+            repo / "data/stage4-producer-sources",
+            image_key,
+            "Stage 4 producer source bundle",
+        )
+        source_manifest = pipeline_contract._read_regular_json(
+            bundle / "source-manifest.json",
+            "Stage 4 producer source manifest",
+        )
+        expected_files = {
+            "klean_export.py": generator_manifest.get("exporter_sha256"),
+            "klean.py": generator_manifest.get("klean_py_sha256"),
+        }
+        if (
+            set(source_manifest) != {
+                "schema_version",
+                "generator_image_id",
+                "files",
+            }
+            or source_manifest.get("schema_version") != 1
+            or source_manifest.get("generator_image_id") != image_id
+            or source_manifest.get("files") != expected_files
+        ):
+            raise KleanAuditContractError(
+                "Stage 4 producer source manifest differs from generator "
+                "provenance"
+            )
+        observed_names = {
+            path.relative_to(bundle).as_posix()
+            for path in pipeline_contract._walk_regular_files(
+                bundle, "Stage 4 producer source bundle"
+            )
+$ sed -n sha256_tree implementation
+190:def sha256_tree(root: Path) -> str:
+191-    root = require_real_directory(root, "tree root")
+192-    digest = hashlib.sha256()
+193-    pending = [root]
+194-    entries: list[tuple[str, str, Path]] = []
+195-    while pending:
+196-        directory = pending.pop()
+197-        try:
+198-            children = list(os.scandir(directory))
+199-        except OSError as error:
+200-            raise PipelineContractError(f"cannot scan tree {directory}: {error}") from error
+201-        for child in children:
+202-            path = Path(child.path)
+203-            try:
+204-                mode = child.stat(follow_symlinks=False).st_mode
+205-            except OSError as error:
+206-                raise PipelineContractError(
+207-                    f"cannot inspect tree entry {path}: {error}"
+208-                ) from error
+209-            relative = path.relative_to(root).as_posix()
+210-            if stat.S_ISDIR(mode):
+211-                entries.append((relative, "directory", path))
+212-                pending.append(path)
+213-            elif stat.S_ISREG(mode):
+214-                entries.append((relative, "file", path))
+215-            else:
+216-                raise PipelineContractError(
+217-                    f"tree contains linked or unsupported entry: {path}"
+218-                )
+219-    for relative, kind, path in sorted(entries):
+220-        encoded = relative.encode()
+221-        digest.update(len(encoded).to_bytes(4, "big"))
+222-        digest.update(encoded)
+223-        digest.update(kind.encode() + b"\0")
+224-        if kind == "file":
+225-            try:
+226-                size = path.stat(follow_symlinks=False).st_size
+227-                digest.update(size.to_bytes(8, "big"))
+228-                with path.open("rb") as stream:
+229-                    for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+230-                        digest.update(chunk)
+231-            except OSError as error:
+232-                raise PipelineContractError(
+233-                    f"cannot hash tree file {path}: {error}"
+234-                ) from error
+235-    return digest.hexdigest()
+236-
+237-
+238-def write_json_atomic(path: Path, document: dict[str, Any]) -> None:
+239-    path.parent.mkdir(parents=True, exist_ok=True)
+240-    file_descriptor, temporary_name = tempfile.mkstemp(
+241-        prefix=f".{path.name}.", dir=path.parent
+242-    )
+243-    temporary = Path(temporary_name)
+244-    try:
+245-        with os.fdopen(file_descriptor, "w", encoding="utf-8") as stream:
+246-            json.dump(document, stream, indent=2, sort_keys=True)
+247-            stream.write("\n")
+248-            stream.flush()
+249-            os.fsync(stream.fileno())
+250-        os.replace(temporary, path)
+251-    finally:
+252-        if temporary.exists():
+253-            temporary.unlink()
+254-
+255-
+256-def _copy_file_atomic_no_clobber(source: Path, destination: Path) -> None:
+257-    file_descriptor, temporary_name = tempfile.mkstemp(
+258-        prefix=f".{destination.name}.",
+259-        dir=destination.parent,
+260-    )
+261-    os.close(file_descriptor)
+262-    temporary = Path(temporary_name)
+263-    published_identity: tuple[int, int] | None = None
+264-
+265-    def remove_published_destination() -> None:
+266-        if published_identity is None:
+267-            return
+268-        try:
+269-            destination_stat = destination.lstat()
+270-        except FileNotFoundError:
+$ sed -n tree_digest implementation
+def _patch_lake_build_directory(package: Path) -> None:
+    lakefile = package / "lakefile.toml"
+    if not lakefile.is_file() or lakefile.is_symlink():
+        raise KleanExportError("generated package is missing regular lakefile.toml")
+    text = lakefile.read_text()
+    build_setting = 'buildDir = "/tmp/klean-generated-build"\n'
+    stack_setting = (
+        'moreLeanArgs = ["-D maxRecDepth=100000", "-s", "65536"]\n'
+    )
+    if build_setting in text and stack_setting in text:
+        return
+    setting = ""
+    if build_setting not in text:
+        setting += build_setting
+    if stack_setting not in text:
+        setting += stack_setting
+    marker = "[[lean_lib]]"
+    if marker in text:
+        text = text.replace(marker, setting + "\n" + marker, 1)
+    else:
+        text = text.rstrip() + "\n" + setting
+    lakefile.write_text(text)
+
+
+def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+    if not root.is_dir() or root.is_symlink():
+        raise KleanExportError(f"tree root must be a real directory: {root}")
+    entries: list[tuple[str, str, Path]] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        for child in os.scandir(directory):
+            path = Path(child.path)
+            mode = child.stat(follow_symlinks=False).st_mode
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise KleanExportError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    return sorted(entries)
+
+
+def tree_digest(root: Path) -> str:
+    digest = hashlib.sha256()
+    for relative, kind, path in _tree_entries(Path(root)):
+        digest.update(relative.encode() + b"\0" + kind.encode() + b"\0")
+        if kind == "file":
+            digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def _regular_json(path: Path) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise KleanExportError(f"required JSON is not a regular file: {path}")
+    try:
+        document = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise KleanExportError(f"malformed JSON: {path}") from error
+    if not isinstance(document, dict):
+        raise KleanExportError(f"JSON must be an object: {path}")
+    return document
+
+
+def _run_command(
+    command: list[str] | str,
+    *,
+    cwd: Path | None,
+    timeout: int,
+    env: dict[str, str],
+    shell: bool = False,
+) -> tuple[int, str]:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            timeout=timeout,
+            shell=shell,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        return result.returncode, result.stdout
+    except subprocess.TimeoutExpired:
+        return 124, f"TIMEOUT after {timeout}s"
+
+
+def _trust_inventory(
+    package: Path,
+    *,
+    axiomatized: set[str],

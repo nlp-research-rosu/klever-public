@@ -1,0 +1,2 @@
+cwd: /audit-output
+command: bash -lc cmp\ /candidate/semantic.k\ /tmp/audit-work/rebuild-52/semantic.k\ \&\&\ cmp\ /candidate/verification.k\ /tmp/audit-work/rebuild-52/verification.k\ \&\&\ cmp\ /candidate/spec.k\ /tmp/audit-work/rebuild-52/spec.k\ \&\&\ cmp\ /candidate/solution.py\ /tmp/audit-work/rebuild-52/solution.py\ \&\&\ cmp\ /candidate/solution.mpy\ /tmp/audit-work/rebuild-52/solution.mpy\ \&\&\ cmp\ /reference/py2mpy.py\ /tmp/audit-work/rebuild-52/trusted-py2mpy.py\ \&\&\ find\ /tmp/audit-work/rebuild-52\ -maxdepth\ 1\ -type\ f\ -printf\ \"%f\\n\"\ \|\ sort

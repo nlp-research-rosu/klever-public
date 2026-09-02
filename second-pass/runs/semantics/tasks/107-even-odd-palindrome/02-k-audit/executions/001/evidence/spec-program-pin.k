@@ -1,0 +1,74 @@
+requires "verification.k"
+
+module SPEC-PROGRAM-PIN
+  imports VERIFICATION
+
+  claim
+    <k>
+      solutionModule
+      =>
+      Module(
+        FuncDef("even_odd_palindrome", Params("n"),
+          If(Compare(Name("n"), CmpOp("<", Int(10))),
+            Return(
+              TupleExpr(
+                BinOp("//", Name("n"), Int(2)),
+                BinOp("//", BinOp("+", Name("n"), Int(1)), Int(2)))),
+            )
+          If(Compare(Name("n"), CmpOp("<", Int(100))),
+            Assign(Name("two_digit"), BinOp("//", Name("n"), Int(11)))
+            Return(
+              TupleExpr(
+                BinOp("+", Int(4), BinOp("//", Name("two_digit"), Int(2))),
+                BinOp(
+                  "+",
+                  Int(5),
+                  BinOp("//", BinOp("+", Name("two_digit"), Int(1)), Int(2))))),
+            )
+          If(Compare(Name("n"), CmpOp("==", Int(1000))),
+            Return(TupleExpr(Int(48), Int(60))),
+            )
+          Assign(Name("hundreds"), BinOp("//", Name("n"), Int(100)))
+          Assign(
+            Name("current_block"),
+            BinOp(
+              "+",
+              BinOp(
+                "//",
+                BinOp("-", BinOp("%", Name("n"), Int(100)), Name("hundreds")),
+                Int(10)),
+              Int(1)))
+          Assign(
+            Name("even"),
+            BinOp(
+              "+",
+              Int(8),
+              BinOp(
+                "*",
+                Int(10),
+                BinOp("//", BinOp("-", Name("hundreds"), Int(1)), Int(2)))))
+          Assign(
+            Name("odd"),
+            BinOp(
+              "+",
+              Int(10),
+              BinOp("*", Int(10), BinOp("//", Name("hundreds"), Int(2)))))
+          If(Compare(BinOp("%", Name("hundreds"), Int(2)), CmpOp("==", Int(0))),
+            AugAssign(Name("even"), "+", Name("current_block")),
+            AugAssign(Name("odd"), "+", Name("current_block")))
+          Return(TupleExpr(Name("even"), Name("odd")))))
+    </k>
+    <env> 0 </env>
+    <scopes>
+      0  |-> scope(.Map, parent(-1))
+      -1 |-> builtinsScope
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+
+endmodule

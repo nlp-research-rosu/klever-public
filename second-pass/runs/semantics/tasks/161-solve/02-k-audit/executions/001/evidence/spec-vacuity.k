@@ -1,0 +1,24 @@
+requires "verification.k"
+
+module SPEC-VACUITY
+  imports VERIFICATION
+
+  // Reviewer-authored false result mutation. For CS = [97] ("a"), the
+  // precondition holds, fixed execution returns [65] ("A"), but this asks for
+  // the unchanged input [97].
+  claim [false-unchanged-letter-result]:
+    <k> #runSolve(CS:IntSeq) => str(CS) </k>
+    <env> 0 </env>
+    <scopes>
+      0  |-> scope(.Map => "solve" |-> solutionClosure(), parent(-1))
+      -1 |-> builtinsScope
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    requires notBool (CS ==K mapSwap(CS))
+endmodule

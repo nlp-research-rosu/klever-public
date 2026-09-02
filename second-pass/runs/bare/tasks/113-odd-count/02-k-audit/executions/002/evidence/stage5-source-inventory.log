@@ -1,0 +1,491 @@
+PWD: /tmp/audit-work/reconstruction/candidate
+COMMAND: bash -lc nl\ -ba\ semantic.k\;\ nl\ -ba\ verification.k\;\ nl\ -ba\ spec.k\;\ rg\ -n\ \"\\\[\(function\|total\|functional\|simplification\|concrete\|macro\|priority\|opaque\)\[\^\]\]\*\\\]\|\^\\s\*\(syntax\|configuration\|rule\|claim\)\"\ semantic.k\ verification.k\ spec.k
+BEGIN OUTPUT
+     1	// A small, executable semantics for the py2mpy fragment used by solution.py.
+     2	// Digit strings retain precisely the information observable by odd_count:
+     3	// whether each character is odd or even.  Text concatenation remains
+     4	// structural, so symbolic decimal conversion does not depend on a host hook.
+     5	
+     6	module MPY-SYNTAX
+     7	  imports INT-SYNTAX
+     8	  imports BOOL-SYNTAX
+     9	  imports STRING-SYNTAX
+    10	
+    11	  syntax Module ::= "Module" "(" Stmts ")"
+    12	  syntax Stmts ::= List{Stmt, ""}
+    13	
+    14	  syntax Params ::= "Params" "(" String ")"
+    15	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    16	                | "Assign" "(" Expr "," Expr ")"
+    17	                | "For" "(" Expr "," Expr "," Stmts ")"
+    18	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    19	                | "Return" "(" Expr ")"
+    20	
+    21	  syntax Expr ::= "Name" "(" String ")"
+    22	                | "Int" "(" Int ")"
+    23	                | "Str" "(" String ")"
+    24	                | "ListExpr" "(" ")"
+    25	                | "ListExpr" "(" Expr ")"
+    26	                | "BinOp" "(" String "," Expr "," Expr ")"
+    27	                | "Compare" "(" Expr "," CmpOp ")"
+    28	                | "Call" "(" Expr "," Expr ")"
+    29	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    30	
+    31	  // Valid input strings contain only digits.  This quotient records exactly
+    32	  // their parity, the only property this task observes.
+    33	  syntax Digit ::= "evenDigit" | "oddDigit"
+    34	  syntax Digits ::= "noDigits"
+    35	                  | "digit" "(" Digit "," Digits ")"
+    36	
+    37	  // Text is a denotation of a Python string.  concat and number denote exact
+    38	  // string concatenation and decimal rendering, respectively.
+    39	  syntax Text ::= "literal" "(" String ")"
+    40	                | "inputDigits" "(" Digits ")"
+    41	                | "oneDigit" "(" Digit ")"
+    42	                | "number" "(" Int ")"
+    43	                | "concat" "(" Text "," Text ")"
+    44	
+    45	  syntax Values ::= "noValues"
+    46	                  | "value" "(" Value "," Values ")"
+    47	  syntax Value ::= "noValue"
+    48	                 | "pyInt" "(" Int ")"
+    49	                 | "pyBool" "(" Bool ")"
+    50	                 | "pyString" "(" Text ")"
+    51	                 | "pyList" "(" Values ")"
+    52	
+    53	  // A newest-binding-first environment.  Assignment adds a shadowing entry;
+    54	  // this avoids imposing any host-map reasoning on symbolic proofs.
+    55	  syntax Env ::= "emptyEnv"
+    56	               | "store" "(" String "," Value "," Env ")"
+    57	
+    58	  syntax ExecResult ::= "normal" "(" Env ")"
+    59	                      | "returned" "(" Value ")"
+    60	endmodule
+    61	
+    62	module MPY-SEMANTICS
+    63	  imports MPY-SYNTAX
+    64	  imports INT
+    65	  imports BOOL
+    66	  imports STRING
+    67	
+    68	  configuration
+    69	    <py>
+    70	      <k> $PGM:Module </k>
+    71	      <input> $INPUT:Value </input>
+    72	      <output> noValue </output>
+    73	    </py>
+    74	
+    75	  syntax Value ::= evaluate ( Expr , Env ) [function]
+    76	                 | lookup ( String , Env ) [function]
+    77	  syntax Value ::= addValue ( Value , Value ) [function]
+    78	                 | containsValue ( Value , Value ) [function]
+    79	                 | builtinStr ( Value ) [function]
+    80	  syntax Values ::= appendValues ( Values , Values ) [function]
+    81	                  | iterableValues ( Value ) [function]
+    82	                  | digitValues ( Digits ) [function]
+    83	
+    84	  rule evaluate(Name(X), ENV) => lookup(X, ENV)
+    85	  rule lookup(X, store(X, V, _ENV)) => V
+    86	  rule lookup(X, store(Y, _V, ENV)) => lookup(X, ENV)
+    87	    requires X =/=String Y
+    88	  rule evaluate(Int(I), _) => pyInt(I)
+    89	  rule evaluate(Str(S), _) => pyString(literal(S))
+    90	  rule evaluate(ListExpr(), _) => pyList(noValues)
+    91	  rule evaluate(ListExpr(E), ENV) => pyList(value(evaluate(E, ENV), noValues))
+    92	  rule evaluate(BinOp("+", LEFT, RIGHT), ENV)
+    93	    => addValue(evaluate(LEFT, ENV), evaluate(RIGHT, ENV))
+    94	  rule evaluate(Compare(LEFT, CmpOp("in", RIGHT)), ENV)
+    95	    => containsValue(evaluate(LEFT, ENV), evaluate(RIGHT, ENV))
+    96	  rule evaluate(Call(Name("str"), ARG), ENV)
+    97	    => builtinStr(evaluate(ARG, ENV))
+    98	
+    99	  rule addValue(pyInt(I), pyInt(J)) => pyInt(I +Int J)
+   100	  rule addValue(pyString(A), pyString(B)) => pyString(concat(A, B))
+   101	  rule addValue(pyList(A), pyList(B)) => pyList(appendValues(A, B))
+   102	
+   103	  rule appendValues(noValues, B) => B
+   104	  rule appendValues(value(V, VS), B) => value(V, appendValues(VS, B))
+   105	
+   106	  rule builtinStr(pyInt(I)) => pyString(number(I))
+   107	
+   108	  rule containsValue(pyString(oneDigit(oddDigit)),
+   109	                     pyString(literal("13579"))) => pyBool(true)
+   110	  rule containsValue(pyString(oneDigit(evenDigit)),
+   111	                     pyString(literal("13579"))) => pyBool(false)
+   112	
+   113	  rule iterableValues(pyList(VS)) => VS
+   114	  rule iterableValues(pyString(inputDigits(DS))) => digitValues(DS)
+   115	  rule digitValues(noDigits) => noValues
+   116	  rule digitValues(digit(D, DS))
+   117	    => value(pyString(oneDigit(D)), digitValues(DS))
+   118	
+   119	  syntax ExecResult ::= execute ( Stmts , Env ) [function]
+   120	                      | afterBlock ( ExecResult , Stmts ) [function]
+   121	                      | executeFor ( Values , String , Stmts , Stmts , Env ) [function]
+   122	                      | afterIteration ( ExecResult , Values , String , Stmts , Stmts ) [function]
+   123	
+   124	  rule execute(.Stmts, ENV) => normal(ENV)
+   125	
+   126	  rule execute(Assign(Name(X), E) REST, ENV)
+   127	    => execute(REST, store(X, evaluate(E, ENV), ENV))
+   128	
+   129	  rule execute(If(COND, YES, NO) REST, ENV)
+   130	    => executeIf(evaluate(COND, ENV), YES, NO, REST, ENV)
+   131	
+   132	  syntax ExecResult ::= executeIf ( Value , Stmts , Stmts , Stmts , Env ) [function]
+   133	  rule executeIf(pyBool(true), YES, _, REST, ENV)
+   134	    => afterBlock(execute(YES, ENV), REST)
+   135	  rule executeIf(pyBool(false), _, NO, REST, ENV)
+   136	    => afterBlock(execute(NO, ENV), REST)
+   137	
+   138	  rule afterBlock(normal(ENV), REST) => execute(REST, ENV)
+   139	  rule afterBlock(returned(V), _) => returned(V)
+   140	
+   141	  rule execute(For(Name(X), ITER, BODY) REST, ENV)
+   142	    => executeFor(iterableValues(evaluate(ITER, ENV)), X, BODY, REST, ENV)
+   143	
+   144	  rule executeFor(noValues, _, _, REST, ENV) => execute(REST, ENV)
+   145	  rule executeFor(value(V, VS), X, BODY, REST, ENV)
+   146	    => afterIteration(execute(BODY, store(X, V, ENV)), VS, X, BODY, REST)
+   147	
+   148	  rule afterIteration(normal(ENV), VS, X, BODY, REST)
+   149	    => executeFor(VS, X, BODY, REST, ENV)
+   150	  rule afterIteration(returned(V), _, _, _, _) => returned(V)
+   151	
+   152	  rule execute(Return(E) _REST, ENV) => returned(evaluate(E, ENV))
+   153	
+   154	  syntax Value ::= resultValue ( ExecResult ) [function]
+   155	  rule resultValue(returned(V)) => V
+   156	
+   157	  rule <k> Module(FuncDef("odd_count", Params("lst"), BODY))
+   158	        => .K ...</k>
+   159	       <input> IN </input>
+   160	       <output> noValue => resultValue(execute(BODY, store("lst", IN, emptyEnv))) </output>
+   161	endmodule
+   162	
+   163	module MPY
+   164	  imports MPY-SEMANTICS
+   165	endmodule
+     1	requires "semantic.k"
+     2	
+     3	// Program text and a mathematical oracle used only by the proof.
+     4	// The three statement macros are a readable factorization of solution.mpy.
+     5	
+     6	module ODD-COUNT-VERIFICATION
+     7	  imports MPY-SEMANTICS
+     8	
+     9	  syntax Stmts ::= "innerBody" [macro]
+    10	                 | "outerBody" [macro]
+    11	                 | "functionBody" [macro]
+    12	  syntax Module ::= "solutionProgram" [macro]
+    13	
+    14	  rule innerBody
+    15	    => If(Compare(Name("c"), CmpOp("in", Str("13579"))),
+    16	          Assign(Name("count"), BinOp("+", Name("count"), Int(1))),
+    17	          .Stmts)
+    18	
+    19	  rule outerBody
+    20	    => Assign(Name("count"), Int(0))
+    21	       For(Name("c"), Name("s"), innerBody)
+    22	       Assign(
+    23	         Name("result"),
+    24	         BinOp(
+    25	           "+", Name("result"),
+    26	           ListExpr(
+    27	             BinOp(
+    28	               "+",
+    29	               BinOp(
+    30	                 "+",
+    31	                 BinOp(
+    32	                   "+",
+    33	                   BinOp(
+    34	                     "+",
+    35	                     BinOp(
+    36	                       "+",
+    37	                       BinOp(
+    38	                         "+",
+    39	                         BinOp(
+    40	                           "+",
+    41	                           BinOp(
+    42	                             "+",
+    43	                             Str("the number of odd elements "),
+    44	                             Call(Name("str"), Name("count"))),
+    45	                           Str("n the str")),
+    46	                         Call(Name("str"), Name("count"))),
+    47	                       Str("ng ")),
+    48	                     Call(Name("str"), Name("count"))),
+    49	                   Str(" of the ")),
+    50	                 Call(Name("str"), Name("count"))),
+    51	               Str("nput.")))))
+    52	
+    53	  rule functionBody
+    54	    => Assign(Name("result"), ListExpr())
+    55	       For(Name("s"), Name("lst"), outerBody)
+    56	       Return(Name("result"))
+    57	
+    58	  rule solutionProgram
+    59	    => Module(FuncDef("odd_count", Params("lst"), functionBody))
+    60	
+    61	  syntax Int ::= oddCount ( Digits ) [function]
+    62	  rule oddCount(noDigits) => 0
+    63	  rule oddCount(digit(evenDigit, DS)) => oddCount(DS)
+    64	  rule oddCount(digit(oddDigit, DS)) => 1 +Int oddCount(DS)
+    65	
+    66	  syntax Text ::= message ( Int ) [function]
+    67	  rule message(N)
+    68	    => concat(
+    69	         concat(
+    70	           concat(
+    71	             concat(
+    72	               concat(
+    73	                 concat(
+    74	                   concat(
+    75	                     concat(literal("the number of odd elements "), number(N)),
+    76	                     literal("n the str")),
+    77	                   number(N)),
+    78	                 literal("ng ")),
+    79	               number(N)),
+    80	             literal(" of the ")),
+    81	           number(N)),
+    82	         literal("nput."))
+    83	
+    84	  syntax Values ::= expected ( Values ) [function]
+    85	  rule expected(noValues) => noValues
+    86	  rule expected(value(pyString(inputDigits(DS)), REST))
+    87	    => value(pyString(message(oddCount(DS))), expected(REST))
+    88	
+    89	  syntax Value ::= runProgram ( Module , Value ) [function]
+    90	  rule runProgram(Module(FuncDef("odd_count", Params("lst"), BODY)), IN)
+    91	    => resultValue(execute(BODY, store("lst", IN, emptyEnv)))
+    92	endmodule
+     1	requires "verification.k"
+     2	
+     3	module ODD-COUNT-SPEC
+     4	  imports ODD-COUNT-VERIFICATION
+     5	
+     6	  // The empty list is the outer-loop base case.
+     7	  claim [empty-list]:
+     8	    <k> solutionProgram => .K </k>
+     9	    <input> pyList(noValues) </input>
+    10	    <output> noValue => pyList(expected(noValues)) </output>
+    11	
+    12	  // Exact examples from prompt.py (digits are represented by their parity).
+    13	  claim [prompt-example-one]:
+    14	    <k> solutionProgram => .K </k>
+    15	    <input> pyList(value(
+    16	        pyString(inputDigits(
+    17	          digit(oddDigit,
+    18	          digit(evenDigit,
+    19	          digit(oddDigit,
+    20	          digit(evenDigit,
+    21	          digit(oddDigit,
+    22	          digit(evenDigit,
+    23	          digit(oddDigit, noDigits))))))))),
+    24	        noValues)) </input>
+    25	    <output> noValue => pyList(expected(value(
+    26	         pyString(inputDigits(
+    27	           digit(oddDigit,
+    28	           digit(evenDigit,
+    29	           digit(oddDigit,
+    30	           digit(evenDigit,
+    31	           digit(oddDigit,
+    32	           digit(evenDigit,
+    33	           digit(oddDigit, noDigits))))))))),
+    34	         noValues))) </output>
+    35	
+    36	  claim [prompt-example-two]:
+    37	    <k> solutionProgram => .K </k>
+    38	    <input> pyList(
+    39	        value(pyString(inputDigits(digit(oddDigit, noDigits))),
+    40	        value(pyString(inputDigits(
+    41	          digit(oddDigit,
+    42	          digit(oddDigit,
+    43	          digit(oddDigit,
+    44	          digit(oddDigit,
+    45	          digit(oddDigit,
+    46	          digit(oddDigit,
+    47	          digit(oddDigit,
+    48	          digit(oddDigit, noDigits)))))))))),
+    49	        noValues))) </input>
+    50	    <output> noValue => pyList(expected(
+    51	         value(pyString(inputDigits(digit(oddDigit, noDigits))),
+    52	         value(pyString(inputDigits(
+    53	           digit(oddDigit,
+    54	           digit(oddDigit,
+    55	           digit(oddDigit,
+    56	           digit(oddDigit,
+    57	           digit(oddDigit,
+    58	           digit(oddDigit,
+    59	           digit(oddDigit,
+    60	           digit(oddDigit, noDigits)))))))))),
+    61	         noValues)))) </output>
+    62	
+    63	  // For every integer N, the source expression constructs exactly the
+    64	  // contract's sentence with N substituted at all four occurrences of "i".
+    65	  claim [format-all-counts]:
+    66	    <k> evaluate(
+    67	      BinOp(
+    68	        "+",
+    69	        BinOp(
+    70	          "+",
+    71	          BinOp(
+    72	            "+",
+    73	            BinOp(
+    74	              "+",
+    75	              BinOp(
+    76	                "+",
+    77	                BinOp(
+    78	                  "+",
+    79	                  BinOp(
+    80	                    "+",
+    81	                    BinOp(
+    82	                      "+",
+    83	                      Str("the number of odd elements "),
+    84	                      Call(Name("str"), Name("count"))),
+    85	                    Str("n the str")),
+    86	                  Call(Name("str"), Name("count"))),
+    87	                Str("ng ")),
+    88	              Call(Name("str"), Name("count"))),
+    89	            Str(" of the ")),
+    90	          Call(Name("str"), Name("count"))),
+    91	        Str("nput.")),
+    92	      store("count", pyInt(N), emptyEnv))
+    93	        => pyString(message(N)) </k>
+    94	
+    95	  // These claims are the two universal character-step cases.  Together with
+    96	  // digitValues(noDigits) => noValues, they exhaust valid digit strings.
+    97	  claim [character-loop-base]:
+    98	    <k> executeFor(noValues, "c", innerBody, REST, ENV)
+    99	        => execute(REST, ENV) </k>
+   100	
+   101	  claim [even-character-step]:
+   102	    <k> executeFor(
+   103	      digitValues(digit(evenDigit, DS)), "c", innerBody, REST,
+   104	      ENV)
+   105	        => executeFor(
+   106	         digitValues(DS), "c", innerBody, REST,
+   107	         store("c", pyString(oneDigit(evenDigit)), ENV)) </k>
+   108	
+   109	  claim [odd-character-step]:
+   110	    <k> executeFor(
+   111	      digitValues(digit(oddDigit, DS)), "c", innerBody, REST,
+   112	      ENV)
+   113	        => executeFor(
+   114	         digitValues(DS), "c", innerBody, REST,
+   115	         store(
+   116	           "count",
+   117	           addValue(
+   118	             evaluate(Name("count"),
+   119	               store("c", pyString(oneDigit(oddDigit)), ENV)),
+   120	             pyInt(1)),
+   121	           store("c", pyString(oneDigit(oddDigit)), ENV))) </k>
+   122	
+   123	  // The list-loop base and the two append equations complete the structural
+   124	  // cases used by the outer loop, for arbitrary values and continuations.
+   125	  claim [list-loop-base]:
+   126	    <k> executeFor(noValues, "s", outerBody, REST, ENV)
+   127	        => execute(REST, ENV) </k>
+   128	
+   129	  claim [append-base]:
+   130	    <k> appendValues(noValues, VS) => VS </k>
+   131	
+   132	  claim [append-step]:
+   133	    <k> appendValues(value(V, VS), WS)
+   134	        => value(V, appendValues(VS, WS)) </k>
+   135	endmodule
+spec.k:7:  claim [empty-list]:
+spec.k:13:  claim [prompt-example-one]:
+spec.k:36:  claim [prompt-example-two]:
+spec.k:65:  claim [format-all-counts]:
+spec.k:97:  claim [character-loop-base]:
+spec.k:101:  claim [even-character-step]:
+spec.k:109:  claim [odd-character-step]:
+spec.k:125:  claim [list-loop-base]:
+spec.k:129:  claim [append-base]:
+spec.k:132:  claim [append-step]:
+verification.k:9:  syntax Stmts ::= "innerBody" [macro]
+verification.k:10:                 | "outerBody" [macro]
+verification.k:11:                 | "functionBody" [macro]
+verification.k:12:  syntax Module ::= "solutionProgram" [macro]
+verification.k:14:  rule innerBody
+verification.k:19:  rule outerBody
+verification.k:53:  rule functionBody
+verification.k:58:  rule solutionProgram
+verification.k:61:  syntax Int ::= oddCount ( Digits ) [function]
+verification.k:62:  rule oddCount(noDigits) => 0
+verification.k:63:  rule oddCount(digit(evenDigit, DS)) => oddCount(DS)
+verification.k:64:  rule oddCount(digit(oddDigit, DS)) => 1 +Int oddCount(DS)
+verification.k:66:  syntax Text ::= message ( Int ) [function]
+verification.k:67:  rule message(N)
+verification.k:84:  syntax Values ::= expected ( Values ) [function]
+verification.k:85:  rule expected(noValues) => noValues
+verification.k:86:  rule expected(value(pyString(inputDigits(DS)), REST))
+verification.k:89:  syntax Value ::= runProgram ( Module , Value ) [function]
+verification.k:90:  rule runProgram(Module(FuncDef("odd_count", Params("lst"), BODY)), IN)
+semantic.k:11:  syntax Module ::= "Module" "(" Stmts ")"
+semantic.k:12:  syntax Stmts ::= List{Stmt, ""}
+semantic.k:14:  syntax Params ::= "Params" "(" String ")"
+semantic.k:15:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+semantic.k:21:  syntax Expr ::= "Name" "(" String ")"
+semantic.k:29:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+semantic.k:33:  syntax Digit ::= "evenDigit" | "oddDigit"
+semantic.k:34:  syntax Digits ::= "noDigits"
+semantic.k:39:  syntax Text ::= "literal" "(" String ")"
+semantic.k:45:  syntax Values ::= "noValues"
+semantic.k:47:  syntax Value ::= "noValue"
+semantic.k:55:  syntax Env ::= "emptyEnv"
+semantic.k:58:  syntax ExecResult ::= "normal" "(" Env ")"
+semantic.k:68:  configuration
+semantic.k:75:  syntax Value ::= evaluate ( Expr , Env ) [function]
+semantic.k:76:                 | lookup ( String , Env ) [function]
+semantic.k:77:  syntax Value ::= addValue ( Value , Value ) [function]
+semantic.k:78:                 | containsValue ( Value , Value ) [function]
+semantic.k:79:                 | builtinStr ( Value ) [function]
+semantic.k:80:  syntax Values ::= appendValues ( Values , Values ) [function]
+semantic.k:81:                  | iterableValues ( Value ) [function]
+semantic.k:82:                  | digitValues ( Digits ) [function]
+semantic.k:84:  rule evaluate(Name(X), ENV) => lookup(X, ENV)
+semantic.k:85:  rule lookup(X, store(X, V, _ENV)) => V
+semantic.k:86:  rule lookup(X, store(Y, _V, ENV)) => lookup(X, ENV)
+semantic.k:88:  rule evaluate(Int(I), _) => pyInt(I)
+semantic.k:89:  rule evaluate(Str(S), _) => pyString(literal(S))
+semantic.k:90:  rule evaluate(ListExpr(), _) => pyList(noValues)
+semantic.k:91:  rule evaluate(ListExpr(E), ENV) => pyList(value(evaluate(E, ENV), noValues))
+semantic.k:92:  rule evaluate(BinOp("+", LEFT, RIGHT), ENV)
+semantic.k:94:  rule evaluate(Compare(LEFT, CmpOp("in", RIGHT)), ENV)
+semantic.k:96:  rule evaluate(Call(Name("str"), ARG), ENV)
+semantic.k:99:  rule addValue(pyInt(I), pyInt(J)) => pyInt(I +Int J)
+semantic.k:100:  rule addValue(pyString(A), pyString(B)) => pyString(concat(A, B))
+semantic.k:101:  rule addValue(pyList(A), pyList(B)) => pyList(appendValues(A, B))
+semantic.k:103:  rule appendValues(noValues, B) => B
+semantic.k:104:  rule appendValues(value(V, VS), B) => value(V, appendValues(VS, B))
+semantic.k:106:  rule builtinStr(pyInt(I)) => pyString(number(I))
+semantic.k:108:  rule containsValue(pyString(oneDigit(oddDigit)),
+semantic.k:110:  rule containsValue(pyString(oneDigit(evenDigit)),
+semantic.k:113:  rule iterableValues(pyList(VS)) => VS
+semantic.k:114:  rule iterableValues(pyString(inputDigits(DS))) => digitValues(DS)
+semantic.k:115:  rule digitValues(noDigits) => noValues
+semantic.k:116:  rule digitValues(digit(D, DS))
+semantic.k:119:  syntax ExecResult ::= execute ( Stmts , Env ) [function]
+semantic.k:120:                      | afterBlock ( ExecResult , Stmts ) [function]
+semantic.k:121:                      | executeFor ( Values , String , Stmts , Stmts , Env ) [function]
+semantic.k:122:                      | afterIteration ( ExecResult , Values , String , Stmts , Stmts ) [function]
+semantic.k:124:  rule execute(.Stmts, ENV) => normal(ENV)
+semantic.k:126:  rule execute(Assign(Name(X), E) REST, ENV)
+semantic.k:129:  rule execute(If(COND, YES, NO) REST, ENV)
+semantic.k:132:  syntax ExecResult ::= executeIf ( Value , Stmts , Stmts , Stmts , Env ) [function]
+semantic.k:133:  rule executeIf(pyBool(true), YES, _, REST, ENV)
+semantic.k:135:  rule executeIf(pyBool(false), _, NO, REST, ENV)
+semantic.k:138:  rule afterBlock(normal(ENV), REST) => execute(REST, ENV)
+semantic.k:139:  rule afterBlock(returned(V), _) => returned(V)
+semantic.k:141:  rule execute(For(Name(X), ITER, BODY) REST, ENV)
+semantic.k:144:  rule executeFor(noValues, _, _, REST, ENV) => execute(REST, ENV)
+semantic.k:145:  rule executeFor(value(V, VS), X, BODY, REST, ENV)
+semantic.k:148:  rule afterIteration(normal(ENV), VS, X, BODY, REST)
+semantic.k:150:  rule afterIteration(returned(V), _, _, _, _) => returned(V)
+semantic.k:152:  rule execute(Return(E) _REST, ENV) => returned(evaluate(E, ENV))
+semantic.k:154:  syntax Value ::= resultValue ( ExecResult ) [function]
+semantic.k:155:  rule resultValue(returned(V)) => V
+semantic.k:157:  rule <k> Module(FuncDef("odd_count", Params("lst"), BODY))
+END OUTPUT
+EXIT STATUS: 0

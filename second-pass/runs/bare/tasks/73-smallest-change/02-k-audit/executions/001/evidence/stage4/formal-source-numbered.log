@@ -1,0 +1,268 @@
+COMMAND: bash -lc nl\ -ba\ /tmp/audit-work/73-smallest-change/solution.mpy\;\ nl\ -ba\ /tmp/audit-work/73-smallest-change/semantic.k\;\ nl\ -ba\ /tmp/audit-work/73-smallest-change/verification.k\;\ nl\ -ba\ /tmp/audit-work/73-smallest-change/spec.k
+     1	Module(
+     2	  FuncDef("smallest_change", Params("arr"),
+     3	    If(Compare(Call(Name("len"), Name("arr")), CmpOp("<=", Int(1))),
+     4	      Return(Int(0)),
+     5	      )
+     6	    If(Compare(
+     7	      Subscript(Name("arr"), Int(0)),
+     8	      CmpOp("==", Subscript(Name("arr"), UnaryOp("-", Int(1))))),
+     9	      Return(
+    10	        Call(
+    11	          Name("smallest_change"),
+    12	          Subscript(
+    13	            Name("arr"),
+    14	            Slice(Int(1), UnaryOp("-", Int(1)), NoBound)))),
+    15	      )
+    16	    Return(
+    17	      BinOp(
+    18	        "+",
+    19	        Int(1),
+    20	        Call(
+    21	          Name("smallest_change"),
+    22	          Subscript(
+    23	            Name("arr"),
+    24	            Slice(Int(1), UnaryOp("-", Int(1)), NoBound)))))))
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports BOOL-SYNTAX
+     6	  imports STRING-SYNTAX
+     7	  imports LIST
+     8	
+     9	  // The concrete syntax is deliberately the constructor syntax emitted by
+    10	  // py2mpy.py.  Statement and expression lists use the same separators as the
+    11	  // transliterator (juxtaposition and comma, respectively).
+    12	  syntax Program ::= "Module" "(" Stmts ")" [symbol(Module)]
+    13	
+    14	  syntax Stmts ::= List{Stmt, ""}
+    15	  syntax Exprs ::= List{Expr, ","}
+    16	  syntax Strings ::= List{String, ","}
+    17	  syntax CmpOps ::= List{CmpOp, ","}
+    18	
+    19	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")" [symbol(FuncDef)]
+    20	                | "If" "(" Expr "," Stmts "," Stmts ")"       [symbol(If)]
+    21	                | "Return" "(" Expr ")"                         [symbol(Return)]
+    22	
+    23	  syntax Params ::= "Params" "(" Strings ")" [symbol(Params)]
+    24	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")" [symbol(CmpOp)]
+    25	
+    26	  syntax Expr ::= "Int" "(" Int ")"                              [symbol(IntExpr)]
+    27	                | "Name" "(" String ")"                          [symbol(Name)]
+    28	                | "Call" "(" Expr "," Exprs ")"                 [symbol(Call)]
+    29	                | "Compare" "(" Expr "," CmpOps ")"             [symbol(Compare)]
+    30	                | "Subscript" "(" Expr "," Expr ")"             [symbol(Subscript)]
+    31	                | "Slice" "(" Expr "," Expr "," Expr ")"       [symbol(Slice)]
+    32	                | "UnaryOp" "(" String "," Expr ")"             [symbol(UnaryOp)]
+    33	                | "BinOp" "(" String "," Expr "," Expr ")"     [symbol(BinOp)]
+    34	                | "NoBound"                                       [symbol(NoBound)]
+    35	endmodule
+    36	
+    37	module SEMANTIC
+    38	  imports MPY-SYNTAX
+    39	  imports INT
+    40	  imports BOOL
+    41	  imports LIST
+    42	  imports K-EQUAL
+    43	
+    44	  configuration
+    45	    <mpy>
+    46	      <k> $PGM:Program </k>
+    47	      <input> $INPUT:List </input>
+    48	      <result> .K </result>
+    49	    </mpy>
+    50	
+    51	  // Runtime helpers.  A function body is passed as the third argument so a
+    52	  // recursive call invokes the actual parsed body, not a built-in replacement.
+    53	  // `run` is operational (rather than a function) so symbolic side conditions
+    54	  // split proof paths. `addResult` is the return continuation for 1 + recurse.
+    55	  syntax KItem ::= run(Stmts, List, Stmts)
+    56	                 | recur(Stmts, List, Stmts)
+    57	                 | finish(Int)
+    58	                 | addResult(Int)
+    59	                 | eval(Expr, List, Stmts)  [function]
+    60	  syntax Bool ::= truth(Expr, List, Stmts)  [function]
+    61	  syntax Stmts ::= concatStmts(Stmts, Stmts) [function]
+    62	
+    63	  rule concatStmts(.Stmts, S2) => S2
+    64	  rule concatStmts((S:Stmt) S1, S2) => S concatStmts(S1, S2)
+    65	
+    66	  rule <k> Module(FuncDef("smallest_change", Params("arr"), BODY))
+    67	             => run(BODY, L, BODY) </k>
+    68	       <input> L </input>
+    69	
+    70	  // Statements.  Returning discards the remaining statements.  An if-body
+    71	  // is prepended to the continuation exactly as Python executes it.
+    72	  rule <k> run(If(Compare(Call(Name("len"), Name("arr")),
+    73	                         CmpOp("<=", Int(1))), THEN, _ELSE) REST, L, BODY)
+    74	             => run(concatStmts(THEN, REST), L, BODY) ... </k>
+    75	    requires size(L) <=Int 1
+    76	  rule <k> run(If(Compare(Call(Name("len"), Name("arr")),
+    77	                         CmpOp("<=", Int(1))), _THEN, ELSE) REST, L, BODY)
+    78	             => run(concatStmts(ELSE, REST), L, BODY) ... </k>
+    79	    requires size(L) >Int 1
+    80	  rule <k> run(If(Compare(Subscript(Name("arr"), Int(0)),
+    81	                         CmpOp("==", Subscript(Name("arr"),
+    82	                                               UnaryOp("-", Int(1))))),
+    83	                    THEN, _ELSE) REST, L, BODY)
+    84	             => run(concatStmts(THEN, REST), L, BODY) ... </k>
+    85	    requires {L[0]}:>Int ==Int {L[-1]}:>Int
+    86	  rule <k> run(If(Compare(Subscript(Name("arr"), Int(0)),
+    87	                         CmpOp("==", Subscript(Name("arr"),
+    88	                                               UnaryOp("-", Int(1))))),
+    89	                    _THEN, ELSE) REST, L, BODY)
+    90	             => run(concatStmts(ELSE, REST), L, BODY) ... </k>
+    91	    requires notBool ({L[0]}:>Int ==Int {L[-1]}:>Int)
+    92	
+    93	  rule <k> run(Return(Int(I)) _REST, _L, _BODY) => finish(I) ... </k>
+    94	  rule <k> run(Return(Call(Name("smallest_change"), ARG)) _REST, L, BODY)
+    95	             => recur(BODY, {eval(ARG, L, BODY)}:>List, BODY) ... </k>
+    96	  rule <k> run(Return(BinOp("+", Int(I),
+    97	                           Call(Name("smallest_change"), ARG))) _REST, L, BODY)
+    98	             => recur(BODY, {eval(ARG, L, BODY)}:>List, BODY)
+    99	                ~> addResult(I) ... </k>
+   100	  // Ground execution continues immediately.  Symbolic proofs stop at recur,
+   101	  // which is the induction cutpoint discharged by the recurrence claims.
+   102	  rule <k> recur(BODY, L, BODY) => run(BODY, L, BODY) ... </k> [concrete]
+   103	  rule <k> finish(I) ~> addResult(N) => finish(N +Int I) ... </k>
+   104	  rule <k> finish(I) => .K </k>
+   105	       <result> .K => I </result>
+   106	
+   107	  // Integer and list expressions used by solution.py.
+   108	  rule eval(Int(I), _L, _BODY) => I
+   109	  rule eval(UnaryOp("-", E), L, BODY)
+   110	    => 0 -Int {eval(E, L, BODY)}:>Int
+   111	  rule eval(BinOp("+", E1, E2), L, BODY)
+   112	    => {eval(E1, L, BODY)}:>Int +Int {eval(E2, L, BODY)}:>Int
+   113	  rule eval(Call(Name("len"), Name("arr")), L, _BODY) => size(L)
+   114	  rule eval(Subscript(Name("arr"), INDEX), L, BODY)
+   115	    => L[{eval(INDEX, L, BODY)}:>Int]
+   116	  rule eval(Subscript(Name("arr"), Slice(LOW, HIGH, NoBound)), L, BODY)
+   117	    => range(L,
+   118	             {eval(LOW, L, BODY)}:>Int,
+   119	             0 -Int {eval(HIGH, L, BODY)}:>Int)
+   120	  // Comparisons are intentionally interpreted here rather than translated by
+   121	  // py2mpy.py.  List elements are constrained to Int by these projections.
+   122	  rule truth(Compare(E1, CmpOp("<=", E2)), L, BODY)
+   123	    => {eval(E1, L, BODY)}:>Int <=Int {eval(E2, L, BODY)}:>Int
+   124	  rule truth(Compare(E1, CmpOp("==", E2)), L, BODY)
+   125	    => {eval(E1, L, BODY)}:>Int ==Int {eval(E2, L, BODY)}:>Int
+   126	endmodule
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // Mathematical specification.  Each outer pair is independent: an equal
+     7	  // pair costs zero, while an unequal pair necessarily and sufficiently costs
+     8	  // one edit.  Removing that pair therefore defines the minimum recursively.
+     9	  syntax Int ::= minimumPalindromeChanges(List) [function, total]
+    10	
+    11	  rule minimumPalindromeChanges(L) => 0
+    12	    requires size(L) <=Int 1 [simplification]
+    13	  rule minimumPalindromeChanges(L)
+    14	    => minimumPalindromeChanges(range(L, 1, 1))
+    15	    requires size(L) >Int 1
+    16	     andBool {L[0]}:>Int ==Int {L[-1]}:>Int [simplification]
+    17	  rule minimumPalindromeChanges(L)
+    18	    => 1 +Int minimumPalindromeChanges(range(L, 1, 1))
+    19	    requires size(L) >Int 1
+    20	     andBool notBool ({L[0]}:>Int ==Int {L[-1]}:>Int) [simplification]
+    21	
+    22	  // This function constant expands to the exact Stmts tree in solution.mpy.
+    23	  // It keeps claims readable while still proving the translated body itself.
+    24	  syntax Stmts ::= "#smallestChangeBody" [function, symbol(smallestChangeBody)]
+    25	  rule #smallestChangeBody =>
+    26	    If(Compare(Call(Name("len"), Name("arr")), CmpOp("<=", Int(1))),
+    27	      Return(Int(0)),
+    28	      .Stmts)
+    29	    If(Compare(Subscript(Name("arr"), Int(0)),
+    30	               CmpOp("==", Subscript(Name("arr"), UnaryOp("-", Int(1))))),
+    31	      Return(Call(Name("smallest_change"),
+    32	                  Subscript(Name("arr"),
+    33	                            Slice(Int(1), UnaryOp("-", Int(1)), NoBound)))),
+    34	      .Stmts)
+    35	    Return(BinOp("+", Int(1),
+    36	                 Call(Name("smallest_change"),
+    37	                      Subscript(Name("arr"),
+    38	                                Slice(Int(1), UnaryOp("-", Int(1)), NoBound)))))
+    39	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Exhaustive symbolic proof of the recurrence defining the minimum.  These
+     7	  // claims cover every finite list: the length test is true or false, and in
+     8	  // the latter case the two endpoints are equal or unequal.
+     9	  claim <k>
+    10	          run(#smallestChangeBody, L, #smallestChangeBody) ~> KONT
+    11	          => finish(0) ~> KONT
+    12	        </k>
+    13	    requires size(L) <=Int 1
+    14	
+    15	  claim <k>
+    16	          run(#smallestChangeBody, L, #smallestChangeBody) ~> KONT
+    17	          => recur(#smallestChangeBody, range(L, 1, 1),
+    18	                   #smallestChangeBody) ~> KONT
+    19	        </k>
+    20	    requires size(L) >Int 1
+    21	     andBool {L[0]}:>Int ==Int {L[-1]}:>Int
+    22	
+    23	  claim <k>
+    24	          run(#smallestChangeBody, L, #smallestChangeBody) ~> KONT
+    25	          => recur(#smallestChangeBody, range(L, 1, 1),
+    26	                   #smallestChangeBody) ~> addResult(1) ~> KONT
+    27	        </k>
+    28	    requires size(L) >Int 1
+    29	     andBool notBool ({L[0]}:>Int ==Int {L[-1]}:>Int)
+    30	
+    31	  // The independent mathematical specification has the same exhaustive
+    32	  // recurrence, establishing the correspondence used by the three program
+    33	  // claims above.
+    34	  claim <k> minimumPalindromeChanges(L) => 0 </k>
+    35	    requires size(L) <=Int 1
+    36	
+    37	  claim <k>
+    38	          minimumPalindromeChanges(L)
+    39	          => minimumPalindromeChanges(range(L, 1, 1))
+    40	        </k>
+    41	    requires size(L) >Int 1
+    42	     andBool {L[0]}:>Int ==Int {L[-1]}:>Int
+    43	
+    44	  claim <k>
+    45	          minimumPalindromeChanges(L)
+    46	          => 1 +Int minimumPalindromeChanges(range(L, 1, 1))
+    47	        </k>
+    48	    requires size(L) >Int 1
+    49	     andBool notBool ({L[0]}:>Int ==Int {L[-1]}:>Int)
+    50	
+    51	  // The three examples from prompt.py additionally prove concrete executions
+    52	  // of the evaluator.  Full Module/FuncDef linkage is exercised by krun.
+    53	  claim <k>
+    54	          run(#smallestChangeBody,
+    55	               ListItem(1) ListItem(2) ListItem(3) ListItem(5)
+    56	               ListItem(4) ListItem(7) ListItem(9) ListItem(6),
+    57	               #smallestChangeBody)
+    58	          => finish(4)
+    59	        </k>
+    60	
+    61	  claim <k>
+    62	          run(#smallestChangeBody,
+    63	               ListItem(1) ListItem(2) ListItem(3) ListItem(4)
+    64	               ListItem(3) ListItem(2) ListItem(2),
+    65	               #smallestChangeBody)
+    66	          => finish(1)
+    67	        </k>
+    68	
+    69	  claim <k>
+    70	          run(#smallestChangeBody,
+    71	               ListItem(1) ListItem(2) ListItem(3)
+    72	               ListItem(2) ListItem(1),
+    73	               #smallestChangeBody)
+    74	          => finish(0)
+    75	        </k>
+    76	endmodule
+
+EXIT_STATUS: 0

@@ -1,0 +1,266 @@
+COMMAND: nl -ba semantic.k verification.k spec.k; rg syntax/configuration/rule/claim/attributes
+FILE: semantic.k
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports BOOL-SYNTAX
+     4	  imports STRING-SYNTAX
+     5	
+     6	  syntax Program ::= "Module" "(" Stmts ")"
+     7	
+     8	  syntax Stmts ::= List{Stmt, ""}
+     9	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    10	                | "Return" "(" Expr ")"
+    11	                | "Assign" "(" Expr "," Expr ")"
+    12	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    13	
+    14	  syntax Params ::= "Params" "(" StringList ")"
+    15	  syntax StringList ::= List{String, ","}
+    16	
+    17	  syntax Expr ::= "Bool" "(" Bool ")"
+    18	                | "Int" "(" Int ")"
+    19	                | "Name" "(" String ")"
+    20	                | "UnaryOp" "(" String "," Expr ")"
+    21	                | "Compare" "(" Expr "," CmpOps ")"
+    22	                | "Subscript" "(" Expr "," Index ")"
+    23	                | "Call" "(" Expr "," Exprs ")"
+    24	
+    25	  syntax Exprs ::= List{Expr, ","}
+    26	  syntax CmpOps ::= List{CmpOp, ","}
+    27	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    28	  syntax Index ::= Expr
+    29	                 | "Slice" "(" Bound "," Bound "," Bound ")"
+    30	  syntax Bound ::= Expr | "NoBound"
+    31	endmodule
+    32	
+    33	module MPY-SEMANTIC
+    34	  imports MPY-SYNTAX
+    35	  imports INT
+    36	  imports BOOL
+    37	  imports MAP
+    38	
+    39	  // Integer lists are a semantic value domain, independent of the source AST.
+    40	  syntax ISeq ::= ".ISeq" [symbol(seqNil)]
+    41	                | Int "::" ISeq [symbol(seqCons)]
+    42	
+    43	  syntax PyVal ::= "pyInt" "(" Int ")"
+    44	                 | "pyBool" "(" Bool ")"
+    45	                 | "pyList" "(" ISeq ")"
+    46	                 | "pyNone"
+    47	
+    48	  syntax KItem ::= "run" "(" Program "," ISeq ")"
+    49	                 | "functionEnd"
+    50	                 | "ifStmt" "(" Bool "," Stmts "," Stmts ")"
+    51	
+    52	  syntax PyVal ::= "eval" "(" Expr "," Map ")" [function]
+    53	                 | "negVal" "(" PyVal ")" [function]
+    54	                 | "atZero" "(" PyVal ")" [function]
+    55	                 | "tailVal" "(" PyVal ")" [function]
+    56	                 | "containsVal" "(" PyVal "," PyVal ")" [function]
+    57	  syntax Bool ::= "truth" "(" PyVal ")" [function]
+    58	  syntax ISeq ::= "asList" "(" PyVal ")" [function]
+    59	
+    60	  syntax Bool ::= "isEmpty" "(" ISeq ")" [function, total]
+    61	  syntax Bool ::= "member" "(" Int "," ISeq ")" [function, total]
+    62	  syntax Bool ::= "hasZeroPair" "(" ISeq ")" [function, total]
+    63	  syntax Int ::= "first" "(" ISeq ")" [function, total]
+    64	  syntax ISeq ::= "rest" "(" ISeq ")" [function, total]
+    65	
+    66	  configuration
+    67	    <mpy>
+    68	      <k> run($PGM:Program, $INPUT:ISeq) </k>
+    69	      <program> $PGM </program>
+    70	      <env> .Map </env>
+    71	    </mpy>
+    72	
+    73	  // A translated one-argument function is entered with its parameter bound.
+    74	  rule <k> run(Module(FuncDef(_F, Params(P:String), BODY)), INPUT)
+    75	        => BODY ~> functionEnd ... </k>
+    76	       <env> .Map => P |-> pyList(INPUT) </env>
+    77	
+    78	  // The translator represents statement blocks as juxtaposed statement lists.
+    79	  rule <k> (S:Stmt SS:Stmts) => S ~> SS ... </k>
+    80	  rule <k> .Stmts => .K ... </k>
+    81	
+    82	  rule <k> Assign(Name(X), E) => .K ... </k>
+    83	       <env> RHO => RHO [ X <- eval(E, RHO) ] </env>
+    84	
+    85	  rule <k> If(E, THEN, ELSE) => ifStmt(truth(eval(E, RHO)), THEN, ELSE) ... </k>
+    86	       <env> RHO </env>
+    87	  rule <k> ifStmt(B, THEN, _ELSE) => THEN ... </k> requires B
+    88	  rule <k> ifStmt(B, _THEN, ELSE) => ELSE ... </k> requires notBool B
+    89	
+    90	  // Calls in tail-return position re-enter the same translated definition.
+    91	  rule <k> Return(Call(Name(F), ARG:Expr)) ~> _REST
+    92	        => run(Module(FuncDef(F, Params(P:String), BODY)),
+    93	               asList(eval(ARG, RHO))) </k>
+    94	       <program> Module(FuncDef(F, Params(P:String), BODY)) </program>
+    95	       <env> RHO => .Map </env>
+    96	
+    97	  rule <k> Return(Bool(B)) ~> _REST => pyBool(B) </k>
+    98	       <env> _RHO => .Map </env>
+    99	  rule <k> functionEnd => pyNone ... </k>
+   100	
+   101	  rule eval(Bool(B), _RHO) => pyBool(B)
+   102	  rule eval(Int(I), _RHO) => pyInt(I)
+   103	  rule eval(Name(X), (X |-> V) _RHO) => V
+   104	  rule eval(UnaryOp("not", E), RHO) => pyBool(notBool truth(eval(E, RHO)))
+   105	  rule eval(UnaryOp("-", E), RHO) => negVal(eval(E, RHO))
+   106	  rule eval(Subscript(E, Int(0)), RHO) => atZero(eval(E, RHO))
+   107	  rule eval(Subscript(E, Slice(Int(1), NoBound, NoBound)), RHO)
+   108	    => tailVal(eval(E, RHO))
+   109	  rule eval(Compare(L, CmpOp("in", R)), RHO)
+   110	    => containsVal(eval(L, RHO), eval(R, RHO))
+   111	
+   112	  rule negVal(pyInt(I)) => pyInt(0 -Int I)
+   113	  rule atZero(pyList(L)) => pyInt(first(L))
+   114	  rule tailVal(pyList(L)) => pyList(rest(L))
+   115	  rule containsVal(pyInt(I), pyList(L)) => pyBool(member(I, L))
+   116	
+   117	  rule truth(pyBool(B)) => B
+   118	  rule truth(pyInt(I)) => I =/=Int 0
+   119	  rule truth(pyList(L)) => notBool isEmpty(L)
+   120	  rule asList(pyList(L)) => L
+   121	
+   122	  rule isEmpty(.ISeq) => true
+   123	  rule isEmpty(_I :: _IS) => false
+   124	  rule first(I :: _IS) => I
+   125	  rule rest(_I :: IS) => IS
+   126	  rule member(_I, .ISeq) => false
+   127	  rule member(I, J :: JS) => (I ==Int J) orBool member(I, JS)
+   128	endmodule
+FILE: verification.k
+     1	requires "semantic.k"
+     2	
+     3	module MPY-VERIFICATION
+     4	  imports MPY-SEMANTIC
+     5	
+     6	  rule notBool notBool B => B [simplification]
+     7	
+     8	  // Mathematical contract: in a nonempty list, either the head has its
+     9	  // additive inverse at a later (therefore distinct) position, or the pair is
+    10	  // wholly in the tail.  These guarded equations also serve as the invariant
+    11	  // used by the circular reachability proof.
+    12	  rule hasZeroPair(L) => false
+    13	    requires isEmpty(L) [simplification]
+    14	  rule hasZeroPair(L)
+    15	    => member(0 -Int first(L), rest(L)) orBool hasZeroPair(rest(L))
+    16	    requires notBool isEmpty(L) [simplification]
+    17	endmodule
+FILE: spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports MPY-VERIFICATION
+     5	
+     6	  // Universal functional-correctness claim.  L is arbitrary: the proof
+     7	  // splits on emptiness and membership, and its recursive branch closes by
+     8	  // circularity on rest(L).
+     9	  claim
+    10	    <k>
+    11	      run(
+    12	        Module(
+    13	          FuncDef("pairs_sum_to_zero", Params("l"),
+    14	            If(UnaryOp("not", Name("l")),
+    15	              Return(Bool(false)) .Stmts,
+    16	              .Stmts)
+    17	            If(Compare(
+    18	              UnaryOp("-", Subscript(Name("l"), Int(0))),
+    19	              CmpOp("in", Subscript(Name("l"),
+    20	                Slice(Int(1), NoBound, NoBound)))),
+    21	              Return(Bool(true)) .Stmts,
+    22	              .Stmts)
+    23	            Return(Call(Name("pairs_sum_to_zero"),
+    24	              Subscript(Name("l"), Slice(Int(1), NoBound, NoBound))))
+    25	            .Stmts)
+    26	          .Stmts),
+    27	        L:ISeq)
+    28	      => pyBool(hasZeroPair(L))
+    29	    </k>
+    30	    <program>
+    31	      Module(
+    32	        FuncDef("pairs_sum_to_zero", Params("l"),
+    33	          If(UnaryOp("not", Name("l")),
+    34	            Return(Bool(false)) .Stmts,
+    35	            .Stmts)
+    36	          If(Compare(
+    37	            UnaryOp("-", Subscript(Name("l"), Int(0))),
+    38	            CmpOp("in", Subscript(Name("l"),
+    39	              Slice(Int(1), NoBound, NoBound)))),
+    40	            Return(Bool(true)) .Stmts,
+    41	            .Stmts)
+    42	          Return(Call(Name("pairs_sum_to_zero"),
+    43	            Subscript(Name("l"), Slice(Int(1), NoBound, NoBound))))
+    44	          .Stmts)
+    45	        .Stmts)
+    46	    </program>
+    47	    <env> .Map </env>
+    48	endmodule
+DECLARATION_AND_RULE_INDEX:
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/spec.k:9:  claim
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/verification.k:6:  rule notBool notBool B => B [simplification]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/verification.k:12:  rule hasZeroPair(L) => false
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/verification.k:13:    requires isEmpty(L) [simplification]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/verification.k:14:  rule hasZeroPair(L)
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/verification.k:16:    requires notBool isEmpty(L) [simplification]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:6:  syntax Program ::= "Module" "(" Stmts ")"
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:8:  syntax Stmts ::= List{Stmt, ""}
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:9:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:14:  syntax Params ::= "Params" "(" StringList ")"
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:15:  syntax StringList ::= List{String, ","}
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:17:  syntax Expr ::= "Bool" "(" Bool ")"
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:25:  syntax Exprs ::= List{Expr, ","}
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:26:  syntax CmpOps ::= List{CmpOp, ","}
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:27:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:28:  syntax Index ::= Expr
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:30:  syntax Bound ::= Expr | "NoBound"
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:40:  syntax ISeq ::= ".ISeq" [symbol(seqNil)]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:41:                | Int "::" ISeq [symbol(seqCons)]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:43:  syntax PyVal ::= "pyInt" "(" Int ")"
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:48:  syntax KItem ::= "run" "(" Program "," ISeq ")"
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:52:  syntax PyVal ::= "eval" "(" Expr "," Map ")" [function]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:53:                 | "negVal" "(" PyVal ")" [function]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:54:                 | "atZero" "(" PyVal ")" [function]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:55:                 | "tailVal" "(" PyVal ")" [function]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:56:                 | "containsVal" "(" PyVal "," PyVal ")" [function]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:57:  syntax Bool ::= "truth" "(" PyVal ")" [function]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:58:  syntax ISeq ::= "asList" "(" PyVal ")" [function]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:60:  syntax Bool ::= "isEmpty" "(" ISeq ")" [function, total]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:61:  syntax Bool ::= "member" "(" Int "," ISeq ")" [function, total]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:62:  syntax Bool ::= "hasZeroPair" "(" ISeq ")" [function, total]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:63:  syntax Int ::= "first" "(" ISeq ")" [function, total]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:64:  syntax ISeq ::= "rest" "(" ISeq ")" [function, total]
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:66:  configuration
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:74:  rule <k> run(Module(FuncDef(_F, Params(P:String), BODY)), INPUT)
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:79:  rule <k> (S:Stmt SS:Stmts) => S ~> SS ... </k>
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:80:  rule <k> .Stmts => .K ... </k>
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:82:  rule <k> Assign(Name(X), E) => .K ... </k>
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:85:  rule <k> If(E, THEN, ELSE) => ifStmt(truth(eval(E, RHO)), THEN, ELSE) ... </k>
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:87:  rule <k> ifStmt(B, THEN, _ELSE) => THEN ... </k> requires B
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:88:  rule <k> ifStmt(B, _THEN, ELSE) => ELSE ... </k> requires notBool B
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:91:  rule <k> Return(Call(Name(F), ARG:Expr)) ~> _REST
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:97:  rule <k> Return(Bool(B)) ~> _REST => pyBool(B) </k>
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:99:  rule <k> functionEnd => pyNone ... </k>
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:101:  rule eval(Bool(B), _RHO) => pyBool(B)
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:102:  rule eval(Int(I), _RHO) => pyInt(I)
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:103:  rule eval(Name(X), (X |-> V) _RHO) => V
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:104:  rule eval(UnaryOp("not", E), RHO) => pyBool(notBool truth(eval(E, RHO)))
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:105:  rule eval(UnaryOp("-", E), RHO) => negVal(eval(E, RHO))
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:106:  rule eval(Subscript(E, Int(0)), RHO) => atZero(eval(E, RHO))
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:107:  rule eval(Subscript(E, Slice(Int(1), NoBound, NoBound)), RHO)
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:109:  rule eval(Compare(L, CmpOp("in", R)), RHO)
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:112:  rule negVal(pyInt(I)) => pyInt(0 -Int I)
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:113:  rule atZero(pyList(L)) => pyInt(first(L))
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:114:  rule tailVal(pyList(L)) => pyList(rest(L))
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:115:  rule containsVal(pyInt(I), pyList(L)) => pyBool(member(I, L))
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:117:  rule truth(pyBool(B)) => B
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:118:  rule truth(pyInt(I)) => I =/=Int 0
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:119:  rule truth(pyList(L)) => notBool isEmpty(L)
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:120:  rule asList(pyList(L)) => L
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:122:  rule isEmpty(.ISeq) => true
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:123:  rule isEmpty(_I :: _IS) => false
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:124:  rule first(I :: _IS) => I
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:125:  rule rest(_I :: IS) => IS
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:126:  rule member(_I, .ISeq) => false
+/tmp/audit-work/43-pairs-sum-to-zero/candidate/semantic.k:127:  rule member(I, J :: JS) => (I ==Int J) orBool member(I, JS)
+EXIT_STATUS: 0
+SCRIPT_EXIT_STATUS: 0

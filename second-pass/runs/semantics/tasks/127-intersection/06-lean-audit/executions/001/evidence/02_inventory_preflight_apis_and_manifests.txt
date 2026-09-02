@@ -1,0 +1,1207 @@
+Script started on 2026-07-28 18:23:01-05:00 [<not executed on terminal>]
+COMMAND: inspect remaining inventory API, preflight contract, and manifests without jq
+
+[k_rule_inventory.py remainder]
+    return len(masked_text) + 1
+
+
+def _modules(masked_text: str) -> tuple[_Module, ...]:
+    modules: list[_Module] = []
+    open_module: tuple[
+        str, int, list[str], list[_Sentence]
+    ] | None = None
+    open_rule_until = 0
+    for line_start, line_end, keyword, rest in _line_heads(masked_text):
+        if line_start < open_rule_until:
+            continue
+        open_rule_until = 0
+        separated = bool(rest) and rest[0] in " \t"
+        if keyword == "module":
+            if not separated:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            named = _MODULE_NAME_RE.fullmatch(rest)
+            if named is None or open_module is not None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            open_module = (named.group("name"), line_end, [], [])
+            continue
+        if keyword == "endmodule":
+            if rest.strip():
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            if open_module is None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            name, content_start, imports, sentences = open_module
+            modules.append(
+                _Module(
+                    name=name,
+                    content_start=content_start,
+                    content_end=line_start,
+                    imports=tuple(imports),
+                    sentences=tuple(sentences),
+                )
+            )
+            open_module = None
+            continue
+        if open_module is not None and keyword == "rule":
+            open_module[3].append(
+                _Sentence(keyword=keyword, start=line_start)
+            )
+            open_rule_until = _rule_bubble_end(masked_text, line_start)
+            continue
+        if open_module is not None and keyword == "imports" and separated:
+            imported = rest.strip().split()
+            if len(imported) != 1:
+                raise KRuleInventoryError(
+                    "verification.k has malformed imports"
+                )
+            open_module[2].append(imported[0])
+        if (
+            open_module is not None
+            and keyword in _OUTER_SENTENCE_KEYWORDS
+            and separated
+        ):
+            open_module[3].append(
+                _Sentence(keyword=keyword, start=line_start)
+            )
+    if not modules or open_module is not None:
+        raise KRuleInventoryError(
+            "verification.k has malformed module boundaries"
+        )
+    return tuple(modules)
+
+
+def _verification_module(
+    modules: tuple[_Module, ...], selected_name: str | None = None
+) -> _Module:
+    if selected_name is not None:
+        selected = [module for module in modules if module.name == selected_name]
+        if len(selected) != 1:
+            raise KRuleInventoryError(
+                "prove.sh selects an unknown verification main module: "
+                + selected_name
+            )
+        return selected[0]
+    candidates = [
+        module
+        for module in modules
+        if module.name.endswith("VERIFICATION")
+        and not module.name.endswith("-SYNTAX")
+    ]
+    if len(candidates) != 1:
+        raise KRuleInventoryError(
+            "verification.k must contain exactly one verification module"
+        )
+    return candidates[0]
+
+
+def _last_verification_main_module(workspace: Path) -> str | None:
+    script = workspace / "prove.sh"
+    if not script.exists() and not script.is_symlink():
+        return None
+    try:
+        mode = script.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(f"cannot inspect prove.sh: {script}") from error
+    if not stat.S_ISREG(mode):
+        raise KRuleInventoryError(f"prove.sh must be a regular file: {script}")
+    try:
+        text = script.read_text()
+    except (OSError, UnicodeError) as error:
+        raise KRuleInventoryError(f"cannot read prove.sh: {script}") from error
+    logical = re.sub(r"\\\r?\n", " ", text)
+    selected: str | None = None
+    for line in logical.splitlines():
+        code = line.split("#", 1)[0]
+        if not re.search(r"(?:^|[;&|]\s*)kompile\s+", code):
+            continue
+        if re.search(r"(?:^|\s)(?:\./)?verification\.k(?:\s|$)", code) is None:
+            continue
+        match = re.search(
+            r"(?:^|\s)--main-module(?:=|\s+)([A-Za-z][A-Za-z0-9_'-]*)",
+            code,
+        )
+        if match is not None:
+            selected = match.group(1)
+    return selected
+
+
+def _verification_closure(
+    modules: tuple[_Module, ...], verification: _Module
+) -> tuple[_Module, ...]:
+    by_name = {module.name: module for module in modules}
+    reached: set[str] = set()
+    pending = [verification.name]
+    while pending:
+        name = pending.pop()
+        if name in reached:
+            continue
+        reached.add(name)
+        module = by_name.get(name)
+        if module is not None:
+            pending.extend(module.imports)
+    return tuple(module for module in modules if module.name in reached)
+
+
+def _without_comments(text: str) -> str:
+    """Remove K comments while preserving strings and their exact contents."""
+
+    output: list[str] = []
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                output.append(character)
+                state = "code"
+            index += 1
+            continue
+        if state == "string":
+            output.append(character)
+            if character == "\\" and following:
+                output.append(following)
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character in "\r\n":
+                output.append(character)
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output.append(" ")
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output.append(" ")
+            state = "block-comment"
+            block_depth = 1
+            index += 2
+            continue
+        output.append(character)
+        if character == '"':
+            state = "string"
+        index += 1
+    return "".join(output)
+
+
+def _attribute_tokens(text: str, masked_text: str) -> list[str]:
+    tokens: list[str] = []
+    start = 0
+    depth = 0
+    for index, character in enumerate(masked_text):
+        if character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth = max(depth - 1, 0)
+        elif character == "," and depth == 0:
+            token = _without_comments(text[start:index]).strip()
+            if token:
+                tokens.append(token)
+            start = index + 1
+    final = _without_comments(text[start:]).strip()
+    if final:
+        tokens.append(final)
+    return tokens
+
+
+def _rule_spans(text: str, module: _Module) -> list[_RuleSpan]:
+    masked_text = _mask_non_code(text)
+    sentences = module.sentences
+    rules: list[_RuleSpan] = []
+    seen_hashes: set[str] = set()
+    for index, sentence in enumerate(sentences):
+        if sentence.keyword != "rule":
+            continue
+        end_offset = (
+            sentences[index + 1].start
+            if index + 1 < len(sentences)
+            else module.content_end
+        )
+        start_offset = sentence.start
+        raw_segment = text[start_offset:end_offset]
+        masked_segment = masked_text[start_offset:end_offset]
+        logical_length = len(masked_segment.rstrip(" \t\r\n"))
+        if logical_length == 0:
+            continue
+        rule_text = raw_segment[:logical_length].rstrip(" \t\r\n")
+        masked_rule = _mask_non_code(rule_text)
+        attribute_match = _TRAILING_ATTRIBUTES_RE.search(masked_rule)
+        attribute_start = None
+        attribute_end = None
+        attributes: list[str] = []
+        if attribute_match is not None:
+            attribute_start = attribute_match.start("attributes")
+            attribute_end = attribute_match.end("attributes")
+            attributes = _attribute_tokens(
+                rule_text[attribute_start:attribute_end],
+                masked_rule[attribute_start:attribute_end],
+            )
+        normalized = " ".join(rule_text.split())
+        digest = hashlib.sha256(normalized.encode()).hexdigest()
+        if digest in seen_hashes:
+            raise KRuleInventoryError(
+                f"duplicate normalized simplification rule hash: {digest}"
+            )
+        seen_hashes.add(digest)
+        start_line = text.count("\n", 0, start_offset) + 1
+        end_line = start_line + rule_text.count("\n")
+        rule = KRule(
+            source_rule_id=f"rule-{digest}",
+            module=module.name,
+            start_line=start_line,
+            end_line=end_line,
+            normalized_sha256=digest,
+            attributes=attributes,
+            text=rule_text,
+        )
+        rules.append(
+            _RuleSpan(
+                rule=rule,
+                start_offset=start_offset,
+                end_offset=start_offset + len(rule_text),
+                attribute_start=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.start()
+                ),
+                attribute_end=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.end()
+                ),
+            )
+        )
+    return rules
+
+
+def _rule_documents(
+    text: str, modules: tuple[_Module, ...]
+) -> list[dict[str, Any]]:
+    spans = [span for module in modules for span in _rule_spans(text, module)]
+    spans.sort(key=lambda span: span.start_offset)
+    return [dataclasses.asdict(span.rule) for span in spans]
+
+
+def _attribute_token_spans(
+    text: str,
+    masked_text: str,
+) -> list[tuple[int, int, str]]:
+    spans: list[tuple[int, int, str]] = []
+    start = 0
+    depth = 0
+    for index, character in enumerate(masked_text):
+        if character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth = max(depth - 1, 0)
+        elif character == "," and depth == 0:
+            spans.append(
+                (
+                    start,
+                    index,
+                    _without_comments(text[start:index]).strip(),
+                )
+            )
+            start = index + 1
+    spans.append(
+        (
+            start,
+            len(text),
+            _without_comments(text[start:]).strip(),
+        )
+    )
+    return spans
+
+
+def _blank_non_newlines(text: str) -> str:
+    return "".join(
+        character if character in "\r\n" else " "
+        for character in text
+    )
+
+
+def desimplify_rule_ids(
+    text: str,
+    source_rule_ids: list[str],
+) -> str:
+    """Remove simplification from exactly the selected canonical rule IDs."""
+
+    if len(source_rule_ids) != len(set(source_rule_ids)):
+        raise KRuleInventoryError(
+            "exact rule transformation contains a duplicate source rule ID"
+        )
+    selected = set(source_rule_ids)
+    modules = _modules(_mask_non_code(text))
+    spans = [
+        span
+        for local_module in modules
+        for span in _rule_spans(text, local_module)
+    ]
+    by_id = {span.rule.source_rule_id: span for span in spans}
+    unknown = sorted(selected - set(by_id))
+    if unknown:
+        raise KRuleInventoryError(
+            "exact rule transformation names an unknown source rule ID: "
+            + ", ".join(unknown)
+        )
+
+    edits: list[tuple[int, int]] = []
+    for source_rule_id in source_rule_ids:
+        span = by_id[source_rule_id]
+        if span.attribute_start is None or span.attribute_end is None:
+            raise KRuleInventoryError(
+                "selected source rule has no simplification attribute: "
+                f"{source_rule_id}"
+            )
+        attribute_text = text[
+            span.attribute_start + 1 : span.attribute_end - 1
+        ]
+        masked_attributes = _mask_non_code(attribute_text)
+        tokens = _attribute_token_spans(
+            attribute_text,
+            masked_attributes,
+        )
+        matches = [
+            index
+            for index, (_start, _end, token) in enumerate(tokens)
+            if token == "simplification"
+        ]
+        if len(matches) != 1:
+            raise KRuleInventoryError(
+                "selected source rule has ambiguous simplification "
+                f"attributes: {source_rule_id}"
+            )
+        token_index = matches[0]
+        if len(tokens) == 1:
+            edit_start = span.attribute_start
+            edit_end = span.attribute_end
+        elif token_index < len(tokens) - 1:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index][0]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index + 1][0]
+            )
+        else:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index - 1][1]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index][1]
+            )
+        edits.append((edit_start, edit_end))
+
+    transformed = text
+    for start, end in sorted(edits, reverse=True):
+        transformed = (
+            transformed[:start]
+            + _blank_non_newlines(transformed[start:end])
+            + transformed[end:]
+        )
+    return transformed
+
+
+def inventory_verification(workspace: Path) -> dict[str, Any]:
+    workspace = Path(workspace)
+    try:
+        workspace_mode = workspace.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        ) from error
+    if not stat.S_ISDIR(workspace_mode):
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        )
+    verification = workspace / "verification.k"
+    try:
+        verification_mode = verification.stat(
+            follow_symlinks=False
+        ).st_mode
+
+[klean_preflight.py check_generation]
+#!/usr/bin/env python3
+"""Hard, model-free sanity gate for a deterministic Klean generation."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
+
+REPO = Path(__file__).resolve().parent.parent
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from tools import klean_export
+from tools import lemma_discovery_contract
+
+
+class KleanPreflightError(RuntimeError):
+    pass
+
+
+_SIDECAR_NAMES = (
+    "input-manifest.json",
+    "generator-manifest.json",
+    "trust-inventory.json",
+    "export-result.json",
+)
+
+
+@dataclass(frozen=True)
+class PreflightSnapshot:
+    stage1_workspace_sha256: str
+    stage3_discovery_manifest_sha256: str
+    generated_tree_sha256: str
+    sidecar_sha256: tuple[tuple[str, str], ...]
+
+
+def _preflight_snapshot(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+) -> PreflightSnapshot:
+    generated = generation / "generated"
+    try:
+        sidecars = tuple(
+            (
+                name,
+                hashlib.sha256(
+                    pipeline_path.read_bytes()
+                ).hexdigest(),
+            )
+            for name in _SIDECAR_NAMES
+            if (
+                pipeline_path := generation / name
+            ).is_file()
+            and not pipeline_path.is_symlink()
+        )
+        if len(sidecars) != len(_SIDECAR_NAMES):
+            raise KleanPreflightError(
+                "preflight sidecar set is incomplete or unsafe"
+            )
+        return PreflightSnapshot(
+            stage1_workspace_sha256=klean_export.tree_digest(
+                frozen_input
+            ),
+            stage3_discovery_manifest_sha256=hashlib.sha256(
+                discovery_manifest.read_bytes()
+            ).hexdigest(),
+            generated_tree_sha256=klean_export.tree_digest(generated),
+            sidecar_sha256=sidecars,
+        )
+    except (OSError, klean_export.KleanExportError) as error:
+        raise KleanPreflightError(
+            "cannot snapshot immutable preflight inputs"
+        ) from error
+
+
+def _require_unchanged_snapshot(
+    expected: PreflightSnapshot,
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+) -> None:
+    current = _preflight_snapshot(
+        frozen_input, discovery_manifest, generation
+    )
+    if current.stage1_workspace_sha256 != (
+        expected.stage1_workspace_sha256
+    ):
+        raise KleanPreflightError(
+            "frozen Stage 1 input changed during preflight"
+        )
+    if current.stage3_discovery_manifest_sha256 != (
+        expected.stage3_discovery_manifest_sha256
+    ):
+        raise KleanPreflightError(
+            "validated Stage 3 discovery manifest changed during preflight"
+        )
+    if current.generated_tree_sha256 != expected.generated_tree_sha256:
+        raise KleanPreflightError(
+            "generated project changed during preflight"
+        )
+    if current.sidecar_sha256 != expected.sidecar_sha256:
+        raise KleanPreflightError(
+            "generation sidecar changed during preflight"
+        )
+
+
+def _regular_json(path: Path, label: str) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise KleanPreflightError(f"{label} must be a regular file: {path}")
+    try:
+        document = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise KleanPreflightError(f"{label} is malformed: {path}") from error
+    if not isinstance(document, dict):
+        raise KleanPreflightError(f"{label} must be a JSON object")
+    return document
+
+
+def _run(
+def _source_and_obligation_gate(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generated: Path,
+    input_manifest: dict[str, Any],
+    generator_manifest: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    verification = frozen_input / "verification.k"
+    if not verification.is_file() or verification.is_symlink():
+        raise KleanPreflightError("frozen input is missing regular verification.k")
+    try:
+        validated = lemma_discovery_contract.validate_trust_boundary(
+            frozen_input, discovery_manifest
+        )
+    except lemma_discovery_contract.LemmaDiscoveryContractError as error:
+        raise KleanPreflightError(str(error)) from error
+    discovery_hash = hashlib.sha256(discovery_manifest.read_bytes()).hexdigest()
+    if input_manifest.get("inventory_sha256") != validated[
+        "inventory_sha256"
+    ]:
+        raise KleanPreflightError(
+            "Stage 1/Stage 3 inventory hash changed after deterministic export"
+        )
+    source_rules = klean_export._domain_source_rules(
+        validated, discovery_hash
+    )
+    if input_manifest.get("source_rules") != source_rules:
+        raise KleanPreflightError(
+            "Stage 3 DOMAIN_LEMMA inventory changed after deterministic export"
+        )
+    if input_manifest.get("verification_sha256") != hashlib.sha256(
+        verification.read_bytes()
+    ).hexdigest():
+        raise KleanPreflightError("verification.k hash changed after export")
+
+    mapping_path = generated / "obligation-map.json"
+    obligation_map = _regular_json(mapping_path, "obligation map")
+    if obligation_map.get("source_rules") != source_rules:
+        raise KleanPreflightError(
+            "source rules and generated obligations are not bijective"
+        )
+    obligations = obligation_map.get("obligations")
+    if not isinstance(obligations, list):
+        raise KleanPreflightError("generated obligation list is malformed")
+    eligible = source_rules
+    expected_ids = [rule["source_rule_id"] for rule in eligible]
+    observed_ids: list[str] = []
+    for obligation in obligations:
+        if not isinstance(obligation, dict):
+            raise KleanPreflightError("generated obligation is malformed")
+        source_rule_id = obligation.get("source_rule_id")
+        if not isinstance(source_rule_id, str):
+            raise KleanPreflightError("generated obligation ID is malformed")
+        observed_ids.append(source_rule_id)
+        lean_conjunct = obligation.get("lean_conjunct")
+        if not isinstance(lean_conjunct, str) or not lean_conjunct:
+            raise KleanPreflightError("generated Lean conjunct is malformed")
+        if obligation.get("lean_conjunct_sha256") != klean_export.sha256_text(
+            lean_conjunct
+        ):
+            raise KleanPreflightError("generated Lean conjunct hash changed")
+        source_rule = eligible[len(observed_ids) - 1] if len(
+            observed_ids
+        ) <= len(eligible) else None
+        if source_rule is None or obligation.get("source_span") != {
+            "start_line": source_rule["start_line"],
+            "end_line": source_rule["end_line"],
+        }:
+            raise KleanPreflightError(
+                "source rules and generated obligations are not bijective"
+            )
+        for key in (
+            "normalized_sha256",
+            "inventory_sha256",
+            "discovery_manifest_sha256",
+        ):
+            if obligation.get(key) != source_rule[key]:
+                raise KleanPreflightError(
+                    "generated obligation provenance differs from "
+                    f"Stage 1/Stage 3: {key}"
+                )
+    if observed_ids != expected_ids or len(set(observed_ids)) != len(
+        observed_ids
+    ):
+        raise KleanPreflightError(
+            "source rules and generated obligations are not bijective"
+        )
+    parameters = obligation_map.get("trust_parameters")
+    if not isinstance(parameters, list):
+        raise KleanPreflightError("generated trust-parameter list is malformed")
+    validate_trust_parameter_links(expected_ids, parameters)
+    if generator_manifest.get("obligation_count") != len(obligations):
+        raise KleanPreflightError("generator obligation count changed")
+    if generator_manifest.get("obligation_map_sha256") != hashlib.sha256(
+        mapping_path.read_bytes()
+    ).hexdigest():
+        raise KleanPreflightError("generated obligation map hash changed")
+    expected_definition = klean_export.expected_target_definition(
+        obligation_map
+    )
+    try:
+        target = klean_export.target_statement(generated)
+    except klean_export.KleanExportError as error:
+        raise KleanPreflightError(str(error)) from error
+    if expected_definition is None:
+        if target is not None:
+            raise KleanPreflightError(
+                "zero obligations unexpectedly generated a target proposition"
+            )
+    elif (
+        target is None
+        or target.get("definition_sha256")
+        != klean_export.sha256_text(expected_definition)
+    ):
+        raise KleanPreflightError(
+            "generated target is not the exact conjunction of mapped obligations"
+        )
+    return source_rules, obligations
+
+
+def validate_trust_parameter_links(
+    expected_ids: list[str], parameters: list[object]
+) -> set[str]:
+    """Validate every opaque parameter without requiring one per theorem."""
+
+    bound_rule_ids: set[str] = set()
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanPreflightError("generated trust parameter is malformed")
+        source_rule_ids = parameter.get("source_rule_ids")
+        if (
+            not isinstance(source_rule_ids, list)
+            or not source_rule_ids
+            or not all(
+                isinstance(source_rule_id, str)
+                and source_rule_id in expected_ids
+                for source_rule_id in source_rule_ids
+            )
+        ):
+            raise KleanPreflightError(
+                "trust parameter is not bound to source obligations"
+            )
+        bound_rule_ids.update(source_rule_ids)
+    return bound_rule_ids
+
+
+def _check_imports(generated: Path, sources: list[Path]) -> None:
+    for source in sources:
+        for line in source.read_text().splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("import "):
+                continue
+            imported = stripped.removeprefix("import ").strip()
+            if (
+                not imported
+                or imported.startswith(("/", "."))
+                or ".." in imported
+                or '"' in imported
+                or "\\" in imported
+            ):
+                raise KleanPreflightError(
+                    f"untrusted Lean import in {source}: {imported!r}"
+                )
+    for name in ("lakefile.toml", "lakefile.lean", "lean-toolchain"):
+        path = generated / name
+        if path.exists() and (not path.is_file() or path.is_symlink()):
+            raise KleanPreflightError(
+                f"generated dependency metadata is not regular: {path}"
+            )
+        if path.is_file():
+            text = path.read_text()
+            if re.search(r"(?m)^\s*(?:path|dir)\s*=\s*\"/", text):
+                raise KleanPreflightError(
+                    f"absolute dependency path in generated {name}"
+                )
+
+
+def check_generation(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    *,
+    toolchain_lock: Path,
+    run_command: Callable[..., tuple[int, str]] = _run,
+) -> dict[str, Any]:
+    frozen_input = Path(frozen_input)
+    discovery_manifest = Path(discovery_manifest)
+    generation = Path(generation)
+    generated = generation / "generated"
+    if not frozen_input.is_dir() or frozen_input.is_symlink():
+        raise KleanPreflightError("frozen K input must be a real directory")
+    if not discovery_manifest.is_file() or discovery_manifest.is_symlink():
+        raise KleanPreflightError(
+            "validated Stage 3 discovery manifest must be a regular file"
+        )
+    if not generation.is_dir() or generation.is_symlink():
+        raise KleanPreflightError("generation must be a real directory")
+    if not generated.is_dir() or generated.is_symlink():
+        raise KleanPreflightError("generated project must be a real directory")
+    # Traversing every entry rejects symlinks/FIFOs before any build command.
+    klean_export._tree_entries(generated)
+    snapshot = _preflight_snapshot(
+        frozen_input, discovery_manifest, generation
+    )
+    input_manifest = _regular_json(
+        generation / "input-manifest.json", "input manifest"
+    )
+    generator_manifest = _regular_json(
+        generation / "generator-manifest.json", "generator manifest"
+    )
+    inventory = _regular_json(
+        generation / "trust-inventory.json", "trust inventory"
+    )
+    export_result = _regular_json(
+        generation / "export-result.json", "export result"
+    )
+    lock = _regular_json(Path(toolchain_lock), "toolchain lock")
+    export_status = export_result.get("status")
+    if export_result.get("schema_version") != 3:
+        raise KleanPreflightError("export result schema version is not 3")
+    if export_status not in {"OK", "KLEAN_NO_OBLIGATIONS"}:
+        raise KleanPreflightError("export result status is invalid")
+    input_hash = snapshot.stage1_workspace_sha256
+    discovery_hash = snapshot.stage3_discovery_manifest_sha256
+    generated_hash = snapshot.generated_tree_sha256
+    sidecar_hashes = dict(snapshot.sidecar_sha256)
+    if input_manifest.get("schema_version") != 3:
+        raise KleanPreflightError("input manifest schema version is not 3")
+    if generator_manifest.get("schema_version") != 3:
+        raise KleanPreflightError("generator manifest schema version is not 3")
+    if input_manifest.get("frozen_input_sha256") != input_hash:
+        raise KleanPreflightError("frozen Stage 1 input hash changed")
+    if input_manifest.get("stage1_workspace_sha256") != input_hash:
+        raise KleanPreflightError("Stage 1 workspace hash changed")
+    if (
+        input_manifest.get("stage3_discovery_manifest_sha256")
+        != discovery_hash
+    ):
+        raise KleanPreflightError(
+            "validated Stage 3 discovery manifest hash changed"
+        )
+    if generator_manifest.get("generated_tree_sha256") != generated_hash:
+        raise KleanPreflightError("generated project hash changed")
+    if generator_manifest.get("toolchain") != lock:
+        raise KleanPreflightError("generator toolchain differs from pinned lock")
+    provenance = generator_manifest.get("provenance")
+    if not isinstance(provenance, dict):
+        raise KleanPreflightError("generator provenance is malformed")
+    if provenance.get("stage1_workspace_sha256") != input_hash:
+        raise KleanPreflightError(
+            "Stage 1 provenance differs between generation manifests"
+        )
+    if provenance.get("stage3_discovery_manifest_sha256") != discovery_hash:
+        raise KleanPreflightError(
+            "Stage 3 provenance differs between generation manifests"
+        )
+    if provenance.get("inventory_sha256") != input_manifest.get(
+        "inventory_sha256"
+    ):
+        raise KleanPreflightError(
+            "Stage 1/Stage 3 inventory provenance differs"
+        )
+    _source_rules, obligations = _source_and_obligation_gate(
+        frozen_input,
+        discovery_manifest,
+        generated,
+        input_manifest,
+        generator_manifest,
+    )
+    expected_export_status = "OK" if obligations else "KLEAN_NO_OBLIGATIONS"
+    if export_status != expected_export_status:
+        raise KleanPreflightError(
+            "export status disagrees with generated obligation count"
+        )
+    if export_result.get("obligation_count") != len(obligations):
+        raise KleanPreflightError(
+            "export result obligation_count does not match generated obligations"
+        )
+
+    try:
+        target = klean_export.target_statement(generated)
+    except klean_export.KleanExportError as error:
+        raise KleanPreflightError(str(error)) from error
+    expected_target = generator_manifest.get("target")
+    if target != expected_target:
+        raise KleanPreflightError("target theorem statement or location changed")
+    if bool(obligations) != bool(target):
+        raise KleanPreflightError(
+            "target proposition and obligation inventory disagree"
+        )
+    sources = _lean_sources(generated)
+    sorry_locations: list[str] = []
+    for source in sources:
+        text = source.read_text()
+        for forbidden in (r"\badmit\b", r"\bunsafe\b"):
+            if re.search(forbidden, text):
+                raise KleanPreflightError(
+                    f"forbidden Lean token in {source.relative_to(generated)}"
+                )
+        for match in re.finditer(r"\bsorry\b", text):
+            sorry_locations.append(source.relative_to(generated).as_posix())
+    if sorry_locations:
+        raise KleanPreflightError("generated immutable project contains sorry")
+    if inventory.get("designated_sorries") != 0 or inventory.get(
+        "other_sorries"
+    ) != 0:
+        raise KleanPreflightError("trust inventory has unexpected proof-hole counts")
+
+    declared = _trust_declarations(sources)
+    _reject_proposition_trust(generated, sources, declared)
+    allowlist = inventory.get("allowlist")
+    if not isinstance(allowlist, list):
+        raise KleanPreflightError("trust inventory allowlist is malformed")
+    expected: dict[str, tuple[str, str]] = {}
+    for entry in allowlist:
+        if not isinstance(entry, dict):
+            raise KleanPreflightError("trust allowlist entry is malformed")
+        name = entry.get("name")
+        kind = entry.get("kind")
+        lean_type = entry.get("type")
+        reason = entry.get("reason")
+        if not all(
+            isinstance(value, str) and value
+            for value in (name, kind, lean_type, reason)
+        ):
+            raise KleanPreflightError("trust allowlist entry is incomplete")
+        if name in expected:
+            raise KleanPreflightError(
+                f"duplicate trust allowlist entry: {name}"
+
+[generator-manifest.json]
+{
+    "exporter_sha256": "0c18ea7997ddd34d3cabbeb0f271e17eb8a01cd03342319facf749ba92df18f0",
+    "generated_tree_sha256": "ea57bbe9b9d904f91a8e4ef8939cb3b77800bc7449d76d20728d35646d9c09b6",
+    "klean_py_sha256": "3a5a8be795d55a2bc01b73d47099f04795b9d64f6bbcf64494b57bcde8266582",
+    "obligation_count": 1,
+    "obligation_map_sha256": "d376a51806582d3f7c2146ef58bbfab59a5177f3bccc62bb24573c7d9566ad90",
+    "provenance": {
+        "generator_image_id": "sha256:db04cbaec4c5ee7b34348393f5a7742991e12d63480de3eab85fe97022f51657",
+        "inventory_sha256": "2b8a9ab9483d01691862d6f17b9f749f531528c3930e42996b1feddba2790f04",
+        "stage1_workspace_sha256": "43e122367c3fa138cd7b368c1dfc4a647fc76627f78a320e9f70fc804e305ad5",
+        "stage3_discovery_manifest_sha256": "887abeff1f4abb1472dd076af3400fd08e1e7624065f1e0cdf4e2f4777195bba"
+    },
+    "schema_version": 3,
+    "target": {
+        "declaration": "Klean127Intersection.Lemmas.targetStatement",
+        "definition_sha256": "77c6099db84e920d1ac90e53fe6c583c39d3ad2a53e0c8c9425a0e6f9a7f9d21",
+        "file": "Klean127Intersection/Lemmas.lean",
+        "parameters": [
+            {
+                "binding_sha256": "f2b26bea1724ea7457db659ff5adaf7876f410ccd2d13289d592344e4605669e",
+                "kore_symbol": "Lbl'Unds'Map'Unds'",
+                "name": "_Map_",
+                "source_rule_ids": [
+                    "rule-5cdc3db730891902bebfc52c9ef2d3ed5f0ac955c8c9731b0522f080198846d0"
+                ],
+                "type": "SortMap \u2192 SortMap \u2192 SortMap"
+            },
+            {
+                "binding_sha256": "4f985c178c7070916c1682b4202eaa76bc89e5c0f62b159033fe50eed72a8687",
+                "kore_symbol": "Lbl'Unds'in'Unds'keys'LParUndsRParUnds'MAP'Unds'Bool'Unds'KItem'Unds'Map",
+                "name": "\u00ab_in_keys(_)_MAP_Bool_KItem_Map\u00bb",
+                "source_rule_ids": [
+                    "rule-5cdc3db730891902bebfc52c9ef2d3ed5f0ac955c8c9731b0522f080198846d0"
+                ],
+                "type": "SortKItem \u2192 SortMap \u2192 SortBool"
+            },
+            {
+                "binding_sha256": "11172001f14b6f79ff68f6f450bd2cd84bb3e022f6c86d476f10fc2e531185b8",
+                "kore_symbol": "Lbl'UndsLSqBUnds-LT-'-undef'RSqB'",
+                "name": "\u00ab_[_<-undef]\u00bb",
+                "source_rule_ids": [
+                    "rule-5cdc3db730891902bebfc52c9ef2d3ed5f0ac955c8c9731b0522f080198846d0"
+                ],
+                "type": "SortMap \u2192 SortKItem \u2192 SortMap"
+            },
+            {
+                "binding_sha256": "0840fdf91dc8035ff3b80c170cec77722a27f9ab95e2f7ad99ddd649b1bb48c4",
+                "kore_symbol": "Lbl'UndsPipe'-'-GT-Unds'",
+                "name": "\u00ab_|->_\u00bb",
+                "source_rule_ids": [
+                    "rule-5cdc3db730891902bebfc52c9ef2d3ed5f0ac955c8c9731b0522f080198846d0"
+                ],
+                "type": "SortKItem \u2192 SortKItem \u2192 SortMap"
+            },
+            {
+                "binding_sha256": "56f3e434837e7063d1eb5fb4fae4ab192f7df05473502a01baa0c14ff32b72ca",
+                "kore_symbol": "LblnotBool'Unds'",
+                "name": "notBool_",
+                "source_rule_ids": [
+                    "rule-5cdc3db730891902bebfc52c9ef2d3ed5f0ac955c8c9731b0522f080198846d0"
+                ],
+                "type": "SortBool \u2192 SortBool"
+            }
+        ],
+        "statement": "Klean127Intersection.Lemmas.targetStatement _Map_ \u00ab_in_keys(_)_MAP_Bool_KItem_Map\u00bb \u00ab_[_<-undef]\u00bb \u00ab_|->_\u00bb notBool_",
+        "statement_sha256": "6ab235a1c3e7a25f39ee53429c5800ce59682e43165ee9b123fe076761ad9935"
+    },
+    "toolchain": {
+        "codex_cli_version": "0.144.6",
+        "k_base_image": "runtimeverificationinc/kframework-k:ubuntu-jammy-7.1.293@sha256:f3f64ab72bd7b560082d50e4c6c23e107025cf217ca62ab73700104fc45de09a",
+        "k_version": "7.1.293",
+        "lean_commit": "ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05",
+        "lean_toolchain": "leanprover/lean4:v4.22.0",
+        "pyk_project": "pyk@runtimeverification/k",
+        "pyk_version": "7.1.293",
+        "runtimeverification_k_commit": "ff15baac9e66426612ec45ff912af7f14965b64a"
+    }
+}
+
+[source-manifest.json]
+{
+    "files": {
+        "klean.py": "3a5a8be795d55a2bc01b73d47099f04795b9d64f6bbcf64494b57bcde8266582",
+        "klean_export.py": "0c18ea7997ddd34d3cabbeb0f271e17eb8a01cd03342319facf749ba92df18f0"
+    },
+    "generator_image_id": "sha256:db04cbaec4c5ee7b34348393f5a7742991e12d63480de3eab85fe97022f51657",
+    "schema_version": 1
+}
+
+[input-manifest.json]
+{
+    "definitions": [
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 35,
+            "module": "VERIFICATION-BASE",
+            "normalized_sha256": "788e85236d4fdb02bfae01e44eb7dc4848a2c7aeefa5e5f3978eddefac276591",
+            "rationale": "This equation macro-expands the named intersectionBody proof term into the exact MPY statement sequence used for the implementation.",
+            "source_rule_id": "rule-788e85236d4fdb02bfae01e44eb7dc4848a2c7aeefa5e5f3978eddefac276591",
+            "start_line": 16,
+            "text": "  rule intersectionBody =>\n    Assign(Name(\"left\"),\n           Call(Name(\"max\"),\n                Subscript(Name(\"interval1\"), Int(0)),\n                Subscript(Name(\"interval2\"), Int(0)),\n                .Exprs))\n    Assign(Name(\"right\"),\n           Call(Name(\"min\"),\n                Subscript(Name(\"interval1\"), Int(1)),\n                Subscript(Name(\"interval2\"), Int(1)),\n                .Exprs))\n    Assign(Name(\"length\"), BinOp(\"-\", Name(\"right\"), Name(\"left\")))\n    If(Compare(Name(\"length\"), CmpOp(\"<=\", Int(1))),\n       Return(Str(\"NO\")) .Stmts,\n       .Stmts)\n    Assign(Name(\"divisor\"), Int(2))\n    For(Name(\"divisor\"), Call(Name(\"range\"),\n                              Int(2), Name(\"length\"), .Exprs),\n        divisorBody)\n    Return(Str(\"YES\")) .Stmts"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 43,
+            "module": "VERIFICATION-BASE",
+            "normalized_sha256": "e477e6a18711be5148d01c441315717c292c1b231770c99911dfff771362bf01",
+            "rationale": "This equation macro-expands the named divisorBody proof term into the MPY conditional used for one trial-divisor iteration.",
+            "source_rule_id": "rule-e477e6a18711be5148d01c441315717c292c1b231770c99911dfff771362bf01",
+            "start_line": 38,
+            "text": "  rule divisorBody =>\n    If(Compare(BinOp(\"%\", Name(\"length\"), Name(\"divisor\")),\n               CmpOp(\"==\", Int(0))),\n       Return(Str(\"NO\")) .Stmts,\n       .Stmts)\n    .Stmts"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 48,
+            "module": "VERIFICATION-BASE",
+            "normalized_sha256": "c894f081fa5f052cfc3c27ba0bb963e894757b2ed6e27e947ef205d1503985dc",
+            "rationale": "This equation defines the named answer value yesV as the MPY ASCII string value for YES.",
+            "source_rule_id": "rule-c894f081fa5f052cfc3c27ba0bb963e894757b2ed6e27e947ef205d1503985dc",
+            "start_line": 48,
+            "text": "  rule yesV => str(iCons(89, iCons(69, iCons(83, .IntSeq))))"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 49,
+            "module": "VERIFICATION-BASE",
+            "normalized_sha256": "030fd8a67c53b44e20b4cb2ccc77df8f8167452e91b4e41d6a92f017edbed4db",
+            "rationale": "This equation defines the named answer value noV as the MPY ASCII string value for NO.",
+            "source_rule_id": "rule-030fd8a67c53b44e20b4cb2ccc77df8f8167452e91b4e41d6a92f017edbed4db",
+            "start_line": 49,
+            "text": "  rule noV  => str(iCons(78, iCons(79, .IntSeq)))"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 56,
+            "module": "VERIFICATION-BASE",
+            "normalized_sha256": "218fea2aa535c30ea2fd59ec59079a3980d99783c8971e0dc8770578ae00e579",
+            "rationale": "This is the terminal-success equation in the recursive definition of primeFrom: no candidate divisor remains once D is at least N.",
+            "source_rule_id": "rule-218fea2aa535c30ea2fd59ec59079a3980d99783c8971e0dc8770578ae00e579",
+            "start_line": 55,
+            "text": "  rule primeFrom(N:Int, D:Int) => yesV\n    requires D >=Int N"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 58,
+            "module": "VERIFICATION-BASE",
+            "normalized_sha256": "481982f7fb0f64a26b0ba203c55547f80e5afbe032144345b7ce7c1c5ae195d9",
+            "rationale": "This is the terminal-composite equation in the recursive definition of primeFrom when the current candidate divides N.",
+            "source_rule_id": "rule-481982f7fb0f64a26b0ba203c55547f80e5afbe032144345b7ce7c1c5ae195d9",
+            "start_line": 57,
+            "text": "  rule primeFrom(N:Int, D:Int) => noV\n    requires D <Int N andBool pyMod(N, D) ==Int 0"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 60,
+            "module": "VERIFICATION-BASE",
+            "normalized_sha256": "0d1d13596c71ab1f337e58b76564e5f6430e3bc305f977f4e988d03d32fdfeb5",
+            "rationale": "This recurrence defines primeFrom on a non-dividing candidate by advancing from D to D + 1.",
+            "source_rule_id": "rule-0d1d13596c71ab1f337e58b76564e5f6430e3bc305f977f4e988d03d32fdfeb5",
+            "start_line": 59,
+            "text": "  rule primeFrom(N:Int, D:Int) => primeFrom(N, D +Int 1)\n    requires D <Int N andBool pyMod(N, D) =/=Int 0"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 63,
+            "module": "VERIFICATION-BASE",
+            "normalized_sha256": "54a4a387ef9d190235a844c018259e195e0102c7268712b1fff478181c9828a9",
+            "rationale": "This equation defines primeResult for non-prime lengths N less than or equal to 1.",
+            "source_rule_id": "rule-54a4a387ef9d190235a844c018259e195e0102c7268712b1fff478181c9828a9",
+            "start_line": 62,
+            "text": "  rule primeResult(N:Int) => noV\n    requires N <=Int 1"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 65,
+            "module": "VERIFICATION-BASE",
+            "normalized_sha256": "1bb0b0bdef9968fad2cf78239c1ddca2b6acf02567365de96909a8f1978fac32",
+            "rationale": "This equation defines primeResult for N greater than 1 by starting the primeFrom divisor recurrence at 2.",
+            "source_rule_id": "rule-1bb0b0bdef9968fad2cf78239c1ddca2b6acf02567365de96909a8f1978fac32",
+            "start_line": 64,
+            "text": "  rule primeResult(N:Int) => primeFrom(N, 2)\n    requires N >Int 1"
+        },
+        {
+            "attributes": [],
+            "classification": "DEFINITION",
+            "end_line": 69,
+            "module": "VERIFICATION-BASE",
+            "normalized_sha256": "0c9edd4e23025de56e77c15f109ea9a7d86609c63e5f44e9d3c83c10c12c43a2",
+            "rationale": "This equation defines the named mathematical summary overlapLength as the minimum right endpoint minus the maximum left endpoint.",
+            "source_rule_id": "rule-0c9edd4e23025de56e77c15f109ea9a7d86609c63e5f44e9d3c83c10c12c43a2",
+            "start_line": 68,
+            "text": "  rule overlapLength(A:Int, B:Int, C:Int, D:Int)\n    => minInt(B, D) -Int maxInt(A, C)"
+        }
+    ],
+    "frozen_input_sha256": "43e122367c3fa138cd7b368c1dfc4a647fc76627f78a320e9f70fc804e305ad5",
+    "inventory_sha256": "2b8a9ab9483d01691862d6f17b9f749f531528c3930e42996b1feddba2790f04",
+    "operational_rules": [],
+    "problem": "127-intersection",
+    "proved_derived_lemmas": [
+        {
+            "attributes": [
+                "priority(40)"
+            ],
+            "classification": "PROVED_DERIVED_LEMMA",
+            "end_line": 106,
+            "module": "VERIFICATION",
+            "normalized_sha256": "3564ec1a0c7873a21e248d06a49acdb05fe46af166b68d498bbff1afc2702e72",
+            "rationale": "The same loop summary is first proved by the loop-correct claim against VERIFICATION-BASE, which lacks this rule; prove.sh then compiles VERIFICATION, where the proved summary is installed for the end-to-end proof. The rule expands divisorBody and alpha-renames unused frame variables but otherwise matches the proved claim.",
+            "source_rule_id": "rule-3564ec1a0c7873a21e248d06a49acdb05fe46af166b68d498bbff1afc2702e72",
+            "start_line": 78,
+            "text": "  rule\n    <k> #loop(rangeObj(DIVISOR:Int, LENGTH:Int, 1),\n              Name(\"divisor\"),\n              If(Compare(BinOp(\"%\", Name(\"length\"), Name(\"divisor\")),\n                         CmpOp(\"==\", Int(0))),\n                 Return(Str(\"NO\")) .Stmts,\n                 .Stmts)\n              .Stmts)\n        ~> (Return(Str(\"YES\")) .Stmts) ~> #endcall\n      => primeFrom(LENGTH, DIVISOR) ~> KONT:K\n    </k>\n    <env> 1 => 0 </env>\n    <scopes>\n      SC:Map\n      1 |-> scope(\n        \"interval1\" |-> _INTERVAL1:Val\n        \"interval2\" |-> _INTERVAL2:Val\n        \"left\"      |-> _LEFT:Int\n        \"right\"     |-> _RIGHT:Int\n        \"length\"    |-> LENGTH\n        \"divisor\"   |-> _OLD:Int,\n        parent(0))\n      => SC\n    </scopes>\n    <scopeLoc> 2 => 1 </scopeLoc>\n    <stack> ListItem(frame(KONT, 0, 1)) => .List </stack>\n    <ret> noRet </ret>\n    requires 2 <=Int DIVISOR andBool DIVISOR <=Int LENGTH\n    [priority(40)]"
+        }
+    ],
+    "required_k_files": [
+        "/frozen-k/reference-semantics/semantics.k",
+        "/frozen-k/reference-semantics/semantics/assert.k",
+        "/frozen-k/reference-semantics/semantics/bool.k",
+        "/frozen-k/reference-semantics/semantics/builtins.k",
+        "/frozen-k/reference-semantics/semantics/call.k",
+        "/frozen-k/reference-semantics/semantics/comprehension.k",
+        "/frozen-k/reference-semantics/semantics/concrete.k",
+        "/frozen-k/reference-semantics/semantics/controls.k",
+        "/frozen-k/reference-semantics/semantics/core.k",
+        "/frozen-k/reference-semantics/semantics/dict.k",
+        "/frozen-k/reference-semantics/semantics/float.k",
+        "/frozen-k/reference-semantics/semantics/functions.k",
+        "/frozen-k/reference-semantics/semantics/int.k",
+        "/frozen-k/reference-semantics/semantics/iter.k",
+        "/frozen-k/reference-semantics/semantics/list.k",
+        "/frozen-k/reference-semantics/semantics/methods.k",
+        "/frozen-k/reference-semantics/semantics/operators.k",
+        "/frozen-k/reference-semantics/semantics/range.k",
+        "/frozen-k/reference-semantics/semantics/set.k",
+        "/frozen-k/reference-semantics/semantics/sort.k",
+        "/frozen-k/reference-semantics/semantics/str.k",
+        "/frozen-k/reference-semantics/semantics/subscript.k",
+        "/frozen-k/reference-semantics/semantics/syntax.k",
+        "/frozen-k/reference-semantics/semantics/tuple.k",
+        "/frozen-k/verification.k"
+    ],
+    "schema_version": 3,
+    "source_rules": [
+        {
+            "attributes": [],
+            "classification": "DOMAIN_LEMMA",
+            "discovery_manifest_sha256": "887abeff1f4abb1472dd076af3400fd08e1e7624065f1e0cdf4e2f4777195bba",
+            "end_line": 10,
+            "inventory_sha256": "2b8a9ab9483d01691862d6f17b9f749f531528c3930e42996b1feddba2790f04",
+            "module": "VERIFICATION-BASE",
+            "normalized_sha256": "5cdc3db730891902bebfc52c9ef2d3ed5f0ac955c8c9731b0522f080198846d0",
+            "rationale": "This proof-only normalization asserts a fact about the existing Map update operation: deleting the known key 1 from a disjoint binding-plus-remainder map yields the remainder. It introduces no named definition and is not separately proved in prove.sh, so it is a trusted domain fact.",
+            "source_rule_id": "rule-5cdc3db730891902bebfc52c9ef2d3ed5f0ac955c8c9731b0522f080198846d0",
+            "start_line": 9,
+            "text": "  rule (1 |-> _FRAME:Scope REST:Map) [1 <- undef] => REST\n    requires notBool (1 in_keys(REST))"
+        }
+    ],
+    "stage1_workspace_sha256": "43e122367c3fa138cd7b368c1dfc4a647fc76627f78a320e9f70fc804e305ad5",
+    "stage3_discovery_manifest_sha256": "887abeff1f4abb1472dd076af3400fd08e1e7624065f1e0cdf4e2f4777195bba",
+    "summary_functions": [
+        {
+            "argument_sorts": [
+                "Int",
+                "Int"
+            ],
+            "name": "primeFrom",
+            "return_sort": "Val"
+        },
+        {
+            "argument_sorts": [
+                "Int"
+            ],
+            "name": "primeResult",
+            "return_sort": "Val"
+        },
+        {
+            "argument_sorts": [
+                "Int",
+                "Int",
+                "Int",
+                "Int"
+            ],
+            "name": "overlapLength",
+            "return_sort": "Int"
+        }
+    ],
+    "syntax_module": "MPY-SYNTAX",
+    "verification_module": "VERIFICATION",
+    "verification_sha256": "5eec610010347c9a2846f3382cc02cd6d26abfce341dc6a75783e6a9f1a78385"
+}
+
+Script done on 2026-07-28 18:23:01-05:00 [COMMAND_EXIT_CODE="0"]

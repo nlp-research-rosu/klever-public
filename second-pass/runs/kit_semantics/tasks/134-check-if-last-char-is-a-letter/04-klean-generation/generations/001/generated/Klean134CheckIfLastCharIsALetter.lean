@@ -1,0 +1,2 @@
+import Klean134CheckIfLastCharIsALetter.Rewrite
+import Klean134CheckIfLastCharIsALetter.Lemmas

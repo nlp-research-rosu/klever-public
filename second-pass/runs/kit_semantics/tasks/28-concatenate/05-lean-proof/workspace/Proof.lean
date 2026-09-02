@@ -1,0 +1,128 @@
+import Klean28Concatenate.Lemmas
+
+namespace Proof
+
+/- These helpers are direct Lean realizations of the corresponding hooked K
+   operations used by the frozen `applyBin` rule table. -/
+private def appendCodeSeq : SortIntSeq → SortIntSeq → SortIntSeq
+  | SortIntSeq.«.IntSeq_MPY-CORE_IntSeq», ys => ys
+  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» x xs, ys =>
+      SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» x (appendCodeSeq xs ys)
+
+private def boolAsInt : SortBool → SortInt
+  | false => 0
+  | true => 1
+
+/- K's `%Int` is truncating remainder.  Applying it twice exactly mirrors
+   `pyMod(I1,I2) = ((I1 %Int I2) +Int I2) %Int I2`. -/
+private def pythonIntMod (x y : SortInt) : SortInt :=
+  Int.tmod (Int.tmod x y + y) y
+
+private def pythonFloorDiv (x y : SortInt) : SortInt :=
+  Int.tdiv (x - pythonIntMod x y) y
+
+private def intAsFloat (x : SortInt) : SortFloat :=
+  Float.ofInt x
+
+/- K's float modulo rule is floor-based, rather than IEEE remainder. -/
+private def pythonFloatMod (x y : SortFloat) : SortFloat :=
+  x - Float.floor (x / y) * y
+
+/- KORE symbol: LblapplyBin'LParUndsCommUndsCommUndsRParUnds'MPY-CORE'Unds'Val'Unds'String'Unds'Val'Unds'Val; frozen source obligations: rule-d77f984813dd200ec980ca7e00225a96be53f3a6ed10be91093061eb9e528506. Replace this stub with its honest total meaning from the frozen K semantics. -/
+def «applyBin(_,_,_)_MPY-CORE_Val_String_Val_Val» :
+    SortString → SortVal → SortVal → SortVal
+  -- MPY-STR
+  | "+",
+    SortVal.inj_SortStr (SortStr.«str(_)_MPY-CORE_Str_IntSeq» lhs),
+    SortVal.inj_SortStr (SortStr.«str(_)_MPY-CORE_Str_IntSeq» rhs) =>
+      SortVal.inj_SortStr
+        (SortStr.«str(_)_MPY-CORE_Str_IntSeq» (appendCodeSeq lhs rhs))
+
+  -- MPY-INT
+  | "+", SortVal.inj_SortInt x, SortVal.inj_SortInt y =>
+      SortVal.inj_SortInt (x + y)
+  | "+", SortVal.inj_SortInt x, SortVal.inj_SortBool y =>
+      SortVal.inj_SortInt (x + boolAsInt y)
+  | "+", SortVal.inj_SortBool x, SortVal.inj_SortInt y =>
+      SortVal.inj_SortInt (boolAsInt x + y)
+  | "-", SortVal.inj_SortInt x, SortVal.inj_SortInt y =>
+      SortVal.inj_SortInt (x - y)
+  | "*", SortVal.inj_SortInt x, SortVal.inj_SortInt y =>
+      SortVal.inj_SortInt (x * y)
+  | "%", SortVal.inj_SortInt x, SortVal.inj_SortInt y =>
+      if y == 0 then
+        SortVal.«noneV_MPY-CORE_Val»
+      else
+        SortVal.inj_SortInt (pythonIntMod x y)
+  | "//", SortVal.inj_SortInt x, SortVal.inj_SortInt y =>
+      if y == 0 then
+        SortVal.«noneV_MPY-CORE_Val»
+      else
+        SortVal.inj_SortInt (pythonFloorDiv x y)
+  | "**", SortVal.inj_SortInt x, SortVal.inj_SortInt (Int.ofNat exponent) =>
+      SortVal.inj_SortInt (Int.pow x exponent)
+
+  -- MPY-FLOAT: true division (including Int/Int).
+  | "/", SortVal.inj_SortInt x, SortVal.inj_SortInt y =>
+      SortVal.inj_SortFloat (intAsFloat x / intAsFloat y)
+  | "/", SortVal.inj_SortInt x, SortVal.inj_SortFloat y =>
+      SortVal.inj_SortFloat (intAsFloat x / y)
+  | "/", SortVal.inj_SortFloat x, SortVal.inj_SortInt y =>
+      SortVal.inj_SortFloat (x / intAsFloat y)
+  | "/", SortVal.inj_SortFloat x, SortVal.inj_SortFloat y =>
+      SortVal.inj_SortFloat (x / y)
+
+  -- MPY-FLOAT: same-sort operations.
+  | "%", SortVal.inj_SortFloat x, SortVal.inj_SortFloat y =>
+      SortVal.inj_SortFloat (pythonFloatMod x y)
+  | "+", SortVal.inj_SortFloat x, SortVal.inj_SortFloat y =>
+      SortVal.inj_SortFloat (x + y)
+  | "-", SortVal.inj_SortFloat x, SortVal.inj_SortFloat y =>
+      SortVal.inj_SortFloat (x - y)
+  | "*", SortVal.inj_SortFloat x, SortVal.inj_SortFloat y =>
+      SortVal.inj_SortFloat (x * y)
+  | "**", SortVal.inj_SortFloat x, SortVal.inj_SortFloat y =>
+      SortVal.inj_SortFloat (x ^ y)
+
+  -- MPY-FLOAT: mixed arithmetic promotes the Int operand with Int2Float.
+  | "+", SortVal.inj_SortInt x, SortVal.inj_SortFloat y =>
+      SortVal.inj_SortFloat (intAsFloat x + y)
+  | "+", SortVal.inj_SortFloat x, SortVal.inj_SortInt y =>
+      SortVal.inj_SortFloat (x + intAsFloat y)
+  | "-", SortVal.inj_SortInt x, SortVal.inj_SortFloat y =>
+      SortVal.inj_SortFloat (intAsFloat x - y)
+  | "-", SortVal.inj_SortFloat x, SortVal.inj_SortInt y =>
+      SortVal.inj_SortFloat (x - intAsFloat y)
+  | "*", SortVal.inj_SortInt x, SortVal.inj_SortFloat y =>
+      SortVal.inj_SortFloat (intAsFloat x * y)
+  | "*", SortVal.inj_SortFloat x, SortVal.inj_SortInt y =>
+      SortVal.inj_SortFloat (x * intAsFloat y)
+  | "**", SortVal.inj_SortInt x, SortVal.inj_SortFloat y =>
+      SortVal.inj_SortFloat (intAsFloat x ^ y)
+  | "**", SortVal.inj_SortFloat x, SortVal.inj_SortInt y =>
+      SortVal.inj_SortFloat (x ^ intAsFloat y)
+
+  -- The frozen K function has no rule for any remaining input.  `noneV` is
+  -- only the totalization of those genuinely stuck cases; every concrete
+  -- rule above has its own arm.
+  | _, _, _ => SortVal.«noneV_MPY-CORE_Val»
+
+/- KORE symbol: LblseqConcat'LParUndsCommUndsRParUnds'MPY-STR'Unds'IntSeq'Unds'IntSeq'Unds'IntSeq; frozen source obligations: rule-d77f984813dd200ec980ca7e00225a96be53f3a6ed10be91093061eb9e528506. Replace this stub with its honest total meaning from the frozen K semantics. -/
+def «seqConcat(_,_)_MPY-STR_IntSeq_IntSeq_IntSeq» :
+    SortIntSeq → SortIntSeq → SortIntSeq :=
+  appendCodeSeq
+
+/- KORE symbol: LblstringCodes'LParUndsRParUnds'VERIFICATION'Unds'IntSeq'Unds'Val; frozen source obligations: rule-d77f984813dd200ec980ca7e00225a96be53f3a6ed10be91093061eb9e528506. Replace this stub with its honest total meaning from the frozen K semantics. -/
+def «stringCodes(_)_VERIFICATION_IntSeq_Val» : SortVal → SortIntSeq
+  | SortVal.inj_SortStr (SortStr.«str(_)_MPY-CORE_Str_IntSeq» codes) => codes
+  | _ => SortIntSeq.«.IntSeq_MPY-CORE_IntSeq»
+
+theorem final :
+    Klean28Concatenate.Lemmas.targetStatement «applyBin(_,_,_)_MPY-CORE_Val_String_Val_Val» «seqConcat(_,_)_MPY-STR_IntSeq_IntSeq_IntSeq» «stringCodes(_)_VERIFICATION_IntSeq_Val» := by
+  intro V A h
+  cases V <;> cases h
+  case inj_SortStr value =>
+    cases value
+    rfl
+
+end Proof

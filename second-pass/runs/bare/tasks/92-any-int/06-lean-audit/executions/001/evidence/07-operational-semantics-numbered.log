@@ -1,0 +1,114 @@
+Script started on 2026-07-28 02:20:03-05:00 [<not executed on terminal>]
+     1	module MPY-SYNTAX
+     2	  imports INT
+     3	  imports FLOAT
+     4	  imports BOOL
+     5	  imports STRING
+     6	  imports MAP
+     7	
+     8	  // The constructor grammar used by the portion of py2mpy.py exercised by
+     9	  // solution.py.  The constructors retain the structure of the CPython AST.
+    10	  syntax Program ::= "Module" "(" Stmts ")"
+    11	  syntax Stmts  ::= Stmt
+    12	  syntax Stmt   ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    13	                  | "Return" "(" Expr ")"
+    14	  syntax Params ::= "Params" "(" String "," String "," String ")"
+    15	
+    16	  syntax Expr ::= "Name" "(" String ")"
+    17	                | "Int" "(" Int ")"
+    18	                | "Bool" "(" Bool ")"
+    19	                | "BinOp" "(" String "," Expr "," Expr ")"
+    20	                | "Call" "(" Expr "," Expr ")"
+    21	                | "Compare" "(" Expr "," CmpOp ")"
+    22	                | "BoolOp" "(" String "," Expr "," Expr "," Expr ")"
+    23	                | "BoolOp" "(" String "," Expr "," Expr "," Expr "," Expr ")"
+    24	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    25	
+    26	  // Runtime values distinguish Python integers from every modeled
+    27	  // non-integer number.  Bool is deliberately non-integer here because the
+    28	  // solution uses exact type(x) == int, not isinstance(x, int).
+    29	  syntax IntVal    ::= "intVal" "(" Int ")"
+    30	  syntax NonIntVal ::= "floatVal" "(" Float ")"
+    31	                     | "boolVal" "(" Bool ")"
+    32	                     | "otherNumberVal" "(" String ")"
+    33	  syntax Val ::= IntVal | NonIntVal
+    34	               | "typeVal" "(" String ")"
+    35	
+    36	  syntax KItem ::= "Invoke" "(" Program "," Val "," Val "," Val ")"
+    37	endmodule
+    38	
+    39	module MPY-SEMANTICS
+    40	  imports MPY-SYNTAX
+    41	
+    42	  configuration
+    43	    <mpy>
+    44	      <k> $PGM:K </k>
+    45	      <env> .Map </env>
+    46	    </mpy>
+    47	
+    48	  syntax KItem ::= "exec" "(" Stmts ")"
+    49	                 | "eval" "(" Expr ")"
+    50	                 | "finishCall"
+    51	                 | "typeOf"
+    52	                 | "binLeft" "(" String "," Expr ")"
+    53	                 | "binRight" "(" String "," Val ")"
+    54	                 | "compareLeft" "(" String "," Expr ")"
+    55	                 | "compareRight" "(" String "," Val ")"
+    56	                 | "andThen" "(" Expr ")"
+    57	                 | "orThen" "(" Expr ")"
+    58	
+    59	  // Module/function entry and return.  The local environment is cleared when
+    60	  // the call finishes, making each invocation independent.
+    61	  rule <k> Invoke(Module(FuncDef(_F, Params(X, Y, Z), BODY)), V1, V2, V3)
+    62	           => exec(BODY) ~> finishCall ... </k>
+    63	       <env> .Map => X |-> V1 Y |-> V2 Z |-> V3 </env>
+    64	  rule <k> exec(Return(E)) => eval(E) ... </k>
+    65	  rule <k> V:Val ~> finishCall => V ... </k>
+    66	       <env> _ => .Map </env>
+    67	
+    68	  // Literals, local names, and the built-in int type object.
+    69	  rule <k> eval(Int(I)) => intVal(I) ... </k>
+    70	  rule <k> eval(Bool(B)) => boolVal(B) ... </k>
+    71	  rule <k> eval(Name("int")) => typeVal("int") ... </k>
+    72	  rule <k> eval(Name(X)) => V ... </k>
+    73	       <env>... X |-> V ...</env>
+    74	
+    75	  // The only built-in call emitted by solution.py: exact Python type.
+    76	  rule <k> eval(Call(Name("type"), E)) => eval(E) ~> typeOf ... </k>
+    77	  rule <k> _I:IntVal ~> typeOf => typeVal("int") ... </k>
+    78	  rule <k> _N:NonIntVal ~> typeOf => typeVal("non-int") ... </k>
+    79	
+    80	  // Left-to-right integer addition.
+    81	  rule <k> eval(BinOp(OP, E1, E2)) => eval(E1) ~> binLeft(OP, E2) ... </k>
+    82	  rule <k> V1:Val ~> binLeft(OP, E2) => eval(E2) ~> binRight(OP, V1) ... </k>
+    83	  rule <k> intVal(I2) ~> binRight("+", intVal(I1))
+    84	           => intVal(I1 +Int I2) ... </k>
+    85	
+    86	  // The target uses one-element comparison chains.  Both integer equality
+    87	  // and equality of type objects return a Python boolean value.
+    88	  rule <k> eval(Compare(E1, CmpOp(OP, E2)))
+    89	           => eval(E1) ~> compareLeft(OP, E2) ... </k>
+    90	  rule <k> V1:Val ~> compareLeft(OP, E2)
+    91	           => eval(E2) ~> compareRight(OP, V1) ... </k>
+    92	  rule <k> intVal(I2) ~> compareRight("==", intVal(I1))
+    93	           => boolVal(I1 ==Int I2) ... </k>
+    94	  rule <k> typeVal(T2) ~> compareRight("==", typeVal(T1))
+    95	           => boolVal(T1 ==String T2) ... </k>
+    96	
+    97	  // Python's and/or are evaluated left-to-right and short circuit.  The
+    98	  // continuation rules skip, rather than evaluate, remaining operands once
+    99	  // their result is determined.
+   100	  rule <k> eval(BoolOp("and", E1, E2, E3))
+   101	           => eval(E1) ~> andThen(E2) ~> andThen(E3) ... </k>
+   102	  rule <k> eval(BoolOp("and", E1, E2, E3, E4))
+   103	           => eval(E1) ~> andThen(E2) ~> andThen(E3) ~> andThen(E4) ... </k>
+   104	  rule <k> boolVal(true) ~> andThen(E) => eval(E) ... </k>
+   105	  rule <k> boolVal(false) ~> andThen(_E) => boolVal(false) ... </k>
+   106	
+   107	  rule <k> eval(BoolOp("or", E1, E2, E3))
+   108	           => eval(E1) ~> orThen(E2) ~> orThen(E3) ... </k>
+   109	  rule <k> boolVal(false) ~> orThen(E) => eval(E) ... </k>
+   110	  rule <k> boolVal(true) ~> orThen(_E) => boolVal(true) ... </k>
+   111	endmodule
+
+Script done on 2026-07-28 02:20:03-05:00 [COMMAND_EXIT_CODE="0"]

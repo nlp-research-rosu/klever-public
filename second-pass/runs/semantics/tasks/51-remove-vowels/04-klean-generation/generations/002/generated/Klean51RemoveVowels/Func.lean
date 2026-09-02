@@ -1,0 +1,168 @@
+import Klean51RemoveVowels.Inj
+
+def _982236f : SortIntSeq → SortIntSeq → Option SortIntSeq
+  | SortIntSeq.«.IntSeq_MPY-CORE_IntSeq», T => some T
+  | _, _ => none
+
+def _f69553d : SortIntSeq → SortIntSeq → Option SortBool
+  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» _Gen0 _Gen1, SortIntSeq.«.IntSeq_MPY-CORE_IntSeq» => some false
+  | _, _ => none
+
+def _991a329 : SortBool → SortBool → Option SortBool
+  | false, B => some B
+  | _, _ => none
+
+def _df7826c : SortIntSeq → SortIntSeq → Option SortIntSeq
+  | ACC, SortIntSeq.«.IntSeq_MPY-CORE_IntSeq» => some ACC
+  | _, _ => none
+
+def _17ebc68 : SortBool → Option SortBool
+  | false => some true
+  | _ => none
+
+axiom «.Map» : Option SortMap
+
+def _5b9db8d : SortBool → SortBool → Option SortBool
+  | true, B => some B
+  | _, _ => none
+
+def _61fbef3 : SortBool → SortBool → Option SortBool
+  | false, _Gen0 => some false
+  | _, _ => none
+
+def _5a819d8 : SortIntSeq → SortIntSeq → Option SortBool
+  | SortIntSeq.«.IntSeq_MPY-CORE_IntSeq», _Gen0 => some true
+  | _, _ => none
+
+def _53fc758 : SortBool → Option SortBool
+  | true => some false
+  | _ => none
+
+def _7174452 : SortBool → SortBool → Option SortBool
+  | true, _Gen0 => some true
+  | _, _ => none
+
+axiom _List_ (x0 : SortList) (x1 : SortList) : Option SortList
+
+axiom _Map_ (x0 : SortMap) (x1 : SortMap) : Option SortMap
+
+axiom «.List» : Option SortList
+
+axiom «_|->_» (x0 : SortKItem) (x1 : SortKItem) : Option SortMap
+
+axiom ListItem (x0 : SortKItem) : Option SortList
+
+mutual
+  def _6d95c8d : SortIntSeq → SortIntSeq → Option SortIntSeq
+    | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» I S, T => do
+      let _Val0 <- «seqConcat(_,_)_MPY-STR_IntSeq_IntSeq_IntSeq» S T
+      return (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» I _Val0)
+    | _, _ => none
+
+  def «seqConcat(_,_)_MPY-STR_IntSeq_IntSeq_IntSeq» (x0 : SortIntSeq) (x1 : SortIntSeq) : Option SortIntSeq := (_6d95c8d x0 x1) <|> (_982236f x0 x1)
+end
+
+def _andBool_ (x0 : SortBool) (x1 : SortBool) : Option SortBool := (_5b9db8d x0 x1) <|> (_61fbef3 x0 x1)
+
+def notBool_ (x0 : SortBool) : Option SortBool := (_17ebc68 x0) <|> (_53fc758 x0)
+
+def _orBool_ (x0 : SortBool) (x1 : SortBool) : Option SortBool := (_7174452 x0 x1) <|> (_991a329 x0 x1)
+
+mutual
+  def _3a4bf2f : SortIntSeq → SortIntSeq → Option SortBool
+    | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» A As, SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» B Bs => do
+      let _Val0 <- «_==Int_» A B
+      let _Val1 <- «strPrefix(_,_)_MPY-STR_Bool_IntSeq_IntSeq» As Bs
+      let _Val2 <- _andBool_ _Val0 _Val1
+      return _Val2
+    | _, _ => none
+
+  def «strPrefix(_,_)_MPY-STR_Bool_IntSeq_IntSeq» (x0 : SortIntSeq) (x1 : SortIntSeq) : Option SortBool := (_3a4bf2f x0 x1) <|> (_5a819d8 x0 x1) <|> (_f69553d x0 x1)
+end
+
+def _fdbc0d1 : SortInt → Option SortBool
+  | C => do
+    let _Val0 <- «_==Int_» C 65
+    let _Val1 <- «_==Int_» C 69
+    let _Val2 <- _orBool_ _Val0 _Val1
+    let _Val3 <- «_==Int_» C 73
+    let _Val4 <- _orBool_ _Val2 _Val3
+    let _Val5 <- «_==Int_» C 79
+    let _Val6 <- _orBool_ _Val4 _Val5
+    let _Val7 <- «_==Int_» C 85
+    let _Val8 <- _orBool_ _Val6 _Val7
+    let _Val9 <- «_==Int_» C 97
+    let _Val10 <- _orBool_ _Val8 _Val9
+    let _Val11 <- «_==Int_» C 101
+    let _Val12 <- _orBool_ _Val10 _Val11
+    let _Val13 <- «_==Int_» C 105
+    let _Val14 <- _orBool_ _Val12 _Val13
+    let _Val15 <- «_==Int_» C 111
+    let _Val16 <- _orBool_ _Val14 _Val15
+    let _Val17 <- «_==Int_» C 117
+    let _Val18 <- _orBool_ _Val16 _Val17
+    return _Val18
+
+def _56a27c9 : SortIntSeq → SortIntSeq → Option SortBool
+  | P, X => do
+    let _Val0 <- «strPrefix(_,_)_MPY-STR_Bool_IntSeq_IntSeq» P X
+    guard _Val0
+    return true
+
+def _38142ad : SortIntSeq → SortIntSeq → Option SortBool
+  | P, SortIntSeq.«.IntSeq_MPY-CORE_IntSeq» => do
+    let _Val0 <- «strPrefix(_,_)_MPY-STR_Bool_IntSeq_IntSeq» P SortIntSeq.«.IntSeq_MPY-CORE_IntSeq»
+    let _Val1 <- notBool_ _Val0
+    guard _Val1
+    return false
+  | _, _ => none
+
+def «isVowelCode(_)_VERIFICATION_Bool_Int» (x0 : SortInt) : Option SortBool := _fdbc0d1 x0
+
+mutual
+  def «removeVowelCodesAcc(_,_)_VERIFICATION_IntSeq_IntSeq_IntSeq» (x0 : SortIntSeq) (x1 : SortIntSeq) : Option SortIntSeq := (_c8b63e6 x0 x1) <|> (_df7826c x0 x1) <|> (_e0881b0 x0 x1)
+
+  def _c8b63e6 : SortIntSeq → SortIntSeq → Option SortIntSeq
+    | ACC, SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» C REST => do
+      let _Val0 <- «isVowelCode(_)_VERIFICATION_Bool_Int» C
+      let _Val1 <- «removeVowelCodesAcc(_,_)_VERIFICATION_IntSeq_IntSeq_IntSeq» ACC REST
+      guard _Val0
+      return _Val1
+    | _, _ => none
+
+  def _e0881b0 : SortIntSeq → SortIntSeq → Option SortIntSeq
+    | ACC, SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» C REST => do
+      let _Val0 <- «isVowelCode(_)_VERIFICATION_Bool_Int» C
+      let _Val1 <- notBool_ _Val0
+      let _Val2 <- «seqConcat(_,_)_MPY-STR_IntSeq_IntSeq_IntSeq» ACC (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» C SortIntSeq.«.IntSeq_MPY-CORE_IntSeq»)
+      let _Val3 <- «removeVowelCodesAcc(_,_)_VERIFICATION_IntSeq_IntSeq_IntSeq» _Val2 REST
+      guard _Val1
+      return _Val3
+    | _, _ => none
+end
+
+def _6decd7f : SortIntSeq → SortIntSeq → Option SortBool
+  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» C SortIntSeq.«.IntSeq_MPY-CORE_IntSeq», SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» 97 (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» 101 (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» 105 (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» 111 (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» 117 (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» 65 (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» 69 (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» 73 (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» 79 (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» 85 SortIntSeq.«.IntSeq_MPY-CORE_IntSeq»))))))))) => do
+    let _Val0 <- «isVowelCode(_)_VERIFICATION_Bool_Int» C
+    return _Val0
+  | _, _ => none
+
+def _78f9d87 : SortIntSeq → Option SortIntSeq
+  | CODES => do
+    let _Val0 <- «removeVowelCodesAcc(_,_)_VERIFICATION_IntSeq_IntSeq_IntSeq» SortIntSeq.«.IntSeq_MPY-CORE_IntSeq» CODES
+    return _Val0
+
+mutual
+  def «strContains(_,_)_MPY-STR_Bool_IntSeq_IntSeq» (x0 : SortIntSeq) (x1 : SortIntSeq) : Option SortBool := (_6decd7f x0 x1) <|> (_38142ad x0 x1) <|> (_56a27c9 x0 x1) <|> (_e133ba2 x0 x1)
+
+  def _e133ba2 : SortIntSeq → SortIntSeq → Option SortBool
+    | P, SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» C Xs => do
+      let _Val0 <- «strPrefix(_,_)_MPY-STR_Bool_IntSeq_IntSeq» P (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» C Xs)
+      let _Val1 <- notBool_ _Val0
+      let _Val2 <- «strContains(_,_)_MPY-STR_Bool_IntSeq_IntSeq» P Xs
+      guard _Val1
+      return _Val2
+    | _, _ => none
+end
+
+def «removeVowelCodes(_)_VERIFICATION_IntSeq_IntSeq» (x0 : SortIntSeq) : Option SortIntSeq := _78f9d87 x0

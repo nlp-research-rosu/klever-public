@@ -1,0 +1,551 @@
+Script started on 2026-07-28 17:38:52-05:00 [<not executed on terminal>]
+K version:    v7.1.293
+Build date:   Fri Oct 03 13:32:35 CDT 2025
+K version:    v7.1.293
+Build date:   Fri Oct 03 13:32:35 CDT 2025
+
+CORE IMPORTS/SYNTAX
+     1	// reference/src/semantics/core.k — MPY-CORE
+     2	
+     3	module MPY-CORE
+     4	  imports MPY-SYNTAX
+     5	  imports INT
+     6	  imports BOOL
+     7	  imports STRING
+     8	  imports MAP
+     9	  imports LIST
+    10	  imports K-EQUAL
+    11	
+    12	  // ==== values, the algebraic lists, and the scope heap =====================
+    13	  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+    14	  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+    15	  syntax Str    ::= str(IntSeq)
+    16	
+    17	  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+    18	  syntax Iterable ::= list(ValSeq)
+    19	                    | tuple(ValSeq)
+    20	                    | Str
+    21	                    | rangeObj(Int, Int, Int)
+    22	                    | zipObj(ValSeq, ValSeq)
+    23	                    | zipObjS(IntSeq, IntSeq)
+    24	
+    25	  syntax Val      ::= Int
+    26	                    | Bool
+    27	                    | "noneV"
+    28	                    | Iterable
+    29	                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+    30	                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+    31	                    | closureVal(ParamNames, Stmts, Int)
+    32	                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+    33	                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+    34	                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+    35	
+    36	  syntax Parent   ::= "root" | parent(Int)
+    37	  syntax Scope    ::= scope(Map, Parent)
+    38	  syntax KResult  ::= Val
+    39	  syntax Expr     ::= Val   // cooling puts results back into expression holes
+    40	  syntax Vals     ::= List{Val, ","}
+    41	  syntax Exc      ::= "NoExc" | "AssertionError"
+    42	  syntax RetState ::= "noRet" | retV(Val)
+    43	
+    44	  // ==== configuration =======================================================
+    45	  // The builtins namespace is a real scope at reserved location -1 (the bottom of every
+    46	  // chain; scopeLoc only allocates >=1, so -1 never collides). The module scope (loc 0)
+    47	  // has it as parent, so an unbound name resolves there last — exactly LEGB. `int`/`str`
+    48	  // resolve to their type objects; any local/global binding shadows them via normal lookup.
+    49	  configuration
+    50	    <k>       #loadAll($PGM:Module) </k>
+    51	    <env>     0 </env>
+    52	    <scopes>   0     |-> scope(.Map, parent(-1))
+    53	              -1    |-> builtinsScope </scopes>
+    54	    <scopeLoc> 1 </scopeLoc>
+    55	    <heap>    .Map </heap>
+    56	    <heapLoc> 0 </heapLoc>
+    57	    <stack>   .List </stack>
+    58	    <ret>     noRet </ret>
+    59	    <exc>     NoExc </exc>
+    60	    <exit-code exit=""> 0 </exit-code>
+    61	
+    62	  // ==== heap allocation (constructed lists become objects) ==================
+    63	  // Cons-form emission with a freshness guard (the heap-list-probe discipline:
+    64	  // an update-form H[N <- _] never re-normalizes symbolically). heapLoc is
+    65	  // monotonic — it does NOT wind back at #pop: returned lists escape by ref.
+    66	  // A bare list(VS) Val stays legal (read-only inputs in claims flow unboxed);
+    67	  // only CONSTRUCTORS in program syntax allocate.
+    68	  syntax Bool ::= isRefV(Val) [function, total]
+    69	  rule isRefV(ref(_:Int)) => true
+    70	  rule isRefV(_:Val)      => false [owise]
+    71	
+    72	  // closure cells (Python-faithful capture): the heap holds cellV(V); a
+    73	  // cellRef surfacing as the k-redex reads through (lookup is the only use —
+    74	  // cellRefs never escape to user-visible values)
+    75	  syntax HeapVal ::= cellV(Val)
+    76	  syntax Bool ::= isCellRef(Val) [function, total]
+    77	  rule isCellRef(cellRef(_:Int)) => true
+    78	  rule isCellRef(_:Val)          => false [owise]
+    79	  // k-top deref for cell-bound reads surfacing INSIDE the annotated frame
+    80	  // (AugAssign's in-place read and friends). The "$cells" guard keeps this
+    81	  // DECIDABLY inapplicable in plain frames — an unguarded rule lets the
+    82	  // prover narrow abstract k-top values into cellRef junk (probed on
+    83	  // 26-remove-duplicates). Cross-frame reads (a comprehension closure
+    84	  // reading the enclosing function's cellvar) deref inside #look instead.
+    85	  rule <k> cellRef(H:Int) => V ... </k>
+    86	       <env> L:Int </env>
+    87	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    88	       <heap> ... H |-> cellV(V:Val) ... </heap>
+    89	       requires "$cells" in_keys(M)
+    90	       [priority(40)]
+    91	
+    92	  // write through a cell (Assign / #bindP / #bindTgt dispatch here on
+    93	  // cell-bound names)
+    94	  // a keyword argument cools to a TAGGED value (consumed by kw-aware builtins)
+    95	  syntax Val ::= kwV(String, Val)
+    96	  syntax KItem ::= #kwTag(String)
+    97	  rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>
+    98	  rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k>
+    99	       requires notBool isKwV(V)
+   100	  syntax Bool ::= isKwV(Val) [function, total]
+   101	  rule isKwV(kwV(_:String, _:Val)) => true
+   102	  rule isKwV(_:Val)                => false [owise]
+   103	
+   104	  // the frame marker carries the CONCRETE cellvar list, so cell-write dispatch
+   105	  // decides by pnMember even over an abstract frame rest (no prover branching)
+   106	  syntax Val ::= cellsMark(ParamNames)
+   107	  syntax ParamNames ::= cellsOf(Val) [function]
+   108	  rule cellsOf(cellsMark(CVS:ParamNames)) => CVS
+   109	  syntax Bool ::= pnMember(String, ParamNames) [function, total]
+   110	  rule pnMember(_:String, .ParamNames) => false
+   111	  rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)
+   112	
+   113	  syntax KItem ::= #cellW(Val, Val)
+   114	  rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k>
+   115	       <heap> ... H |-> cellV(_:Val => V) ... </heap>
+   116	
+   117	  syntax KItem ::= #alloc(Val)
+   118	  rule <k> #alloc(V:Val) => ref(N) ... </k>
+   119	       <heap>    H:Map => (N |-> V) H </heap>
+   120	       <heapLoc> N:Int => N +Int 1 </heapLoc>
+   121	       requires notBool N in_keys(H)
+   122	
+   123	  // ==== module load + statement sequencing ==================================
+   124	  syntax KItem ::= #loadAll(Module)
+   125	  rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>
+   126	  rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>
+   127	  rule <k> .Stmts => .K ... </k>
+   128	
+   129	  // ==== Name lookup (walk the scope chain; builtins live in the -1 scope) ====
+   130	  syntax KItem ::= #look(String, Int)
+   131	  rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>
+   132	  rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k>
+   133	       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+   134	       requires X in_keys(M)
+   135	  // a SYNTACTICALLY cell-bound name reads through the heap cell AT THE
+   136	  // LOOKUP (higher priority beats the plain return above on concrete cell
+   137	  // bindings; abstract claim values take the plain rule unchanged) — this
+   138	  // covers cross-frame cell reads (a comprehension closure reading the
+   139	  // enclosing function's cellvar) without a narrowing-prone k-top redex
+   140	  // guarded on the FOUND frame's DECLARED cellvars (pnMember over the
+   141	  // cellsMark): decidable for every concrete frame pin — plain frames and
+   142	  // non-cell names prune outright, so an abstract looked-up value never
+   143	  // drags a narrowing cellV heap match along (probed on 5-intersperse and
+   144	  // Q4's abstract `numbers` in the annotated frame)
+   145	  rule <k> #look(X:String, L:Int) => V ... </k>
+   146	       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+   147	       <heap> ... H |-> cellV(V:Val) ... </heap>
+   148	       requires X in_keys(M) andBool "$cells" in_keys(M)
+   149	        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+   150	        andBool {M[X]}:>Val ==K cellRef(H)
+   151	       [priority(40)]
+   152	  rule <k> #look(X:String, L:Int) => #look(X, P) ... </k>
+   153	       <scopes> ... L |-> scope(M:Map, parent(P:Int)) ... </scopes>
+   154	       requires notBool (X in_keys(M))
+   155	
+   156	  // the ONE predefined builtins scope (the -1 frame; claims write `-1 |-> builtinsScope`)
+   157	  syntax Scope ::= "builtinsScope" [function, total]
+   158	  rule builtinsScope
+   159	    => scope(.Map [ "len"    <- builtinV("len")    ]
+   160	                  [ "set"    <- builtinV("set")    ]
+   161	                  [ "sum"    <- builtinV("sum")    ]
+   162	                  [ "abs"    <- builtinV("abs")    ]
+   163	                  [ "min"    <- builtinV("min")    ]
+   164	                  [ "max"    <- builtinV("max")    ]
+   165	                  [ "ord"    <- builtinV("ord")    ]
+   166	                  [ "chr"    <- builtinV("chr")    ]
+   167	                  [ "range"  <- builtinV("range")  ]
+   168	                  [ "all"    <- builtinV("all")    ]
+   169	                  [ "any"    <- builtinV("any")    ]
+   170	                  [ "zip"    <- builtinV("zip")    ]
+   171	                  [ "isinstance" <- builtinV("isinstance") ]
+   172	                  [ "sorted" <- builtinV("sorted") ]
+   173	                  [ "list"   <- builtinV("list")   ]
+   174	                  [ "round"  <- builtinV("round")  ]
+   175	                  [ "bin"    <- builtinV("bin")    ]
+   176	                  [ "enumerate" <- builtinV("enumerate") ]
+   177	                  [ "map"    <- builtinV("map")    ]
+   178	                  [ "eval"   <- builtinV("eval")   ]
+   179	                  [ "int"    <- typeV("int")       ]
+   180	                  [ "str"    <- typeV("str")       ]
+   181	                  [ "float"  <- typeV("float")     ], root)
+   182	
+   183	  // ==== argument/element evaluation: ONE left-to-right loop, tagged by destination ==
+   184	  // (list/tuple literals and calls all use it; modules extend ApplyK with their tags)
+   185	  syntax ApplyK ::= toCall(Val)
+   186	  syntax KItem  ::= #evalArgs(Exprs, Vals, ApplyK)
+   187	                  | #evalArgCont(Exprs, Vals, ApplyK)
+   188	                  | #applyK(ApplyK, Vals)
+   189	  rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>
+   190	  rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>
+   191	  rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>
+   192	
+   193	  // ==== Int / Bool / None literals ==========================================
+   194	  rule <k> Int(I:Int)   => I ... </k>
+   195	  rule <k> Bool(B:Bool) => B ... </k>
+   196	  rule <k> NoneVal      => noneV ... </k>
+   197	
+   198	  // ==== truthy (If, Assert, BoolOp, IfExp, not, While) ======================
+   199	  syntax Bool ::= truthy(Val) [function]
+   200	  rule truthy(B:Bool)          => B
+   201	  rule truthy(noneV)           => false
+   202	  rule truthy(I:Int)           => I =/=Int 0
+   203	  rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)
+   204	  rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)
+   205	  rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)
+   206	
+   207	  // ==== extensible operator dispatch (cases added by the construct modules) ==
+   208	  syntax Val  ::= applyUn(String, Val) [function]
+   209	  syntax Val  ::= applyBin(String, Val, Val) [function]
+   210	  syntax Bool ::= applyCmp(String, Val, Val) [function]
+   211	
+   212	  // ==== shared list helpers =================================================
+   213	  syntax Vals ::= appendVal(Vals, Val) [function, total]
+   214	  rule appendVal(.Vals, V:Val)              => V , .Vals
+   215	  rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+   216	
+   217	  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+   218	  rule vals2valSeq(.Vals)            => .ValSeq
+   219	  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+   220	
+   221	  // ==== shared sequence length (len / summaries across many modules) ========
+   222	  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+   223	  syntax Int ::= vsLen(ValSeq) [function, total]
+   224	  rule vsLen(.ValSeq)                => 0
+   225	  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+   226	
+   227	  syntax Int ::= isLen(IntSeq) [function, total]
+   228	  rule isLen(.IntSeq)                => 0
+   229	  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+   230	
+   231	  // in-bounds positional write (list subscript-assign); OOB leaves the seq unchanged
+   232	  // (valid programs write in-bounds — mirrors valSeqAt's total-but-underspecified stance)
+   233	  syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]
+   234	  rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq
+   235	  rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val)    => vCons(V, S)
+   236	  rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V))
+   237	       requires I >Int 0
+   238	  rule setVSAt(VS:ValSeq, I:Int, _:Val)             => VS
+   239	       requires I <Int 0
+   240	endmodule
+
+K MAP BUILTIN DECLARATIONS
+/usr/local/lib/node_modules/@openai/codex/README.md-45-Each GitHub Release contains many executables, but in practice, you likely want one of these:
+/usr/local/lib/node_modules/@openai/codex/README.md-46-
+/usr/local/lib/node_modules/@openai/codex/README.md-47-- macOS
+/usr/local/lib/node_modules/@openai/codex/README.md-48-  - Apple Silicon/arm64: `codex-aarch64-apple-darwin.tar.gz`
+/usr/local/lib/node_modules/@openai/codex/README.md:49:  - x86_64 (older Mac hardware): `codex-x86_64-apple-darwin.tar.gz`
+/usr/local/lib/node_modules/@openai/codex/README.md-50-- Linux
+/usr/local/lib/node_modules/@openai/codex/README.md:51:  - x86_64: `codex-x86_64-unknown-linux-musl.tar.gz`
+/usr/local/lib/node_modules/@openai/codex/README.md-52-  - arm64: `codex-aarch64-unknown-linux-musl.tar.gz`
+/usr/local/lib/node_modules/@openai/codex/README.md-53-
+/usr/local/lib/node_modules/@openai/codex/README.md:54:Each archive contains a single entry with the platform baked into the name (e.g., `codex-x86_64-unknown-linux-musl`), so you likely want to rename it to `codex` after extracting it.
+/usr/local/lib/node_modules/@openai/codex/README.md-55-
+/usr/local/lib/node_modules/@openai/codex/README.md-56-</details>
+/usr/local/lib/node_modules/@openai/codex/README.md-57-
+/usr/local/lib/node_modules/@openai/codex/README.md-58-### Using Codex with your ChatGPT plan
+--
+/usr/lib/dh-elpa/helper/install-1-#!/bin/sh
+/usr/lib/dh-elpa/helper/install:2:# invoke as /usr/lib/dh-elpa/helper/install flavor elpa_package elpa_version elpa_load_path
+/usr/lib/dh-elpa/helper/install-3-
+/usr/lib/dh-elpa/helper/install-4-set -e
+/usr/lib/dh-elpa/helper/install-5-
+/usr/lib/dh-elpa/helper/install-6-# safe values for important variables
+--
+/usr/lib/dh-elpa/helper/install-10-
+/usr/lib/dh-elpa/helper/install-11-# grab parameters
+/usr/lib/dh-elpa/helper/install-12-
+/usr/lib/dh-elpa/helper/install-13-FLAVOR=$1
+/usr/lib/dh-elpa/helper/install:14:ELPA_PACKAGE=$2
+/usr/lib/dh-elpa/helper/install:15:ELPA_VERSION=$3
+/usr/lib/dh-elpa/helper/install:16:ELPA_LOAD_PATH=$4
+/usr/lib/dh-elpa/helper/install-17-
+/usr/lib/dh-elpa/helper/install:18:ELPA_DIR=${ELPA_PACKAGE}-${ELPA_VERSION}
+/usr/lib/dh-elpa/helper/install-19-
+/usr/lib/dh-elpa/helper/install-20-case $FLAVOR in
+/usr/lib/dh-elpa/helper/install-21-    emacs2[01234]*)
+/usr/lib/dh-elpa/helper/install:22:        echo install/${ELPA_DIR}: Skipping obsolete emacs ${FLAVOR}
+/usr/lib/dh-elpa/helper/install-23-        exit 0
+/usr/lib/dh-elpa/helper/install-24-        ;;
+/usr/lib/dh-elpa/helper/install-25-    xemacs*)
+/usr/lib/dh-elpa/helper/install:26:        echo install/${ELPA_DIR}: Skipping unsupported emacs ${FLAVOR}
+/usr/lib/dh-elpa/helper/install-27-        exit 0
+/usr/lib/dh-elpa/helper/install-28-        ;;
+/usr/lib/dh-elpa/helper/install-29-    *)
+/usr/lib/dh-elpa/helper/install:30:        echo install/${ELPA_DIR}: Handling install of emacsen flavor ${FLAVOR}
+/usr/lib/dh-elpa/helper/install-31-esac
+/usr/lib/dh-elpa/helper/install-32-
+/usr/lib/dh-elpa/helper/install:33:src_dir=/usr/share/emacs/site-lisp/elpa-src
+/usr/lib/dh-elpa/helper/install:34:el_dir=$src_dir/${ELPA_DIR}/
+/usr/lib/dh-elpa/helper/install:35:elc_dir=/usr/share/${FLAVOR}/site-lisp/elpa/${ELPA_DIR}/
+/usr/lib/dh-elpa/helper/install-36-
+/usr/lib/dh-elpa/helper/install-37-export EMACSLOADPATH
+/usr/lib/dh-elpa/helper/install:38:EMACSLOADPATH=${ELPA_LOAD_PATH}
+/usr/lib/dh-elpa/helper/install-39-
+/usr/lib/dh-elpa/helper/install:40:echo install/${ELPA_DIR}: byte-compiling for ${FLAVOR}
+/usr/lib/dh-elpa/helper/install-41-
+/usr/lib/dh-elpa/helper/install:42:[ -d ${elc_dir} ] || mkdir -p ${elc_dir}
+/usr/lib/dh-elpa/helper/install-43-
+/usr/lib/dh-elpa/helper/install-44-# Create symlinks to the .el files (see section 6E in debian-emacs
+/usr/lib/dh-elpa/helper/install-45-# policy).  This makes complation easy, and also allows find-function
+/usr/lib/dh-elpa/helper/install-46-# and find-library to work properly.  Also link all other top level
+/usr/lib/dh-elpa/helper/install-47-# files and directories into the flavor directory
+/usr/lib/dh-elpa/helper/install:48:(cd ${elc_dir} && ln -sf ${el_dir}/* .)
+/usr/lib/dh-elpa/helper/install-49-
+/usr/lib/dh-elpa/helper/install-50-# Byte compile them
+/usr/lib/dh-elpa/helper/install:51:(cd ${elc_dir}
+/usr/lib/dh-elpa/helper/install-52- set +e
+/usr/lib/dh-elpa/helper/install-53- ${FLAVOR} --quick --batch -l package \
+/usr/lib/dh-elpa/helper/install-54-           --eval "(setq package-user-dir \"/nonexistent\")" \
+/usr/lib/dh-elpa/helper/install:55:           --eval "(add-to-list 'package-directory-list \"$src_dir\")" \
+/usr/lib/dh-elpa/helper/install-56-           -f package-initialize -f batch-byte-compile *.el > Install.log 2>&1
+/usr/lib/dh-elpa/helper/install-57- if test $? -ne 0
+/usr/lib/dh-elpa/helper/install-58- then
+/usr/lib/dh-elpa/helper/install-59-   cat Install.log
+--
+/usr/lib/dh-elpa/helper/remove-1-#!/bin/sh
+/usr/lib/dh-elpa/helper/remove-2-#!/bin/sh
+/usr/lib/dh-elpa/helper/remove:3:# invoke as /usr/lib/dh-elpa/helper/remove flavor elpa_package elpa_version
+/usr/lib/dh-elpa/helper/remove-4-
+/usr/lib/dh-elpa/helper/remove-5-set -e
+/usr/lib/dh-elpa/helper/remove-6-
+/usr/lib/dh-elpa/helper/remove-7-# safe values for important variables
+--
+/usr/lib/dh-elpa/helper/remove-11-
+/usr/lib/dh-elpa/helper/remove-12-# grab parameters
+/usr/lib/dh-elpa/helper/remove-13-
+/usr/lib/dh-elpa/helper/remove-14-FLAVOR=$1
+/usr/lib/dh-elpa/helper/remove:15:ELPA_PACKAGE=$2
+/usr/lib/dh-elpa/helper/remove:16:ELPA_VERSION=$3
+/usr/lib/dh-elpa/helper/remove-17-
+/usr/lib/dh-elpa/helper/remove:18:ELPA_DIR=${ELPA_PACKAGE}-${ELPA_VERSION}
+/usr/lib/dh-elpa/helper/remove-19-
+/usr/lib/dh-elpa/helper/remove:20:elpa_root="/usr/share/${FLAVOR}/site-lisp/elpa"
+/usr/lib/dh-elpa/helper/remove:21:elc_dir="${elpa_root}/${ELPA_DIR}"
+/usr/lib/dh-elpa/helper/remove-22-
+/usr/lib/dh-elpa/helper/remove-23-FLAVOR=$1
+/usr/lib/dh-elpa/helper/remove-24-case $FLAVOR in
+/usr/lib/dh-elpa/helper/remove-25-    emacs2[01234]*)
+/usr/lib/dh-elpa/helper/remove:26:        echo remove/${ELPA_DIR}: Skipping obsolete emacs ${FLAVOR}
+/usr/lib/dh-elpa/helper/remove-27-        exit 0
+/usr/lib/dh-elpa/helper/remove-28-        ;;
+/usr/lib/dh-elpa/helper/remove-29-    xemacs*)
+/usr/lib/dh-elpa/helper/remove:30:        echo remove/${ELPA_DIR}: Skipping unsupported emacs ${FLAVOR}
+/usr/lib/dh-elpa/helper/remove-31-	exit 0
+/usr/lib/dh-elpa/helper/remove-32-        ;;
+/usr/lib/dh-elpa/helper/remove-33-    *)
+/usr/lib/dh-elpa/helper/remove:34:        echo remove/${ELPA_DIR}: Handling removal of emacsen flavor ${FLAVOR}
+/usr/lib/dh-elpa/helper/remove-35-esac
+/usr/lib/dh-elpa/helper/remove-36-
+/usr/lib/dh-elpa/helper/remove-37-echo dh-elpa: purging flavor specific files for ${FLAVOR}
+/usr/lib/dh-elpa/helper/remove:38:rm -f ${elc_dir}/*.elc
+/usr/lib/dh-elpa/helper/remove:39:[ -d ${elc_dir} ] && find ${elc_dir} -type l -delete
+/usr/lib/dh-elpa/helper/remove:40:rm -f ${elc_dir}/Install.log*
+/usr/lib/dh-elpa/helper/remove:41:if test -e "${elc_dir}"
+/usr/lib/dh-elpa/helper/remove-42-then
+/usr/lib/dh-elpa/helper/remove:43:    rmdir --ignore-fail-on-non-empty "${elc_dir}"
+/usr/lib/dh-elpa/helper/remove:44:    rmdir --ignore-fail-on-non-empty "${elpa_root}"
+/usr/lib/dh-elpa/helper/remove-45-fi
+/usr/lib/dh-elpa/helper/remove-46-
+/usr/lib/dh-elpa/helper/remove-47-exit 0;
+--
+/opt/runtimeverification-k/README.md-28-refer to our [installation notes](k-distribution/INSTALL.md).
+/opt/runtimeverification-k/README.md-29-
+/opt/runtimeverification-k/README.md-30-## Preface
+/opt/runtimeverification-k/README.md-31-
+/opt/runtimeverification-k/README.md:32:This is a readme file for _K developers_. Users should feel comfortable using
+/opt/runtimeverification-k/README.md-33-the command line, as we do not provide GUI tools at this time.
+/opt/runtimeverification-k/README.md-34-
+/opt/runtimeverification-k/README.md:35:_K-based tool users_ should:
+/opt/runtimeverification-k/README.md-36-
+/opt/runtimeverification-k/README.md-37-1.  Consult their tool documentation for build/installation instructions.
+/opt/runtimeverification-k/README.md-38-2.  If needed, download a [packaged release](https://github.com/runtimeverification/k/releases/)
+/opt/runtimeverification-k/README.md-39-    of the K Framework as part of their tool setup process.
+--
+/opt/runtimeverification-k/README.md-151-    *   macOS/brew: Download it from a package manager or from
+/opt/runtimeverification-k/README.md-152-        http://maven.apache.org/download.cgi and follow the instructions on
+/opt/runtimeverification-k/README.md-153-        the webpage.
+/opt/runtimeverification-k/README.md-154-
+/opt/runtimeverification-k/README.md:155:    Maven usually requires setting an environment variable `JAVA_HOME` pointing
+/opt/runtimeverification-k/README.md-156-    to the installation directory of the JDK (not to be mistaken with JRE).
+/opt/runtimeverification-k/README.md-157-
+/opt/runtimeverification-k/README.md-158-    You can test if it works by calling `mvn -version` in a terminal.
+/opt/runtimeverification-k/README.md-159-    This will provide the information about the JDK Maven is using, in case
+--
+/opt/runtimeverification-k/README.md-175-can update your `$PATH` with
+/opt/runtimeverification-k/README.md-176-`<checkout-dir>/k-distribution/target/release/k/bin`
+/opt/runtimeverification-k/README.md-177-(strongly recommended, but optional).
+/opt/runtimeverification-k/README.md-178-
+/opt/runtimeverification-k/README.md:179:You are also encouraged to set the environment variable `MAVEN_OPTS` to
+/opt/runtimeverification-k/README.md-180-`-XX:+TieredCompilation`, which will significantly speed up the incremental
+/opt/runtimeverification-k/README.md-181-build process.
+/opt/runtimeverification-k/README.md-182-
+/opt/runtimeverification-k/README.md-183-### Apple Silicon Support
+--
+/opt/runtimeverification-k/README.md-245-
+/opt/runtimeverification-k/README.md-246-This will build all of K and put a link to the resulting binaries in the `result/` folder.
+/opt/runtimeverification-k/README.md-247-
+/opt/runtimeverification-k/README.md-248-
+/opt/runtimeverification-k/README.md:249:_Note: Mac users, especially those running M1/M2 Macs may find nix segfaulting on occasion. If this happens, try running the nix command like this: `GC_DONT_GC=1 nix build .`_ 
+/opt/runtimeverification-k/README.md-250-
+/opt/runtimeverification-k/README.md-251-
+/opt/runtimeverification-k/README.md-252-If you want to temporarily add the K binaries (such as `kompile` or `kast`) to the current shell, run
+/opt/runtimeverification-k/README.md-253-
+--
+/opt/runtimeverification-k/README.md-278-
+/opt/runtimeverification-k/README.md-279-## IntelliJ IDEA
+/opt/runtimeverification-k/README.md-280-
+/opt/runtimeverification-k/README.md-281-IntelliJ IDEA comes with built-in maven integration. For more information, refer to
+/opt/runtimeverification-k/README.md:282:the [IntelliJ IDEA wiki](http://wiki.jetbrains.net/intellij/Creating_and_importing_Maven_projects)
+/opt/runtimeverification-k/README.md-283-
+/opt/runtimeverification-k/README.md-284-# Running the Test Suite
+/opt/runtimeverification-k/README.md-285-
+/opt/runtimeverification-k/README.md-286-To completely test the current version of the K framework, run `mvn verify`.
+--
+/opt/runtimeverification-k/README.md-306-
+/opt/runtimeverification-k/README.md-307-# Troubleshooting
+/opt/runtimeverification-k/README.md-308-Common build-time error messages:
+/opt/runtimeverification-k/README.md-309-
+/opt/runtimeverification-k/README.md:310:-   `Error: JAVA_HOME not found in your environment.
+/opt/runtimeverification-k/README.md:311:     Please set the JAVA_HOME variable in your environment to match the
+/opt/runtimeverification-k/README.md-312-     location of your Java installation.`
+/opt/runtimeverification-k/README.md:313:    + Make sure `JAVA_HOME` points to the JDK and not the JRE directory.
+/opt/runtimeverification-k/README.md-314-
+/opt/runtimeverification-k/README.md-315--   `[WARNING] Cannot get the branch information from the git repository:
+/opt/runtimeverification-k/README.md-316-     Detecting the current branch failed: 'git' is not recognized as an internal or external command,
+/opt/runtimeverification-k/README.md-317-     operable program or batch file.`
+--
+/opt/runtimeverification-k/README.md-330-
+/opt/runtimeverification-k/README.md-331-    and scrolling up, you see an error message similar to:
+/opt/runtimeverification-k/README.md-332-
+/opt/runtimeverification-k/README.md-333-    `[exec] Installing GHC ...
+/opt/runtimeverification-k/README.md:334:     [exec] ghc-pkg: Couldn't open database $HOME/.stack/programs/x86_64-linux/ghc-tinfo6-8.10.1/lib/ghc-8.10.1/package.conf.d for modification:
+/opt/runtimeverification-k/README.md:335:     {handle: $HOME/.stack/programs/x86_64-linux/ghc-tinfo6-8.10.1/lib/ghc-8.10.1/package.conf.d/package.cache.lock}:
+/opt/runtimeverification-k/README.md-336-     hLock: invalid argument (Invalid argument)`
+/opt/runtimeverification-k/README.md-337-    + If you are using a [WSL version 1 environment](https://docs.microsoft.com/en-us/windows/wsl/compare-versions),
+/opt/runtimeverification-k/README.md-338-      then you have encountered a known issue with the latest versions of GHC. In this
+/opt/runtimeverification-k/README.md-339-      case, please either:
+--
+/opt/runtimeverification-k/install-k-1-#!/bin/sh -e
+/opt/runtimeverification-k/install-k-2-
+/opt/runtimeverification-k/install-k:3:K_VERSION=7.1.293
+/opt/runtimeverification-k/install-k-4-
+/opt/runtimeverification-k/install-k-5-if [ `id -u` -ne 0 ]; then
+/opt/runtimeverification-k/install-k-6-  echo "$0: error: This script must be run as root."
+/opt/runtimeverification-k/install-k-7-  exit 1
+--
+/opt/runtimeverification-k/install-k-9-TAG=`git describe HEAD --tags`
+/opt/runtimeverification-k/install-k-10-. /etc/os-release
+/opt/runtimeverification-k/install-k-11-case $ID in
+/opt/runtimeverification-k/install-k-12-	ubuntu)
+/opt/runtimeverification-k/install-k:13:		CODENAME=$UBUNTU_CODENAME
+/opt/runtimeverification-k/install-k-14-		case $CODENAME in
+/opt/runtimeverification-k/install-k-15-			jammy)
+/opt/runtimeverification-k/install-k-16-				;;
+/opt/runtimeverification-k/install-k-17-			*)
+--
+/opt/runtimeverification-k/install-k-27-esac
+/opt/runtimeverification-k/install-k-28-
+/opt/runtimeverification-k/install-k-29-apt-get update
+/opt/runtimeverification-k/install-k-30-apt-get install -y curl
+/opt/runtimeverification-k/install-k:31:curl -L https://github.com/runtimeverification/k/releases/download/$TAG/kframework_${K_VERSION}_amd64_$CODENAME.deb -o kframework_${K_VERSION}_amd64.deb
+/opt/runtimeverification-k/install-k:32:apt-get install -y ./kframework_${K_VERSION}_amd64.deb
+/opt/runtimeverification-k/install-k:33:rm -f kframework_${K_VERSION}_amd64.deb
+--
+/usr/local/lib/node_modules/npm/README.md-43-* [**Community Feedback and Discussions**](https://github.com/orgs/community/discussions/categories/npm) - Contribute ideas & discussion around the npm registry, website & CLI
+/usr/local/lib/node_modules/npm/README.md-44-* [**RFCs**](https://github.com/npm/rfcs) - Contribute ideas & specifications for the API/design of the npm CLI
+/usr/local/lib/node_modules/npm/README.md-45-* [**Service Status**](https://status.npmjs.org/) - Monitor the current status & see incident reports for the website & registry
+/usr/local/lib/node_modules/npm/README.md-46-* [**Project Status**](https://npm.github.io/statusboard/) - See the health of all our maintained OSS projects in one view
+/usr/local/lib/node_modules/npm/README.md:47:* [**Events Calendar**](https://calendar.google.com/calendar/u/0/embed?src=npmjs.com_oonluqt8oftrt0vmgrfbg6q6go@group.calendar.google.com) - Keep track of our Open RFC calls, releases, meetups, conferences & more
+/usr/local/lib/node_modules/npm/README.md-48-* [**Support**](https://www.npmjs.com/support) - Experiencing problems with the **npm** [website](https://npmjs.com) or [registry](https://registry.npmjs.org)? File a ticket [here](https://www.npmjs.com/support)
+/usr/local/lib/node_modules/npm/README.md-49-
+/usr/local/lib/node_modules/npm/README.md-50-### Acknowledgments
+/usr/local/lib/node_modules/npm/README.md-51-
+--
+/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/README.md-45-Each GitHub Release contains many executables, but in practice, you likely want one of these:
+/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/README.md-46-
+/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/README.md-47-- macOS
+/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/README.md-48-  - Apple Silicon/arm64: `codex-aarch64-apple-darwin.tar.gz`
+/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/README.md:49:  - x86_64 (older Mac hardware): `codex-x86_64-apple-darwin.tar.gz`
+/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/README.md-50-- Linux
+/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/README.md:51:  - x86_64: `codex-x86_64-unknown-linux-musl.tar.gz`
+/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/README.md-52-  - arm64: `codex-aarch64-unknown-linux-musl.tar.gz`
+/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/README.md-53-
+/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/README.md:54:Each archive contains a single entry with the platform baked into the name (e.g., `codex-x86_64-unknown-linux-musl`), so you likely want to rename it to `codex` after extracting it.
+/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/README.md-55-
+/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/README.md-56-</details>
+/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/README.md-57-
+/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/README.md-58-### Using Codex with your ChatGPT plan
+--
+/usr/local/lib/node_modules/npm/package.json-232-    "eslint": "eslint \"**/*.{js,cjs,ts,mjs,jsx,tsx}\""
+/usr/local/lib/node_modules/npm/package.json-233-  },
+/usr/local/lib/node_modules/npm/package.json-234-  "tap": {
+/usr/local/lib/node_modules/npm/package.json-235-    "test-env": [
+/usr/local/lib/node_modules/npm/package.json:236:      "LC_ALL=sk"
+/usr/local/lib/node_modules/npm/package.json-237-    ],
+/usr/local/lib/node_modules/npm/package.json-238-    "timeout": 600,
+/usr/local/lib/node_modules/npm/package.json-239-    "nyc-arg": [
+/usr/local/lib/node_modules/npm/package.json-240-      "--exclude",
+--
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-1-import sys
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-2-import multiprocessing
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-3-
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-4-
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:5:_current = None
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:6:_total = None
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-7-
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-8-
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:9:def _init(current, total):
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:10:    global _current
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:11:    global _total
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:12:    _current = current
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:13:    _total = total
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-14-
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-15-
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:16:def _wrapped_func(func_and_args):
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:17:    func, argument, should_print_progress, filter_ = func_and_args
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-18-
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:19:    if should_print_progress:
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:20:        with _current.get_lock():
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:21:            _current.value += 1
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:22:        sys.stdout.write('\r\t{} of {}'.format(_current.value, _total.value))
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-23-        sys.stdout.flush()
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-24-
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:25:    return func(argument, filter_)
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-26-
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-27-
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:28:def pmap(func, iterable, processes, should_print_progress, filter_=None, *args, **kwargs):
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-29-    """
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-30-    A parallel map function that reports on its progress.
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-31-
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-32-    Applies `func` to every item of `iterable` and return a list of the
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-33-    results. If `processes` is greater than one, a process pool is used to run
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:34:    the functions in parallel. `should_print_progress` is a boolean value that
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-35-    indicates whether a string 'N of M' should be printed to indicate how many
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-36-    of the functions have finished being run.
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-37-    """
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:38:    global _current
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:39:    global _total
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:40:    _current = multiprocessing.Value('i', 0)
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:41:    _total = multiprocessing.Value('i', len(iterable))
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py-42-
+/usr/lib/llvm-14/share/opt-viewer/optpmap.py:43:    func_and_args = [(func, arg, should_print_progress, filter_) for arg in iterable]
+
+Script done on 2026-07-28 17:38:53-05:00 [COMMAND_EXIT_CODE="0"]

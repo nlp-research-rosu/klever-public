@@ -1,0 +1,104 @@
+Script started on 2026-07-31 07:45:48-05:00 [<not executed on terminal>]
+def _optional_regular_file_hash(path: Path) -> str | None:
+    try:
+        mode = path.lstat().st_mode
+    except OSError:
+        return None
+    if not stat.S_ISREG(mode):
+        return None
+    try:
+        return sha256_file(path)
+    except AuditContractError:
+        return None
+
+
+def _tree_entry_type(mode: int) -> str:
+    if stat.S_ISDIR(mode):
+        return "directory"
+    if stat.S_ISREG(mode):
+        return "file"
+    if stat.S_ISLNK(mode):
+        return "symlink"
+    if stat.S_ISFIFO(mode):
+        return "fifo"
+    if stat.S_ISSOCK(mode):
+        return "socket"
+    if stat.S_ISBLK(mode):
+        return "block-device"
+    if stat.S_ISCHR(mode):
+        return "character-device"
+    return "unknown"
+
+
+def _framed_update(digest: Any, value: bytes) -> None:
+    digest.update(len(value).to_bytes(8, "big"))
+    digest.update(value)
+
+
+def _framed_file_update(
+    digest: Any, path: Path, expected_size: int
+) -> None:
+    digest.update(expected_size.to_bytes(8, "big"))
+    bytes_read = 0
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        with os.fdopen(os.open(path, flags), "rb") as stream:
+            for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                bytes_read += len(chunk)
+                digest.update(chunk)
+    except OSError as error:
+        raise AuditContractError(f"cannot read tree file {path}: {error}") from error
+    if bytes_read != expected_size:
+        raise AuditContractError(
+            f"tree file changed size while hashing: {path} "
+            f"(expected {expected_size}, read {bytes_read})"
+        )
+
+
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, f"tree root {root}")
+    entries: list[tuple[str, str, Path, int]] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as iterator:
+                children = list(iterator)
+        except OSError as error:
+            raise AuditContractError(f"cannot scan tree {directory}: {error}") from error
+        for entry in children:
+            path = Path(entry.path)
+            try:
+                entry_stat = entry.stat(follow_symlinks=False)
+            except OSError as error:
+                raise AuditContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            mode = entry_stat.st_mode
+            entry_type = _tree_entry_type(mode)
+            relative = path.relative_to(root).as_posix()
+            entries.append((relative, entry_type, path, entry_stat.st_size))
+            if entry_type == "directory":
+                pending.append(path)
+
+    digest = hashlib.sha256()
+    for relative, entry_type, path, size in sorted(
+        entries, key=lambda item: item[0]
+    ):
+        _framed_update(digest, os.fsencode(relative))
+        _framed_update(digest, entry_type.encode())
+        if entry_type == "file":
+            _framed_file_update(digest, path, size)
+        elif entry_type == "symlink":
+            try:
+                target = os.readlink(path)
+            except OSError as error:
+                raise AuditContractError(
+                    f"cannot read tree symlink {path}: {error}"
+                ) from error
+            _framed_update(digest, os.fsencode(target))
+        else:
+            _framed_update(digest, b"")
+    return digest.hexdigest()
+
+Script done on 2026-07-31 07:45:48-05:00 [COMMAND_EXIT_CODE="0"]

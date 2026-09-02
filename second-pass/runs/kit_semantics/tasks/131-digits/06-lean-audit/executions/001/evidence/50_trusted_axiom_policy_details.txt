@@ -1,0 +1,303 @@
+Script started on 2026-07-31 02:36:46-05:00 [<not executed on terminal>]
+#!/usr/bin/env python3
+"""Model-free Stage 6 gate for Klean classification and optional proof."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any, Callable
+
+REPO = Path(__file__).resolve().parent.parent
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from tools import (
+    klean_export,
+    klean_preflight,
+    pipeline_contract,
+    stage6_resolution_contract,
+)
+
+
+class KleanFinalGateError(RuntimeError):
+    pass
+
+
+def _run(
+    command: list[str],
+    *,
+    cwd: Path,
+    timeout: int,
+) -> tuple[int, str]:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            timeout=timeout,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        return result.returncode, result.stdout
+    except subprocess.TimeoutExpired:
+        return 124, f"TIMEOUT after {timeout}s"
+
+
+def _regular_json(path: Path, label: str) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise KleanFinalGateError(f"{label} is not a regular file")
+    try:
+        document = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise KleanFinalGateError(f"{label} is malformed") from error
+    if not isinstance(document, dict):
+        raise KleanFinalGateError(f"{label} must be a JSON object")
+    return document
+
+
+def _candidate_gate(candidate: Path, target: dict[str, Any]) -> None:
+    entries = klean_export._tree_entries(candidate)
+    proof = candidate / "Proof.lean"
+    if not proof.is_file() or proof.is_symlink():
+        raise KleanFinalGateError("candidate is missing regular Proof.lean")
+    for required in ("lakefile.lean", "lean-toolchain"):
+        path = candidate / required
+        if not path.is_file() or path.is_symlink():
+            raise KleanFinalGateError(f"candidate is missing regular {required}")
+    candidate_sources: list[tuple[str, str]] = []
+    for relative, kind, path in entries:
+        if kind != "file" or path.suffix != ".lean":
+            continue
+        text = path.read_text()
+        if Path(relative).parts[0] != "Base":
+            candidate_sources.append((relative, text))
+        forbidden = re.search(
+            r"\b(?:sorry|admit|unsafe|axiom|opaque)\b", text
+        )
+        if forbidden is not None:
+            raise KleanFinalGateError(
+                f"candidate contains forbidden Lean token "
+                f"{forbidden.group(0)!r} in {relative}"
+            )
+    statement = target.get("statement")
+    parameters = target.get("parameters")
+    if not isinstance(statement, str) or not statement:
+        raise KleanFinalGateError("generator target statement is malformed")
+    if not isinstance(parameters, list):
+        raise KleanFinalGateError("generator target bindings are malformed")
+    proof_text = proof.read_text()
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanFinalGateError("generator target binding is malformed")
+        name = parameter.get("name")
+        lean_type = parameter.get("type")
+        if not isinstance(name, str) or not isinstance(lean_type, str):
+            raise KleanFinalGateError("generator target binding is malformed")
+        declarations = [
+            (relative, match.start())
+            for relative, text in candidate_sources
+            for match in re.finditer(
+                rf"(?m)^\s*(?:@\[[^\n]*\]\s*)*"
+                rf"(?:noncomputable\s+)?def\s+{re.escape(name)}"
+                rf"\s*(?::|\()",
+                text,
+            )
+        ]
+        if len(declarations) != 1:
+            raise KleanFinalGateError(
+                f"candidate must define exact trust binding {name!r} once"
+            )
+    theorem_matches = re.findall(
+        r"(?ms)^\s*theorem\s+final\s*:\s*(.*?)\s*:=\s*by\b",
+        proof_text,
+    )
+    if len(theorem_matches) != 1:
+        raise KleanFinalGateError(
+            "candidate must contain exactly one theorem final"
+        )
+    if " ".join(theorem_matches[0].split()) != " ".join(statement.split()):
+        raise KleanFinalGateError(
+            "Proof.final does not state the exact generated target"
+        )
+
+
+def _allowed_axioms(inventory: dict[str, Any]) -> set[str]:
+    allowlist = inventory.get("allowlist")
+    if not isinstance(allowlist, list):
+        raise KleanFinalGateError("trust inventory allowlist is malformed")
+    names = {"Classical.choice", "propext", "Quot.sound"}
+    for entry in allowlist:
+        if not isinstance(entry, dict):
+            raise KleanFinalGateError("trust inventory entry is malformed")
+        name = entry.get("name")
+        if not isinstance(name, str) or not name:
+            raise KleanFinalGateError("trust inventory name is malformed")
+        names.add(name)
+    return names
+
+
+def _parse_axioms(output: str) -> set[str]:
+    matches = list(re.finditer(r"depends on axioms:\s*\[", output))
+    axiom_free = re.findall(
+        r"does not depend on any axioms", output
+    )
+    if len(matches) + len(axiom_free) != 1:
+        raise KleanFinalGateError("#print axioms output is missing or ambiguous")
+    if axiom_free:
+        return set()
+    tokens: list[str] = []
+    token: list[str] = []
+    quoted = False
+    for character in output[matches[0].end() :]:
+        if character == "«" and not quoted:
+            quoted = True
+            token.append(character)
+        elif character == "»" and quoted:
+            quoted = False
+            token.append(character)
+        elif character == "," and not quoted:
+            name = "".join(token).strip()
+            if not name:
+                raise KleanFinalGateError(
+                    "#print axioms output contains an empty axiom name"
+                )
+            tokens.append(name)
+            token = []
+        elif character == "]" and not quoted:
+            name = "".join(token).strip()
+            if name:
+                tokens.append(name)
+            return set(tokens)
+        else:
+            token.append(character)
+    raise KleanFinalGateError("#print axioms output has no closing bracket")
+
+
+def check_proof_candidate(
+    generation: Path,
+    candidate: Path,
+    *,
+    run_command: Callable[..., tuple[int, str]] = _run,
+) -> dict[str, Any]:
+    """Independently build and axiom-check one immutable Stage 5 proof."""
+
+    generation = Path(generation)
+    candidate = Path(candidate)
+    manifest = _regular_json(
+        generation / "generator-manifest.json", "generator manifest"
+    )
+    target = manifest.get("target")
+    if not isinstance(target, dict):
+        raise KleanFinalGateError("generator target is malformed")
+    before_generation = klean_export.tree_digest(generation)
+    before_candidate = klean_export.tree_digest(candidate)
+    _candidate_gate(candidate, target)
+    inventory = _regular_json(
+        generation / "trust-inventory.json", "trust inventory"
+    )
+    diagnostics: list[dict[str, Any]] = []
+    with tempfile.TemporaryDirectory(prefix="klean-proof-check-") as temporary:
+        project = Path(temporary) / "project"
+        shutil.copytree(candidate, project)
+        if klean_export.tree_digest(project) != before_candidate:
+            raise KleanFinalGateError(
+                "candidate changed while copying for mechanical audit"
+            )
+        shutil.rmtree(project / ".lake", ignore_errors=True)
+        shutil.rmtree(project / "Base", ignore_errors=True)
+        shutil.copytree(generation / "generated", project / "Base")
+        audit_source = project / "AxiomAudit.lean"
+        audit_source.write_text(
+            "import Proof\n\n"
+            "namespace Proof\n\n"
+            f"#check (final : {target['statement']})\n"
+            "#print axioms final\n\n"
+            "end Proof\n"
+        )
+        outputs: dict[tuple[str, ...], str] = {}
+        commands = (
+            ["lake", "clean"],
+            ["lake", "build"],
+            ["lake", "env", "lean", "AxiomAudit.lean"],
+        )
+        for command in commands:
+            code, output = run_command(command, cwd=project, timeout=600)
+            diagnostics.append(
+                {
+                    "command": command,
+                    "exit_code": code,
+                    "output_sha256": hashlib.sha256(
+                        output.encode()
+                    ).hexdigest(),
+                    "output_tail": output[-4000:],
+                }
+            )
+            outputs[tuple(command)] = output
+            if code != 0:
+                raise KleanFinalGateError(
+                    f"{' '.join(command)} failed ({code}): {output[-600:]}"
+                )
+        used_axioms = _parse_axioms(
+            outputs[("lake", "env", "lean", "AxiomAudit.lean")]
+        )
+    if klean_export.tree_digest(generation) != before_generation:
+        raise KleanFinalGateError(
+            "generation changed during mechanical audit"
+        )
+    if klean_export.tree_digest(candidate) != before_candidate:
+        raise KleanFinalGateError(
+            "candidate changed during mechanical audit"
+        )
+    if "sorryAx" in used_axioms:
+        raise KleanFinalGateError("Proof.final depends on forbidden sorryAx")
+    allowed = _allowed_axioms(inventory)
+    unexpected = sorted(
+        axiom for axiom in used_axioms if axiom not in allowed
+    )
+    if unexpected:
+        raise KleanFinalGateError(
+            "Proof.final has unrecorded axiom dependencies: "
+            + ", ".join(unexpected)
+        )
+    return {
+        "status": "PASS",
+        "target": target,
+        "generation_sha256": before_generation,
+        "candidate_sha256": before_candidate,
+        "used_axioms": sorted(used_axioms),
+        "diagnostics": diagnostics,
+    }
+
+
+def evaluate_proof_candidate(
+    generation: Path,
+    candidate: Path,
+    *,
+    run_command: Callable[..., tuple[int, str]] = _run,
+) -> dict[str, Any]:
+    try:
+        return check_proof_candidate(
+            generation, candidate, run_command=run_command
+        )
+    except KleanFinalGateError as error:
+        return {"status": "FAIL", "error": str(error)}
+    except BaseException as error:
+        return {
+            "status": "AUDIT_ERROR",
+            "error": f"{type(error).__name__}: {error}",
+        }
+
+
+def _audit_input_binding(path: Path) -> dict[str, Any]:
+    document = _regular_json(path, "Stage 6 audit input")
+
+Script done on 2026-07-31 02:36:46-05:00 [COMMAND_EXIT_CODE="0"]

@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Validate the frozen Stage 6 mechanical-checker bundle."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+
+
+def _regular_file(path: Path, label: str) -> bytes:
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"{label} must be a real regular file: {path}")
+    return path.read_bytes()
+
+
+def validate_bundle(root: Path, lock_path: Path) -> str:
+    lock_bytes = _regular_file(lock_path, "checker lock")
+    document = json.loads(lock_bytes)
+    if document.get("schema_version") != 1:
+        raise ValueError("checker lock schema_version must be 1")
+    files = document.get("files")
+    if not isinstance(files, dict) or not files:
+        raise ValueError("checker lock files must be a non-empty object")
+    for relative, expected in sorted(files.items()):
+        if (
+            not isinstance(relative, str)
+            or not isinstance(expected, str)
+            or len(expected) != 64
+        ):
+            raise ValueError("checker lock contains an invalid file record")
+        path = root / relative
+        actual = hashlib.sha256(
+            _regular_file(path, f"checker bundle file {relative}")
+        ).hexdigest()
+        if actual != expected:
+            raise ValueError(
+                f"checker bundle SHA-256 mismatch for {relative}: "
+                f"expected {expected}, observed {actual}"
+            )
+    return hashlib.sha256(lock_bytes).hexdigest()
+
+
+def validate_discovery_manifest(path: Path) -> None:
+    document = json.loads(_regular_file(path, "discovery manifest"))
+    if document.get("schema_version") != 2:
+        raise ValueError("discovery manifest schema_version must be 2")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--lock", type=Path, required=True)
+    parser.add_argument("--discovery-manifest", type=Path)
+    arguments = parser.parse_args()
+    try:
+        root = arguments.root.resolve(strict=True)
+        if not root.is_dir() or root.is_symlink():
+            raise ValueError(f"checker root must be a real directory: {root}")
+        lock_sha256 = validate_bundle(root, arguments.lock)
+        if arguments.discovery_manifest is not None:
+            validate_discovery_manifest(arguments.discovery_manifest)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        parser.exit(1, f"Stage 6 checker gate failed: {error}\n")
+    print(f"STAGE6_CHECKER_GATE_OK lock_sha256={lock_sha256}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,166 @@
+$ rg -n "^def sha256_tree" /reference/tools/pipeline_contract.py
+190:def sha256_tree(root: Path) -> str:
+$ sed -n "200,310p" /reference/tools/klean_audit_contract.py
+                "Stage 5 invocation evidence changed after success"
+            )
+        return workspace, invocation, result
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _stage1_source_hashes(workspace: Path) -> dict[str, str]:
+    try:
+        return {
+            path.relative_to(workspace).as_posix(): (
+                pipeline_contract.sha256_file(path)
+            )
+            for path in pipeline_contract._walk_regular_files(
+                workspace, "Stage 1 source workspace"
+            )
+        }
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def resolve_stage6_audit(
+    repo: Path, run_id: str, problem: str
+) -> dict[str, Any]:
+    """Resolve and re-hash every frozen input to the Stage 6 audit."""
+
+    try:
+        task, _state, run = pipeline_contract._resolve_task_state(
+            repo, run_id, problem
+        )
+        pipeline_contract.require_task_unblocked(task, "Stage 6")
+        k_stage = pipeline_contract.require_real_directory(
+            task / "01-k-proof", "Stage 1"
+        )
+        k_workspace = pipeline_contract.require_real_directory(
+            k_stage / "workspace", "Stage 1 K workspace"
+        )
+        k_result = pipeline_contract._read_regular_json(
+            k_stage / "result.json", "Stage 1 result"
+        )
+        if k_result.get("status") != "SUCCEEDED":
+            raise KleanAuditContractError("Stage 1 is not successful")
+        k_hash = pipeline_contract.sha256_tree(k_workspace)
+        if (
+            not isinstance(k_result.get("outputs"), dict)
+            or k_result["outputs"].get("workspace_sha256") != k_hash
+        ):
+            raise KleanAuditContractError(
+                "Stage 1 K workspace changed after success"
+            )
+        stage1_export_hash = klean_export.tree_digest(k_workspace)
+        stage1_source_hashes = _stage1_source_hashes(k_workspace)
+
+        k_audit, k_audit_selection = _selected(
+            task, "02-k-audit", "executions"
+        )
+        k_verdict = pipeline_contract._read_regular_json(
+            k_audit / "verdict.json", "Stage 2 verdict"
+        )
+        if (
+            k_verdict.get("audit_status") != "COMPLETE"
+            or k_verdict.get("legitimacy") != "LEGIT"
+            or k_verdict.get("verdict") not in {"PASS", "CONCERNS"}
+        ):
+            raise KleanAuditContractError(
+                "Stage 2 must have a selected LEGIT verdict"
+            )
+
+        try:
+            discovery = stage4_runner._protected_stage3_discovery(task)
+        except stage4_runner.Stage4RunnerError as error:
+            raise KleanAuditContractError(str(error)) from error
+
+        generation, generation_selection = _selected(
+            task, "04-klean-generation", "generations"
+        )
+        generation_status = generation_selection.get("status")
+        if generation_status not in {
+            "PASS",
+            "KLEAN_NO_OBLIGATIONS",
+        }:
+            raise KleanAuditContractError(
+                "Stage 4 must have a selected passing Klean generation"
+            )
+        preflight = pipeline_contract._read_regular_json(
+            generation / "preflight.json", "Stage 4 preflight"
+        )
+        if preflight.get("status") != generation_status:
+            raise KleanAuditContractError(
+                "Stage 4 selection status differs from its preflight"
+            )
+        generator_manifest = pipeline_contract._read_regular_json(
+            generation / "generator-manifest.json", "generator manifest"
+        )
+        generated = pipeline_contract.require_real_directory(
+            generation / "generated", "generated Klean project"
+        )
+        generated_hash = klean_export.tree_digest(generated)
+        if generator_manifest.get("generated_tree_sha256") != generated_hash:
+            raise KleanAuditContractError(
+                "selected Stage 4 generation changed after preflight"
+            )
+        provenance = generator_manifest.get("provenance")
+        if (
+            not isinstance(provenance, dict)
+            or provenance.get("stage1_workspace_sha256")
+            != stage1_export_hash
+            or provenance.get("stage3_discovery_manifest_sha256")
+            != discovery.sha256
+        ):
+            raise KleanAuditContractError(
+$ sed -n "350,400p" /reference/tools/klean_audit_contract.py
+            "semantics_mode": (
+                "SUPPLIED_SEMANTICS"
+                if condition.get("semantics") is True
+                else "GENERATED_SEMANTICS"
+            ),
+            "k_workspace": str(k_workspace),
+            "k_audit": str(k_audit),
+            "discovery_manifest": str(discovery.path),
+            "klean_generation": str(generation),
+            "lean_workspace": (
+                str(lean_workspace)
+                if lean_workspace is not None
+                else None
+            ),
+            "lean_invocation": (
+                str(lean_invocation)
+                if lean_invocation is not None
+                else None
+            ),
+            "target": target,
+            "stage1_source_hashes": stage1_source_hashes,
+            "trust_inventory": str(
+                pipeline_contract.require_regular_file(
+                    generation / "trust-inventory.json",
+                    "Stage 4 trust inventory",
+                )
+            ),
+            "hashes": {
+                "k_workspace_sha256": k_hash,
+                "stage1_export_sha256": stage1_export_hash,
+                "discovery_manifest_sha256": discovery.sha256,
+                "k_audit_sha256": pipeline_contract.sha256_tree(k_audit),
+                "klean_generation_sha256": pipeline_contract.sha256_tree(
+                    generation
+                ),
+                "generated_tree_sha256": generated_hash,
+                "lean_workspace_sha256": (
+                    pipeline_contract.sha256_tree(lean_workspace)
+                    if lean_workspace is not None
+                    else None
+                ),
+                "lean_invocation_sha256": (
+                    pipeline_contract.sha256_tree(lean_invocation)
+                    if lean_invocation is not None
+                    else None
+                ),
+            },
+            "selections": {
+                "k_audit": k_audit_selection,
+                "klean_generation": generation_selection,
+            },

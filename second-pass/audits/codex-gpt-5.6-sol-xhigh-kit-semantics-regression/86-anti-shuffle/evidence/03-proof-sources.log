@@ -1,0 +1,606 @@
+COMMAND: bash -lc echo\ \"VERIFICATION\"\;\ nl\ -ba\ /candidate/verification.k\;\ echo\ \"SPEC\"\;\ nl\ -ba\ /candidate/spec.k\;\ echo\ \"CANDIDATE_VACUITY\"\;\ nl\ -ba\ /candidate/spec-vacuity.k\;\ echo\ \"PROVE_SH\"\;\ nl\ -ba\ /candidate/prove.sh\;\ echo\ \"PROOF_MD_UNTRUSTED\"\;\ nl\ -ba\ /candidate/PROOF.md
+VERIFICATION
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Reachable heaps for this program are append-only sequences of list values.
+     7	  // heapOf(HS) assigns exactly the consecutive locations 0 .. heapCount(HS)-1.
+     8	  syntax HeapVals ::= ".HeapVals" | hSnoc ( HeapVals , Val )
+     9	  syntax Int ::= heapCount ( HeapVals ) [function, total]
+    10	  syntax Map ::= heapOf ( HeapVals ) [function, total]
+    11	  rule heapCount(.HeapVals) => 0
+    12	  rule heapCount(hSnoc(HS:HeapVals, _V:Val)) => heapCount(HS) +Int 1
+    13	  rule heapOf(.HeapVals) => .Map
+    14	  rule heapOf(hSnoc(HS:HeapVals, V:Val))
+    15	    => (heapCount(HS) |-> V) heapOf(HS)
+    16	
+    17	  // Derived by structural induction on HS: heapOf uses only indices strictly
+    18	  // below heapCount, so the allocator's next location is always fresh.
+    19	  rule (heapCount(HS:HeapVals) in_keys(heapOf(HS))) => false [simplification]
+    20	
+    21	  // Exact membership law for the scope-map updates used by assignment.
+    22	  // In particular, ordinary local writes cannot invent a "$cells" marker.
+    23	  rule (K:String in_keys(M:Map [ X:String <- _V:Val ]))
+    24	    => K ==String X orBool K in_keys(M)
+    25	    [simplification]
+    26	  rule ("$cells" in_keys(("result" |-> _V:Val) M:Map))
+    27	    => "$cells" in_keys(M)
+    28	    [simplification]
+    29	  rule ("$cells" in_keys(("word" |-> _V:Val) M:Map))
+    30	    => "$cells" in_keys(M)
+    31	    [simplification]
+    32	  rule ("$cells" in_keys(("char" |-> _V:Val) M:Map))
+    33	    => "$cells" in_keys(M)
+    34	    [simplification]
+    35	  rule ("$cells" in_keys(("s" |-> _V:Val) M:Map))
+    36	    => "$cells" in_keys(M)
+    37	    [simplification]
+    38	  rule {M:Map [ X:String <- V:Val ][X]}:>Val => V [simplification]
+    39	  rule {("result" |-> V:Val) M:Map ["result"]}:>Val => V [simplification]
+    40	  rule {("word" |-> V:Val) M:Map ["word"]}:>Val => V [simplification]
+    41	  rule {("char" |-> V:Val) M:Map ["char"]}:>Val => V [simplification]
+    42	
+    43	  // Canonicalize the three local-variable updates while preserving the
+    44	  // disjoint remainder M.  This is the standard finite-map overwrite law.
+    45	  rule (("result" |-> RV:Val) ("word" |-> WV:Val) M:Map)
+    46	       [ "char" <- CV:Val ]
+    47	    => ("result" |-> RV) ("word" |-> WV) (M [ "char" <- CV ])
+    48	    [simplification]
+    49	  rule (("result" |-> _RV:Val) ("word" |-> WV:Val) M:Map)
+    50	       [ "result" <- V:Val ]
+    51	    => ("result" |-> V) ("word" |-> WV) M
+    52	    [simplification]
+    53	  rule (("result" |-> RV:Val) ("word" |-> _WV:Val) M:Map)
+    54	       [ "word" <- V:Val ]
+    55	    => ("result" |-> RV) ("word" |-> V) M
+    56	    [simplification]
+    57	  rule ("char" in_keys(
+    58	          ("result" |-> _RV:Val)
+    59	          ("word" |-> _WV:Val)
+    60	          (M:Map [ "char" <- _CV:Val ])))
+    61	    => true
+    62	    [simplification]
+    63	  rule {(("result" |-> _RV:Val)
+    64	         ("word" |-> _WV:Val)
+    65	         (M:Map [ "char" <- CV:Val ]))["char"]}:>Val
+    66	    => CV
+    67	    [simplification]
+    68	  rule ("list" in_keys(
+    69	          ("result" |-> _RV:Val)
+    70	          ("word" |-> _WV:Val)
+    71	          (M:Map [ "char" <- _CV:Val ])))
+    72	    => "list" in_keys(M)
+    73	    [simplification]
+    74	  rule ("sorted" in_keys(
+    75	          ("result" |-> _RV:Val)
+    76	          ("word" |-> _WV:Val)
+    77	          (M:Map [ "char" <- _CV:Val ])))
+    78	    => "sorted" in_keys(M)
+    79	    [simplification]
+    80	  rule ("list" in_keys(
+    81	          ("result" |-> _RV:Val)
+    82	          ("word" |-> _WV:Val)
+    83	          M:Map))
+    84	    => "list" in_keys(M)
+    85	    [simplification]
+    86	  rule ("sorted" in_keys(
+    87	          ("result" |-> _RV:Val)
+    88	          ("word" |-> _WV:Val)
+    89	          M:Map))
+    90	    => "sorted" in_keys(M)
+    91	    [simplification]
+    92	  rule {M:Map [ X:String <- _V:Val ][K:String]}:>Val => {M[K]}:>Val
+    93	    requires K =/=String X andBool K in_keys(M)
+    94	    [simplification]
+    95	
+    96	  // Exact syntax abbreviations for the implementation in solution.mpy.
+    97	  syntax Stmt ::= antiLoopBody ( ) [macro]
+    98	  rule antiLoopBody ( )
+    99	    => If(
+   100	         Compare(Name("char"), CmpOp("==", Str(" "))),
+   101	         Assign(
+   102	           Name("result"),
+   103	           BinOp(
+   104	             "+",
+   105	             BinOp(
+   106	               "+",
+   107	               Name("result"),
+   108	               Call(
+   109	                 Attribute(Str(""), "join"),
+   110	                 Call(Name("sorted"), Call(Name("list"), Name("word"))))),
+   111	             Str(" ")))
+   112	         Assign(Name("word"), Str("")),
+   113	         Assign(Name("word"), BinOp("+", Name("word"), Name("char"))))
+   114	
+   115	  syntax Expr ::= antiFinalExpr ( ) [macro]
+   116	  rule antiFinalExpr ( )
+   117	    => BinOp(
+   118	         "+",
+   119	         Name("result"),
+   120	         Call(
+   121	           Attribute(Str(""), "join"),
+   122	           Call(Name("sorted"), Call(Name("list"), Name("word")))))
+   123	
+   124	  syntax Stmts ::= antiFunctionBody ( ) [macro]
+   125	  rule antiFunctionBody ( )
+   126	    => Assign(Name("result"), Str(""))
+   127	       Assign(Name("word"), Str(""))
+   128	       For(Name("char"), Name("s"), antiLoopBody())
+   129	       Return(antiFinalExpr())
+   130	
+   131	  // The code sequence produced by "".join(sorted(list(str(W)))).  sortVS is
+   132	  // the fixed semantics' deliberately opaque model of Python's sorted().
+   133	  syntax IntSeq ::= sortedWord ( IntSeq ) [function, total]
+   134	  rule sortedWord(W:IntSeq) => joinCodes(.IntSeq, sortVS(charsOf(W)))
+   135	
+   136	  // Values of the two string accumulators after scanning the remaining CS.
+   137	  // These equations are constructor-complete; the two iCons cases are
+   138	  // disjoint and together cover every integer character code.
+   139	  syntax IntSeq ::= scanOut  ( IntSeq , IntSeq , IntSeq ) [function, total]
+   140	                  | scanWord ( IntSeq , IntSeq )          [function, total]
+   141	  syntax Map ::= scanFrame ( IntSeq , Map ) [function, total]
+   142	
+   143	  rule scanOut(.IntSeq, _W:IntSeq, O:IntSeq) => O
+   144	  rule scanOut(iCons(32, R:IntSeq), W:IntSeq, O:IntSeq)
+   145	    => scanOut(
+   146	         R,
+   147	         .IntSeq,
+   148	         seqConcat(seqConcat(O, sortedWord(W)), iCons(32, .IntSeq)))
+   149	  rule scanOut(iCons(C:Int, R:IntSeq), W:IntSeq, O:IntSeq)
+   150	    => scanOut(R, seqConcat(W, iCons(C, .IntSeq)), O)
+   151	    requires C =/=Int 32
+   152	    [simplification]
+   153	
+   154	  rule scanWord(.IntSeq, W:IntSeq) => W
+   155	  rule scanWord(iCons(32, R:IntSeq), _W:IntSeq) => scanWord(R, .IntSeq)
+   156	  rule scanWord(iCons(C:Int, R:IntSeq), W:IntSeq)
+   157	    => scanWord(R, seqConcat(W, iCons(C, .IntSeq)))
+   158	    requires C =/=Int 32
+   159	    [simplification]
+   160	
+   161	  rule scanFrame(.IntSeq, M:Map) => M
+   162	  rule scanFrame(iCons(C:Int, R:IntSeq), M:Map)
+   163	    => scanFrame(R, M [ "char" <- str(iCons(C, .IntSeq)) ])
+   164	  rule ("list" in_keys(scanFrame(_CS:IntSeq, M:Map)))
+   165	    => "list" in_keys(M)
+   166	    [simplification]
+   167	  rule ("sorted" in_keys(scanFrame(_CS:IntSeq, M:Map)))
+   168	    => "sorted" in_keys(M)
+   169	    [simplification]
+   170	
+   171	  // Exact heap/counter transition for the two allocations performed whenever
+   172	  // a completed word is sorted.  freshFor states every allocation guard that
+   173	  // fixed execution will encounter while scanning CS.
+   174	  syntax Map ::= heapAddWord ( IntSeq , Map , Int ) [function, total]
+   175	               | heapAfter   ( IntSeq , IntSeq , Map , Int ) [function, total]
+   176	  syntax Int ::= locAfter ( IntSeq , IntSeq , Int ) [function, total]
+   177	  syntax Bool ::= freshFor ( IntSeq , IntSeq , Int , Map ) [function, total]
+   178	
+   179	  rule heapAddWord(W:IntSeq, H:Map, N:Int)
+   180	    => H
+   181	       [ N <- list(charsOf(W)) ]
+   182	       [ N +Int 1 <- list(sortVS(charsOf(W))) ]
+   183	
+   184	  rule H:Map [ N:Int <- V:Val ] [ M:Int <- W:Val ]
+   185	    => (M |-> W) (N |-> V) H
+   186	    requires notBool (N in_keys(H))
+   187	     andBool notBool (M in_keys(H))
+   188	     andBool N =/=Int M
+   189	    [simplification]
+   190	
+   191	  rule heapAfter(.IntSeq, _W:IntSeq, H:Map, _N:Int) => H
+   192	  rule heapAfter(iCons(32, R:IntSeq), W:IntSeq, H:Map, N:Int)
+   193	    => heapAfter(R, .IntSeq, heapAddWord(W, H, N), N +Int 2)
+   194	  rule heapAfter(iCons(C:Int, R:IntSeq), W:IntSeq, H:Map, N:Int)
+   195	    => heapAfter(R, seqConcat(W, iCons(C, .IntSeq)), H, N)
+   196	    requires C =/=Int 32
+   197	    [simplification]
+   198	
+   199	  rule locAfter(.IntSeq, _W:IntSeq, N:Int) => N
+   200	  rule locAfter(iCons(32, R:IntSeq), _W:IntSeq, N:Int)
+   201	    => locAfter(R, .IntSeq, N +Int 2)
+   202	  rule locAfter(iCons(C:Int, R:IntSeq), W:IntSeq, N:Int)
+   203	    => locAfter(R, seqConcat(W, iCons(C, .IntSeq)), N)
+   204	    requires C =/=Int 32
+   205	    [simplification]
+   206	
+   207	  rule freshFor(.IntSeq, _W:IntSeq, _N:Int, _H:Map) => true
+   208	  rule freshFor(iCons(32, R:IntSeq), W:IntSeq, N:Int, H:Map)
+   209	    => notBool (N in_keys(H))
+   210	       andBool notBool ((N +Int 1) in_keys(H))
+   211	       andBool freshFor(R, .IntSeq, N +Int 2, heapAddWord(W, H, N))
+   212	  rule freshFor(iCons(C:Int, R:IntSeq), W:IntSeq, N:Int, H:Map)
+   213	    => freshFor(R, seqConcat(W, iCons(C, .IntSeq)), N, H)
+   214	    requires C =/=Int 32
+   215	    [simplification]
+   216	
+   217	  // Structural induction on CS and HS: heapOf(HS) occupies exactly the
+   218	  // locations below heapCount(HS), and heapAddWord extends that prefix by two.
+   219	  rule freshFor(CS:IntSeq, W:IntSeq, heapCount(HS:HeapVals), heapOf(HS))
+   220	    => true
+   221	    [simplification]
+   222	  rule freshFor(_CS:IntSeq, _W:IntSeq, 0, .Map) => true [simplification]
+   223	
+   224	  // The same induction gives freshness after the scan, needed by the final
+   225	  // word's list(...) and sorted(...) allocations.
+   226	  rule (locAfter(CS:IntSeq, W:IntSeq, heapCount(HS:HeapVals))
+   227	        in_keys(heapAfter(CS, W, heapOf(HS), heapCount(HS))))
+   228	    => false
+   229	    [simplification]
+   230	  rule (locAfter(CS:IntSeq, W:IntSeq, 0)
+   231	        in_keys(heapAfter(CS, W, .Map, 0)))
+   232	    => false
+   233	    [simplification]
+   234	  rule ((locAfter(CS:IntSeq, W:IntSeq, 0) +Int 1)
+   235	        in_keys(heapAfter(CS, W, .Map, 0)))
+   236	    => false
+   237	    [simplification]
+   238	  rule ((locAfter(CS:IntSeq, W:IntSeq, 0) +Int 1)
+   239	        in_keys(
+   240	          (locAfter(CS, W, 0) |-> _V:Val)
+   241	          heapAfter(CS, W, .Map, 0)))
+   242	    => false
+   243	    [simplification]
+   244	
+   245	  syntax IntSeq ::= antiShuffleCodes ( IntSeq ) [function, total]
+   246	  rule antiShuffleCodes(CS:IntSeq)
+   247	    => seqConcat(
+   248	         scanOut(CS, .IntSeq, .IntSeq),
+   249	         sortedWord(scanWord(CS, .IntSeq)))
+   250	
+   251	  syntax Map ::= antiFinalHeapMap ( IntSeq ) [function, total]
+   252	  syntax Int ::= antiFinalHeapLoc ( IntSeq ) [function, total]
+   253	  rule antiFinalHeapMap(CS:IntSeq)
+   254	    => heapAddWord(
+   255	         scanWord(CS, .IntSeq),
+   256	         heapAfter(CS, .IntSeq, .Map, 0),
+   257	         locAfter(CS, .IntSeq, 0))
+   258	  rule antiFinalHeapLoc(CS:IntSeq) => locAfter(CS, .IntSeq, 0) +Int 2
+   259	endmodule
+SPEC
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // The loop executes under the fixed semantics.  The invariant records the
+     7	  // exact accumulator values and records the fresh list allocations made by
+     8	  // list(word) and sorted(...), including their heap locations.
+     9	  claim [anti-loop]:
+    10	    <k>
+    11	      #loop(str(CS:IntSeq), Name("char"), antiLoopBody())
+    12	      => .K
+    13	      ...
+    14	    </k>
+    15	    <env> 1 </env>
+    16	    <scopes>
+    17	      1 |-> (scope(
+    18	                   ("result" |-> str(O:IntSeq))
+    19	                   ("word" |-> str(W:IntSeq))
+    20	                   M:Map,
+    21	                   parent(0))
+    22	                 => scope(
+    23	                   ("result" |-> str(scanOut(CS, W, O)))
+    24	                   ("word" |-> str(scanWord(CS, W)))
+    25	                   scanFrame(CS, M),
+    26	                   parent(0)))
+    27	      0 |-> scope(
+    28	        "anti_shuffle" |-> closureVal("s", antiFunctionBody(), 0),
+    29	        parent(-1))
+    30	      -1 |-> builtinsScope
+    31	    </scopes>
+    32	    <scopeLoc> 2 </scopeLoc>
+    33	    <heap> H:Map => heapAfter(CS, W, H, N) </heap>
+    34	    <heapLoc> N:Int => locAfter(CS, W, N) </heapLoc>
+    35	    <stack> STACK:List </stack>
+    36	    <ret> noRet </ret>
+    37	    <exc> NoExc </exc>
+    38	    <exit-code> 0 </exit-code>
+    39	    requires notBool ("$cells" in_keys(M))
+    40	     andBool notBool ("list" in_keys(M))
+    41	     andBool notBool ("sorted" in_keys(M))
+    42	     andBool freshFor(CS, W, N, H)
+    43	
+    44	  // Whole-program claim: load the exact function body, resolve its binding,
+    45	  // call it with an arbitrary modeled string, and constrain the returned value.
+    46	  claim [anti-shuffle]:
+    47	    <k>
+    48	      #loadAll(Module(FuncDef("anti_shuffle", Params("s"), antiFunctionBody())))
+    49	      ~> Call(Name("anti_shuffle"), str(CS:IntSeq))
+    50	      => str(antiShuffleCodes(CS))
+    51	    </k>
+    52	    <env> 0 </env>
+    53	    <scopes>
+    54	      (0 |-> scope(.Map, parent(-1))
+    55	       -1 |-> builtinsScope)
+    56	      => (0 |-> scope(
+    57	            "anti_shuffle" |-> closureVal("s", antiFunctionBody(), 0),
+    58	            parent(-1))
+    59	          -1 |-> builtinsScope)
+    60	    </scopes>
+    61	    <scopeLoc> 1 </scopeLoc>
+    62	    <heap> .Map => antiFinalHeapMap(CS) </heap>
+    63	    <heapLoc> 0 => antiFinalHeapLoc(CS) </heapLoc>
+    64	    <stack> .List </stack>
+    65	    <ret> noRet </ret>
+    66	    <exc> NoExc </exc>
+    67	    <exit-code> 0 </exit-code>
+    68	endmodule
+CANDIDATE_VACUITY
+     1	requires "spec.k"
+     2	
+     3	module SPEC-VACUITY
+     4	  imports SPEC
+     5	
+     6	  // Deliberately false: for the realizable empty input, the implementation
+     7	  // returns the empty string, not a string prefixed by code 0.
+     8	  claim [false-result]:
+     9	    <k>
+    10	      #loadAll(Module(FuncDef("anti_shuffle", Params("s"), antiFunctionBody())))
+    11	      ~> Call(Name("anti_shuffle"), str(CS:IntSeq))
+    12	      => str(iCons(0, antiShuffleCodes(CS)))
+    13	    </k>
+    14	    <env> 0 </env>
+    15	    <scopes>
+    16	      (0 |-> scope(.Map, parent(-1))
+    17	       -1 |-> builtinsScope)
+    18	      => (0 |-> scope(
+    19	            "anti_shuffle" |-> closureVal("s", antiFunctionBody(), 0),
+    20	            parent(-1))
+    21	          -1 |-> builtinsScope)
+    22	    </scopes>
+    23	    <scopeLoc> 1 </scopeLoc>
+    24	    <heap> .Map => antiFinalHeapMap(CS) </heap>
+    25	    <heapLoc> 0 => antiFinalHeapLoc(CS) </heapLoc>
+    26	    <stack> .List </stack>
+    27	    <ret> noRet </ret>
+    28	    <exc> NoExc </exc>
+    29	    <exit-code> 0 </exit-code>
+    30	endmodule
+PROVE_SH
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py concrete-tests.py > concrete-tests.mpy
+     6	python3 py2mpy.py differential-tests.py > differential-tests.mpy
+     7	python3 py2mpy.py body-mutation.py > body-mutation.mpy
+     8	if cmp -s solution.mpy body-mutation.mpy; then
+     9	  echo 'body mutation did not change the translated program' >&2
+    10	  exit 1
+    11	fi
+    12	
+    13	python3 concrete-tests.py
+    14	python3 differential-tests.py
+    15	
+    16	kompile reference-semantics/semantics.k \
+    17	  --backend llvm \
+    18	  --main-module MPY-KRUN \
+    19	  --syntax-module MPY-SYNTAX \
+    20	  --output-definition runtime-kompiled
+    21	
+    22	krun concrete-tests.mpy --definition runtime-kompiled > concrete-krun.out
+    23	rg -q -U '<exit-code>\s*0\s*</exit-code>' concrete-krun.out
+    24	
+    25	krun differential-tests.mpy --definition runtime-kompiled > differential-krun.out
+    26	rg -q -U '<exit-code>\s*0\s*</exit-code>' differential-krun.out
+    27	
+    28	if krun body-mutation.mpy --definition runtime-kompiled \
+    29	     > body-mutation-krun.out 2>&1; then
+    30	  echo 'body mutation unexpectedly satisfied the original result' >&2
+    31	  exit 1
+    32	fi
+    33	rg -q -U '<exit-code>\s*1\s*</exit-code>' body-mutation-krun.out
+    34	
+    35	kompile --backend haskell verification.k \
+    36	  --main-module VERIFICATION \
+    37	  --syntax-module MPY-SYNTAX \
+    38	  --output-definition verification-kompiled
+    39	
+    40	kprove spec.k \
+    41	  --definition verification-kompiled \
+    42	  --spec-module SPEC \
+    43	  2>&1 | tee kprove.out
+    44	rg -q '^#Top$' kprove.out
+    45	
+    46	if kprove spec-vacuity.k \
+    47	     --definition verification-kompiled \
+    48	     --spec-module SPEC-VACUITY \
+    49	     > vacuity-kprove.out 2>&1; then
+    50	  echo 'false-result mutation unexpectedly proved' >&2
+    51	  exit 1
+    52	fi
+    53	rg -q 'WarnStuckClaimState' vacuity-kprove.out
+    54	
+    55	echo 'all positive proofs passed; both negative probes failed as expected'
+PROOF_MD_UNTRUSTED
+     1	VALIDATED
+     2	
+     3	## What is proven
+     4	
+     5	Under the supplied `MPY` semantics, the exact translated body of
+     6	`anti_shuffle` is partially correct for every modeled string `str(CS)`.  If the
+     7	call terminates, it returns the original sequence of space-separated words in
+     8	the original order, with each word's characters passed through the supplied
+     9	ascending `sorted` primitive.  Every code `32` is copied in its original
+    10	position, so leading, trailing, and repeated spaces are preserved.
+    11	
+    12	The proof also constrains the observable control and state cells: the module
+    13	binding is the exact function body, the caller environment and empty stack are
+    14	restored, `ret` is `noRet`, `exc` is `NoExc`, the exit code remains zero, and
+    15	all temporary list allocations and the final heap location are characterized.
+    16	This is a partial-correctness theorem; it does not independently prove
+    17	termination.
+    18	
+    19	`solution.mpy` is regenerated from `solution.py` by the fixed translator in
+    20	`prove.sh`.  The proof macros `antiLoopBody`, `antiFinalExpr`, and
+    21	`antiFunctionBody` reproduce that translated AST, including the parameter,
+    22	assignments, branch, loop, builtin lookups, and return expression.
+    23	
+    24	## Formal claims
+    25	
+    26	- `SPEC.anti-loop` is the circular loop invariant.  `scanOut(CS,W,O)` is the
+    27	  completed output prefix after scanning the remaining characters, and
+    28	  `scanWord(CS,W)` is the unfinished final word.  `scanFrame`, `heapAfter`, and
+    29	  `locAfter` state the exact local-frame and allocation effects.  The claim
+    30	  fixes the loaded `anti_shuffle` closure and the `list`/`sorted` builtin scope,
+    31	  but permits an arbitrary continuation and stack because the loop neither
+    32	  changes nor discards them.
+    33	- `SPEC.anti-shuffle` loads the exact module definition, resolves and calls its
+    34	  binding with `str(CS)`, and reaches `str(antiShuffleCodes(CS))` from the empty
+    35	  initial heap and module scope.
+    36	
+    37	At a space, `scanOut` appends `sortedWord(W)` and code `32`, then `scanWord`
+    38	resets to empty.  At every other code, `scanWord` appends that code and
+    39	`scanOut` is unchanged.  At end of input, `antiShuffleCodes` appends the sorted
+    40	unfinished word.  These are exactly the base and inductive cases executed by
+    41	the source loop.
+    42	
+    43	## Proof-extension inventory
+    44	
+    45	There are no operational bridges: no proof-local rule replaces a source call,
+    46	loop, return, frame pop, allocation, or other fixed-semantics computation.
+    47	
+    48	| Extension | Class and semantic role | Domain and matched context | State footprint and justification | Dependents and validation |
+    49	|---|---|---|---|---|
+    50	| `antiLoopBody`, `antiFinalExpr`, `antiFunctionBody` | Definitional syntax macros; abbreviate, but do not rewrite, execution | The exact AST in `solution.mpy` | No state effect of their own; macro expansion is textually the translated body | Both claims; concrete execution and the body mutation check the connection |
+    51	| `sortedWord` | Definitional value summary | Every `IntSeq W` | Names `joinCodes(.IntSeq, sortVS(charsOf(W)))`; no control or state | `scanOut`, `antiShuffleCodes`; conditional on the fixed `sortVS` contract |
+    52	| `scanOut`, `scanWord` | Definitional recursive summaries | All `IntSeq`; cases are `.IntSeq`, head `32`, and head `C =/= 32` | Result strings only; every recursive call consumes one constructor.  The two nonempty guards are disjoint and exhaustive | Loop and entry claims; base/step closure and differential tests |
+    53	| `scanFrame` and its `list`/`sorted` membership equations | Definitional state summary plus derived finite-map lemmas | All `IntSeq` and maps; it only overwrites key `"char"` | Local scope only; induction shows it cannot create `list` or `sorted` bindings | Binding fidelity in both claims |
+    54	| `HeapVals`, `heapCount`, `heapOf` | Definitional consecutive-heap representation | Every finite `HeapVals` constructor term | Heap and heap-location representation; structural recursion assigns keys `0..count-1` | Freshness lemmas and both claims |
+    55	| `heapAddWord`, `heapAfter`, `locAfter`, `freshFor` | Definitional operational-state summaries; they describe rather than replace execution | All arguments.  `heapAddWord` uses total map overwrites; the scan functions have the same exhaustive character cases as the loop | Exact heap values, allocation counter, and allocator guards for the two lists created per completed word | Loop and entry claims; concrete heap traces and `#Top` |
+    56	| `antiShuffleCodes`, `antiFinalHeapMap`, `antiFinalHeapLoc` | Definitional final summaries | Every `IntSeq` | Returned codes and exact final heap/counter, including the last word's two allocations | Entry claim and false-result mutation |
+    57	| Map membership, lookup, and overwrite rules in `verification.k` | Derived lemmas | Defined finite maps of the displayed shapes; the integer-key normalization additionally requires both keys fresh and distinct | No control effect.  They expose standard `in_keys`, lookup, and overwrite facts needed to distinguish plain locals from closure cells and canonicalize exact local/heap writes | Both claims; pairwise overlaps agree (same lookup value or same membership result) |
+    58	| Consecutive-heap freshness rules | Derived lemmas | `heapOf(HS)` at `heapCount(HS)`, plus their explicit empty-prefix corollaries | Heap definedness only.  Structural induction on `HS` and then on `CS` shows all old keys are below the counter and each word adds precisely the next two keys | Allocation steps in both claims; guarded map normalization and concrete heap traces |
+    59	| `SPEC.anti-loop` | Derived reachability claim/circularity | Exact `#loop` term, loop body, function/module/builtin bindings, all configuration cells shown in `spec.k`, arbitrary framed continuation and `STACK`, and the stated freshness/binding guards | Reads the local strings and remaining iterable; writes `char`, `result`, `word`, heap, and heap location; preserves continuation, stack, return, exception, and exit state | `SPEC.anti-shuffle`; proved directly with fixed semantics as part of the combined `#Top` run |
+    60	
+    61	The recursive equations descend structurally.  Every `[total]` symbol has
+    62	constructor-complete equations.  The special empty-heap freshness rules overlap
+    63	the general consecutive-heap rules only with the same `true`/`false` result.
+    64	The specialized `list`/`sorted` map rules overlap the general update laws only
+    65	where both reduce to the same finite-map fact.
+    66	
+    67	## Commands and actual results
+    68	
+    69	The complete reproducible command is:
+    70	
+    71	```sh
+    72	./prove.sh
+    73	```
+    74	
+    75	It exited `0` and ended with:
+    76	
+    77	```text
+    78	#Top
+    79	all positive proofs passed; both negative probes failed as expected
+    80	```
+    81	
+    82	The positive target-proof command executed by the script was:
+    83	
+    84	```sh
+    85	kprove spec.k \
+    86	  --definition verification-kompiled \
+    87	  --spec-module SPEC
+    88	```
+    89	
+    90	Actual result: `#Top`, exit `0`.  Because the complete `SPEC` module is proved
+    91	together, the entry claim has the `anti-loop` circularity available; filtering
+    92	only the entry claim would intentionally remove that invariant.
+    93	
+    94	Concrete LLVM compilation used the required modules:
+    95	
+    96	```sh
+    97	kompile reference-semantics/semantics.k \
+    98	  --backend llvm \
+    99	  --main-module MPY-KRUN \
+   100	  --syntax-module MPY-SYNTAX \
+   101	  --output-definition runtime-kompiled
+   102	```
+   103	
+   104	`krun concrete-tests.mpy --definition runtime-kompiled` and
+   105	`krun differential-tests.mpy --definition runtime-kompiled` both exited `0` and
+   106	ended with modeled `<exit-code> 0 </exit-code>`.  The final Haskell compile and
+   107	proof emitted only compiler warnings about unused variables and unrelated
+   108	non-exhaustive functions in the supplied semantics; the proof result was still
+   109	`#Top` with process exit `0`.
+   110	
+   111	## Gate A — PASS: real-program soundness
+   112	
+   113	- **A1:** The entry claim loads the exact `FuncDef`, resolves the actual module
+   114	  binding, enters the function frame, executes the actual loop and return, and
+   115	  uses an exact auxiliary loop claim.  No program-defined operation is replaced
+   116	  by an opaque result.  `body-mutation.py` changes `word = ""` to `word = "x"`;
+   117	  its translation differs from `solution.mpy`, and the empty-string witness
+   118	  reaches `AssertionError` with modeled exit code `1` under fixed LLVM
+   119	  semantics.
+   120	- **A2:** There is no operational bridge.  The claims explicitly account for
+   121	  local scopes, heap contents, heap location, stack, return state, exception,
+   122	  and exit code.
+   123	- **A3:** The invariant fixes environment `1`, parent scope `0`, the exact
+   124	  module closure, and `builtinsScope` at `-1`; its guards exclude local
+   125	  `list`/`sorted` shadowing.  Fixed semantics performs all lookup, argument
+   126	  evaluation, allocation, method dispatch, return, and frame restoration.
+   127	- **A4:** Summary cases are exhaustive and disjoint, recursion descends, map
+   128	  equations are standard finite-map equalities on their full domains, and the
+   129	  heap equations are total.  The guarded normalization rule applies only when
+   130	  both integer keys are fresh and distinct.  No inconsistent overlap was
+   131	  found.
+   132	- **A5:** `CS = .IntSeq` is a realizable witness and returns the empty string.
+   133	  `spec-vacuity.k` prefixes the expected result with code `0`; its `kprove`
+   134	  command exits `1` with `WarnStuckClaimState` and a residual requiring
+   135	  `iCons(0, RESULT) == RESULT`.
+   136	
+   137	## Gate B — PASS: intent adequacy
+   138	
+   139	- The entry domain is exactly modeled string values `str(CS)`; non-string
+   140	  arguments are outside the HumanEval signature contract.  There is no hidden
+   141	  restriction on length, number of words, leading/trailing spaces, or repeated
+   142	  spaces.
+   143	- The reference model represents characters by integer codes and the delimiter
+   144	  by ASCII code `32`, matching the prompt's ASCII-order wording.  The symbolic
+   145	  theorem accepts arbitrary code sequences; concrete string literals in this
+   146	  semantics are ASCII-only.
+   147	- The execution-to-summary connection is formally proved.  The statement that
+   148	  `sortVS` is an ascending permutation is the supplied semantics' explicit
+   149	  trusted primitive contract, not a theorem invented by this proof; the
+   150	  human-facing conclusion is conditional on that contract and empirically
+   151	  supported below.
+   152	- The three prompt examples and spacing edge cases agree with the
+   153	  implementation and the summary.
+   154	
+   155	## Gate C — PASS: trust and evidence auditability
+   156	
+   157	### Trust ledger
+   158	
+   159	| Component | Why outside this theorem | Effect and dependents | Evidence |
+   160	|---|---|---|---|
+   161	| Supplied `MPY` semantics and K backends | They are the required trusted language/tool foundation | Value, control, state, and proof execution; all claims | Successful LLVM/Haskell compilation, concrete traces, and `#Top` |
+   162	| Fixed `sortVS` in `reference-semantics/semantics/sort.k` | Deliberately opaque under symbolic proof; its ascending-permutation contract is supplied rather than re-proved here | Returned word order and heap values; `sortedWord`, both claims | LLVM concrete implementation plus the independent finite differential suite |
+   163	| Fixed `py2mpy.py` translator | Supplied, read-only front end | Identity of the Python AST proved | Regeneration of `solution.mpy`, successful parsing/execution, and visibly exact proof macros |
+   164	| Proof-local derived map/freshness lemmas | K consumes them as simplifications rather than proving them as separate reachability claims | Symbolic binding and allocation reasoning in both claims; no direct control rewrite | Finite-map algebra and structural-induction derivations recorded above, totality/overlap audit, mutation probes, and concrete state traces |
+   165	
+   166	### Reproducible evidence
+   167	
+   168	- `concrete-tests.py`: six fixed tests, including all three prompt examples,
+   169	  empty input, repeated/edge spaces, and descending words.  Both CPython and
+   170	  LLVM/K runs pass.
+   171	- `differential-tests.py`: an independent oracle that never calls `sorted`; it
+   172	  orders word characters by scanning the known ASCII order `!Aa~`.  It compares
+   173	  all `156` strings of lengths `0..3` over alphabet `" !Aa~"`.  CPython exits
+   174	  `0`; the LLVM/K assertion run has zero mismatches and modeled exit code `0`.
+   175	- `body-mutation.py`: operational-sensitivity witness.  The changed initial
+   176	  word makes `anti_shuffle("")` return `"x"`; the fixed-semantics assertion
+   177	  fails with `AssertionError` and modeled exit code `1`.
+   178	- `spec-vacuity.k`: false-postcondition probe.  The command in `prove.sh` exits
+   179	  nonzero with `WarnStuckClaimState`; the residual visibly compares the actual
+   180	  result with the impossible code-`0` prefix.
+   181	
+   182	Finite tests support the trusted sort contract and model adequacy; they are not
+   183	claimed as a universal proof.  Excluded behavior is non-string input, external
+   184	state not present in the reference semantics, and an independent termination
+   185	theorem.  The universal K result remains conditional on the supplied semantics
+   186	and its documented `sortVS` contract.
+
+EXIT_STATUS: 0

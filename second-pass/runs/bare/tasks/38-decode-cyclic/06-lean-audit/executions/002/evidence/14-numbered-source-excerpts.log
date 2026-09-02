@@ -1,0 +1,287 @@
+$ nl -ba /reference/k-proof/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	  imports MAP-SYMBOLIC
+     6	
+     7	  // Proof-only symbolic support.  The executable rules remain in MPY;
+     8	  // MAP-SYMBOLIC supplies map reasoning needed by reachability claims.
+     9	  rule { M:Map [ K <- V ] #Equals M [ K <- V' ] }
+    10	    => { V #Equals V' }
+    11	    [simplification]
+    12	
+    13	  rule 0 <=Int lengthString(_S) => true [simplification]
+    14	  rule substrString(S, 0, lengthString(S)) => S [simplification]
+    15	endmodule
+
+$ nl -ba /reference/k-proof/semantic.k | sed -n 61,178p
+    61	  configuration
+    62	    <k> run($PGM:Py, $S:String) </k>
+    63	    <env> .Map </env>
+    64	    <result> noResult </result>
+    65	
+    66	  rule <k> run(Module(FuncDef("decode_cyclic", Params("s"), BODY)), S)
+    67	        => exec(BODY) ... </k>
+    68	       <env> _ => "s" |-> pyStr(S) </env>
+    69	
+    70	  rule <k> exec(.Stmts) => .K ... </k>
+    71	  rule <k> exec((STMT:Stmt) REST:Stmts) => STMT ~> exec(REST) ... </k>
+    72	
+    73	  rule <k> Assign(Name(X), E) => eval(E) ~> store(X) ... </k>
+    74	  rule <k> V:Val ~> store(X) => .K ... </k>
+    75	       <env> ENV => ENV [ X <- V ] </env>
+    76	
+    77	  rule <k> While(TEST, BODY) => whileLoop(TEST, BODY) ... </k>
+    78	  rule <k> whileLoop(TEST, BODY) => eval(TEST) ~> whileGuard(TEST, BODY) ... </k>
+    79	  rule <k> pyBool(true) ~> whileGuard(TEST, BODY)
+    80	        => exec(BODY) ~> whileLoop(TEST, BODY) ... </k>
+    81	  rule <k> pyBool(false) ~> whileGuard(_, _) => .K ... </k>
+    82	
+    83	  rule <k> Return(E) => eval(E) ~> doReturn ... </k>
+    84	  rule <k> V:Val ~> doReturn ~> _REST => .K </k>
+    85	       <env> _ => .Map </env>
+    86	       <result> _ => V </result>
+    87	
+    88	  rule <k> eval(Str(S)) => pyStr(S) ... </k>
+    89	  rule <k> eval(Int(I)) => pyInt(I) ... </k>
+    90	  rule <k> eval(Name(X)) => V ... </k>
+    91	       <env> ... X |-> V:Val ... </env>
+    92	
+    93	  rule <k> eval(BinOp(OP, L, R)) => eval(L) ~> binRight(OP, R) ... </k>
+    94	  rule <k> V:Val ~> binRight(OP, R) => eval(R) ~> binApply(OP, V) ... </k>
+    95	  rule <k> pyInt(B) ~> binApply("+", pyInt(A)) => pyInt(A +Int B) ... </k>
+    96	  rule <k> pyStr(B) ~> binApply("+", pyStr(A)) => pyStr(A +String B) ... </k>
+    97	
+    98	  rule <k> eval(Compare(L, CmpOp(OP, R)))
+    99	        => eval(L) ~> cmpRight(OP, R) ... </k>
+   100	  rule <k> V:Val ~> cmpRight(OP, R) => eval(R) ~> cmpApply(OP, V) ... </k>
+   101	  rule <k> pyInt(B) ~> cmpApply("<", pyInt(A)) => pyBool(true) ... </k>
+   102	       requires A <Int B
+   103	  rule <k> pyInt(B) ~> cmpApply("<", pyInt(A)) => pyBool(false) ... </k>
+   104	       requires A >=Int B
+   105	
+   106	  rule <k> eval(Call(Name("len"), E)) => eval(E) ~> builtinLen ... </k>
+   107	  rule <k> pyStr(S) ~> builtinLen => pyInt(lengthString(S)) ... </k>
+   108	
+   109	  rule <k> eval(Subscript(BASE, IDX:Expr))
+   110	        => eval(BASE) ~> indexRight(IDX) ... </k>
+   111	  rule <k> V:Val ~> indexRight(IDX) => eval(IDX) ~> indexApply(V) ... </k>
+   112	  rule <k> pyInt(I) ~> indexApply(pyStr(S))
+   113	        => pyStr(substrString(S, I, I +Int 1)) ... </k>
+   114	        requires 0 <=Int I andBool I <Int lengthString(S)
+   115	
+   116	  rule <k> eval(Subscript(BASE, Slice(L:Expr, U:Expr, NoBound)))
+   117	        => eval(BASE) ~> sliceLower(L, U) ... </k>
+   118	  rule <k> pyStr(S) ~> sliceLower(L, U) => eval(L) ~> sliceUpper(U, pyStr(S)) ... </k>
+   119	  rule <k> LV:Val ~> sliceUpper(U, pyStr(S)) => eval(U) ~> sliceApply(S, LV) ... </k>
+   120	  rule <k> pyInt(U) ~> sliceApply(S, pyInt(L))
+   121	        => pyStr(substrString(S, L, U)) ... </k>
+   122	        requires 0 <=Int L andBool L <=Int U andBool U <=Int lengthString(S)
+   123	
+   124	  rule <k> eval(Subscript(BASE, Slice(L:Expr, NoBound, NoBound)))
+   125	        => eval(BASE) ~> tailLower(L) ... </k>
+   126	  rule <k> pyStr(S) ~> tailLower(L) => eval(L) ~> tailApply(S) ... </k>
+   127	  rule <k> pyInt(L) ~> tailApply(S)
+   128	        => pyStr(substrString(S, L, lengthString(S))) ... </k>
+   129	        requires 0 <=Int L andBool L <=Int lengthString(S)
+   130	
+   131	  // Named terms used by the proof to state the exact translated program and
+   132	  // its loop invariant without duplicating a large AST in every claim.
+   133	  syntax Py ::= "solutionProgram" [function, total]
+   134	  rule solutionProgram =>
+   135	    Module(
+   136	      FuncDef("decode_cyclic", Params("s"),
+   137	        Assign(Name("result"), Str(""))
+   138	        Assign(Name("i"), Int(0))
+   139	        While(Compare(
+   140	          BinOp("+", Name("i"), Int(2)),
+   141	          CmpOp("<", Call(Name("len"), Name("s")))),
+   142	          Assign(
+   143	            Name("result"),
+   144	            BinOp(
+   145	              "+",
+   146	              BinOp(
+   147	                "+",
+   148	                Name("result"),
+   149	                Subscript(Name("s"), BinOp("+", Name("i"), Int(2)))),
+   150	              Subscript(
+   151	                Name("s"),
+   152	                Slice(Name("i"), BinOp("+", Name("i"), Int(2)), NoBound))))
+   153	          Assign(Name("i"), BinOp("+", Name("i"), Int(3))))
+   154	        Return(
+   155	          BinOp(
+   156	            "+",
+   157	            Name("result"),
+   158	            Subscript(Name("s"), Slice(Name("i"), NoBound, NoBound))))))
+   159	
+   160	  // Independent accumulator specification: consume complete 3-character
+   161	  // blocks by rotating each block right; append a short suffix unchanged.
+   162	  syntax String ::= decodeFrom(String, Int, String) [function]
+   163	  rule decodeFrom(S, I, ACC) =>
+   164	       decodeFrom(
+   165	         S,
+   166	         I +Int 3,
+   167	         ACC
+   168	           +String substrString(S, I +Int 2, I +Int 3)
+   169	           +String substrString(S, I, I +Int 2))
+   170	       requires 0 <=Int I
+   171	        andBool I +Int 2 <Int lengthString(S)
+   172	
+   173	  rule decodeFrom(S, I, ACC) =>
+   174	       ACC +String substrString(S, I, lengthString(S))
+   175	       requires 0 <=Int I
+   176	        andBool I <=Int lengthString(S)
+   177	        andBool I +Int 2 >=Int lengthString(S)
+   178	
+
+$ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Loop invariant/circularity: ACC is exactly the already-decoded prefix,
+     7	  // and decodeFrom specifies the remaining work from index I.
+     8	  claim [loop-correct]:
+     9	    <k>
+    10	      whileLoop(decodeTest, decodeBody) ~> exec(decodeReturn)
+    11	      => .K
+    12	    </k>
+    13	    <env>
+    14	      "s" |-> pyStr(S)
+    15	      "i" |-> pyInt(I)
+    16	      "result" |-> pyStr(ACC)
+    17	      => .Map
+    18	    </env>
+    19	    <result>
+    20	      noResult => pyStr(decodeFrom(S, I, ACC))
+    21	    </result>
+    22	    requires 0 <=Int I andBool I <=Int lengthString(S)
+    23	
+    24	  // End-to-end theorem for every input string.
+    25	  claim [program-correct]:
+    26	    <k> run(solutionProgram, S) => .K </k>
+    27	    <env> .Map => .Map </env>
+    28	    <result> noResult => pyStr(decodeFrom(S, 0, "")) </result>
+    29	endmodule
+
+$ nl -ba /reference/k-proof/solution.py
+     1	def decode_cyclic(s: str):
+     2	    result = ""
+     3	    i = 0
+     4	    while i + 2 < len(s):
+     5	        result = result + s[i + 2] + s[i:i + 2]
+     6	        i = i + 3
+     7	    return result + s[i:]
+
+$ nl -ba /reference/klean-generation/generated/Klean38DecodeCyclic/Lemmas.lean
+     1	import Klean38DecodeCyclic.Inj
+     2	
+     3	/- K trust-boundary goals. The second-pass agent must replace every
+     4	   writable opaque stub with an honest definition and prove this
+     5	   immutable proposition in the separate Proof.lean workspace. -/
+     6	
+     7	namespace Klean38DecodeCyclic.Lemmas
+     8	
+     9	def targetStatement
+    10	    («_<=Int_» : SortInt → SortInt → SortBool)
+    11	    («Map:update» : SortMap → SortKItem → SortKItem → SortMap)
+    12	    («lengthString(_)_STRING-COMMON_Int_String» : SortString → SortInt)
+    13	    («substrString(_,_,_)_STRING-COMMON_String_String_Int_Int» : SortString → SortInt → SortInt → SortString)
+    14	    : Prop :=
+    15	    (∀ (V' : SortKItem) (K : SortKItem) (M : SortMap) (V : SortKItem), ((«Map:update» M K V : SortMap) = («Map:update» M K V' : SortMap)) ↔ ((V : SortKItem) = (V' : SortKItem)))
+    16	    ∧ (∀ (_S : SortString), («_<=Int_» 0 («lengthString(_)_STRING-COMMON_Int_String» _S) : SortBool) = (true : SortBool))
+    17	    ∧ (∀ (S : SortString), («substrString(_,_,_)_STRING-COMMON_String_String_Int_Int» S 0 («lengthString(_)_STRING-COMMON_Int_String» S) : SortString) = (S : SortString))
+    18	
+    19	end Klean38DecodeCyclic.Lemmas
+
+$ nl -ba /candidate/Proof.lean
+     1	import Klean38DecodeCyclic.Lemmas
+     2	
+     3	namespace Proof
+     4	
+     5	/- KORE symbol: Lbl'Unds-LT-Eqls'Int'Unds'; frozen source obligations: rule-aa08fc7ab00f7ed5932bfabaec47fbf527e50b83d0b239787af7e592a9c05a9d. Replace this stub with its honest total meaning from the frozen K semantics. -/
+     6	def «_<=Int_» (x y : SortInt) : SortBool :=
+     7	  decide (x ≤ y)
+     8	
+     9	/- KORE symbol: LblMap'Coln'update; frozen source obligations: rule-ef7d5d777b33ed834768f6d5eae1abcfc5bb3ea8e0391ad21da31281612828ec. Replace this stub with its honest total meaning from the frozen K semantics. -/
+    10	noncomputable def «Map:update» (m : SortMap) (key value : SortKItem) : SortMap := by
+    11	  classical
+    12	  exact
+    13	    ⟨(key, value) ::
+    14	      m.coll.filter (fun entry => decide (entry.1 ≠ key))⟩
+    15	
+    16	/- KORE symbol: LbllengthString'LParUndsRParUnds'STRING-COMMON'Unds'Int'Unds'String; frozen source obligations: rule-aa08fc7ab00f7ed5932bfabaec47fbf527e50b83d0b239787af7e592a9c05a9d, rule-6a69a83530cb8d2469f0452d5b6878c9d18dc4dbc80234500bed171c1b093548. Replace this stub with its honest total meaning from the frozen K semantics. -/
+    17	def «lengthString(_)_STRING-COMMON_Int_String» (s : SortString) : SortInt :=
+    18	  Int.ofNat s.length
+    19	
+    20	/- KORE symbol: LblsubstrString'LParUndsCommUndsCommUndsRParUnds'STRING-COMMON'Unds'String'Unds'String'Unds'Int'Unds'Int; frozen source obligations: rule-6a69a83530cb8d2469f0452d5b6878c9d18dc4dbc80234500bed171c1b093548. Replace this stub with its honest total meaning from the frozen K semantics. -/
+    21	def «substrString(_,_,_)_STRING-COMMON_String_String_Int_Int»
+    22	    (s : SortString) (startIndex endIndex : SortInt) : SortString :=
+    23	  String.mk <|
+    24	    (s.toList.drop startIndex.toNat).take (endIndex - startIndex).toNat
+    25	
+    26	theorem final :
+    27	    Klean38DecodeCyclic.Lemmas.targetStatement «_<=Int_» «Map:update» «lengthString(_)_STRING-COMMON_Int_String» «substrString(_,_,_)_STRING-COMMON_String_String_Int_Int» := by
+    28	  constructor
+    29	  · intro V' K M V
+    30	    constructor
+    31	    · intro h
+    32	      have hcoll := congrArg SortMap.coll h
+    33	      simpa [«Map:update»] using hcoll
+    34	    · intro h
+    35	      subst V'
+    36	      rfl
+    37	  constructor
+    38	  · intro S
+    39	    simp [«_<=Int_», «lengthString(_)_STRING-COMMON_Int_String»]
+    40	  · intro S
+    41	    cases S with
+    42	    | mk data =>
+    43	      simp [«substrString(_,_,_)_STRING-COMMON_String_String_Int_Int»,
+    44	        «lengthString(_)_STRING-COMMON_Int_String»]
+    45	
+    46	end Proof
+
+$ sed -n 284,291p;1728,1759p domains.md
+### Map update
+
+You can insert a key/value pair into a map in O(log(N)) time, or effectively
+constant.
+
+```k
+  syntax Map ::= Map "[" key: KItem "<-" value: KItem "]"           [function, total, symbol(Map:update), hook(MAP.update), prefer]
+```
+### String length
+
+You can get the length of a string in O(1) time.
+
+```k
+  syntax Int ::= lengthString ( String ) [function, total, hook(STRING.length)]
+```
+
+### Character and integer conversion
+
+You can convert between a character (as represented by a string containing
+a single code point) and an integer in O(1) time.
+
+```k
+  syntax String ::= chrChar ( Int )      [function, hook(STRING.chr)]
+  syntax Int ::= ordChar ( String )      [function, hook(STRING.ord)]
+```
+
+### String substring
+
+You can compute a substring of a string in O(N) time (where N is the
+length of the substring). There are two important facts to note:
+
+1.  the range generated includes the character at `startIndex` but excludes the
+    character at `endIndex`, i.e., the range is `[startIndex..endIndex)`.
+2.  this function is only defined on valid indices (i.e., it is defined when
+    `startIndex < endIndex` and `endIndex` is less than or equal to the string
+    length).
+
+```k
+  syntax String ::= substrString ( String , startIndex: Int , endIndex: Int ) [function, total, hook(STRING.substr)]
+```

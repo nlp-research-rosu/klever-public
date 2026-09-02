@@ -1,0 +1,136 @@
+        for signature in _CORE_OPERATIONAL_HOOK_MODELS
+        if signature in function_text
+    ]
+    if not present:
+        return function_text, ()
+    missing = set(_CORE_OPERATIONAL_HOOK_MODELS) - set(present)
+    if missing:
+        raise KleanExportError(
+            "generated core operational-hook signature set is incomplete: "
+            + ", ".join(sorted(missing))
+        )
+    repaired = function_text
+    for signature, model in _CORE_OPERATIONAL_HOOK_MODELS.items():
+        if repaired.count(signature) != 1:
+            raise KleanExportError(
+                f"generated core operational hook is not unique: {signature}"
+            )
+        repaired = repaired.replace(signature, model, 1)
+    return repaired, ("_%Int_", "append")
+
+
+_BUILD_IS_HELPER_AXIOM = (
+    "axiom _5bd0f09 : SortIntSeq → SortInt → SortInt → SortInt → "
+    "Option SortIntSeq"
+)
+_BUILD_IS_PUBLIC_AXIOM = (
+    "axiom «buildIS(_,_,_,_)_MPY-SUBSCRIPT_IntSeq_IntSeq_Int_Int_Int» "
+    "(x0 : SortIntSeq) (x1 : SortInt) (x2 : SortInt) (x3 : SortInt) "
+    ": Option SortIntSeq"
+)
+_BUILD_IS_MODEL = """private def kleanIntSeqLengthModel : SortIntSeq → Nat
+  | SortIntSeq.«.IntSeq_MPY-CORE_IntSeq» => 0
+  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» _ rest =>
+      kleanIntSeqLengthModel rest + 1
+
+private def kleanIntSeqAtNatModel : SortIntSeq → Nat → Option SortInt
+  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» value _, 0 =>
+      some value
+  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» _ rest, index + 1 =>
+      kleanIntSeqAtNatModel rest index
+  | _, _ => none
+
+private def kleanIntSeqAtModel
+    (input : SortIntSeq) (index : SortInt) : Option SortInt :=
+  if index < 0 then none else kleanIntSeqAtNatModel input index.toNat
+
+private def kleanBuildISContinueModel
+    (index stop step : SortInt) : Bool :=
+  (step > 0 && index < stop) || (step < 0 && index > stop)
+
+private def kleanBuildISFuelModel :
+    Nat → SortIntSeq → SortInt → SortInt → SortInt → Option SortIntSeq
+  | 0, _, index, stop, step =>
+      if kleanBuildISContinueModel index stop step then none
+      else some SortIntSeq.«.IntSeq_MPY-CORE_IntSeq»
+  | fuel + 1, input, index, stop, step =>
+      if kleanBuildISContinueModel index stop step then
+        match kleanIntSeqAtModel input index with
+        | none => none
+        | some value =>
+            match kleanBuildISFuelModel fuel input (index + step) stop step with
+            | none => none
+            | some rest =>
+                some (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq»
+                  value rest)
+      else some SortIntSeq.«.IntSeq_MPY-CORE_IntSeq»
+
+private def kleanBuildISModel
+    (x0 : SortIntSeq) (x1 x2 x3 : SortInt) : Option SortIntSeq :=
+  kleanBuildISFuelModel (kleanIntSeqLengthModel x0 + 1) x0 x1 x2 x3
+
+noncomputable def _5bd0f09 :
+    SortIntSeq → SortInt → SortInt → SortInt → Option SortIntSeq :=
+  kleanBuildISModel
+"""
+_BUILD_IS_PUBLIC_MODEL = """noncomputable def «buildIS(_,_,_,_)_MPY-SUBSCRIPT_IntSeq_IntSeq_Int_Int_Int»
+    (x0 : SortIntSeq) (x1 : SortInt) (x2 : SortInt) (x3 : SortInt) :
+    Option SortIntSeq :=
+  kleanBuildISModel x0 x1 x2 x3"""
+_BUILD_IS_MUTUAL_DEFS = re.compile(
+    r"(?ms)^mutual\n"
+    r"  (?:noncomputable )?def _5bd0f09 : SortIntSeq → SortInt → "
+    r"SortInt → SortInt → Option SortIntSeq\n"
+    r".*?"
+    r"^  (?:noncomputable )?def "
+    r"«buildIS\(_,_,_,_\)_MPY-SUBSCRIPT_IntSeq_IntSeq_Int_Int_Int» "
+    r"\(x0 : SortIntSeq\) \(x1 : SortInt\) \(x2 : SortInt\) "
+    r"\(x3 : SortInt\) : Option SortIntSeq := .*?\n"
+    r"end(?:\n|$)"
+)
+
+
+def model_recursive_build_is(
+    function_text: str,
+) -> tuple[str, tuple[str, ...]]:
+    """Model the exact recursive IntSeq slicing rules with structural fuel."""
+
+    helper_count = function_text.count(_BUILD_IS_HELPER_AXIOM)
+    public_count = function_text.count(_BUILD_IS_PUBLIC_AXIOM)
+    mutual_defs = list(_BUILD_IS_MUTUAL_DEFS.finditer(function_text))
+    if helper_count == 0 and public_count == 0 and not mutual_defs:
+        return function_text, ()
+    if helper_count or public_count:
+        if helper_count != 1 or public_count != 1 or mutual_defs:
+            raise KleanExportError(
+                "generated buildIS definition pair is incomplete or non-unique"
+            )
+        repaired = function_text.replace(
+            _BUILD_IS_HELPER_AXIOM, _BUILD_IS_MODEL.rstrip(), 1
+        )
+        repaired = repaired.replace(
+            _BUILD_IS_PUBLIC_AXIOM, _BUILD_IS_PUBLIC_MODEL.rstrip(), 1
+        )
+    elif len(mutual_defs) == 1:
+        replacement = _BUILD_IS_MODEL.rstrip() + "\n\n" + _BUILD_IS_PUBLIC_MODEL
+        repaired = _BUILD_IS_MUTUAL_DEFS.sub(replacement + "\n", function_text)
+    else:
+        raise KleanExportError(
+            "generated buildIS mutual definition pair is incomplete or non-unique"
+        )
+    return repaired, (
+        "_5bd0f09",
+        "buildIS(_,_,_,_)_MPY-SUBSCRIPT_IntSeq_IntSeq_Int_Int_Int",
+    )
+
+
+def needs_noncomputable(build_output: str) -> bool:
+    return (
+        "consider marking definition as 'noncomputable'" in build_output
+        or "not supported by code generator" in build_output
+        or "has no executable code" in build_output
+    )
+
+
+def mark_all_noncomputable(function_text: str) -> str:
+    return re.sub(

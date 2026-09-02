@@ -1,0 +1,881 @@
+COMMAND: bash -lc set\ -uo\ pipefail\;\ for\ f\ in\ prompt.py\ canonical.py\ py2mpy.py\;\ do\ echo\ \"=====\ reference/\$f\ =====\"\;\ nl\ -ba\ \"/reference/\$f\"\;\ done\;\ for\ f\ in\ solution.py\ solution.mpy\ semantic.k\ verification.k\ spec.k\ prove.sh\;\ do\ echo\ \"=====\ candidate/\$f\ =====\"\;\ nl\ -ba\ \"/candidate/\$f\"\;\ done
+EXIT_STATUS: 0
+OUTPUT_LINES: 876
+--- OUTPUT BEGIN ---
+===== reference/prompt.py =====
+     1	
+     2	def split_words(txt):
+     3	    '''
+     4	    Given a string of words, return a list of words split on whitespace, if no whitespaces exists in the text you
+     5	    should split on commas ',' if no commas exists you should return the number of lower-case letters with odd order in the
+     6	    alphabet, ord('a') = 0, ord('b') = 1, ... ord('z') = 25
+     7	    Examples
+     8	    split_words("Hello world!") ➞ ["Hello", "world!"]
+     9	    split_words("Hello,world!") ➞ ["Hello", "world!"]
+    10	    split_words("abcdef") == 3 
+    11	    '''
+===== reference/canonical.py =====
+     1	# canonical.py — the UNMODIFIED HumanEval/125 reference solution (from the dataset).
+     2	# Co-located with solution.py (the proof rewrite) to make the original<->rewrite link
+     3	# explicit & auditable.  entry point: split_words
+     4	
+     5	
+     6	def split_words(txt):
+     7	    '''
+     8	    Given a string of words, return a list of words split on whitespace, if no whitespaces exists in the text you
+     9	    should split on commas ',' if no commas exists you should return the number of lower-case letters with odd order in the
+    10	    alphabet, ord('a') = 0, ord('b') = 1, ... ord('z') = 25
+    11	    Examples
+    12	    split_words("Hello world!") ➞ ["Hello", "world!"]
+    13	    split_words("Hello,world!") ➞ ["Hello", "world!"]
+    14	    split_words("abcdef") == 3 
+    15	    '''
+    16	    if " " in txt:
+    17	        return txt.split()
+    18	    elif "," in txt:
+    19	        return txt.replace(',',' ').split()
+    20	    else:
+    21	        return len([i for i in txt if i.islower() and ord(i)%2 == 0])
+===== reference/py2mpy.py =====
+     1	#!/usr/bin/env python3
+     2	"""py2mpy — a *pure* CPython-AST -> K-constructor transliterator.
+     3	
+     4	Reads a .py file and prints the matching `.mpy` term: a Lisp-indented tree of K
+     5	constructors that a (future) K semantics will parse. The design rule is strict:
+     6	
+     7	    PURE TRANSLITERATION. Every Python AST node maps to exactly one K
+     8	    constructor with the same structure. The front-end makes NO semantic
+     9	    decisions — it does not desugar, simplify, normalize, or "interpret"
+    10	    anything. All meaning lives in the K semantics that consumes the term.
+    11	
+    12	Consequences of that rule (vs. a "helpful" front-end):
+    13	
+    14	  * `is` / `is not` transliterate to `CmpOp("is", ...)` / `CmpOp("is not", ...)`
+    15	    — NOT to `==` / `!=`. K decides what identity means.
+    16	  * a chained comparison `a < b < c` stays a single `Compare` carrying the
+    17	    chain (`Compare(a, CmpOp("<", b), CmpOp("<", c))`) — it is NOT pre-expanded
+    18	    into `a < b and b < c`.
+    19	  * a method call `x.append(v)` stays `Call(Attribute(Name("x"), "append"), v)`
+    20	    — there is no special `MethodCall` constructor folding the receiver in.
+    21	  * `a[i] = v` stays `Assign(Subscript(Name("a"), Name("i")), v)` — the target
+    22	    is just an expression in store position; no special `SubscriptAssign`.
+    23	
+    24	The only choices the transliterator makes are unavoidably *syntactic* — e.g. a
+    25	`bool` literal becomes `Bool(...)` not `Int(...)`, because that is the literal's
+    26	actual Python type as read off the AST, not a semantic judgement.
+    27	
+    28	Anything outside the covered subset raises `Unsupported`, naming the node, so
+    29	coverage gaps fail loudly instead of being silently dropped.
+    30	
+    31	Usage:
+    32	    python scripts/py2mpy.py FILE.py          # print the .mpy term (default)
+    33	    python scripts/py2mpy.py FILE.py --ast    # print the Python AST (ast.dump)
+    34	"""
+    35	from __future__ import annotations
+    36	
+    37	import argparse
+    38	import symtable
+    39	import ast
+    40	import json
+    41	import sys
+    42	
+    43	
+    44	class Unsupported(Exception):
+    45	    """Raised for any AST node the transliterator does not cover."""
+    46	
+    47	
+    48	# ---------------------------------------------------------------------------
+    49	# Term model: a .mpy term is a tree of these three node kinds.
+    50	#   Ctor(name, *args)  -> `name(arg, arg, ...)`  (comma-separated args)
+    51	#   Seq([item, ...])   -> a statement list: juxtaposed, no parens, no commas
+    52	#   str                -> a leaf token already in K surface form
+    53	#                         (a quoted string `"op"`, a number `0`, `true`, `Break`)
+    54	# ---------------------------------------------------------------------------
+    55	class Ctor:
+    56	    __slots__ = ("name", "args")
+    57	
+    58	    def __init__(self, name: str, *args):
+    59	        self.name = name
+    60	        self.args = list(args)
+    61	
+    62	
+    63	class Seq:
+    64	    __slots__ = ("items",)
+    65	
+    66	    def __init__(self, items):
+    67	        self.items = list(items)
+    68	
+    69	
+    70	def q(s: str) -> str:
+    71	    """A Python string as a K String token (double-quoted, escaped)."""
+    72	    return json.dumps(s)
+    73	
+    74	
+    75	# --- Operator spellings (string tokens carried inside constructors) ----------
+    76	# These are transliterations of the operator *symbol*, not its meaning.
+    77	_BINOP = {
+    78	    ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
+    79	    ast.FloorDiv: "//", ast.Mod: "%", ast.Pow: "**",
+    80	    ast.BitOr: "|", ast.BitAnd: "&", ast.BitXor: "^",
+    81	    ast.LShift: "<<", ast.RShift: ">>", ast.MatMult: "@",
+    82	}
+    83	_UNARY = {ast.USub: "-", ast.UAdd: "+", ast.Not: "not", ast.Invert: "~"}
+    84	_BOOLOP = {ast.And: "and", ast.Or: "or"}
+    85	_CMPOP = {
+    86	    ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
+    87	    ast.Gt: ">", ast.GtE: ">=", ast.Is: "is", ast.IsNot: "is not",
+    88	    ast.In: "in", ast.NotIn: "not in",
+    89	}
+    90	
+    91	
+    92	# ---------------------------------------------------------------------------
+    93	# Closure scopes (Python's own symtable, faithfully exposed)
+    94	# ---------------------------------------------------------------------------
+    95	# (name, lineno) -> (cellvars, freevars, nested). A def/lambda gets the
+    96	# ANNOTATED node form iff it is nested inside a function or has cells/frees;
+    97	# module-level capture-free defs keep the old shape (zero churn).
+    98	SCOPES: dict = {}
+    99	
+   100	
+   101	def _frees(table):
+   102	    return set(table.get_frees()) if isinstance(table, symtable.Function) else set()
+   103	
+   104	
+   105	def _deep_frees(table):
+   106	    out = _frees(table)
+   107	    for g in table.get_children():
+   108	        out |= _deep_frees(g) - set(table.get_locals())
+   109	    return out
+   110	
+   111	
+   112	def _walk_symtable(table, depth=0):
+   113	    for child in table.get_children():
+   114	        if child.get_type() in ("function", "lambda"):
+   115	            frees = sorted(_frees(child))
+   116	            cells = sorted(
+   117	                s for s in child.get_locals()
+   118	                if any(s in _deep_frees(g) for g in child.get_children())
+   119	            )
+   120	            SCOPES[(child.get_name(), child.get_lineno())] = (
+   121	                cells, frees, depth > 0 or table.get_type() != "module")
+   122	        _walk_symtable(child, depth + (1 if child.get_type() in ("function", "lambda") else 0))
+   123	
+   124	
+   125	def scope_info(name, lineno):
+   126	    return SCOPES.get((name, lineno))
+   127	
+   128	
+   129	# ---------------------------------------------------------------------------
+   130	# Expressions
+   131	# ---------------------------------------------------------------------------
+   132	def emit_expr(node: ast.expr):
+   133	    if isinstance(node, ast.Constant):
+   134	        v = node.value
+   135	        if v is None:
+   136	            return "NoneVal"
+   137	        if isinstance(v, bool):                 # MUST precede int (bool ⊂ int)
+   138	            return Ctor("Bool", "true" if v else "false")
+   139	        if isinstance(v, int):
+   140	            return Ctor("Int", str(v))
+   141	        if isinstance(v, float):
+   142	            return Ctor("Float", repr(v))
+   143	        if isinstance(v, str):
+   144	            return Ctor("Str", q(v))
+   145	        raise Unsupported(f"Constant {type(v).__name__}")
+   146	
+   147	    if isinstance(node, ast.Name):
+   148	        return Ctor("Name", q(node.id))
+   149	
+   150	    if isinstance(node, ast.Lambda):
+   151	        a = node.args
+   152	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   153	            raise Unsupported("complex lambda signature")
+   154	        names = [p.arg for p in (a.posonlyargs + a.args)]
+   155	        params = Ctor("Params", *(q(n) for n in names))
+   156	        info = scope_info("lambda", node.lineno)
+   157	        if info and (info[0] or info[1] or info[2]):
+   158	            cells, frees, _ = info
+   159	            return Ctor("Lambda", params,
+   160	                        Ctor("CellVars", *(q(n) for n in cells)),
+   161	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   162	                        emit_expr(node.body))
+   163	        return Ctor("Lambda", params, emit_expr(node.body))
+   164	
+   165	    if isinstance(node, ast.BinOp):
+   166	        op = _BINOP.get(type(node.op))
+   167	        if op is None:
+   168	            raise Unsupported(f"BinOp {type(node.op).__name__}")
+   169	        return Ctor("BinOp", q(op), emit_expr(node.left), emit_expr(node.right))
+   170	
+   171	    if isinstance(node, ast.UnaryOp):
+   172	        op = _UNARY.get(type(node.op))
+   173	        if op is None:
+   174	            raise Unsupported(f"UnaryOp {type(node.op).__name__}")
+   175	        return Ctor("UnaryOp", q(op), emit_expr(node.operand))
+   176	
+   177	    if isinstance(node, ast.BoolOp):
+   178	        op = _BOOLOP[type(node.op)]
+   179	        return Ctor("BoolOp", q(op), *(emit_expr(v) for v in node.values))
+   180	
+   181	    if isinstance(node, ast.Compare):
+   182	        # Faithful, non-desugared: left operand + a chain of (op, comparator).
+   183	        # Single comparison => one CmpOp; `a < b < c` => two CmpOps.
+   184	        chain = [
+   185	            Ctor("CmpOp", q(_op_or_raise(_CMPOP, op, "Compare")), emit_expr(c))
+   186	            for op, c in zip(node.ops, node.comparators)
+   187	        ]
+   188	        return Ctor("Compare", emit_expr(node.left), *chain)
+   189	
+   190	    if isinstance(node, ast.List):
+   191	        return Ctor("ListExpr", *(emit_expr(e) for e in node.elts))
+   192	
+   193	    if isinstance(node, ast.Tuple):
+   194	        return Ctor("TupleExpr", *(emit_expr(e) for e in node.elts))
+   195	
+   196	    if isinstance(node, ast.Set):
+   197	        return Ctor("SetExpr", *(emit_expr(e) for e in node.elts))
+   198	
+   199	    if isinstance(node, ast.Dict):
+   200	        entries = []
+   201	        for k, v in zip(node.keys, node.values):
+   202	            if k is None:
+   203	                raise Unsupported("dict unpacking {**x}")
+   204	            entries.append(Ctor("Entry", emit_expr(k), emit_expr(v)))
+   205	        return Ctor("DictExpr", *entries)
+   206	
+   207	    if isinstance(node, ast.Subscript):
+   208	        return Ctor("Subscript", emit_expr(node.value), emit_index(node.slice))
+   209	
+   210	    if isinstance(node, ast.Attribute):
+   211	        return Ctor("Attribute", emit_expr(node.value), q(node.attr))
+   212	
+   213	    if isinstance(node, ast.Call):
+   214	        if any(isinstance(a, ast.Starred) for a in node.args):
+   215	            raise Unsupported("*args unpacking")
+   216	        if any(kw.arg is None for kw in node.keywords):
+   217	            raise Unsupported("**kwargs unpacking")
+   218	        # Call grammar is `Call(Expr, Exprs)` — the comma is mandatory, so a zero-arg
+   219	        # call must render as `Call(f, )` (empty Exprs), NOT `Call(f)` (which won't parse).
+   220	        args = [emit_expr(a) for a in node.args]
+   221	        args += [Ctor("KwArg", q(kw.arg), emit_expr(kw.value)) for kw in node.keywords]
+   222	        args = args or [""]
+   223	        return Ctor("Call", emit_expr(node.func), *args)
+   224	
+   225	    if isinstance(node, ast.IfExp):
+   226	        # AST field order: test, body, orelse — kept verbatim.
+   227	        return Ctor("IfExp", emit_expr(node.test),
+   228	                    emit_expr(node.body), emit_expr(node.orelse))
+   229	
+   230	    if isinstance(node, ast.ListComp):
+   231	        return Ctor("ListComp", emit_expr(node.elt), _gens(node.generators))
+   232	    if isinstance(node, ast.SetComp):
+   233	        return Ctor("SetComp", emit_expr(node.elt), _gens(node.generators))
+   234	    if isinstance(node, ast.GeneratorExp):
+   235	        return Ctor("GenExp", emit_expr(node.elt), _gens(node.generators))
+   236	    if isinstance(node, ast.DictComp):
+   237	        return Ctor("DictComp", emit_expr(node.key), emit_expr(node.value),
+   238	                    _gens(node.generators))
+   239	
+   240	    raise Unsupported(f"Expr {type(node).__name__}")
+   241	
+   242	
+   243	def _op_or_raise(table, op, label):
+   244	    spelled = table.get(type(op))
+   245	    if spelled is None:
+   246	        raise Unsupported(f"{label} {type(op).__name__}")
+   247	    return spelled
+   248	
+   249	
+   250	def _compfor(g):
+   251	    """A single generator -> CompFor(target, iter, <ifs as Exprs; .Exprs if none>)."""
+   252	    if getattr(g, "is_async", 0):
+   253	        raise Unsupported("async comprehension")
+   254	    ifs = [emit_expr(c) for c in g.ifs] or [Ctor("Bool", "true")]
+   255	    return Ctor("CompFor", emit_expr(g.target), emit_expr(g.iter), *ifs)
+   256	
+   257	
+   258	def _gens(generators):
+   259	    """The generator list -> a juxtaposed CompFors (a Seq of CompFor)."""
+   260	    return Seq([_compfor(g) for g in generators])
+   261	
+   262	
+   263	def emit_index(node: ast.expr):
+   264	    """Subscript index position: an `ast.Slice` -> `Slice(...)`, else the expr."""
+   265	    # Python <3.9 wrapped the index in ast.Index; unwrap if present.
+   266	    inner = getattr(ast, "Index", None)
+   267	    if inner is not None and isinstance(node, inner):
+   268	        node = node.value
+   269	    if isinstance(node, ast.Slice):
+   270	        def bound(b):
+   271	            # omitted bound (absent field) OR an explicit None constant -> NoBound.
+   272	            # Python treats `a[None:5]` exactly like `a[:5]`; only a *value* None
+   273	            # (Constant(None) outside a slice) becomes NoneVal. Keeping the two
+   274	            # distinct lets NoneVal be a real value without perturbing slices.
+   275	            if b is None or (isinstance(b, ast.Constant) and b.value is None):
+   276	                return "NoBound"
+   277	            return emit_expr(b)
+   278	        return Ctor("Slice", bound(node.lower), bound(node.upper), bound(node.step))
+   279	    return emit_expr(node)
+   280	
+   281	
+   282	# ---------------------------------------------------------------------------
+   283	# Statements
+   284	# ---------------------------------------------------------------------------
+   285	def emit_stmt(node: ast.stmt):
+   286	    if isinstance(node, ast.FunctionDef):
+   287	        a = node.args
+   288	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   289	            raise Unsupported("complex function signature (defaults/varargs/kwonly)")
+   290	        if node.decorator_list:
+   291	            raise Unsupported("decorators")
+   292	        names = [p.arg for p in (a.posonlyargs + a.args)]  # type annotations ignored
+   293	        params = Ctor("Params", *(q(n) for n in names))
+   294	        info = scope_info(node.name, node.lineno)
+   295	        if info and (info[0] or info[1] or info[2]):
+   296	            cells, frees, _ = info
+   297	            return Ctor("FuncDef", q(node.name), params,
+   298	                        Ctor("CellVars", *(q(n) for n in cells)),
+   299	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   300	                        emit_stmts(node.body))
+   301	        return Ctor("FuncDef", q(node.name), params, emit_stmts(node.body))
+   302	
+   303	    if isinstance(node, ast.Return):
+   304	        if node.value is None:
+   305	            return Ctor("Return")
+   306	        return Ctor("Return", emit_expr(node.value))
+   307	
+   308	    if isinstance(node, ast.Assign):
+   309	        if len(node.targets) != 1:
+   310	            raise Unsupported("chained assignment (a = b = ...)")
+   311	        # Target is just an expression in store position (Name / Tuple / Subscript / Attribute).
+   312	        return Ctor("Assign", emit_expr(node.targets[0]), emit_expr(node.value))
+   313	
+   314	    if isinstance(node, ast.AugAssign):
+   315	        op = _BINOP.get(type(node.op))
+   316	        if op is None:
+   317	            raise Unsupported(f"AugAssign {type(node.op).__name__}")
+   318	        return Ctor("AugAssign", emit_expr(node.target), q(op), emit_expr(node.value))
+   319	
+   320	    if isinstance(node, ast.If):
+   321	        return Ctor("If", emit_expr(node.test),
+   322	                    emit_stmts(node.body), emit_stmts(node.orelse))
+   323	
+   324	    if isinstance(node, ast.For):
+   325	        if node.orelse:
+   326	            raise Unsupported("for-else")
+   327	        return Ctor("For", emit_expr(node.target), emit_expr(node.iter),
+   328	                    emit_stmts(node.body))
+   329	
+   330	    if isinstance(node, ast.While):
+   331	        if node.orelse:
+   332	            raise Unsupported("while-else")
+   333	        return Ctor("While", emit_expr(node.test), emit_stmts(node.body))
+   334	
+   335	    if isinstance(node, ast.Break):
+   336	        return "Break"
+   337	    if isinstance(node, ast.Continue):
+   338	        return "Continue"
+   339	    if isinstance(node, ast.Pass):
+   340	        return "Pass"
+   341	
+   342	    if isinstance(node, ast.Assert):
+   343	        if node.msg is not None:
+   344	            return Ctor("Assert", emit_expr(node.test), emit_expr(node.msg))
+   345	        return Ctor("Assert", emit_expr(node.test))
+   346	
+   347	    if isinstance(node, ast.Expr):
+   348	        return Ctor("Expr", emit_expr(node.value))
+   349	
+   350	    if isinstance(node, ast.Import):
+   351	        return Ctor("Import", *(q(n.name) for n in node.names))
+   352	    if isinstance(node, ast.ImportFrom):
+   353	        mod = node.module if node.module is not None else ""
+   354	        return Ctor("ImportFrom", q(mod), *(q(n.name) for n in node.names))
+   355	
+   356	    raise Unsupported(f"Stmt {type(node).__name__}")
+   357	
+   358	
+   359	def emit_stmts(stmts) -> Seq:
+   360	    return Seq([emit_stmt(s) for s in stmts])
+   361	
+   362	
+   363	def emit_module(tree: ast.Module) -> Ctor:
+   364	    return Ctor("Module", emit_stmts(tree.body))
+   365	
+   366	
+   367	# ---------------------------------------------------------------------------
+   368	# Lisp-style pretty printer
+   369	# ---------------------------------------------------------------------------
+   370	WIDTH = 72  # an expression constructor wider than this breaks onto its own lines
+   371	
+   372	
+   373	def render(node, ind: int = 0) -> str:
+   374	    if isinstance(node, str):
+   375	        return node
+   376	
+   377	    if isinstance(node, Seq):
+   378	        if not node.items:
+   379	            return ""
+   380	        pad = "  " * ind
+   381	        return ("\n" + pad).join(render(it, ind) for it in node.items)
+   382	
+   383	    # Ctor
+   384	    cind = ind + 1
+   385	    cpad = "  " * cind
+   386	    has_block = any(isinstance(a, Seq) for a in node.args)
+   387	
+   388	    if not has_block:
+   389	        inline = node.name + "(" + ", ".join(render(a, ind) for a in node.args) + ")"
+   390	        if "\n" not in inline and len("  " * ind) + len(inline) <= WIDTH:
+   391	            return inline
+   392	        parts = [render(a, cind) for a in node.args]
+   393	        return node.name + "(\n" + cpad + (",\n" + cpad).join(parts) + ")"
+   394	
+   395	    # Has a statement block: inline the args before the first block, then put
+   396	    # each remaining arg (blocks included) on its own indented line.
+   397	    first = next(i for i, a in enumerate(node.args) if isinstance(a, Seq))
+   398	    head = node.args[:first]
+   399	    rest = node.args[first:]
+   400	    open_line = node.name + "(" + ", ".join(render(a, ind) for a in head) + ("," if head else "")
+   401	    lines = []
+   402	    for k, a in enumerate(rest):
+   403	        comma = "," if k < len(rest) - 1 else ""
+   404	        lines.append(cpad + render(a, cind) + comma)
+   405	    return open_line + "\n" + "\n".join(lines) + ")"
+   406	
+   407	
+   408	# ---------------------------------------------------------------------------
+   409	# CLI
+   410	# ---------------------------------------------------------------------------
+   411	def main(argv=None) -> int:
+   412	    ap = argparse.ArgumentParser(
+   413	        prog="py2mpy",
+   414	        description="Pure CPython-AST -> K-constructor transliterator.",
+   415	    )
+   416	    ap.add_argument("file", help="Python source file")
+   417	    ap.add_argument("--ast", action="store_true",
+   418	                    help="print the Python AST (ast.dump) instead of the .mpy term")
+   419	    args = ap.parse_args(argv)
+   420	
+   421	    with open(args.file, "r", encoding="utf-8") as fh:
+   422	        src = fh.read()
+   423	    tree = ast.parse(src, filename=args.file)
+   424	    _walk_symtable(symtable.symtable(src, args.file, "exec"))
+   425	
+   426	    if args.ast:
+   427	        print(ast.dump(tree, indent=2))
+   428	    else:
+   429	        print(render(emit_module(tree)))
+   430	    return 0
+   431	
+   432	
+   433	if __name__ == "__main__":
+   434	    sys.exit(main())
+===== candidate/solution.py =====
+     1	def split_words(txt):
+     2	    words = txt.split()
+     3	    if "".join(words) != txt:
+     4	        return words
+     5	    if "," in txt:
+     6	        return txt.split(",")
+     7	    return (
+     8	        txt.count("b")
+     9	        + txt.count("d")
+    10	        + txt.count("f")
+    11	        + txt.count("h")
+    12	        + txt.count("j")
+    13	        + txt.count("l")
+    14	        + txt.count("n")
+    15	        + txt.count("p")
+    16	        + txt.count("r")
+    17	        + txt.count("t")
+    18	        + txt.count("v")
+    19	        + txt.count("x")
+    20	        + txt.count("z")
+    21	    )
+===== candidate/solution.mpy =====
+     1	Module(
+     2	  FuncDef("split_words", Params("txt"),
+     3	    Assign(Name("words"), Call(Attribute(Name("txt"), "split"), ))
+     4	    If(Compare(
+     5	      Call(Attribute(Str(""), "join"), Name("words")),
+     6	      CmpOp("!=", Name("txt"))),
+     7	      Return(Name("words")),
+     8	      )
+     9	    If(Compare(Str(","), CmpOp("in", Name("txt"))),
+    10	      Return(Call(Attribute(Name("txt"), "split"), Str(","))),
+    11	      )
+    12	    Return(
+    13	      BinOp(
+    14	        "+",
+    15	        BinOp(
+    16	          "+",
+    17	          BinOp(
+    18	            "+",
+    19	            BinOp(
+    20	              "+",
+    21	              BinOp(
+    22	                "+",
+    23	                BinOp(
+    24	                  "+",
+    25	                  BinOp(
+    26	                    "+",
+    27	                    BinOp(
+    28	                      "+",
+    29	                      BinOp(
+    30	                        "+",
+    31	                        BinOp(
+    32	                          "+",
+    33	                          BinOp(
+    34	                            "+",
+    35	                            BinOp(
+    36	                              "+",
+    37	                              Call(
+    38	                                Attribute(Name("txt"), "count"),
+    39	                                Str("b")),
+    40	                              Call(
+    41	                                Attribute(Name("txt"), "count"),
+    42	                                Str("d"))),
+    43	                            Call(
+    44	                              Attribute(Name("txt"), "count"),
+    45	                              Str("f"))),
+    46	                          Call(
+    47	                            Attribute(Name("txt"), "count"),
+    48	                            Str("h"))),
+    49	                        Call(Attribute(Name("txt"), "count"), Str("j"))),
+    50	                      Call(Attribute(Name("txt"), "count"), Str("l"))),
+    51	                    Call(Attribute(Name("txt"), "count"), Str("n"))),
+    52	                  Call(Attribute(Name("txt"), "count"), Str("p"))),
+    53	                Call(Attribute(Name("txt"), "count"), Str("r"))),
+    54	              Call(Attribute(Name("txt"), "count"), Str("t"))),
+    55	            Call(Attribute(Name("txt"), "count"), Str("v"))),
+    56	          Call(Attribute(Name("txt"), "count"), Str("x"))),
+    57	        Call(Attribute(Name("txt"), "count"), Str("z"))))))
+===== candidate/semantic.k =====
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports STRING-SYNTAX
+     5	  imports INT-SYNTAX
+     6	
+     7	  syntax Module ::= "Module" "(" Stmts ")"
+     8	
+     9	  syntax Stmts ::= List{Stmt, ""}
+    10	  syntax Strings ::= List{String, ","}
+    11	  syntax Params ::= "Params" "(" Strings ")"
+    12	
+    13	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    14	                | "Assign" "(" Expr "," Expr ")"
+    15	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    16	                | "Return" "(" Expr ")"
+    17	
+    18	  syntax Exprs ::= List{Expr, ","}
+    19	  syntax CmpOps ::= List{CmpOp, ","}
+    20	
+    21	  syntax Expr ::= "Name" "(" String ")"
+    22	                | "Str" "(" String ")"
+    23	                | "Int" "(" Int ")"
+    24	                | "Attribute" "(" Expr "," String ")"
+    25	                | "Call" "(" Expr "," Exprs ")"
+    26	                | "Compare" "(" Expr "," CmpOps ")"
+    27	                | "BinOp" "(" String "," Expr "," Expr ")"
+    28	
+    29	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    30	endmodule
+    31	
+    32	module MPY-SEMANTIC
+    33	  imports MPY-SYNTAX
+    34	  imports DOMAINS
+    35	
+    36	  // Runtime values. Lists contain Value elements wrapped with ListItem.
+    37	  syntax Value ::= "VStr" "(" String ")"
+    38	                 | "VInt" "(" Int ")"
+    39	                 | "VBool" "(" Bool ")"
+    40	                 | "VList" "(" List ")"
+    41	                 | "VAttr" "(" Value "," String ")"
+    42	  syntax Value ::= "iteValue" "(" Bool "," Value "," Value ")" [function]
+    43	
+    44	  syntax Value ::= "eval" "(" Expr "," Map ")" [function]
+    45	  syntax Value ::= "call" "(" Value "," List ")" [function]
+    46	  syntax Value ::= "add" "(" Value "," Value ")" [function]
+    47	  syntax Value ::= "compare" "(" Value "," String "," Value ")" [function]
+    48	  syntax Bool  ::= "asBool" "(" Value ")" [function]
+    49	
+    50	  rule eval(Name(X), (X |-> V:Value) _REST:Map) => V
+    51	  rule eval(Str(S), _) => VStr(S)
+    52	  rule eval(Int(I), _) => VInt(I)
+    53	  rule eval(Attribute(E, A), ENV) => VAttr(eval(E, ENV), A)
+    54	  rule eval(Call(F, .Exprs), ENV) => call(eval(F, ENV), .List)
+    55	  rule eval(Call(F, A:Expr), ENV) => call(eval(F, ENV), ListItem(eval(A, ENV)))
+    56	  rule eval(BinOp("+", L, R), ENV) => add(eval(L, ENV), eval(R, ENV))
+    57	  rule eval(Compare(L, CmpOp(OP, R)), ENV)
+    58	    => compare(eval(L, ENV), OP, eval(R, ENV))
+    59	
+    60	  rule call(VAttr(VStr(S), "split"), .List) => VList(pySplitWhitespace(S))
+    61	  rule call(VAttr(VStr(S), "split"), ListItem(VStr(SEP)))
+    62	    => VList(pySplitOn(S, SEP))
+    63	  rule call(VAttr(VStr(SEP), "join"), ListItem(VList(VS)))
+    64	    => VStr(joinValues(SEP, VS))
+    65	  rule call(VAttr(VStr(S), "count"), ListItem(VStr(NEEDLE)))
+    66	    => VInt(countAllOccurrences(S, NEEDLE))
+    67	
+    68	  rule add(VInt(I), VInt(J)) => VInt(I +Int J)
+    69	  rule compare(VStr(A), "!=", VStr(B)) => VBool(A =/=String B)
+    70	  rule compare(VStr(A), "in", VStr(B))
+    71	    => VBool(findString(B, A, 0) >=Int 0)
+    72	  rule asBool(VBool(B)) => B
+    73	  rule iteValue(true, THEN, _) => THEN
+    74	  rule iteValue(false, _, ELSE) => ELSE
+    75	
+    76	  // Big-step statement execution with explicit return propagation.
+    77	  syntax Outcome ::= "normal" "(" Map ")"
+    78	                   | "returned" "(" Value ")"
+    79	  syntax Outcome ::= "iteOutcome" "(" Bool "," Outcome "," Outcome ")"
+    80	  syntax Outcome ::= "exec" "(" Stmts "," Map ")" [function]
+    81	                   | "execStmt" "(" Stmt "," Map ")" [function]
+    82	                   | "execRest" "(" Outcome "," Stmts ")" [function]
+    83	
+    84	  rule exec(.Stmts, ENV) => normal(ENV)
+    85	  rule exec(S:Stmt SS:Stmts, ENV) => execRest(execStmt(S, ENV), SS)
+    86	
+    87	  rule execRest(normal(ENV), SS) => exec(SS, ENV)
+    88	  rule execRest(returned(V), _) => returned(V)
+    89	  rule execRest(iteOutcome(B, THEN, ELSE), SS)
+    90	    => iteOutcome(B, execRest(THEN, SS), execRest(ELSE, SS))
+    91	
+    92	  rule execStmt(Assign(Name(X), E), ENV) => normal(ENV [ X <- eval(E, ENV) ])
+    93	  rule execStmt(Return(E), ENV) => returned(eval(E, ENV))
+    94	  rule execStmt(If(COND, THEN, ELSE), ENV)
+    95	    => iteOutcome(
+    96	         asBool(eval(COND, ENV)), exec(THEN, ENV), exec(ELSE, ENV))
+    97	
+    98	  // Python str.split() with no separator: collapse whitespace runs and omit
+    99	  // empty fields. This is the whitespace set recognized by CPython isspace().
+   100	  syntax Bool ::= "isWhitespace" "(" String ")" [function, total]
+   101	  rule isWhitespace(C)
+   102	    => findString(
+   103	         " \t\n\r\f\x0b\x1c\x1d\x1e\x1f\x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000",
+   104	         C, 0) >=Int 0
+   105	
+   106	  syntax List ::= "pySplitWhitespace" "(" String ")" [function]
+   107	                | "splitWhitespaceAt" "(" String "," Int "," String "," List ")" [function]
+   108	  rule pySplitWhitespace(S) => splitWhitespaceAt(S, 0, "", .List)
+   109	  rule splitWhitespaceAt(S, I, "", OUT) => OUT
+   110	    requires I >=Int lengthString(S)
+   111	  rule splitWhitespaceAt(S, I, WORD, OUT) => OUT ListItem(VStr(WORD))
+   112	    requires I >=Int lengthString(S) andBool WORD =/=String ""
+   113	  rule splitWhitespaceAt(S, I, "", OUT)
+   114	    => splitWhitespaceAt(S, I +Int 1, "", OUT)
+   115	    requires I <Int lengthString(S)
+   116	      andBool isWhitespace(substrString(S, I, I +Int 1))
+   117	  rule splitWhitespaceAt(S, I, WORD, OUT)
+   118	    => splitWhitespaceAt(S, I +Int 1, "", OUT ListItem(VStr(WORD)))
+   119	    requires I <Int lengthString(S)
+   120	      andBool WORD =/=String ""
+   121	      andBool isWhitespace(substrString(S, I, I +Int 1))
+   122	  rule splitWhitespaceAt(S, I, WORD, OUT)
+   123	    => splitWhitespaceAt(
+   124	         S, I +Int 1,
+   125	         WORD +String substrString(S, I, I +Int 1), OUT)
+   126	    requires I <Int lengthString(S)
+   127	      andBool notBool isWhitespace(substrString(S, I, I +Int 1))
+   128	
+   129	  syntax String ::= "joinValues" "(" String "," List ")" [function]
+   130	                  | "joinValuesTail" "(" String "," List ")" [function]
+   131	  rule joinValues(_, .List) => ""
+   132	  rule joinValues(SEP, ListItem(VStr(S)) REST:List)
+   133	    => S +String joinValuesTail(SEP, REST)
+   134	  rule joinValuesTail(_, .List) => ""
+   135	  rule joinValuesTail(SEP, ListItem(VStr(S)) REST:List)
+   136	    => SEP +String S +String joinValuesTail(SEP, REST)
+   137	
+   138	  // Python str.split(separator), including leading, trailing, and repeated
+   139	  // separators. The program calls this only with the nonempty string ",".
+   140	  syntax List ::= "pySplitOn" "(" String "," String ")" [function]
+   141	  rule pySplitOn(S, SEP) => ListItem(VStr(S))
+   142	    requires findString(S, SEP, 0) <Int 0
+   143	  rule pySplitOn(S, SEP)
+   144	    => ListItem(VStr(substrString(S, 0, findString(S, SEP, 0))))
+   145	       pySplitOn(
+   146	         substrString(
+   147	           S,
+   148	           findString(S, SEP, 0) +Int lengthString(SEP),
+   149	           lengthString(S)),
+   150	         SEP)
+   151	    requires findString(S, SEP, 0) >=Int 0
+   152	      andBool lengthString(SEP) >Int 0
+   153	endmodule
+===== candidate/verification.k =====
+     1	requires "semantic.k"
+     2	
+     3	module MPY-VERIFICATION
+     4	  imports MPY-SEMANTIC
+     5	
+     6	  // A generic one-argument function invocation layer over the translated AST.
+     7	  syntax Function ::= "closure" "(" Params "," Stmts ")"
+     8	  syntax Function ::= "findFunction" "(" String "," Stmts ")" [function]
+     9	  syntax Value ::= "invoke" "(" Function "," Value ")" [function]
+    10	                 | "outcomeValue" "(" Outcome ")" [function]
+    11	                 | "runProgram" "(" Module "," String ")" [function]
+    12	
+    13	  rule findFunction(F, FuncDef(F, PARAMS, BODY) _REST:Stmts)
+    14	    => closure(PARAMS, BODY)
+    15	  rule findFunction(F, FuncDef(G, _, _) REST:Stmts)
+    16	    => findFunction(F, REST)
+    17	    requires F =/=String G
+    18	
+    19	  rule invoke(closure(Params(P:String), BODY), V)
+    20	    => outcomeValue(exec(BODY, P |-> V))
+    21	  rule outcomeValue(returned(V)) => V
+    22	  rule outcomeValue(iteOutcome(B, THEN, ELSE))
+    23	    => iteValue(B, outcomeValue(THEN), outcomeValue(ELSE))
+    24	  rule runProgram(Module(STMTS), S)
+    25	    => invoke(findFunction("split_words", STMTS), VStr(S))
+    26	
+    27	  // This nullary term expands to the exact constructor tree in solution.mpy.
+    28	  // Keeping it here makes every symbolic claim explicitly about the submitted
+    29	  // implementation rather than about a hand-written summary of the function.
+    30	  syntax Module ::= "solutionAST" [function]
+    31	  rule solutionAST =>
+    32	    Module(
+    33	      FuncDef("split_words", Params("txt"),
+    34	        Assign(Name("words"), Call(Attribute(Name("txt"), "split"), .Exprs))
+    35	        If(Compare(
+    36	          Call(Attribute(Str(""), "join"), Name("words")),
+    37	          CmpOp("!=", Name("txt"))),
+    38	          Return(Name("words")),
+    39	          .Stmts)
+    40	        If(Compare(Str(","), CmpOp("in", Name("txt"))),
+    41	          Return(Call(Attribute(Name("txt"), "split"), Str(","))),
+    42	          .Stmts)
+    43	        Return(
+    44	          BinOp(
+    45	            "+",
+    46	            BinOp(
+    47	              "+",
+    48	              BinOp(
+    49	                "+",
+    50	                BinOp(
+    51	                  "+",
+    52	                  BinOp(
+    53	                    "+",
+    54	                    BinOp(
+    55	                      "+",
+    56	                      BinOp(
+    57	                        "+",
+    58	                        BinOp(
+    59	                          "+",
+    60	                          BinOp(
+    61	                            "+",
+    62	                            BinOp(
+    63	                              "+",
+    64	                              BinOp(
+    65	                                "+",
+    66	                                BinOp(
+    67	                                  "+",
+    68	                                  Call(Attribute(Name("txt"), "count"), Str("b")),
+    69	                                  Call(Attribute(Name("txt"), "count"), Str("d"))),
+    70	                                Call(Attribute(Name("txt"), "count"), Str("f"))),
+    71	                              Call(Attribute(Name("txt"), "count"), Str("h"))),
+    72	                            Call(Attribute(Name("txt"), "count"), Str("j"))),
+    73	                          Call(Attribute(Name("txt"), "count"), Str("l"))),
+    74	                        Call(Attribute(Name("txt"), "count"), Str("n"))),
+    75	                      Call(Attribute(Name("txt"), "count"), Str("p"))),
+    76	                    Call(Attribute(Name("txt"), "count"), Str("r"))),
+    77	                  Call(Attribute(Name("txt"), "count"), Str("t"))),
+    78	                Call(Attribute(Name("txt"), "count"), Str("v"))),
+    79	              Call(Attribute(Name("txt"), "count"), Str("x"))),
+    80	            Call(Attribute(Name("txt"), "count"), Str("z"))))))
+    81	
+    82	  // The mathematical value required by the third branch of the prompt.
+    83	  syntax Int ::= "oddLetterCount" "(" String ")" [function, total]
+    84	  rule oddLetterCount(S) =>
+    85	    ((((((((((((countAllOccurrences(S, "b")
+    86	      +Int countAllOccurrences(S, "d"))
+    87	      +Int countAllOccurrences(S, "f"))
+    88	      +Int countAllOccurrences(S, "h"))
+    89	      +Int countAllOccurrences(S, "j"))
+    90	      +Int countAllOccurrences(S, "l"))
+    91	      +Int countAllOccurrences(S, "n"))
+    92	      +Int countAllOccurrences(S, "p"))
+    93	      +Int countAllOccurrences(S, "r"))
+    94	      +Int countAllOccurrences(S, "t"))
+    95	      +Int countAllOccurrences(S, "v"))
+    96	      +Int countAllOccurrences(S, "x"))
+    97	      +Int countAllOccurrences(S, "z"))
+    98	
+    99	  syntax Bool ::= "containsWhitespace" "(" String ")" [function, total]
+   100	  rule containsWhitespace(S)
+   101	    => joinValues("", pySplitWhitespace(S)) =/=String S
+   102	
+   103	  configuration <k> runProgram($PGM:Module, $INPUT:String) </k>
+   104	endmodule
+===== candidate/spec.k =====
+     1	requires "verification.k"
+     2	
+     3	module SPLIT-WORDS-SPEC
+     4	  imports MPY-VERIFICATION
+     5	
+     6	  // One total symbolic claim states the contract for every String. The nested
+     7	  // conditional encodes the three exhaustive branches and their precedence.
+     8	  claim <k> runProgram(solutionAST, S:String)
+     9	          => iteValue(
+    10	               containsWhitespace(S),
+    11	               VList(pySplitWhitespace(S)),
+    12	               iteValue(
+    13	                 findString(S, ",", 0) >=Int 0,
+    14	                 VList(pySplitOn(S, ",")),
+    15	                 VInt(oddLetterCount(S)))) ... </k>
+    16	
+    17	  // Original prompt examples.
+    18	  claim <k> runProgram(solutionAST, "Hello world!")
+    19	          => VList(ListItem(VStr("Hello")) ListItem(VStr("world!"))) ... </k>
+    20	
+    21	  claim <k> runProgram(solutionAST, "Hello,world!")
+    22	          => VList(ListItem(VStr("Hello")) ListItem(VStr("world!"))) ... </k>
+    23	
+    24	  claim <k> runProgram(solutionAST, "abcdef") => VInt(3) ... </k>
+    25	
+    26	  // Edge cases: empty input, whitespace precedence, and preserved empty comma
+    27	  // fields.
+    28	  claim <k> runProgram(solutionAST, "") => VInt(0) ... </k>
+    29	
+    30	  claim <k> runProgram(solutionAST, "a,b c")
+    31	          => VList(ListItem(VStr("a,b")) ListItem(VStr("c"))) ... </k>
+    32	
+    33	  claim <k> runProgram(solutionAST, "left\u2003right")
+    34	          => VList(ListItem(VStr("left")) ListItem(VStr("right"))) ... </k>
+    35	
+    36	  claim <k> runProgram(solutionAST, "a,,b,")
+    37	          => VList(
+    38	               ListItem(VStr("a"))
+    39	               ListItem(VStr(""))
+    40	               ListItem(VStr("b"))
+    41	               ListItem(VStr(""))) ... </k>
+    42	endmodule
+===== candidate/prove.sh =====
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Regenerate the constructor program from the submitted Python source.
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	
+     7	# Build the hand-written semantics with the symbolic Haskell backend.
+     8	kompile verification.k \
+     9	  --backend haskell \
+    10	  --main-module MPY-VERIFICATION \
+    11	  --syntax-module MPY-SYNTAX
+    12	
+    13	# Exercise all three contract branches and two precedence/edge cases using the
+    14	# actual translated program as $PGM.
+    15	krun solution.mpy -cINPUT='"Hello world!"'
+    16	krun solution.mpy -cINPUT='"Hello,world!"'
+    17	krun solution.mpy -cINPUT='"abcdef"'
+    18	krun solution.mpy -cINPUT='"a,b c"'
+    19	krun solution.mpy -cINPUT='"a,,b,"'
+    20	
+    21	# Prove the total symbolic contract and every concrete claim in spec.k.
+    22	kprove spec.k \
+    23	  --definition verification-kompiled \
+    24	  --spec-module SPLIT-WORDS-SPEC
+--- OUTPUT END ---

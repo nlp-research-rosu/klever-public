@@ -1,0 +1,571 @@
+COMMAND: bash -lc $'\nprintf "core.k value/sort definitions\\n"\nnl -ba /reference/k-proof/reference-semantics/semantics/core.k | sed -n "1,70p;200,245p"\nprintf "builtins.k len definitions\\n"\nnl -ba /reference/k-proof/reference-semantics/semantics/builtins.k | sed -n "1,45p"\nprintf "syntax.k relevant grammar\\n"\nrg -n -C 3 "FuncDef|For\\(|Compare\\(|Call\\(|Return\\(|Subscript\\(|Name\\(|Module\\(" /reference/k-proof/reference-semantics/semantics/syntax.k\nprintf "operational loop, call, compare, len context matches\\n"\nrg -n -C 4 "#loop|For\\(|applyBuiltin|Call\\(|applyCmp|Compare\\(|#iter" /reference/k-proof/reference-semantics/semantics/{controls,call,operators,builtins,iter,core}.k\n'
+WORKDIR: /audit-output
+START_UTC: 2026-07-31T04:05:01Z
+core.k value/sort definitions
+     1	// reference/src/semantics/core.k — MPY-CORE
+     2	
+     3	module MPY-CORE
+     4	  imports MPY-SYNTAX
+     5	  imports INT
+     6	  imports BOOL
+     7	  imports STRING
+     8	  imports MAP
+     9	  imports LIST
+    10	  imports K-EQUAL
+    11	
+    12	  // ==== values, the algebraic lists, and the scope heap =====================
+    13	  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+    14	  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+    15	  syntax Str    ::= str(IntSeq)
+    16	
+    17	  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+    18	  syntax Iterable ::= list(ValSeq)
+    19	                    | tuple(ValSeq)
+    20	                    | Str
+    21	                    | rangeObj(Int, Int, Int)
+    22	                    | zipObj(ValSeq, ValSeq)
+    23	                    | zipObjS(IntSeq, IntSeq)
+    24	
+    25	  syntax Val      ::= Int
+    26	                    | Bool
+    27	                    | "noneV"
+    28	                    | Iterable
+    29	                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+    30	                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+    31	                    | closureVal(ParamNames, Stmts, Int)
+    32	                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+    33	                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+    34	                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+    35	
+    36	  syntax Parent   ::= "root" | parent(Int)
+    37	  syntax Scope    ::= scope(Map, Parent)
+    38	  syntax KResult  ::= Val
+    39	  syntax Expr     ::= Val   // cooling puts results back into expression holes
+    40	  syntax Vals     ::= List{Val, ","}
+    41	  syntax Exc      ::= "NoExc" | "AssertionError"
+    42	  syntax RetState ::= "noRet" | retV(Val)
+    43	
+    44	  // ==== configuration =======================================================
+    45	  // The builtins namespace is a real scope at reserved location -1 (the bottom of every
+    46	  // chain; scopeLoc only allocates >=1, so -1 never collides). The module scope (loc 0)
+    47	  // has it as parent, so an unbound name resolves there last — exactly LEGB. `int`/`str`
+    48	  // resolve to their type objects; any local/global binding shadows them via normal lookup.
+    49	  configuration
+    50	    <k>       #loadAll($PGM:Module) </k>
+    51	    <env>     0 </env>
+    52	    <scopes>   0     |-> scope(.Map, parent(-1))
+    53	              -1    |-> builtinsScope </scopes>
+    54	    <scopeLoc> 1 </scopeLoc>
+    55	    <heap>    .Map </heap>
+    56	    <heapLoc> 0 </heapLoc>
+    57	    <stack>   .List </stack>
+    58	    <ret>     noRet </ret>
+    59	    <exc>     NoExc </exc>
+    60	    <exit-code exit=""> 0 </exit-code>
+    61	
+    62	  // ==== heap allocation (constructed lists become objects) ==================
+    63	  // Cons-form emission with a freshness guard (the heap-list-probe discipline:
+    64	  // an update-form H[N <- _] never re-normalizes symbolically). heapLoc is
+    65	  // monotonic — it does NOT wind back at #pop: returned lists escape by ref.
+    66	  // A bare list(VS) Val stays legal (read-only inputs in claims flow unboxed);
+    67	  // only CONSTRUCTORS in program syntax allocate.
+    68	  syntax Bool ::= isRefV(Val) [function, total]
+    69	  rule isRefV(ref(_:Int)) => true
+    70	  rule isRefV(_:Val)      => false [owise]
+   200	  rule truthy(B:Bool)          => B
+   201	  rule truthy(noneV)           => false
+   202	  rule truthy(I:Int)           => I =/=Int 0
+   203	  rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)
+   204	  rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)
+   205	  rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)
+   206	
+   207	  // ==== extensible operator dispatch (cases added by the construct modules) ==
+   208	  syntax Val  ::= applyUn(String, Val) [function]
+   209	  syntax Val  ::= applyBin(String, Val, Val) [function]
+   210	  syntax Bool ::= applyCmp(String, Val, Val) [function]
+   211	
+   212	  // ==== shared list helpers =================================================
+   213	  syntax Vals ::= appendVal(Vals, Val) [function, total]
+   214	  rule appendVal(.Vals, V:Val)              => V , .Vals
+   215	  rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+   216	
+   217	  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+   218	  rule vals2valSeq(.Vals)            => .ValSeq
+   219	  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+   220	
+   221	  // ==== shared sequence length (len / summaries across many modules) ========
+   222	  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+   223	  syntax Int ::= vsLen(ValSeq) [function, total]
+   224	  rule vsLen(.ValSeq)                => 0
+   225	  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+   226	
+   227	  syntax Int ::= isLen(IntSeq) [function, total]
+   228	  rule isLen(.IntSeq)                => 0
+   229	  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+   230	
+   231	  // in-bounds positional write (list subscript-assign); OOB leaves the seq unchanged
+   232	  // (valid programs write in-bounds — mirrors valSeqAt's total-but-underspecified stance)
+   233	  syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]
+   234	  rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq
+   235	  rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val)    => vCons(V, S)
+   236	  rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V))
+   237	       requires I >Int 0
+   238	  rule setVSAt(VS:ValSeq, I:Int, _:Val)             => VS
+   239	       requires I <Int 0
+   240	endmodule
+builtins.k len definitions
+     1	// reference/src/semantics/builtins.k — MPY-BUILTINS
+     2	
+     3	module MPY-BUILTINS
+     4	  imports MPY-CORE
+     5	  imports MPY-STR
+     6	  imports MPY-SET
+     7	  imports MPY-ITER
+     8	  imports MPY-RANGE
+     9	  imports MPY-INT
+    10	  imports MPY-METHODS
+    11	
+    12	  // the builtins REGISTRY is core.k's builtinsScope (the -1 frame); names resolve by lookup
+    13	
+    14	  // Call routing + argument evaluation live in call.k, which also routes the fold
+    15	  // builtins (sum/all/any/max/min) to the #_Acc folds below and everything else to
+    16	  // applyBuiltin. This module owns applyBuiltin + the fold implementations.
+    17	  syntax Val ::= applyBuiltin(String, Vals) [function]
+    18	
+    19	  // ==== len(obj) — O(1) per kind ============================================
+    20	  syntax Int ::= seqLen(Val) [function]
+    21	  rule applyBuiltin("len", OBJ:Val, .Vals) => seqLen(OBJ)
+    22	  rule seqLen(list(VS:ValSeq))                  => vsLen(VS)
+    23	  rule seqLen(tuple(VS:ValSeq))                 => vsLen(VS)
+    24	  rule seqLen(str(IS:IntSeq))                   => isLen(IS)
+    25	  rule seqLen(setV(DS:IntSeq))                  => isLen(DS)
+    26	  rule seqLen(rangeObj(LO:Int, HI:Int, ST:Int)) => rangeLen(LO, HI, ST)
+    27	
+    28	  // ==== list(seq) — materialize a list/tuple into a list (e.g. list(d.keys())) ==
+    29	  // Minimal: the "copy a sequence" case (list of a list is itself; list of a tuple keeps order).
+    30	  // list() of other iterables (str/range/set/zip) is added via the iterator fold when needed.
+    31	  // (k-cell — list() constructs a NEW object)
+    32	  rule <k> #applyK(toCall(builtinV("list")), (list(VS:ValSeq),  .Vals)) => #alloc(list(VS)) ... </k>
+    33	  rule <k> #applyK(toCall(builtinV("list")), (tuple(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>
+    34	  rule <k> #applyK(toCall(builtinV("list")), .Vals)                     => #alloc(list(.ValSeq)) ... </k>
+    35	  rule <k> #applyK(toCall(builtinV("list")), (str(CS:IntSeq), .Vals))   => #alloc(list(charsOf(CS))) ... </k>
+    36	  syntax ValSeq ::= charsOf(IntSeq) [function, total]
+    37	  rule charsOf(.IntSeq)                => .ValSeq
+    38	  rule charsOf(iCons(C:Int, R:IntSeq)) => vCons(str(iCons(C, .IntSeq)), charsOf(R))
+    39	
+    40	  // ==== set(str) — distinct character codes =================================
+    41	  rule applyBuiltin("set", str(CS:IntSeq), .Vals) => setV(dedupCodes(CS))
+    42	
+    43	  // ==== abs(int) ============================================================
+    44	  rule applyBuiltin("abs", I:Int, .Vals) => absInt(I)
+    45	
+syntax.k relevant grammar
+50-                | "Return"    "(" Expr ")" [strict]
+51-                | "Assert"    "(" Expr ")" [strict]
+52-                | "Expr"      "(" Expr ")" [strict]
+53:                | "FuncDef"   "(" String "," Params "," Stmts ")"
+54:                | "FuncDef"   "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"
+55-
+56-  syntax Stmts      ::= List{Stmt, ""}
+57-  syntax Params     ::= "Params" "(" ParamNames ")"
+operational loop, call, compare, len context matches
+/reference/k-proof/reference-semantics/semantics/core.k-181-                  [ "float"  <- typeV("float")     ], root)
+/reference/k-proof/reference-semantics/semantics/core.k-182-
+/reference/k-proof/reference-semantics/semantics/core.k-183-  // ==== argument/element evaluation: ONE left-to-right loop, tagged by destination ==
+/reference/k-proof/reference-semantics/semantics/core.k-184-  // (list/tuple literals and calls all use it; modules extend ApplyK with their tags)
+/reference/k-proof/reference-semantics/semantics/core.k:185:  syntax ApplyK ::= toCall(Val)
+/reference/k-proof/reference-semantics/semantics/core.k-186-  syntax KItem  ::= #evalArgs(Exprs, Vals, ApplyK)
+/reference/k-proof/reference-semantics/semantics/core.k-187-                  | #evalArgCont(Exprs, Vals, ApplyK)
+/reference/k-proof/reference-semantics/semantics/core.k-188-                  | #applyK(ApplyK, Vals)
+/reference/k-proof/reference-semantics/semantics/core.k-189-  rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>
+--
+/reference/k-proof/reference-semantics/semantics/core.k-206-
+/reference/k-proof/reference-semantics/semantics/core.k-207-  // ==== extensible operator dispatch (cases added by the construct modules) ==
+/reference/k-proof/reference-semantics/semantics/core.k-208-  syntax Val  ::= applyUn(String, Val) [function]
+/reference/k-proof/reference-semantics/semantics/core.k-209-  syntax Val  ::= applyBin(String, Val, Val) [function]
+/reference/k-proof/reference-semantics/semantics/core.k:210:  syntax Bool ::= applyCmp(String, Val, Val) [function]
+/reference/k-proof/reference-semantics/semantics/core.k-211-
+/reference/k-proof/reference-semantics/semantics/core.k-212-  // ==== shared list helpers =================================================
+/reference/k-proof/reference-semantics/semantics/core.k-213-  syntax Vals ::= appendVal(Vals, Val) [function, total]
+/reference/k-proof/reference-semantics/semantics/core.k-214-  rule appendVal(.Vals, V:Val)              => V , .Vals
+--
+/reference/k-proof/reference-semantics/semantics/iter.k-1-// reference/src/semantics/iter.k — MPY-ITER
+/reference/k-proof/reference-semantics/semantics/iter.k:2:// The iterator protocol, DECLARATION ONLY. Each iterable's #iterNext case lives in that
+/reference/k-proof/reference-semantics/semantics/iter.k-3-// iterable's own module (list/tuple/str in their modules, rangeObj in range.k, zip in
+/reference/k-proof/reference-semantics/semantics/iter.k-4-// builtins.k). Consumers (the for-loop, `x in _`, sum/all/any/max/min) import this.
+/reference/k-proof/reference-semantics/semantics/iter.k-5-
+/reference/k-proof/reference-semantics/semantics/iter.k-6-module MPY-ITER
+/reference/k-proof/reference-semantics/semantics/iter.k-7-  imports MPY-CORE
+/reference/k-proof/reference-semantics/semantics/iter.k:8:  syntax KItem ::= #iterNext(Iterable) | "#iterDone" | #iterYield(Val, Iterable)
+/reference/k-proof/reference-semantics/semantics/iter.k-9-endmodule
+--
+/reference/k-proof/reference-semantics/semantics/builtins.k-12-  // the builtins REGISTRY is core.k's builtinsScope (the -1 frame); names resolve by lookup
+/reference/k-proof/reference-semantics/semantics/builtins.k-13-
+/reference/k-proof/reference-semantics/semantics/builtins.k-14-  // Call routing + argument evaluation live in call.k, which also routes the fold
+/reference/k-proof/reference-semantics/semantics/builtins.k-15-  // builtins (sum/all/any/max/min) to the #_Acc folds below and everything else to
+/reference/k-proof/reference-semantics/semantics/builtins.k:16:  // applyBuiltin. This module owns applyBuiltin + the fold implementations.
+/reference/k-proof/reference-semantics/semantics/builtins.k:17:  syntax Val ::= applyBuiltin(String, Vals) [function]
+/reference/k-proof/reference-semantics/semantics/builtins.k-18-
+/reference/k-proof/reference-semantics/semantics/builtins.k-19-  // ==== len(obj) — O(1) per kind ============================================
+/reference/k-proof/reference-semantics/semantics/builtins.k-20-  syntax Int ::= seqLen(Val) [function]
+/reference/k-proof/reference-semantics/semantics/builtins.k:21:  rule applyBuiltin("len", OBJ:Val, .Vals) => seqLen(OBJ)
+/reference/k-proof/reference-semantics/semantics/builtins.k-22-  rule seqLen(list(VS:ValSeq))                  => vsLen(VS)
+/reference/k-proof/reference-semantics/semantics/builtins.k-23-  rule seqLen(tuple(VS:ValSeq))                 => vsLen(VS)
+/reference/k-proof/reference-semantics/semantics/builtins.k-24-  rule seqLen(str(IS:IntSeq))                   => isLen(IS)
+/reference/k-proof/reference-semantics/semantics/builtins.k-25-  rule seqLen(setV(DS:IntSeq))                  => isLen(DS)
+--
+/reference/k-proof/reference-semantics/semantics/builtins.k-28-  // ==== list(seq) — materialize a list/tuple into a list (e.g. list(d.keys())) ==
+/reference/k-proof/reference-semantics/semantics/builtins.k-29-  // Minimal: the "copy a sequence" case (list of a list is itself; list of a tuple keeps order).
+/reference/k-proof/reference-semantics/semantics/builtins.k-30-  // list() of other iterables (str/range/set/zip) is added via the iterator fold when needed.
+/reference/k-proof/reference-semantics/semantics/builtins.k-31-  // (k-cell — list() constructs a NEW object)
+/reference/k-proof/reference-semantics/semantics/builtins.k:32:  rule <k> #applyK(toCall(builtinV("list")), (list(VS:ValSeq),  .Vals)) => #alloc(list(VS)) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:33:  rule <k> #applyK(toCall(builtinV("list")), (tuple(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:34:  rule <k> #applyK(toCall(builtinV("list")), .Vals)                     => #alloc(list(.ValSeq)) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:35:  rule <k> #applyK(toCall(builtinV("list")), (str(CS:IntSeq), .Vals))   => #alloc(list(charsOf(CS))) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-36-  syntax ValSeq ::= charsOf(IntSeq) [function, total]
+/reference/k-proof/reference-semantics/semantics/builtins.k-37-  rule charsOf(.IntSeq)                => .ValSeq
+/reference/k-proof/reference-semantics/semantics/builtins.k-38-  rule charsOf(iCons(C:Int, R:IntSeq)) => vCons(str(iCons(C, .IntSeq)), charsOf(R))
+/reference/k-proof/reference-semantics/semantics/builtins.k-39-
+/reference/k-proof/reference-semantics/semantics/builtins.k-40-  // ==== set(str) — distinct character codes =================================
+/reference/k-proof/reference-semantics/semantics/builtins.k:41:  rule applyBuiltin("set", str(CS:IntSeq), .Vals) => setV(dedupCodes(CS))
+/reference/k-proof/reference-semantics/semantics/builtins.k-42-
+/reference/k-proof/reference-semantics/semantics/builtins.k-43-  // ==== abs(int) ============================================================
+/reference/k-proof/reference-semantics/semantics/builtins.k:44:  rule applyBuiltin("abs", I:Int, .Vals) => absInt(I)
+/reference/k-proof/reference-semantics/semantics/builtins.k-45-
+/reference/k-proof/reference-semantics/semantics/builtins.k:46:  // ==== sum(iterable) — one #iterNext fold; intOf = int value of an int/bool ==
+/reference/k-proof/reference-semantics/semantics/builtins.k-47-  syntax KItem ::= #sumAcc(Iterable, Int) | #sumCont(Int)
+/reference/k-proof/reference-semantics/semantics/builtins.k:48:  rule <k> #sumAcc(IT:Iterable, ACC:Int) => #iterNext(IT) ~> #sumCont(ACC) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:49:  rule <k> #iterDone ~> #sumCont(ACC:Int) => ACC ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:50:  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int)
+/reference/k-proof/reference-semantics/semantics/builtins.k-51-        => #sumAcc(R, ACC +Int intOf(V)) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-52-       requires isInt(V) orBool isBool(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k-53-
+/reference/k-proof/reference-semantics/semantics/builtins.k-54-  syntax Int ::= intOf(Val) [function]
+/reference/k-proof/reference-semantics/semantics/builtins.k-55-  rule intOf(I:Int)  => I
+/reference/k-proof/reference-semantics/semantics/builtins.k-56-  rule intOf(B:Bool) => #if B #then 1 #else 0 #fi
+/reference/k-proof/reference-semantics/semantics/builtins.k-57-
+/reference/k-proof/reference-semantics/semantics/builtins.k:58:  // ==== all / any (short-circuiting #iterNext folds) ========================
+/reference/k-proof/reference-semantics/semantics/builtins.k-59-  syntax KItem ::= #allAcc(Iterable) | "#allCont"
+/reference/k-proof/reference-semantics/semantics/builtins.k:60:  rule <k> #allAcc(IT:Iterable) => #iterNext(IT) ~> #allCont ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:61:  rule <k> #iterDone ~> #allCont => true ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:62:  rule <k> #iterYield(V:Val, R:Iterable) ~> #allCont => #allAcc(R) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-63-       requires truthy(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k:64:  rule <k> #iterYield(V:Val, _:Iterable) ~> #allCont => false ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-65-       requires notBool truthy(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k-66-
+/reference/k-proof/reference-semantics/semantics/builtins.k-67-  syntax KItem ::= #anyAcc(Iterable) | "#anyCont"
+/reference/k-proof/reference-semantics/semantics/builtins.k:68:  rule <k> #anyAcc(IT:Iterable) => #iterNext(IT) ~> #anyCont ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:69:  rule <k> #iterDone ~> #anyCont => false ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:70:  rule <k> #iterYield(V:Val, _:Iterable) ~> #anyCont => true ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-71-       requires truthy(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k:72:  rule <k> #iterYield(V:Val, R:Iterable) ~> #anyCont => #anyAcc(R) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-73-       requires notBool truthy(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k-74-
+/reference/k-proof/reference-semantics/semantics/builtins.k:75:  // ==== max / min over an iterable (#iterNext folds; first element seeds) ====
+/reference/k-proof/reference-semantics/semantics/builtins.k-76-  syntax KItem ::= #maxAcc0(Iterable) | "#maxCont0" | #maxAcc(Iterable, Int) | #maxCont(Int)
+/reference/k-proof/reference-semantics/semantics/builtins.k:77:  rule <k> #maxAcc0(IT:Iterable) => #iterNext(IT) ~> #maxCont0 ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:78:  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAcc(R, {V}:>Int) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-79-       requires isInt(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k:80:  rule <k> #maxAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #maxCont(M) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:81:  rule <k> #iterDone ~> #maxCont(M:Int) => M ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:82:  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont(M:Int)
+/reference/k-proof/reference-semantics/semantics/builtins.k-83-        => #maxAcc(R, maxInt(M, {V}:>Int)) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-84-       requires isInt(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k-85-
+/reference/k-proof/reference-semantics/semantics/builtins.k-86-  syntax KItem ::= #minAcc0(Iterable) | "#minCont0" | #minAcc(Iterable, Int) | #minCont(Int)
+/reference/k-proof/reference-semantics/semantics/builtins.k:87:  rule <k> #minAcc0(IT:Iterable) => #iterNext(IT) ~> #minCont0 ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:88:  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAcc(R, {V}:>Int) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-89-       requires isInt(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k:90:  rule <k> #minAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #minCont(M) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:91:  rule <k> #iterDone ~> #minCont(M:Int) => M ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:92:  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont(M:Int)
+/reference/k-proof/reference-semantics/semantics/builtins.k-93-        => #minAcc(R, minInt(M, {V}:>Int)) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-94-       requires isInt(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k-95-
+/reference/k-proof/reference-semantics/semantics/builtins.k-96-  // ==== variadic max / min (a Vals fold) ====================================
+/reference/k-proof/reference-semantics/semantics/builtins.k-97-  syntax Int ::= maxVals(Int, Vals) [function]
+/reference/k-proof/reference-semantics/semantics/builtins.k:98:  rule applyBuiltin("max", I:Int, REST:Vals) => maxVals(I, REST)
+/reference/k-proof/reference-semantics/semantics/builtins.k-99-  rule maxVals(M:Int, .Vals)           => M
+/reference/k-proof/reference-semantics/semantics/builtins.k-100-  rule maxVals(M:Int, (I:Int, R:Vals)) => maxVals(maxInt(M, I), R)
+/reference/k-proof/reference-semantics/semantics/builtins.k-101-
+/reference/k-proof/reference-semantics/semantics/builtins.k-102-  syntax Int ::= minVals(Int, Vals) [function]
+/reference/k-proof/reference-semantics/semantics/builtins.k:103:  rule applyBuiltin("min", I:Int, REST:Vals) => minVals(I, REST)
+/reference/k-proof/reference-semantics/semantics/builtins.k-104-  rule minVals(M:Int, .Vals)           => M
+/reference/k-proof/reference-semantics/semantics/builtins.k-105-  rule minVals(M:Int, (I:Int, R:Vals)) => minVals(minInt(M, I), R)
+/reference/k-proof/reference-semantics/semantics/builtins.k-106-
+/reference/k-proof/reference-semantics/semantics/builtins.k-107-  // ==== bin(n) — "0b" + binary digit codes (promoted from 103's defined fold) ==
+/reference/k-proof/reference-semantics/semantics/builtins.k:108:  rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(48, iCons(98, binCodes(N))))
+/reference/k-proof/reference-semantics/semantics/builtins.k-109-       requires N >=Int 0
+/reference/k-proof/reference-semantics/semantics/builtins.k-110-  // negative operand: the '-' sign prefixes the magnitude's digits
+/reference/k-proof/reference-semantics/semantics/builtins.k:111:  rule applyBuiltin("bin", N:Int, .Vals)
+/reference/k-proof/reference-semantics/semantics/builtins.k-112-    => str(iCons(45, iCons(48, iCons(98, binCodes(0 -Int N)))))
+/reference/k-proof/reference-semantics/semantics/builtins.k-113-       requires N <Int 0
+/reference/k-proof/reference-semantics/semantics/builtins.k-114-  syntax IntSeq ::= binCodes(Int) [function, total]
+/reference/k-proof/reference-semantics/semantics/builtins.k-115-  rule binCodes(0) => iCons(48, .IntSeq)
+--
+/reference/k-proof/reference-semantics/semantics/builtins.k-120-    => binAcc((N -Int pyMod(N, 2)) /Int 2, iCons(48 +Int pyMod(N, 2), ACC))
+/reference/k-proof/reference-semantics/semantics/builtins.k-121-       requires N >Int 0
+/reference/k-proof/reference-semantics/semantics/builtins.k-122-
+/reference/k-proof/reference-semantics/semantics/builtins.k-123-  // ==== enumerate(xs) — pairs (i, v); materialized eagerly over a list =========
+/reference/k-proof/reference-semantics/semantics/builtins.k:124:  rule <k> #applyK(toCall(builtinV("enumerate")), (list(VS:ValSeq), .Vals))
+/reference/k-proof/reference-semantics/semantics/builtins.k-125-        => #alloc(list(enumVS(VS, 0))) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-126-  syntax ValSeq ::= enumVS(ValSeq, Int) [function, total]
+/reference/k-proof/reference-semantics/semantics/builtins.k-127-  rule enumVS(.ValSeq, _:Int) => .ValSeq
+/reference/k-proof/reference-semantics/semantics/builtins.k-128-  rule enumVS(vCons(V:Val, R:ValSeq), I:Int)
+/reference/k-proof/reference-semantics/semantics/builtins.k-129-    => vCons(tuple(vCons(I, vCons(V, .ValSeq))), enumVS(R, I +Int 1))
+/reference/k-proof/reference-semantics/semantics/builtins.k-130-
+/reference/k-proof/reference-semantics/semantics/builtins.k-131-  // ==== map(str, xs) — eager (only the str case is in the subset) =============
+/reference/k-proof/reference-semantics/semantics/builtins.k:132:  rule <k> #applyK(toCall(builtinV("map")), (typeV("str"), list(VS:ValSeq), .Vals))
+/reference/k-proof/reference-semantics/semantics/builtins.k-133-        => #alloc(list(mapStrVS(VS))) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-134-  syntax ValSeq ::= mapStrVS(ValSeq) [function, total]
+/reference/k-proof/reference-semantics/semantics/builtins.k-135-  rule mapStrVS(.ValSeq) => .ValSeq
+/reference/k-proof/reference-semantics/semantics/builtins.k-136-  rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))
+/reference/k-proof/reference-semantics/semantics/builtins.k-137-  rule mapStrVS(vCons(str(CS:IntSeq), R:ValSeq)) => vCons(str(CS), mapStrVS(R))
+/reference/k-proof/reference-semantics/semantics/builtins.k-138-
+/reference/k-proof/reference-semantics/semantics/builtins.k-139-  // ==== int(x) identities (int(round(x)) composes through) ====================
+/reference/k-proof/reference-semantics/semantics/builtins.k:140:  rule applyBuiltin("int", I:Int, .Vals) => I
+/reference/k-proof/reference-semantics/semantics/builtins.k-141-
+/reference/k-proof/reference-semantics/semantics/builtins.k-142-  // ==== ord / chr ===========================================================
+/reference/k-proof/reference-semantics/semantics/builtins.k:143:  rule applyBuiltin("ord", str(iCons(C:Int, .IntSeq)), .Vals) => C
+/reference/k-proof/reference-semantics/semantics/builtins.k:144:  rule applyBuiltin("chr", I:Int, .Vals) => str(iCons(I, .IntSeq))
+/reference/k-proof/reference-semantics/semantics/builtins.k-145-       requires 0 <=Int I andBool I <Int 128
+/reference/k-proof/reference-semantics/semantics/builtins.k-146-
+/reference/k-proof/reference-semantics/semantics/builtins.k-147-  // ==== str(int) / str(str) =================================================
+/reference/k-proof/reference-semantics/semantics/builtins.k:148:  rule applyBuiltin("str", I:Int, .Vals)       => str(strToCodes(Int2String(I)))
+/reference/k-proof/reference-semantics/semantics/builtins.k:149:  rule applyBuiltin("str", str(CS:IntSeq), .Vals) => str(CS)
+/reference/k-proof/reference-semantics/semantics/builtins.k-150-
+/reference/k-proof/reference-semantics/semantics/builtins.k-151-  // ==== int(str) — a single digit char ('0'..'9', code 48..57) to its value =====
+/reference/k-proof/reference-semantics/semantics/builtins.k:152:  rule applyBuiltin("int", str(iCons(C:Int, .IntSeq)), .Vals) => C -Int 48
+/reference/k-proof/reference-semantics/semantics/builtins.k-153-       requires 48 <=Int C andBool C <=Int 57
+/reference/k-proof/reference-semantics/semantics/builtins.k-154-
+/reference/k-proof/reference-semantics/semantics/builtins.k-155-  // ==== int(str) — a multi-digit non-negative numeral (Horner fold; the single-char rule covers len 1)
+/reference/k-proof/reference-semantics/semantics/builtins.k:156:  rule applyBuiltin("int", str(CS:IntSeq), .Vals) => intDigAcc(CS, 0)
+/reference/k-proof/reference-semantics/semantics/builtins.k-157-       requires isLen(CS) >=Int 2
+/reference/k-proof/reference-semantics/semantics/builtins.k-158-  syntax Int ::= intDigAcc(IntSeq, Int) [function, total]
+/reference/k-proof/reference-semantics/semantics/builtins.k-159-  rule intDigAcc(.IntSeq, ACC:Int)             => ACC
+/reference/k-proof/reference-semantics/semantics/builtins.k-160-  rule intDigAcc(iCons(C:Int, R:IntSeq), ACC:Int) => intDigAcc(R, (ACC *Int 10) +Int (C -Int 48))
+/reference/k-proof/reference-semantics/semantics/builtins.k-161-
+/reference/k-proof/reference-semantics/semantics/builtins.k-162-  // ==== zip(a, b) — parallel iterable of pairs, truncating to the shorter =====
+/reference/k-proof/reference-semantics/semantics/builtins.k:163:  rule applyBuiltin("zip", list(A:ValSeq), list(B:ValSeq), .Vals) => zipObj(A, B)
+/reference/k-proof/reference-semantics/semantics/builtins.k:164:  rule applyBuiltin("zip", str(A:IntSeq), str(B:IntSeq), .Vals)   => zipObjS(A, B)
+/reference/k-proof/reference-semantics/semantics/builtins.k-165-
+/reference/k-proof/reference-semantics/semantics/builtins.k:166:  // zip's iterator-protocol cases (zip is created here, so its #iterNext lives here)
+/reference/k-proof/reference-semantics/semantics/builtins.k:167:  rule <k> #iterNext(zipObj(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq)))
+/reference/k-proof/reference-semantics/semantics/builtins.k:168:        => #iterYield(tuple(vCons(A, vCons(B, .ValSeq))), zipObj(As, Bs)) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:169:  rule <k> #iterNext(zipObj(.ValSeq, _:ValSeq))               => #iterDone ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:170:  rule <k> #iterNext(zipObj(vCons(_:Val, _:ValSeq), .ValSeq)) => #iterDone ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:171:  rule <k> #iterNext(zipObjS(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)))
+/reference/k-proof/reference-semantics/semantics/builtins.k:172:        => #iterYield(tuple(vCons(str(iCons(A, .IntSeq)), vCons(str(iCons(B, .IntSeq)), .ValSeq))), zipObjS(As, Bs)) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:173:  rule <k> #iterNext(zipObjS(.IntSeq, _:IntSeq))              => #iterDone ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:174:  rule <k> #iterNext(zipObjS(iCons(_:Int, _:IntSeq), .IntSeq)) => #iterDone ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-175-
+/reference/k-proof/reference-semantics/semantics/builtins.k-176-  // ==== range(stop) / range(start, stop) / range(start, stop, step) =========
+/reference/k-proof/reference-semantics/semantics/builtins.k:177:  rule applyBuiltin("range", I:Int, .Vals)               => rangeObj(0, I, 1)
+/reference/k-proof/reference-semantics/semantics/builtins.k:178:  rule applyBuiltin("range", A:Int, B:Int, .Vals)        => rangeObj(A, B, 1)
+/reference/k-proof/reference-semantics/semantics/builtins.k:179:  rule applyBuiltin("range", A:Int, B:Int, S:Int, .Vals) => rangeObj(A, B, S)
+/reference/k-proof/reference-semantics/semantics/builtins.k-180-       requires S =/=Int 0
+/reference/k-proof/reference-semantics/semantics/builtins.k-181-
+/reference/k-proof/reference-semantics/semantics/builtins.k-182-  // ==== eval(str) — arithmetic expressions (ints, + - * // **, spaces) ========
+/reference/k-proof/reference-semantics/semantics/builtins.k-183-  // Python precedence: ** right-assoc, then * //, then + -. Promoted from 160's
+/reference/k-proof/reference-semantics/semantics/builtins.k-184-  // trusted pass evaluator, now DEFINED in the reference and driven by a
+/reference/k-proof/reference-semantics/semantics/builtins.k-185-  // code-level tokenizer. Reduces on concrete strings (krun); a symbolic
+/reference/k-proof/reference-semantics/semantics/builtins.k-186-  // argument leaves the call unevaluated for problem-level folds.
+/reference/k-proof/reference-semantics/semantics/builtins.k:187:  rule applyBuiltin("eval", str(CS:IntSeq), .Vals) => evalArith(CS)
+/reference/k-proof/reference-semantics/semantics/builtins.k-188-  syntax Int ::= evalArith(IntSeq) [function]
+/reference/k-proof/reference-semantics/semantics/builtins.k-189-  rule evalArith(CS:IntSeq)
+/reference/k-proof/reference-semantics/semantics/builtins.k-190-    => firstNdE(passAddE(passMulE(passPowE(tokOps(CS), tokNds(CS)))))
+/reference/k-proof/reference-semantics/semantics/builtins.k-191-
+--
+/reference/k-proof/reference-semantics/semantics/builtins.k-276-  // ==== hashlib.md5(S).hexdigest() — a trusted opaque digest ==================
+/reference/k-proof/reference-semantics/semantics/builtins.k-277-  // The md5 value itself is a named shared trust (sortVS-style, no concrete
+/reference/k-proof/reference-semantics/semantics/builtins.k-278-  // twin); proofs use the length/hex-charset lemmas (lemmas/builtins.k).
+/reference/k-proof/reference-semantics/semantics/builtins.k-279-  syntax KItem ::= "#md5"
+/reference/k-proof/reference-semantics/semantics/builtins.k:280:  rule <k> Call(Attribute(Name("hashlib"), "md5"), (E:Expr, .Exprs)) => E ~> #md5 ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-281-       [priority(40)]
+/reference/k-proof/reference-semantics/semantics/builtins.k-282-  rule <k> str(CS:IntSeq) ~> #md5 => md5Obj(CS) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-283-  syntax Val ::= md5Obj(IntSeq)
+/reference/k-proof/reference-semantics/semantics/builtins.k-284-  rule applyMethod(md5Obj(CS:IntSeq), "hexdigest", .Vals) => str(md5hexCodes(CS))
+--
+/reference/k-proof/reference-semantics/semantics/builtins.k-287-  // ==== isinstance(V, int|str) — an ordinary 2-arg builtin ===================
+/reference/k-proof/reference-semantics/semantics/builtins.k-288-  // The type argument (int/str) is an ordinary name that resolves via the builtins frame to
+/reference/k-proof/reference-semantics/semantics/builtins.k-289-  // typeV (see core.k's config); no Call-level special case. isIntV/isStrV mirror the old
+/reference/k-proof/reference-semantics/semantics/builtins.k-290-  // owise-on-Val test (concrete-sort args decide; a symbolic Val stays owise, as before).
+/reference/k-proof/reference-semantics/semantics/builtins.k:291:  rule applyBuiltin("isinstance", V:Val, typeV("int"), .Vals) => isIntV(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k:292:  rule applyBuiltin("isinstance", V:Val, typeV("str"), .Vals) => isStrV(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k-293-  syntax Bool ::= isIntV(Val) [function] | isStrV(Val) [function]
+/reference/k-proof/reference-semantics/semantics/builtins.k-294-  rule isIntV(_:Int)         => true
+/reference/k-proof/reference-semantics/semantics/builtins.k-295-  rule isIntV(_:Val)         => false [owise]
+/reference/k-proof/reference-semantics/semantics/builtins.k-296-  rule isStrV(str(_:IntSeq)) => true
+--
+/reference/k-proof/reference-semantics/semantics/operators.k-1-// reference/src/semantics/operators.k — MPY-OPERATORS
+/reference/k-proof/reference-semantics/semantics/operators.k-2-// The operator DISPATCH layer: operands evaluate by strictness (heat/cool over KResult=Val),
+/reference/k-proof/reference-semantics/semantics/operators.k:3:// the cooled node hands to applyUn/applyBin/applyCmp (declared in core.k; each domain file
+/reference/k-proof/reference-semantics/semantics/operators.k-4-// owns its cases — bool.k, int.k, float.k, str.k, list.k, tuple.k, set.k, dict.k).
+/reference/k-proof/reference-semantics/semantics/operators.k-5-
+/reference/k-proof/reference-semantics/semantics/operators.k-6-module MPY-OPERATORS
+/reference/k-proof/reference-semantics/semantics/operators.k-7-  imports MPY-CORE
+--
+/reference/k-proof/reference-semantics/semantics/operators.k-11-
+/reference/k-proof/reference-semantics/semantics/operators.k-12-  rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+/reference/k-proof/reference-semantics/semantics/operators.k-13-
+/reference/k-proof/reference-semantics/semantics/operators.k-14-  // Compare's right operand sits under the CmpOp wrapper — contexts instead of attributes
+/reference/k-proof/reference-semantics/semantics/operators.k:15:  context Compare(HOLE, _)
+/reference/k-proof/reference-semantics/semantics/operators.k:16:  context Compare(_:Val, CmpOp(_, HOLE))
+/reference/k-proof/reference-semantics/semantics/operators.k:17:  rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]
+/reference/k-proof/reference-semantics/semantics/operators.k-18-
+/reference/k-proof/reference-semantics/semantics/operators.k:19:  rule applyCmp("is",     V:Val, noneV) => V ==K noneV
+/reference/k-proof/reference-semantics/semantics/operators.k:20:  rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)
+/reference/k-proof/reference-semantics/semantics/operators.k-21-
+/reference/k-proof/reference-semantics/semantics/operators.k-22-  // ==== operand deref: heap objects combine/compare by STRUCTURE ============
+/reference/k-proof/reference-semantics/semantics/operators.k-23-  // (Python: list == is structural; identity only via `is`.) priority(40)
+/reference/k-proof/reference-semantics/semantics/operators.k:24:  // preempts the generic dispatch so applyUn/applyBin/applyCmp never see a ref.
+/reference/k-proof/reference-semantics/semantics/operators.k-25-  rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k>
+/reference/k-proof/reference-semantics/semantics/operators.k-26-       <heap> ... H |-> V:Val ... </heap>
+/reference/k-proof/reference-semantics/semantics/operators.k-27-       [priority(40)]
+/reference/k-proof/reference-semantics/semantics/operators.k-28-  rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k>
+--
+/reference/k-proof/reference-semantics/semantics/operators.k-30-       requires notBool isRefV(L)
+/reference/k-proof/reference-semantics/semantics/operators.k-31-       [priority(40)]
+/reference/k-proof/reference-semantics/semantics/operators.k-32-
+/reference/k-proof/reference-semantics/semantics/operators.k-33-  // the left operand of `in`/`not in` is an ELEMENT (compares by ==K) — never deref'd
+/reference/k-proof/reference-semantics/semantics/operators.k:34:  rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k>
+/reference/k-proof/reference-semantics/semantics/operators.k-35-       <heap> ... H |-> V:Val ... </heap>
+/reference/k-proof/reference-semantics/semantics/operators.k-36-       requires OP =/=String "in" andBool OP =/=String "not in"
+/reference/k-proof/reference-semantics/semantics/operators.k-37-       [priority(40)]
+/reference/k-proof/reference-semantics/semantics/operators.k:38:  rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k>
+/reference/k-proof/reference-semantics/semantics/operators.k-39-       <heap> ... H |-> V:Val ... </heap>
+/reference/k-proof/reference-semantics/semantics/operators.k-40-       requires notBool isRefV(L)
+/reference/k-proof/reference-semantics/semantics/operators.k-41-        orBool OP ==String "in" orBool OP ==String "not in"
+/reference/k-proof/reference-semantics/semantics/operators.k-42-       [priority(40)]
+--
+/reference/k-proof/reference-semantics/semantics/call.k-3-// builtins at the root; a cooled Attribute is a bound method), evaluate the args (the shared
+/reference/k-proof/reference-semantics/semantics/call.k-4-// #evalArgs loop in core.k), then dispatch on the callee value:
+/reference/k-proof/reference-semantics/semantics/call.k-5-//   closureVal    -> bind params, push a frame (user function)
+/reference/k-proof/reference-semantics/semantics/call.k-6-//   boundMethodV  -> applyMethod
+/reference/k-proof/reference-semantics/semantics/call.k:7://   builtinV      -> the #iterNext folds (sum/all/any/max/min) or applyBuiltin
+/reference/k-proof/reference-semantics/semantics/call.k-8-//   typeV         -> callable type objects: int(...) / str(...)
+/reference/k-proof/reference-semantics/semantics/call.k-9-
+/reference/k-proof/reference-semantics/semantics/call.k-10-module MPY-CALL
+/reference/k-proof/reference-semantics/semantics/call.k-11-  imports MPY-METHODS
+--
+/reference/k-proof/reference-semantics/semantics/call.k-16-  rule <k> Attribute(V:Val, M:String) => boundMethodV(V, M) ... </k>
+/reference/k-proof/reference-semantics/semantics/call.k-17-
+/reference/k-proof/reference-semantics/semantics/call.k-18-  // evaluate callee, then args ([owise]: problem-local Call interceptions beat this)
+/reference/k-proof/reference-semantics/semantics/call.k-19-  syntax KItem ::= #callee(Exprs)
+/reference/k-proof/reference-semantics/semantics/call.k:20:  rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]
+/reference/k-proof/reference-semantics/semantics/call.k:21:  rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>
+/reference/k-proof/reference-semantics/semantics/call.k-22-
+/reference/k-proof/reference-semantics/semantics/call.k-23-  // ==== dispatch on the callee value ========================================
+/reference/k-proof/reference-semantics/semantics/call.k:24:  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>
+/reference/k-proof/reference-semantics/semantics/call.k-25-
+/reference/k-proof/reference-semantics/semantics/call.k:26:  rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>
+/reference/k-proof/reference-semantics/semantics/call.k:27:  rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ)    ... </k>
+/reference/k-proof/reference-semantics/semantics/call.k:28:  rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ)    ... </k>
+/reference/k-proof/reference-semantics/semantics/call.k:29:  rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ)   ... </k>
+/reference/k-proof/reference-semantics/semantics/call.k:30:  rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ)   ... </k>
+/reference/k-proof/reference-semantics/semantics/call.k:31:  rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]
+/reference/k-proof/reference-semantics/semantics/call.k:32:  rule <k> #applyK(toCall(typeV(T:String)),     ACC:Vals) => applyBuiltin(T, ACC)  ... </k>
+/reference/k-proof/reference-semantics/semantics/call.k-33-
+/reference/k-proof/reference-semantics/semantics/call.k-34-  // ==== heap-object arguments/receivers =====================================
+/reference/k-proof/reference-semantics/semantics/call.k-35-  // Builtins and type calls READ structure — deref the first two arg positions
+/reference/k-proof/reference-semantics/semantics/call.k-36-  // (covers len/sum/all/any/max/min/sorted/list/set + zip's pair). Mutating list
+/reference/k-proof/reference-semantics/semantics/call.k-37-  // methods take the ref itself; every other method receiver is deref'd.
+/reference/k-proof/reference-semantics/semantics/call.k:38:  rule <k> #applyK(toCall(builtinV(BN:String)), (ref(H:Int), REST:Vals))
+/reference/k-proof/reference-semantics/semantics/call.k:39:        => #applyK(toCall(builtinV(BN)), (V, REST)) ... </k>
+/reference/k-proof/reference-semantics/semantics/call.k-40-       <heap> ... H |-> V:Val ... </heap>
+/reference/k-proof/reference-semantics/semantics/call.k-41-       [priority(40)]
+/reference/k-proof/reference-semantics/semantics/call.k:42:  rule <k> #applyK(toCall(builtinV(BN:String)), (A:Val, ref(H:Int), REST:Vals))
+/reference/k-proof/reference-semantics/semantics/call.k:43:        => #applyK(toCall(builtinV(BN)), (A, V, REST)) ... </k>
+/reference/k-proof/reference-semantics/semantics/call.k-44-       <heap> ... H |-> V:Val ... </heap>
+/reference/k-proof/reference-semantics/semantics/call.k-45-       requires notBool isRefV(A)
+/reference/k-proof/reference-semantics/semantics/call.k-46-       [priority(40)]
+/reference/k-proof/reference-semantics/semantics/call.k:47:  rule <k> #applyK(toCall(typeV(T:String)), (ref(H:Int), REST:Vals))
+/reference/k-proof/reference-semantics/semantics/call.k:48:        => #applyK(toCall(typeV(T)), (V, REST)) ... </k>
+/reference/k-proof/reference-semantics/semantics/call.k-49-       <heap> ... H |-> V:Val ... </heap>
+/reference/k-proof/reference-semantics/semantics/call.k-50-       [priority(40)]
+/reference/k-proof/reference-semantics/semantics/call.k-51-
+/reference/k-proof/reference-semantics/semantics/call.k-52-  syntax Bool ::= isMutMethod(String) [function, total]
+/reference/k-proof/reference-semantics/semantics/call.k-53-  rule isMutMethod(M:String)
+/reference/k-proof/reference-semantics/semantics/call.k-54-    => M ==String "append" orBool M ==String "sort" orBool M ==String "extend"
+/reference/k-proof/reference-semantics/semantics/call.k-55-       orBool M ==String "insert" orBool M ==String "pop" orBool M ==String "remove"
+/reference/k-proof/reference-semantics/semantics/call.k:56:  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), M:String)), ACC:Vals)
+/reference/k-proof/reference-semantics/semantics/call.k:57:        => #applyK(toCall(boundMethodV(V, M)), ACC) ... </k>
+/reference/k-proof/reference-semantics/semantics/call.k-58-       <heap> ... H |-> V:Val ... </heap>
+/reference/k-proof/reference-semantics/semantics/call.k-59-       requires notBool isMutMethod(M)
+/reference/k-proof/reference-semantics/semantics/call.k-60-       [priority(40)]
+/reference/k-proof/reference-semantics/semantics/call.k-61-  // non-mutating methods READ their heap-object arguments too (join's list);
+/reference/k-proof/reference-semantics/semantics/call.k-62-  // mutators keep refs (append of a list into a list-of-lists stays aliased)
+/reference/k-proof/reference-semantics/semantics/call.k:63:  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), (ref(H:Int), REST:Vals))
+/reference/k-proof/reference-semantics/semantics/call.k:64:        => #applyK(toCall(boundMethodV(OBJ, M)), (V, REST)) ... </k>
+/reference/k-proof/reference-semantics/semantics/call.k-65-       <heap> ... H |-> V:Val ... </heap>
+/reference/k-proof/reference-semantics/semantics/call.k-66-       requires notBool isMutMethod(M) andBool notBool isRefV(OBJ)
+/reference/k-proof/reference-semantics/semantics/call.k-67-       [priority(40)]
+/reference/k-proof/reference-semantics/semantics/call.k-68-
+/reference/k-proof/reference-semantics/semantics/call.k:69:  rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT
+/reference/k-proof/reference-semantics/semantics/call.k-70-        => #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+/reference/k-proof/reference-semantics/semantics/call.k-71-       <env>     CALLERL:Int => NEWL </env>
+/reference/k-proof/reference-semantics/semantics/call.k-72-       <scopes>   STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes>
+/reference/k-proof/reference-semantics/semantics/call.k-73-       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+--
+/reference/k-proof/reference-semantics/semantics/call.k-76-  // annotated closure: the frame starts with the captured freevar cells, its
+/reference/k-proof/reference-semantics/semantics/call.k-77-  // parent is the module scope (all enclosing-local reads go through cells),
+/reference/k-proof/reference-semantics/semantics/call.k-78-  // and the cellvars' fresh cells allocate before params bind (a cellvar param
+/reference/k-proof/reference-semantics/semantics/call.k-79-  // then writes through its cell in #bindP).
+/reference/k-proof/reference-semantics/semantics/call.k:80:  rule <k> #applyK(toCall(closureValC(PNS:ParamNames, CVS:ParamNames, BODY:Stmts, CM:Map)), ACC:Vals) ~> CONT
+/reference/k-proof/reference-semantics/semantics/call.k-81-        => #allocCells(CVS) ~> #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+/reference/k-proof/reference-semantics/semantics/call.k-82-       <env>     CALLERL:Int => NEWL </env>
+/reference/k-proof/reference-semantics/semantics/call.k-83-       <scopes>   STORE:Map => STORE [ NEWL <- scope(CM [ "$cells" <- cellsMark(CVS) ], parent(0)) ] </scopes>
+/reference/k-proof/reference-semantics/semantics/call.k-84-       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+--
+/reference/k-proof/reference-semantics/semantics/controls.k-58-       requires truthy(V)
+/reference/k-proof/reference-semantics/semantics/controls.k-59-  rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k-60-       requires notBool truthy(V)
+/reference/k-proof/reference-semantics/semantics/controls.k-61-
+/reference/k-proof/reference-semantics/semantics/controls.k:62:  // ==== For: one loop, in-cell continuation, over #iterNext =================
+/reference/k-proof/reference-semantics/semantics/controls.k-63-  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+/reference/k-proof/reference-semantics/semantics/controls.k:64:  // circularities anchor on #loop and narrowing substitutes the structure)
+/reference/k-proof/reference-semantics/semantics/controls.k:65:  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+/reference/k-proof/reference-semantics/semantics/controls.k-66-                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+/reference/k-proof/reference-semantics/semantics/controls.k:67:                 | #loopLbl(K) | "#cont" | "#brk"
+/reference/k-proof/reference-semantics/semantics/controls.k-68-
+/reference/k-proof/reference-semantics/semantics/controls.k:69:  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k-70-
+/reference/k-proof/reference-semantics/semantics/controls.k:71:  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k:72:  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k:73:  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+/reference/k-proof/reference-semantics/semantics/controls.k:74:        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k-75-
+/reference/k-proof/reference-semantics/semantics/controls.k-76-  // ==== While ==============================================================
+/reference/k-proof/reference-semantics/semantics/controls.k-77-  rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k-78-  rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k:79:  rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k-80-       requires truthy(V)
+/reference/k-proof/reference-semantics/semantics/controls.k-81-  rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k-82-       requires notBool truthy(V)
+/reference/k-proof/reference-semantics/semantics/controls.k-83-
+/reference/k-proof/reference-semantics/semantics/controls.k-84-  // ==== loop control (break / continue) =====================================
+/reference/k-proof/reference-semantics/semantics/controls.k:85:  rule <k> #loopLbl(NEXT:K) => NEXT ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k-86-  rule <k> Continue => #cont ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k-87-  rule <k> Break => #brk ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k:88:  rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k-89-  rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]
+/reference/k-proof/reference-semantics/semantics/controls.k:90:  rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k-91-  rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]
+/reference/k-proof/reference-semantics/semantics/controls.k-92-
+/reference/k-proof/reference-semantics/semantics/controls.k-93-  // ==== heap-object deref at the truthiness/iteration consumers ==============
+/reference/k-proof/reference-semantics/semantics/controls.k:94:  // (priority(40) preempts the generic Val rules so truthy/#loop never see a ref)
+/reference/k-proof/reference-semantics/semantics/controls.k-95-  rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k-96-       <heap> ... H |-> V:Val ... </heap>
+/reference/k-proof/reference-semantics/semantics/controls.k-97-       [priority(40)]
+/reference/k-proof/reference-semantics/semantics/controls.k-98-  rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k>
+--
+/reference/k-proof/reference-semantics/semantics/controls.k-102-       <heap> ... H |-> V:Val ... </heap>
+/reference/k-proof/reference-semantics/semantics/controls.k-103-       [priority(40)]
+/reference/k-proof/reference-semantics/semantics/controls.k-104-  // For derefs its iterable ONCE at loop start (iteration is over the snapshot;
+/reference/k-proof/reference-semantics/semantics/controls.k-105-  // mutating the iterated list inside its own loop is outside the subset)
+/reference/k-proof/reference-semantics/semantics/controls.k:106:  rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k>
+/reference/k-proof/reference-semantics/semantics/controls.k-107-       <heap> ... H |-> V:Val ... </heap>
+/reference/k-proof/reference-semantics/semantics/controls.k-108-       [priority(40)]
+/reference/k-proof/reference-semantics/semantics/controls.k-109-endmodule
+EXIT_STATUS: 0
+END_UTC: 2026-07-31T04:05:01Z

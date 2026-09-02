@@ -1,0 +1,1142 @@
+# Mechanical K declaration and rule inventory
+
+COMMAND: `python3 /audit-output/evidence/05_rule_inventory.py > /audit-output/evidence/05_rule_inventory.md`
+
+This inventories every declaration start in all 25 supplied `.k` files and
+the four candidate source theory/spec files; compiled definitions are excluded.
+
+## Counts
+
+- Total records: 1122
+- Origins: {'proof-local': 35, 'supplied': 1087}
+- Kinds: {'claim': 4, 'configuration': 1, 'context': 5, 'endmodule': 29, 'imports': 90, 'module': 29, 'requires': 27, 'rule': 705, 'syntax': 232}
+- Attributes: {'concrete': 36, 'function': 151, 'macro': 4, 'macro-rec': 1, 'no-evaluators': 22, 'owise': 26, 'priority': 45, 'seqstrict': 1, 'simplification': 1, 'strict': 2, 'symbol': 25, 'total': 112}
+
+## Records
+
+| Origin | File:line | Kind | Attributes | Complete declaration block |
+|---|---|---|---|---|
+| supplied | `/reference/reference-semantics/semantics/assert.k:3` | module | — | `module MPY-ASSERT` |
+| supplied | `/reference/reference-semantics/semantics/assert.k:4` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/assert.k:6` | rule | — | `rule <k> Assert(V:Val) => .K ... </k> requires truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/assert.k:8` | rule | — | `rule <k> Assert(V:Val) ~> _ => .K </k> <exc> NoExc => AssertionError </exc> <exit-code> _ => 1 </exit-code> requires notBool truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/assert.k:13` | rule | priority | `rule <k> Assert(ref(H:Int)) => Assert(V) ... </k> <heap> ... H \|-> V:Val ... </heap> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/assert.k:16` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:5` | module | — | `module MPY-BOOL` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:6` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:8` | rule | — | `rule applyUn("not", V:Val) => notBool truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:10` | rule | — | `rule applyCmp("==", B1:Bool, B2:Bool) => B1 ==Bool B2` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:11` | rule | — | `rule applyCmp("!=", B1:Bool, B2:Bool) => B1 =/=Bool B2` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:16` | context | — | `context BoolOp(_, (HOLE:Expr, _:Exprs))` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:17` | rule | — | `rule <k> BoolOp(_:String, (V:Val, .Exprs)) => V ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:18` | rule | — | `rule <k> BoolOp("and", (V:Val, A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k> requires truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:20` | rule | — | `rule <k> BoolOp("and", (V:Val, _:Expr, _:Exprs)) => V ... </k> requires notBool truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:22` | rule | — | `rule <k> BoolOp("or",  (V:Val, _:Expr, _:Exprs)) => V ... </k> requires truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:24` | rule | — | `rule <k> BoolOp("or",  (V:Val, A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k> requires notBool truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:29` | rule | priority | `rule <k> BoolOp(_:String, (ref(H:Int), .Exprs)) => ref(H) ... </k> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:31` | rule | priority | `rule <k> BoolOp("and", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k> <heap> ... H \|-> V:Val ... </heap> requires truthy(V) [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:35` | rule | priority | `rule <k> BoolOp("and", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k> <heap> ... H \|-> V:Val ... </heap> requires notBool truthy(V) [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:39` | rule | priority | `rule <k> BoolOp("or", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k> <heap> ... H \|-> V:Val ... </heap> requires truthy(V) [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:43` | rule | priority | `rule <k> BoolOp("or", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k> <heap> ... H \|-> V:Val ... </heap> requires notBool truthy(V) [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/bool.k:47` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:3` | module | — | `module MPY-BUILTINS` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:4` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:5` | imports | — | `imports MPY-STR` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:6` | imports | — | `imports MPY-SET` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:7` | imports | — | `imports MPY-ITER` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:8` | imports | — | `imports MPY-RANGE` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:9` | imports | — | `imports MPY-INT` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:10` | imports | — | `imports MPY-METHODS` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:17` | syntax | function | `syntax Val ::= applyBuiltin(String, Vals) [function]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:20` | syntax | function | `syntax Int ::= seqLen(Val) [function]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:21` | rule | — | `rule applyBuiltin("len", OBJ:Val, .Vals) => seqLen(OBJ)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:22` | rule | — | `rule seqLen(list(VS:ValSeq))                  => vsLen(VS)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:23` | rule | — | `rule seqLen(tuple(VS:ValSeq))                 => vsLen(VS)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:24` | rule | — | `rule seqLen(str(IS:IntSeq))                   => isLen(IS)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:25` | rule | — | `rule seqLen(setV(DS:IntSeq))                  => isLen(DS)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:26` | rule | — | `rule seqLen(rangeObj(LO:Int, HI:Int, ST:Int)) => rangeLen(LO, HI, ST)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:32` | rule | — | `rule <k> #applyK(toCall(builtinV("list")), (list(VS:ValSeq),  .Vals)) => #alloc(list(VS)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:33` | rule | — | `rule <k> #applyK(toCall(builtinV("list")), (tuple(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:34` | rule | — | `rule <k> #applyK(toCall(builtinV("list")), .Vals)                     => #alloc(list(.ValSeq)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:35` | rule | — | `rule <k> #applyK(toCall(builtinV("list")), (str(CS:IntSeq), .Vals))   => #alloc(list(charsOf(CS))) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:36` | syntax | function, total | `syntax ValSeq ::= charsOf(IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:37` | rule | — | `rule charsOf(.IntSeq)                => .ValSeq` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:38` | rule | — | `rule charsOf(iCons(C:Int, R:IntSeq)) => vCons(str(iCons(C, .IntSeq)), charsOf(R))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:41` | rule | — | `rule applyBuiltin("set", str(CS:IntSeq), .Vals) => setV(dedupCodes(CS))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:44` | rule | — | `rule applyBuiltin("abs", I:Int, .Vals) => absInt(I)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:47` | syntax | — | `syntax KItem ::= #sumAcc(Iterable, Int) \| #sumCont(Int)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:48` | rule | — | `rule <k> #sumAcc(IT:Iterable, ACC:Int) => #iterNext(IT) ~> #sumCont(ACC) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:49` | rule | — | `rule <k> #iterDone ~> #sumCont(ACC:Int) => ACC ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:50` | rule | — | `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int) => #sumAcc(R, ACC +Int intOf(V)) ... </k> requires isInt(V) orBool isBool(V)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:54` | syntax | function | `syntax Int ::= intOf(Val) [function]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:55` | rule | — | `rule intOf(I:Int)  => I` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:56` | rule | — | `rule intOf(B:Bool) => #if B #then 1 #else 0 #fi` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:59` | syntax | — | `syntax KItem ::= #allAcc(Iterable) \| "#allCont"` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:60` | rule | — | `rule <k> #allAcc(IT:Iterable) => #iterNext(IT) ~> #allCont ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:61` | rule | — | `rule <k> #iterDone ~> #allCont => true ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:62` | rule | — | `rule <k> #iterYield(V:Val, R:Iterable) ~> #allCont => #allAcc(R) ... </k> requires truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:64` | rule | — | `rule <k> #iterYield(V:Val, _:Iterable) ~> #allCont => false ... </k> requires notBool truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:67` | syntax | — | `syntax KItem ::= #anyAcc(Iterable) \| "#anyCont"` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:68` | rule | — | `rule <k> #anyAcc(IT:Iterable) => #iterNext(IT) ~> #anyCont ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:69` | rule | — | `rule <k> #iterDone ~> #anyCont => false ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:70` | rule | — | `rule <k> #iterYield(V:Val, _:Iterable) ~> #anyCont => true ... </k> requires truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:72` | rule | — | `rule <k> #iterYield(V:Val, R:Iterable) ~> #anyCont => #anyAcc(R) ... </k> requires notBool truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:76` | syntax | — | `syntax KItem ::= #maxAcc0(Iterable) \| "#maxCont0" \| #maxAcc(Iterable, Int) \| #maxCont(Int)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:77` | rule | — | `rule <k> #maxAcc0(IT:Iterable) => #iterNext(IT) ~> #maxCont0 ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:78` | rule | — | `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAcc(R, {V}:>Int) ... </k> requires isInt(V)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:80` | rule | — | `rule <k> #maxAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #maxCont(M) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:81` | rule | — | `rule <k> #iterDone ~> #maxCont(M:Int) => M ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:82` | rule | — | `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont(M:Int) => #maxAcc(R, maxInt(M, {V}:>Int)) ... </k> requires isInt(V)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:86` | syntax | — | `syntax KItem ::= #minAcc0(Iterable) \| "#minCont0" \| #minAcc(Iterable, Int) \| #minCont(Int)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:87` | rule | — | `rule <k> #minAcc0(IT:Iterable) => #iterNext(IT) ~> #minCont0 ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:88` | rule | — | `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAcc(R, {V}:>Int) ... </k> requires isInt(V)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:90` | rule | — | `rule <k> #minAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #minCont(M) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:91` | rule | — | `rule <k> #iterDone ~> #minCont(M:Int) => M ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:92` | rule | — | `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont(M:Int) => #minAcc(R, minInt(M, {V}:>Int)) ... </k> requires isInt(V)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:97` | syntax | function | `syntax Int ::= maxVals(Int, Vals) [function]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:98` | rule | — | `rule applyBuiltin("max", I:Int, REST:Vals) => maxVals(I, REST)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:99` | rule | — | `rule maxVals(M:Int, .Vals)           => M` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:100` | rule | — | `rule maxVals(M:Int, (I:Int, R:Vals)) => maxVals(maxInt(M, I), R)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:102` | syntax | function | `syntax Int ::= minVals(Int, Vals) [function]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:103` | rule | — | `rule applyBuiltin("min", I:Int, REST:Vals) => minVals(I, REST)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:104` | rule | — | `rule minVals(M:Int, .Vals)           => M` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:105` | rule | — | `rule minVals(M:Int, (I:Int, R:Vals)) => minVals(minInt(M, I), R)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:108` | rule | — | `rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(48, iCons(98, binCodes(N)))) requires N >=Int 0` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:111` | rule | — | `rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(45, iCons(48, iCons(98, binCodes(0 -Int N))))) requires N <Int 0` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:114` | syntax | function, total | `syntax IntSeq ::= binCodes(Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:115` | rule | — | `rule binCodes(0) => iCons(48, .IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:116` | rule | — | `rule binCodes(N:Int) => binAcc(N, .IntSeq) requires N >Int 0` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:117` | syntax | function, total | `syntax IntSeq ::= binAcc(Int, IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:118` | rule | — | `rule binAcc(0, ACC:IntSeq) => ACC` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:119` | rule | — | `rule binAcc(N:Int, ACC:IntSeq) => binAcc((N -Int pyMod(N, 2)) /Int 2, iCons(48 +Int pyMod(N, 2), ACC)) requires N >Int 0` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:124` | rule | — | `rule <k> #applyK(toCall(builtinV("enumerate")), (list(VS:ValSeq), .Vals)) => #alloc(list(enumVS(VS, 0))) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:126` | syntax | function, total | `syntax ValSeq ::= enumVS(ValSeq, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:127` | rule | — | `rule enumVS(.ValSeq, _:Int) => .ValSeq` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:128` | rule | — | `rule enumVS(vCons(V:Val, R:ValSeq), I:Int) => vCons(tuple(vCons(I, vCons(V, .ValSeq))), enumVS(R, I +Int 1))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:132` | rule | — | `rule <k> #applyK(toCall(builtinV("map")), (typeV("str"), list(VS:ValSeq), .Vals)) => #alloc(list(mapStrVS(VS))) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:134` | syntax | function, total | `syntax ValSeq ::= mapStrVS(ValSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:135` | rule | — | `rule mapStrVS(.ValSeq) => .ValSeq` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:136` | rule | — | `rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:137` | rule | — | `rule mapStrVS(vCons(str(CS:IntSeq), R:ValSeq)) => vCons(str(CS), mapStrVS(R))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:140` | rule | — | `rule applyBuiltin("int", I:Int, .Vals) => I` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:143` | rule | — | `rule applyBuiltin("ord", str(iCons(C:Int, .IntSeq)), .Vals) => C` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:144` | rule | — | `rule applyBuiltin("chr", I:Int, .Vals) => str(iCons(I, .IntSeq)) requires 0 <=Int I andBool I <Int 128` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:148` | rule | — | `rule applyBuiltin("str", I:Int, .Vals)       => str(strToCodes(Int2String(I)))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:149` | rule | — | `rule applyBuiltin("str", str(CS:IntSeq), .Vals) => str(CS)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:152` | rule | — | `rule applyBuiltin("int", str(iCons(C:Int, .IntSeq)), .Vals) => C -Int 48 requires 48 <=Int C andBool C <=Int 57` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:156` | rule | — | `rule applyBuiltin("int", str(CS:IntSeq), .Vals) => intDigAcc(CS, 0) requires isLen(CS) >=Int 2` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:158` | syntax | function, total | `syntax Int ::= intDigAcc(IntSeq, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:159` | rule | — | `rule intDigAcc(.IntSeq, ACC:Int)             => ACC` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:160` | rule | — | `rule intDigAcc(iCons(C:Int, R:IntSeq), ACC:Int) => intDigAcc(R, (ACC *Int 10) +Int (C -Int 48))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:163` | rule | — | `rule applyBuiltin("zip", list(A:ValSeq), list(B:ValSeq), .Vals) => zipObj(A, B)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:164` | rule | — | `rule applyBuiltin("zip", str(A:IntSeq), str(B:IntSeq), .Vals)   => zipObjS(A, B)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:167` | rule | — | `rule <k> #iterNext(zipObj(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq))) => #iterYield(tuple(vCons(A, vCons(B, .ValSeq))), zipObj(As, Bs)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:169` | rule | — | `rule <k> #iterNext(zipObj(.ValSeq, _:ValSeq))               => #iterDone ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:170` | rule | — | `rule <k> #iterNext(zipObj(vCons(_:Val, _:ValSeq), .ValSeq)) => #iterDone ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:171` | rule | — | `rule <k> #iterNext(zipObjS(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq))) => #iterYield(tuple(vCons(str(iCons(A, .IntSeq)), vCons(str(iCons(B, .IntSeq)), .ValSeq))), zipObjS(As, Bs)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:173` | rule | — | `rule <k> #iterNext(zipObjS(.IntSeq, _:IntSeq))              => #iterDone ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:174` | rule | — | `rule <k> #iterNext(zipObjS(iCons(_:Int, _:IntSeq), .IntSeq)) => #iterDone ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:177` | rule | — | `rule applyBuiltin("range", I:Int, .Vals)               => rangeObj(0, I, 1)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:178` | rule | — | `rule applyBuiltin("range", A:Int, B:Int, .Vals)        => rangeObj(A, B, 1)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:179` | rule | — | `rule applyBuiltin("range", A:Int, B:Int, S:Int, .Vals) => rangeObj(A, B, S) requires S =/=Int 0` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:187` | rule | — | `rule applyBuiltin("eval", str(CS:IntSeq), .Vals) => evalArith(CS)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:188` | syntax | function | `syntax Int ::= evalArith(IntSeq) [function]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:189` | rule | — | `rule evalArith(CS:IntSeq) => firstNdE(passAddE(passMulE(passPowE(tokOps(CS), tokNds(CS)))))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:192` | syntax | — | `syntax OpSeq ::= ".OpSeq" \| oCons(String, OpSeq)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:194` | syntax | function, total | `syntax Bool ::= evDigit(Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:195` | rule | — | `rule evDigit(C:Int) => C >=Int 48 andBool C <=Int 57` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:196` | syntax | function, total | `syntax Bool ::= evHead42(IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:197` | rule | — | `rule evHead42(iCons(42, _:IntSeq)) => true` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:198` | rule | owise | `rule evHead42(_:IntSeq)            => false [owise]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:199` | syntax | function, total | `syntax Bool ::= evHead47(IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:200` | rule | — | `rule evHead47(iCons(47, _:IntSeq)) => true` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:201` | rule | owise | `rule evHead47(_:IntSeq)            => false [owise]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:203` | syntax | function, total | `syntax OpSeq ::= tokOps(IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:204` | rule | — | `rule tokOps(.IntSeq)                 => .OpSeq` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:205` | rule | — | `rule tokOps(iCons(32, R:IntSeq))     => tokOps(R)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:206` | rule | — | `rule tokOps(iCons(C:Int, R:IntSeq))  => tokOps(R) requires evDigit(C)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:207` | rule | — | `rule tokOps(iCons(42, iCons(42, R:IntSeq))) => oCons("**", tokOps(R))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:208` | rule | — | `rule tokOps(iCons(42, R:IntSeq))     => oCons("*", tokOps(R)) requires notBool evHead42(R)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:209` | rule | — | `rule tokOps(iCons(47, iCons(47, R:IntSeq))) => oCons("//", tokOps(R))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:210` | rule | — | `rule tokOps(iCons(47, R:IntSeq))     => oCons("/", tokOps(R)) requires notBool evHead47(R)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:211` | rule | — | `rule tokOps(iCons(43, R:IntSeq))     => oCons("+", tokOps(R))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:212` | rule | — | `rule tokOps(iCons(45, R:IntSeq))     => oCons("-", tokOps(R))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:214` | syntax | function, total | `syntax IntSeq ::= tokNds(IntSeq) [function, total] \| tokNdAcc(Int, IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:216` | rule | — | `rule tokNds(.IntSeq)                => .IntSeq` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:217` | rule | — | `rule tokNds(iCons(32, R:IntSeq))    => tokNds(R)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:218` | rule | — | `rule tokNds(iCons(C:Int, R:IntSeq)) => tokNdAcc(C -Int 48, R) requires evDigit(C)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:219` | rule | — | `rule tokNds(iCons(C:Int, R:IntSeq)) => tokNds(R) requires notBool evDigit(C) andBool C =/=Int 32` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:221` | rule | — | `rule tokNdAcc(A:Int, iCons(C:Int, R:IntSeq)) => tokNdAcc(A *Int 10 +Int (C -Int 48), R) requires evDigit(C)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:223` | rule | owise | `rule tokNdAcc(A:Int, S:IntSeq) => iCons(A, tokNds(S)) [owise]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:225` | syntax | — | `syntax EvPair ::= evp(OpSeq, IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:226` | syntax | function, total | `syntax Int ::= firstNdE(EvPair) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:227` | rule | — | `rule firstNdE(evp(_:OpSeq, iCons(N:Int, _:IntSeq))) => N` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:228` | rule | owise | `rule firstNdE(_:EvPair) => 0 [owise]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:230` | syntax | function, total | `syntax Int ::= applyOpE(String, Int, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:231` | rule | — | `rule applyOpE("+",  A:Int, B:Int) => A +Int B` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:232` | rule | — | `rule applyOpE("-",  A:Int, B:Int) => A -Int B` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:233` | rule | — | `rule applyOpE("*",  A:Int, B:Int) => A *Int B` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:234` | rule | — | `rule applyOpE("//", A:Int, B:Int) => A divInt B` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:235` | rule | — | `rule applyOpE("**", A:Int, B:Int) => A ^Int B` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:236` | rule | owise | `rule applyOpE(_:String, A:Int, _:Int) => A [owise]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:238` | syntax | function, total | `syntax EvPair ::= passPowE(OpSeq, IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:239` | rule | — | `rule passPowE(.OpSeq, NDS:IntSeq) => evp(.OpSeq, NDS)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:240` | rule | — | `rule passPowE(oCons("**", OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCombE(N, passPowE(OPS, NDS))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:241` | rule | — | `rule passPowE(oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCarryE(O, N, passPowE(OPS, NDS)) requires O =/=String "**"` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:243` | rule | owise | `rule passPowE(_:OpSeq, .IntSeq) => evp(.OpSeq, .IntSeq) [owise]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:244` | syntax | function, total | `syntax EvPair ::= powCombE(Int, EvPair) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:245` | rule | — | `rule powCombE(N:Int, evp(OPS:OpSeq, iCons(M:Int, REST:IntSeq))) => evp(OPS, iCons(N ^Int M, REST))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:246` | rule | — | `rule powCombE(N:Int, evp(OPS:OpSeq, .IntSeq)) => evp(OPS, iCons(N, .IntSeq))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:247` | syntax | function, total | `syntax EvPair ::= powCarryE(String, Int, EvPair) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:248` | rule | — | `rule powCarryE(O:String, N:Int, evp(OPS:OpSeq, NDS:IntSeq)) => evp(oCons(O, OPS), iCons(N, NDS))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:250` | syntax | function, total | `syntax EvPair ::= passMulE(EvPair) [function, total] \| passAddE(EvPair) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:251` | rule | — | `rule passMulE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("mul", N0, OPS, NDS, .OpSeq, .IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:252` | rule | — | `rule passMulE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:253` | rule | — | `rule passAddE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("add", N0, OPS, NDS, .OpSeq, .IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:254` | rule | — | `rule passAddE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:255` | syntax | function, total | `syntax EvPair ::= passLGoE(String, Int, OpSeq, IntSeq, OpSeq, IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:256` | rule | — | `rule passLGoE(_:String, CUR:Int, .OpSeq, _:IntSeq, OO:OpSeq, ON:IntSeq) => evp(OO, appendIE(ON, CUR))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:257` | rule | — | `rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq) => passLGoE(L, applyOpE(O, CUR, N), OPS, NDS, OO, ON) requires inLevelE(L, O)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:260` | rule | — | `rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq) => passLGoE(L, N, OPS, NDS, appendOpE(OO, O), appendIE(ON, CUR)) requires notBool inLevelE(L, O)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:263` | rule | owise | `rule passLGoE(_:String, CUR:Int, oCons(_:String, _:OpSeq), .IntSeq, OO:OpSeq, ON:IntSeq) => evp(OO, appendIE(ON, CUR)) [owise]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:265` | syntax | function, total | `syntax Bool ::= inLevelE(String, String) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:266` | rule | — | `rule inLevelE("mul", O:String) => O ==String "*" orBool O ==String "//" orBool O ==String "/"` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:267` | rule | — | `rule inLevelE("add", O:String) => O ==String "+" orBool O ==String "-"` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:268` | rule | owise | `rule inLevelE(_:String, _:String) => false [owise]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:269` | syntax | function, total | `syntax OpSeq ::= appendOpE(OpSeq, String) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:270` | rule | — | `rule appendOpE(.OpSeq, O:String) => oCons(O, .OpSeq)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:271` | rule | — | `rule appendOpE(oCons(H:String, T:OpSeq), O:String) => oCons(H, appendOpE(T, O))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:272` | syntax | function, total | `syntax IntSeq ::= appendIE(IntSeq, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:273` | rule | — | `rule appendIE(.IntSeq, N:Int) => iCons(N, .IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:274` | rule | — | `rule appendIE(iCons(H:Int, T:IntSeq), N:Int) => iCons(H, appendIE(T, N))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:279` | syntax | — | `syntax KItem ::= "#md5"` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:280` | rule | priority | `rule <k> Call(Attribute(Name("hashlib"), "md5"), (E:Expr, .Exprs)) => E ~> #md5 ... </k> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:282` | rule | — | `rule <k> str(CS:IntSeq) ~> #md5 => md5Obj(CS) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:283` | syntax | — | `syntax Val ::= md5Obj(IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:284` | rule | — | `rule applyMethod(md5Obj(CS:IntSeq), "hexdigest", .Vals) => str(md5hexCodes(CS))` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:285` | syntax | function, total, symbol, no-evaluators | `syntax IntSeq ::= md5hexCodes(IntSeq) [function, total, symbol(md5hexCodes), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:291` | rule | — | `rule applyBuiltin("isinstance", V:Val, typeV("int"), .Vals) => isIntV(V)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:292` | rule | — | `rule applyBuiltin("isinstance", V:Val, typeV("str"), .Vals) => isStrV(V)` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:293` | syntax | function | `syntax Bool ::= isIntV(Val) [function] \| isStrV(Val) [function]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:294` | rule | — | `rule isIntV(_:Int)         => true` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:295` | rule | owise | `rule isIntV(_:Val)         => false [owise]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:296` | rule | — | `rule isStrV(str(_:IntSeq)) => true` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:297` | rule | owise | `rule isStrV(_:Val)         => false [owise]` |
+| supplied | `/reference/reference-semantics/semantics/builtins.k:298` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/call.k:10` | module | — | `module MPY-CALL` |
+| supplied | `/reference/reference-semantics/semantics/call.k:11` | imports | — | `imports MPY-METHODS` |
+| supplied | `/reference/reference-semantics/semantics/call.k:12` | imports | — | `imports MPY-BUILTINS` |
+| supplied | `/reference/reference-semantics/semantics/call.k:13` | imports | — | `imports MPY-FUNCTIONS` |
+| supplied | `/reference/reference-semantics/semantics/call.k:16` | rule | — | `rule <k> Attribute(V:Val, M:String) => boundMethodV(V, M) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/call.k:19` | syntax | — | `syntax KItem ::= #callee(Exprs)` |
+| supplied | `/reference/reference-semantics/semantics/call.k:20` | rule | owise | `rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]` |
+| supplied | `/reference/reference-semantics/semantics/call.k:21` | rule | — | `rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/call.k:24` | rule | — | `rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/call.k:26` | rule | — | `rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/call.k:27` | rule | — | `rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ)    ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/call.k:28` | rule | — | `rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ)    ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/call.k:29` | rule | — | `rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ)   ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/call.k:30` | rule | — | `rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ)   ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/call.k:31` | rule | owise | `rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]` |
+| supplied | `/reference/reference-semantics/semantics/call.k:32` | rule | — | `rule <k> #applyK(toCall(typeV(T:String)),     ACC:Vals) => applyBuiltin(T, ACC)  ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/call.k:38` | rule | priority | `rule <k> #applyK(toCall(builtinV(BN:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(builtinV(BN)), (V, REST)) ... </k> <heap> ... H \|-> V:Val ... </heap> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/call.k:42` | rule | priority | `rule <k> #applyK(toCall(builtinV(BN:String)), (A:Val, ref(H:Int), REST:Vals)) => #applyK(toCall(builtinV(BN)), (A, V, REST)) ... </k> <heap> ... H \|-> V:Val ... </heap> requires notBool isRefV(A) [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/call.k:47` | rule | priority | `rule <k> #applyK(toCall(typeV(T:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(typeV(T)), (V, REST)) ... </k> <heap> ... H \|-> V:Val ... </heap> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/call.k:52` | syntax | function, total | `syntax Bool ::= isMutMethod(String) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/call.k:53` | rule | — | `rule isMutMethod(M:String) => M ==String "append" orBool M ==String "sort" orBool M ==String "extend" orBool M ==String "insert" orBool M ==String "pop" orBool M ==String "remove"` |
+| supplied | `/reference/reference-semantics/semantics/call.k:56` | rule | priority | `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), M:String)), ACC:Vals) => #applyK(toCall(boundMethodV(V, M)), ACC) ... </k> <heap> ... H \|-> V:Val ... </heap> requires notBool isMutMethod(M) [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/call.k:63` | rule | priority | `rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(boundMethodV(OBJ, M)), (V, REST)) ... </k> <heap> ... H \|-> V:Val ... </heap> requires notBool isMutMethod(M) andBool notBool isRefV(OBJ) [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/call.k:69` | rule | — | `rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT => #bindP(PNS, ACC) ~> BODY ~> #endcall </k> <env>     CALLERL:Int => NEWL </env> <scopes>   STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes> <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc> <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>` |
+| supplied | `/reference/reference-semantics/semantics/call.k:80` | rule | — | `rule <k> #applyK(toCall(closureValC(PNS:ParamNames, CVS:ParamNames, BODY:Stmts, CM:Map)), ACC:Vals) ~> CONT => #allocCells(CVS) ~> #bindP(PNS, ACC) ~> BODY ~> #endcall </k> <env>     CALLERL:Int => NEWL </env> <scopes>   STORE:Map => STORE [ NEWL <- scope(CM [ "$cells" <- cellsMark(CVS) ], parent(0)) ] </scopes> <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc> <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>` |
+| supplied | `/reference/reference-semantics/semantics/call.k:87` | syntax | — | `syntax KItem ::= #allocCells(ParamNames)` |
+| supplied | `/reference/reference-semantics/semantics/call.k:88` | rule | — | `rule <k> #allocCells(.ParamNames) => .K ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/call.k:89` | rule | — | `rule <k> #allocCells((CV:String, R:ParamNames)) => #allocCells(R) ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map => M [ CV <- cellRef(N) ], _) ... </scopes> <heap>    H:Map => (N \|-> cellV(noneV)) H </heap> <heapLoc> N:Int => N +Int 1 </heapLoc> requires notBool N in_keys(H)` |
+| supplied | `/reference/reference-semantics/semantics/call.k:95` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:3` | module | — | `module MPY-COMPREHENSION` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:4` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:5` | imports | — | `imports MPY-OPERATORS` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:6` | imports | — | `imports MPY-LIST` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:7` | imports | — | `imports MPY-CONTROLS` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:8` | imports | — | `imports MPY-FUNCTIONS` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:11` | rule | — | `rule ListComp(ELT:Expr, Gs:CompFors) => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:12` | rule | — | `rule GenExp(ELT:Expr, Gs:CompFors)   => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:14` | syntax | macro | `syntax Stmts ::= compBody(CompFors, Expr) [macro]` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:15` | rule | — | `rule compBody(Gs:CompFors, ELT:Expr) => Assign(Name("$acc"), ListExpr(.Exprs)) compNest(Gs, ELT) Return(Name("$acc"))` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:18` | syntax | macro, macro-rec | `syntax Stmt ::= compNest(CompFors, Expr) [macro-rec]` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:19` | rule | — | `rule compNest(.CompFors, ELT:Expr) => Assign(Name("$acc"), BinOp("+", Name("$acc"), ListExpr(ELT)))` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:21` | rule | — | `rule compNest((CompFor(T:Expr, ITER:Expr, Fs:Exprs) GRest:CompFors), ELT:Expr) => For(T, ITER, If(compGuard(Fs), compNest(GRest, ELT), .Stmts))` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:24` | syntax | macro | `syntax Expr ::= compGuard(Exprs) [macro]` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:25` | rule | — | `rule compGuard(.Exprs)             => Bool(true)` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:26` | rule | — | `rule compGuard((F:Expr, Fs:Exprs)) => BoolOp("and", (F, Fs))` |
+| supplied | `/reference/reference-semantics/semantics/comprehension.k:27` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:8` | module | — | `module MPY-CONCRETE` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:9` | imports | — | `imports MPY` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:13` | rule | — | `rule <k> Compare(list(A:ValSeq), CmpOp("==", list(B:ValSeq))) => deepEqVS(A, B, HP) ... </k> <heap> HP:Map </heap> requires hasRefVS(A) orBool hasRefVS(B)` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:16` | rule | — | `rule <k> Compare(list(A:ValSeq), CmpOp("!=", list(B:ValSeq))) => notBool deepEqVS(A, B, HP) ... </k> <heap> HP:Map </heap> requires hasRefVS(A) orBool hasRefVS(B)` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:25` | syntax | — | `syntax Val ::= kvP(Val, Val)` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:26` | syntax | — | `syntax KItem ::= #ksort(ValSeq, Val, ValSeq, Bool) \| #ksIns(Val, ValSeq, Val, ValSeq, Bool)` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:28` | rule | priority | `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals)) => #ksort(VS, KV, .ValSeq, false) ... </k> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:31` | rule | priority | `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals)) => #ksort(VS, KV, .ValSeq, RB) ... </k> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:34` | rule | — | `rule <k> #ksort(.ValSeq, _:Val, ACC:ValSeq, RB:Bool) => #alloc(list(condRev(unpairVS(ACC), RB))) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:36` | rule | — | `rule <k> #ksort(vCons(V:Val, R:ValSeq), KV:Val, ACC:ValSeq, RB:Bool) => KV ~> #callee((V, .Exprs)) ~> #ksIns(V, R, KV, ACC, RB) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:38` | rule | — | `rule <k> K:Val ~> #ksIns(V:Val, R:ValSeq, KV:Val, ACC:ValSeq, RB:Bool) => #ksort(R, KV, insPair(ACC, K, V), RB) ... </k> requires notBool isKwV(K)` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:42` | syntax | function | `syntax ValSeq ::= insPair(ValSeq, Val, Val) [function]` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:43` | rule | — | `rule insPair(.ValSeq, K:Val, V:Val) => vCons(kvP(K, V), .ValSeq)` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:44` | rule | — | `rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val) => vCons(kvP(K, V), vCons(kvP(K2, V2), R)) requires kLt(K, K2)` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:47` | rule | — | `rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val) => vCons(kvP(K2, V2), insPair(R, K, V)) requires notBool kLt(K, K2)` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:51` | syntax | function | `syntax Bool ::= kLt(Val, Val) [function]` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:52` | rule | — | `rule kLt(I1:Int, I2:Int)             => I1 <Int I2` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:53` | rule | — | `rule kLt(F1:Float, F2:Float)         => F1 <Float F2` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:54` | rule | — | `rule kLt(str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:56` | syntax | function, total | `syntax ValSeq ::= unpairVS(ValSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:57` | rule | — | `rule unpairVS(.ValSeq) => .ValSeq` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:58` | rule | — | `rule unpairVS(vCons(kvP(_:Val, V:Val), R:ValSeq)) => vCons(V, unpairVS(R))` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:59` | rule | owise | `rule unpairVS(vCons(V:Val, R:ValSeq)) => vCons(V, unpairVS(R)) [owise]` |
+| supplied | `/reference/reference-semantics/semantics/concrete.k:60` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:3` | module | — | `module MPY-CONTROLS` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:4` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:5` | imports | — | `imports MPY-TUPLE` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:6` | imports | — | `imports MPY-ITER` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:9` | rule | — | `rule <k> Assign(Name(X:String), V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map => M [ X <- V ], _) ... </scopes>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:12` | rule | priority | `rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool X in_keys(M) andBool isCellRef({M[X]}:>Val) [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:20` | rule | — | `rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes> requires X in_keys(M)` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:27` | rule | priority | `rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map, _) ... </scopes> requires X in_keys(M) andBool isRefV({M[X]}:>Val) [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:35` | rule | — | `rule <k> ImportFrom("math", NS:ParamNames) => #bindImports(NS) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:36` | rule | owise | `rule <k> ImportFrom(_:String, _:ParamNames) => .K ... </k> [owise]` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:37` | syntax | — | `syntax KItem ::= #bindImports(ParamNames)` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:38` | rule | — | `rule <k> #bindImports(.ParamNames) => .K ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:39` | rule | — | `rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map => M [ N <- builtinV(N) ], _) ... </scopes> requires N ==String "floor" orBool N ==String "ceil"` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:43` | rule | — | `rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k> requires notBool (N ==String "floor" orBool N ==String "ceil")` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:48` | rule | — | `rule <k> Expr(_:Val) => .K ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:51` | syntax | — | `syntax KItem ::= #branch(Bool, Stmts, Stmts)` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:52` | rule | — | `rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:53` | rule | — | `rule <k> #branch(true,  T:Stmts, _:Stmts) => T ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:54` | rule | — | `rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:57` | rule | — | `rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k> requires truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:59` | rule | — | `rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k> requires notBool truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:65` | syntax | — | `syntax KItem ::= #loop(Val, Expr, Stmts) \| #loopStep(Expr, Stmts) \| #while(Expr, Stmts) \| #whileCond(Expr, Stmts) \| #loopLbl(K) \| "#cont" \| "#brk"` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:69` | rule | — | `rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:71` | rule | — | `rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:72` | rule | — | `rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:73` | rule | — | `rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts) => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:77` | rule | — | `rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:78` | rule | — | `rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:79` | rule | — | `rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k> requires truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:81` | rule | — | `rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k> requires notBool truthy(V)` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:85` | rule | — | `rule <k> #loopLbl(NEXT:K) => NEXT ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:86` | rule | — | `rule <k> Continue => #cont ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:87` | rule | — | `rule <k> Break => #brk ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:88` | rule | — | `rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:89` | rule | owise | `rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:90` | rule | — | `rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:91` | rule | owise | `rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:95` | rule | priority | `rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k> <heap> ... H \|-> V:Val ... </heap> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:98` | rule | priority | `rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k> <heap> ... H \|-> V:Val ... </heap> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:101` | rule | priority | `rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k> <heap> ... H \|-> V:Val ... </heap> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:106` | rule | priority | `rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k> <heap> ... H \|-> V:Val ... </heap> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/controls.k:109` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/core.k:3` | module | — | `module MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/core.k:4` | imports | — | `imports MPY-SYNTAX` |
+| supplied | `/reference/reference-semantics/semantics/core.k:5` | imports | — | `imports INT` |
+| supplied | `/reference/reference-semantics/semantics/core.k:6` | imports | — | `imports BOOL` |
+| supplied | `/reference/reference-semantics/semantics/core.k:7` | imports | — | `imports STRING` |
+| supplied | `/reference/reference-semantics/semantics/core.k:8` | imports | — | `imports MAP` |
+| supplied | `/reference/reference-semantics/semantics/core.k:9` | imports | — | `imports LIST` |
+| supplied | `/reference/reference-semantics/semantics/core.k:10` | imports | — | `imports K-EQUAL` |
+| supplied | `/reference/reference-semantics/semantics/core.k:13` | syntax | — | `syntax IntSeq ::= ".IntSeq" \| iCons(Int, IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:14` | syntax | — | `syntax ValSeq ::= ".ValSeq" \| vCons(Val, ValSeq)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:15` | syntax | — | `syntax Str    ::= str(IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:18` | syntax | — | `syntax Iterable ::= list(ValSeq) \| tuple(ValSeq) \| Str \| rangeObj(Int, Int, Int) \| zipObj(ValSeq, ValSeq) \| zipObjS(IntSeq, IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:25` | syntax | function | `syntax Val      ::= Int \| Bool \| "noneV" \| Iterable \| ref(Int)          // a heap object: <heap> holds its list(VS) \| cellRef(Int)      // a closure cell: <heap> holds cellV(V) \| closureVal(ParamNames, Stmts, Int) \| typeV(String)     // a type object (int/str), resolved from the builtins frame \| builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough) \| boundMethodV(Val, String)   // a cooled Attribute: obj.method` |
+| supplied | `/reference/reference-semantics/semantics/core.k:36` | syntax | — | `syntax Parent   ::= "root" \| parent(Int)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:37` | syntax | — | `syntax Scope    ::= scope(Map, Parent)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:38` | syntax | — | `syntax KResult  ::= Val` |
+| supplied | `/reference/reference-semantics/semantics/core.k:39` | syntax | — | `syntax Expr     ::= Val   // cooling puts results back into expression holes` |
+| supplied | `/reference/reference-semantics/semantics/core.k:40` | syntax | — | `syntax Vals     ::= List{Val, ","}` |
+| supplied | `/reference/reference-semantics/semantics/core.k:41` | syntax | — | `syntax Exc      ::= "NoExc" \| "AssertionError"` |
+| supplied | `/reference/reference-semantics/semantics/core.k:42` | syntax | — | `syntax RetState ::= "noRet" \| retV(Val)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:49` | configuration | — | `configuration <k>       #loadAll($PGM:Module) </k> <env>     0 </env> <scopes>   0     \|-> scope(.Map, parent(-1)) -1    \|-> builtinsScope </scopes> <scopeLoc> 1 </scopeLoc> <heap>    .Map </heap> <heapLoc> 0 </heapLoc> <stack>   .List </stack> <ret>     noRet </ret> <exc>     NoExc </exc> <exit-code exit=""> 0 </exit-code>` |
+| supplied | `/reference/reference-semantics/semantics/core.k:68` | syntax | function, total | `syntax Bool ::= isRefV(Val) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:69` | rule | — | `rule isRefV(ref(_:Int)) => true` |
+| supplied | `/reference/reference-semantics/semantics/core.k:70` | rule | owise | `rule isRefV(_:Val)      => false [owise]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:75` | syntax | — | `syntax HeapVal ::= cellV(Val)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:76` | syntax | function, total | `syntax Bool ::= isCellRef(Val) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:77` | rule | — | `rule isCellRef(cellRef(_:Int)) => true` |
+| supplied | `/reference/reference-semantics/semantics/core.k:78` | rule | owise | `rule isCellRef(_:Val)          => false [owise]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:85` | rule | priority | `rule <k> cellRef(H:Int) => V ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map, _) ... </scopes> <heap> ... H \|-> cellV(V:Val) ... </heap> requires "$cells" in_keys(M) [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:95` | syntax | — | `syntax Val ::= kwV(String, Val)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:96` | syntax | — | `syntax KItem ::= #kwTag(String)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:97` | rule | — | `rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/core.k:98` | rule | — | `rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k> requires notBool isKwV(V)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:100` | syntax | function, total | `syntax Bool ::= isKwV(Val) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:101` | rule | — | `rule isKwV(kwV(_:String, _:Val)) => true` |
+| supplied | `/reference/reference-semantics/semantics/core.k:102` | rule | owise | `rule isKwV(_:Val)                => false [owise]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:106` | syntax | — | `syntax Val ::= cellsMark(ParamNames)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:107` | syntax | function | `syntax ParamNames ::= cellsOf(Val) [function]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:108` | rule | — | `rule cellsOf(cellsMark(CVS:ParamNames)) => CVS` |
+| supplied | `/reference/reference-semantics/semantics/core.k:109` | syntax | function, total | `syntax Bool ::= pnMember(String, ParamNames) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:110` | rule | — | `rule pnMember(_:String, .ParamNames) => false` |
+| supplied | `/reference/reference-semantics/semantics/core.k:111` | rule | — | `rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:113` | syntax | — | `syntax KItem ::= #cellW(Val, Val)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:114` | rule | — | `rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k> <heap> ... H \|-> cellV(_:Val => V) ... </heap>` |
+| supplied | `/reference/reference-semantics/semantics/core.k:117` | syntax | — | `syntax KItem ::= #alloc(Val)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:118` | rule | — | `rule <k> #alloc(V:Val) => ref(N) ... </k> <heap>    H:Map => (N \|-> V) H </heap> <heapLoc> N:Int => N +Int 1 </heapLoc> requires notBool N in_keys(H)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:124` | syntax | — | `syntax KItem ::= #loadAll(Module)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:125` | rule | — | `rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/core.k:126` | rule | — | `rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/core.k:127` | rule | — | `rule <k> .Stmts => .K ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/core.k:130` | syntax | — | `syntax KItem ::= #look(String, Int)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:131` | rule | — | `rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>` |
+| supplied | `/reference/reference-semantics/semantics/core.k:132` | rule | — | `rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k> <scopes> ... L \|-> scope(M:Map, _:Parent) ... </scopes> requires X in_keys(M)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:145` | rule | priority | `rule <k> #look(X:String, L:Int) => V ... </k> <scopes> ... L \|-> scope(M:Map, _:Parent) ... </scopes> <heap> ... H \|-> cellV(V:Val) ... </heap> requires X in_keys(M) andBool "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool {M[X]}:>Val ==K cellRef(H) [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:152` | rule | — | `rule <k> #look(X:String, L:Int) => #look(X, P) ... </k> <scopes> ... L \|-> scope(M:Map, parent(P:Int)) ... </scopes> requires notBool (X in_keys(M))` |
+| supplied | `/reference/reference-semantics/semantics/core.k:157` | syntax | function, total | `syntax Scope ::= "builtinsScope" [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:158` | rule | — | `rule builtinsScope => scope(.Map [ "len"    <- builtinV("len")    ] [ "set"    <- builtinV("set")    ] [ "sum"    <- builtinV("sum")    ] [ "abs"    <- builtinV("abs")    ] [ "min"    <- builtinV("min")    ] [ "max"    <- builtinV("max")    ] [ "ord"    <- builtinV("ord")    ] [ "chr"    <- builtinV("chr")    ] [ "range"  <- builtinV("range")  ] [ "all"    <- builtinV("all")    ] [ "any"    <- builtinV("any")    ] [ "zip"    <- builtinV("zip")    ] [ "isinstance" <- builtinV("isinstance") ] [ "sorted" <- builtinV("sorted") ] [ "list"   <- builtinV("list")   ] [ "round"  <- builtinV("round")  ] [ "bin"    <- builtinV("bin")    ] [ "enumerate" <- builtinV("enumerate") ] [ "map"    <- builtinV("map")    ] [ "eval"   <- builtinV("eval")   ] [ "int"    <- typeV("int")       ] [ "str"    <- typeV("str")       ] [ "float"  <- typeV("float")     ], root)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:185` | syntax | — | `syntax ApplyK ::= toCall(Val)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:186` | syntax | — | `syntax KItem  ::= #evalArgs(Exprs, Vals, ApplyK) \| #evalArgCont(Exprs, Vals, ApplyK) \| #applyK(ApplyK, Vals)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:189` | rule | — | `rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/core.k:190` | rule | — | `rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/core.k:191` | rule | — | `rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/core.k:194` | rule | — | `rule <k> Int(I:Int)   => I ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/core.k:195` | rule | — | `rule <k> Bool(B:Bool) => B ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/core.k:196` | rule | — | `rule <k> NoneVal      => noneV ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/core.k:199` | syntax | function | `syntax Bool ::= truthy(Val) [function]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:200` | rule | — | `rule truthy(B:Bool)          => B` |
+| supplied | `/reference/reference-semantics/semantics/core.k:201` | rule | — | `rule truthy(noneV)           => false` |
+| supplied | `/reference/reference-semantics/semantics/core.k:202` | rule | — | `rule truthy(I:Int)           => I =/=Int 0` |
+| supplied | `/reference/reference-semantics/semantics/core.k:203` | rule | — | `rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:204` | rule | — | `rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:205` | rule | — | `rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:208` | syntax | function | `syntax Val  ::= applyUn(String, Val) [function]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:209` | syntax | function | `syntax Val  ::= applyBin(String, Val, Val) [function]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:210` | syntax | function | `syntax Bool ::= applyCmp(String, Val, Val) [function]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:213` | syntax | function, total | `syntax Vals ::= appendVal(Vals, Val) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:214` | rule | — | `rule appendVal(.Vals, V:Val)              => V , .Vals` |
+| supplied | `/reference/reference-semantics/semantics/core.k:215` | rule | — | `rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:217` | syntax | function, total | `syntax ValSeq ::= vals2valSeq(Vals) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:218` | rule | — | `rule vals2valSeq(.Vals)            => .ValSeq` |
+| supplied | `/reference/reference-semantics/semantics/core.k:219` | rule | — | `rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))` |
+| supplied | `/reference/reference-semantics/semantics/core.k:223` | syntax | function, total | `syntax Int ::= vsLen(ValSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:224` | rule | — | `rule vsLen(.ValSeq)                => 0` |
+| supplied | `/reference/reference-semantics/semantics/core.k:225` | rule | — | `rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:227` | syntax | function, total | `syntax Int ::= isLen(IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:228` | rule | — | `rule isLen(.IntSeq)                => 0` |
+| supplied | `/reference/reference-semantics/semantics/core.k:229` | rule | — | `rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:233` | syntax | function, total | `syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/core.k:234` | rule | — | `rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq` |
+| supplied | `/reference/reference-semantics/semantics/core.k:235` | rule | — | `rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val)    => vCons(V, S)` |
+| supplied | `/reference/reference-semantics/semantics/core.k:236` | rule | — | `rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V)) requires I >Int 0` |
+| supplied | `/reference/reference-semantics/semantics/core.k:238` | rule | — | `rule setVSAt(VS:ValSeq, I:Int, _:Val)             => VS requires I <Int 0` |
+| supplied | `/reference/reference-semantics/semantics/core.k:240` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:13` | module | — | `module MPY-DICT` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:14` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:15` | imports | — | `imports MPY-ITER` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:16` | imports | — | `imports MPY-METHODS` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:17` | imports | — | `imports MPY-LIST` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:20` | syntax | — | `syntax Val ::= dictV(ValSeq, ValSeq)` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:23` | syntax | — | `syntax KItem ::= #dictAcc(Entries, ValSeq, ValSeq) \| #dictKey(Expr, Entries, ValSeq, ValSeq) \| #dictVal(Val, Entries, ValSeq, ValSeq)` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:26` | rule | — | `rule <k> DictExpr(ES:Entries) => #dictAcc(ES, .ValSeq, .ValSeq) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:27` | rule | — | `rule <k> #dictAcc(.Entries, KS:ValSeq, VS:ValSeq) => dictV(KS, VS) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:28` | rule | — | `rule <k> #dictAcc((Entry(K:Expr, V:Expr), REST:Entries), KS:ValSeq, VS:ValSeq) => K ~> #dictKey(V, REST, KS, VS) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:30` | rule | — | `rule <k> KV:Val ~> #dictKey(V:Expr, REST:Entries, KS:ValSeq, VS:ValSeq) => V ~> #dictVal(KV, REST, KS, VS) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:32` | rule | — | `rule <k> VV:Val ~> #dictVal(KV:Val, REST:Entries, KS:ValSeq, VS:ValSeq) => #dictAcc(REST, dPutK(KS, KV), dPutV(KS, VS, KV, VV)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:37` | syntax | function, total | `syntax Bool ::= dHasKey(ValSeq, Val) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:38` | rule | — | `rule dHasKey(.ValSeq, _:Val)                => false` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:39` | rule | — | `rule dHasKey(vCons(A:Val, _:ValSeq), K:Val) => true          requires A ==K K` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:40` | rule | — | `rule dHasKey(vCons(A:Val, R:ValSeq), K:Val) => dHasKey(R, K) requires notBool (A ==K K)` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:43` | syntax | function, total | `syntax ValSeq ::= dPutK(ValSeq, Val) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:44` | rule | — | `rule dPutK(KS:ValSeq, K:Val) => KS                                  requires dHasKey(KS, K)` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:45` | rule | — | `rule dPutK(KS:ValSeq, K:Val) => valSeqConcat(KS, vCons(K, .ValSeq)) requires notBool dHasKey(KS, K)` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:49` | syntax | function, total | `syntax ValSeq ::= dPutV(ValSeq, ValSeq, Val, Val) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:50` | rule | — | `rule dPutV(vCons(A:Val, _:ValSeq), vCons(_:Val, VR:ValSeq), K:Val, V:Val)  => vCons(V, VR) requires A ==K K` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:52` | rule | — | `rule dPutV(vCons(A:Val, KR:ValSeq), vCons(B:Val, VR:ValSeq), K:Val, V:Val) => vCons(B, dPutV(KR, VR, K, V)) requires notBool (A ==K K)` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:54` | rule | owise | `rule dPutV(_KS:ValSeq, VS:ValSeq, _K:Val, V:Val) => valSeqConcat(VS, vCons(V, .ValSeq)) [owise]` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:58` | rule | priority | `rule <k> #applyK(toCall(boundMethodV(dictV(KS:ValSeq, _:ValSeq), "keys")), .Vals) => #alloc(list(KS)) ... </k> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:63` | rule | — | `rule applyIndexD(dictV(KS:ValSeq, VS:ValSeq), K:Val) => dGet(KS, VS, K)` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:64` | syntax | function | `syntax Val ::= applyIndexD(Val, Val) [function]` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:65` | rule | priority | `rule <k> Subscript(dictV(KS:ValSeq, VS:ValSeq), K:Val) => applyIndexD(dictV(KS, VS), K) ... </k> [priority(45)]` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:70` | syntax | function | `syntax Val ::= dictSet(Val, Val, Val) [function]` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:71` | rule | — | `rule dictSet(dictV(KS:ValSeq, VS:ValSeq), K:Val, V:Val) => dictV(dPutK(KS, K), dPutV(KS, VS, K, V))` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:76` | syntax | — | `syntax KItem ::= #dsetK(String, Val)` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:77` | rule | — | `rule <k> Assign(Subscript(Name(X:String), K:Expr), VV:Val) => K ~> #dsetK(X, VV) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:78` | rule | — | `rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map => M [ X <- dictSet({M[X]}:>Val, KV, VV) ], _) ... </scopes> requires X in_keys(M) andBool notBool isRefV({M[X]}:>Val)` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:82` | rule | — | `rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => #dsetV({M[X]}:>Val, KV, VV) ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map, _) ... </scopes> requires X in_keys(M) andBool isRefV({M[X]}:>Val)` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:86` | syntax | — | `syntax KItem ::= #dsetV(Val, Val, Val)` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:87` | rule | — | `rule <k> #dsetV(ref(H:Int), I:Int, VV:Val) => .K ... </k> <heap> ... H \|-> list(VS:ValSeq => setVSAt(VS, normIdxD(I, vsLen(VS)), VV)) ... </heap>` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:90` | syntax | function, total | `syntax Int ::= normIdxD(Int, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:91` | rule | — | `rule normIdxD(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:92` | rule | — | `rule normIdxD(I:Int, _:Int)   => I          requires I >=Int 0` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:95` | rule | — | `rule applyCmp("==", dictV(KS1:ValSeq, VS1:ValSeq), dictV(KS2:ValSeq, VS2:ValSeq)) => (vsLen(KS1) ==Int vsLen(KS2)) andBool dSubset(KS1, VS1, KS2, VS2)` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:97` | syntax | function | `syntax Bool ::= dSubset(ValSeq, ValSeq, ValSeq, ValSeq) [function]` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:98` | rule | — | `rule dSubset(.ValSeq, .ValSeq, _:ValSeq, _:ValSeq) => true` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:99` | rule | — | `rule dSubset(vCons(K:Val, KR:ValSeq), vCons(V:Val, VR:ValSeq), KS2:ValSeq, VS2:ValSeq) => dHasKey(KS2, K) andBool (dGet(KS2, VS2, K) ==K V) andBool dSubset(KR, VR, KS2, VS2)` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:101` | syntax | function | `syntax Val ::= dGet(ValSeq, ValSeq, Val) [function]` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:102` | rule | — | `rule dGet(vCons(A:Val, _:ValSeq), vCons(B:Val, _:ValSeq), K:Val) => B                requires A ==K K` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:103` | rule | — | `rule dGet(vCons(A:Val, KR:ValSeq), vCons(_:Val, VR:ValSeq), K:Val) => dGet(KR, VR, K) requires notBool (A ==K K)` |
+| supplied | `/reference/reference-semantics/semantics/dict.k:104` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/float.k:14` | module | — | `module MPY-FLOAT` |
+| supplied | `/reference/reference-semantics/semantics/float.k:15` | imports | — | `imports MPY-OPERATORS` |
+| supplied | `/reference/reference-semantics/semantics/float.k:16` | imports | — | `imports MPY-BUILTINS` |
+| supplied | `/reference/reference-semantics/semantics/float.k:17` | imports | — | `imports FLOAT` |
+| supplied | `/reference/reference-semantics/semantics/float.k:20` | syntax | — | `syntax Val ::= Float` |
+| supplied | `/reference/reference-semantics/semantics/float.k:21` | rule | — | `rule <k> Float(F:Float) => F ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/float.k:24` | syntax | function, total, symbol, no-evaluators | `syntax Float ::= intFloatDiv(Int, Float) [function, total, symbol(intFloatDiv), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:25` | rule | concrete | `rule intFloatDiv(I:Int, F:Float) => Int2Float(I, 53, 11) /Float F [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:27` | rule | — | `rule applyBin("/", I:Int, F:Float) => intFloatDiv(I, F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:30` | syntax | function, total, symbol, no-evaluators | `syntax Float ::= divII(Int, Int) [function, total, symbol(divII), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:31` | rule | concrete | `rule divII(I1:Int, I2:Int) => Int2Float(I1, 53, 11) /Float Int2Float(I2, 53, 11) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:32` | rule | — | `rule applyBin("/", I1:Int, I2:Int) => divII(I1, I2)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:37` | syntax | function, total, symbol, no-evaluators | `syntax Float ::= floatMod(Float, Float) [function, total, symbol(floatMod), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:38` | rule | concrete | `rule floatMod(F1:Float, F2:Float) => F1 -Float (floorFloat(F1 /Float F2) *Float F2) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:39` | rule | — | `rule applyBin("%", F1:Float, F2:Float) => floatMod(F1, F2)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:43` | rule | — | `rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2` |
+| supplied | `/reference/reference-semantics/semantics/float.k:44` | rule | — | `rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:50` | syntax | function, total, symbol, no-evaluators | `syntax Bool ::= floatLt(Float, Float) [function, total, symbol(floatLt), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:51` | rule | concrete | `rule floatLt(F1:Float, F2:Float) => F1 <Float F2 [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:52` | rule | — | `rule applyCmp("<", F1:Float, F2:Float) => floatLt(F1, F2)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:54` | syntax | function, total, symbol, no-evaluators | `syntax Float ::= absF(Float) [function, total, symbol(absF), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:55` | rule | concrete | `rule absF(F:Float) => absFloat(F) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:56` | rule | — | `rule applyBuiltin("abs", F:Float, .Vals) => absF(F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:61` | rule | — | `rule <k> Import(_:String) => .K ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/float.k:65` | syntax | — | `syntax KItem ::= "#mathCeil"` |
+| supplied | `/reference/reference-semantics/semantics/float.k:66` | rule | priority | `rule <k> Call(Attribute(Name("math"), "ceil"), (E:Expr, .Exprs)) => E ~> #mathCeil ... </k> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:67` | rule | — | `rule <k> V:Val ~> #mathCeil => ceilF(V) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/float.k:70` | syntax | — | `syntax KItem ::= "#mathFloor"` |
+| supplied | `/reference/reference-semantics/semantics/float.k:71` | rule | priority | `rule <k> Call(Attribute(Name("math"), "floor"), (E:Expr, .Exprs)) => E ~> #mathFloor ... </k> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:72` | rule | — | `rule <k> V:Val ~> #mathFloor => floorFI(V) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/float.k:73` | syntax | function, total, symbol | `syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:74` | rule | concrete | `rule floorFI(I:Int)   => I                        [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:75` | rule | concrete | `rule floorFI(F:Float) => Float2Int(floorFloat(F)) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:78` | rule | — | `rule applyBuiltin("floor", V:Val, .Vals) => floorFI(V)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:79` | rule | — | `rule applyBuiltin("ceil",  V:Val, .Vals) => ceilF(V)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:82` | syntax | — | `syntax KItem ::= #mathPow1(Expr) \| #mathPow2(Val)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:83` | rule | priority | `rule <k> Call(Attribute(Name("math"), "pow"), (E1:Expr, E2:Expr, .Exprs)) => E1 ~> #mathPow1(E2) ... </k> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:84` | rule | — | `rule <k> V1:Val ~> #mathPow1(E2:Expr) => E2 ~> #mathPow2(V1) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/float.k:85` | rule | — | `rule <k> V2:Val ~> #mathPow2(V1:Val) => powF(toF(V1), toF(V2)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/float.k:86` | syntax | function, total, symbol | `syntax Float ::= toF(Val) [function, total, symbol(toF)]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:87` | rule | concrete | `rule toF(F:Float) => F        [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:88` | rule | concrete | `rule toF(I:Int)   => intToF(I) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:93` | syntax | function, total, symbol | `syntax Int ::= ceilF(Val) [function, total, symbol(ceilF)]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:94` | rule | concrete | `rule ceilF(I:Int)   => I                       [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:95` | rule | concrete | `rule ceilF(F:Float) => Float2Int(ceilFloat(F)) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:99` | rule | — | `rule applyUn("-", F:Float) => 0.0 -Float F` |
+| supplied | `/reference/reference-semantics/semantics/float.k:103` | syntax | function, total, symbol, no-evaluators | `syntax Float ::= subF(Float, Float) [function, total, symbol(subF), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:104` | rule | concrete | `rule subF(F1:Float, F2:Float) => F1 -Float F2 [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:105` | rule | — | `rule applyBin("-", F1:Float, F2:Float) => subF(F1, F2)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:107` | syntax | function, total, symbol, no-evaluators | `syntax Float ::= divF(Float, Float) [function, total, symbol(divF), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:108` | rule | concrete | `rule divF(F1:Float, F2:Float) => F1 /Float F2 [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:109` | rule | — | `rule applyBin("/", F1:Float, F2:Float) => divF(F1, F2)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:111` | syntax | function, total, symbol, no-evaluators | `syntax Float ::= addF(Float, Float) [function, total, symbol(addF), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:112` | rule | concrete | `rule addF(F1:Float, F2:Float) => F1 +Float F2 [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:113` | rule | — | `rule applyBin("+", F1:Float, F2:Float) => addF(F1, F2)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:115` | syntax | function, total, symbol, no-evaluators | `syntax Float ::= mulF(Float, Float) [function, total, symbol(mulF), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:116` | rule | concrete | `rule mulF(F1:Float, F2:Float) => F1 *Float F2 [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:117` | rule | — | `rule applyBin("*", F1:Float, F2:Float) => mulF(F1, F2)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:119` | syntax | function, total, symbol, no-evaluators | `syntax Float ::= powF(Float, Float) [function, total, symbol(powF), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:120` | rule | concrete | `rule powF(F1:Float, F2:Float) => F1 ^Float F2 [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:121` | rule | — | `rule applyBin("**", F1:Float, F2:Float) => powF(F1, F2)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:125` | syntax | function, total, symbol, no-evaluators | `syntax Bool ::= gtF(Float, Float) [function, total, symbol(gtF), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:126` | rule | concrete | `rule gtF(F1:Float, F2:Float) => F1 >Float F2 [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:127` | rule | — | `rule applyCmp(">",  F1:Float, F2:Float) => gtF(F1, F2)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:128` | rule | — | `rule applyCmp(">=", F1:Float, F2:Float) => notBool floatLt(F1, F2)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:129` | rule | — | `rule applyCmp("<=", F1:Float, F2:Float) => notBool gtF(F1, F2)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:132` | rule | — | `rule applyBin("**", I:Int, F:Float) => powF(intToF(I), F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:133` | rule | — | `rule applyBin("**", F:Float, I:Int) => powF(F, intToF(I))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:134` | rule | — | `rule applyBin("-",  I:Int, F:Float) => subF(intToF(I), F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:135` | rule | — | `rule applyBin("-",  F:Float, I:Int) => subF(F, intToF(I))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:136` | rule | — | `rule applyBin("+",  I:Int, F:Float) => addF(intToF(I), F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:137` | rule | — | `rule applyBin("+",  F:Float, I:Int) => addF(F, intToF(I))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:138` | rule | — | `rule applyBin("*",  I:Int, F:Float) => mulF(intToF(I), F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:139` | rule | — | `rule applyBin("*",  F:Float, I:Int) => mulF(F, intToF(I))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:142` | syntax | function, total, symbol, no-evaluators | `syntax Bool ::= eqF(Float, Float) [function, total, symbol(eqF), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:143` | rule | concrete | `rule eqF(F1:Float, F2:Float) => F1 ==Float F2 [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:144` | rule | — | `rule applyCmp("==", I:Int, F:Float) => eqF(intToF(I), F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:145` | rule | — | `rule applyCmp("==", F:Float, I:Int) => eqF(F, intToF(I))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:146` | rule | — | `rule applyCmp("!=", I:Int, F:Float) => notBool eqF(intToF(I), F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:147` | rule | — | `rule applyCmp("!=", F:Float, I:Int) => notBool eqF(F, intToF(I))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:148` | rule | — | `rule applyCmp("<",  I:Int, F:Float) => floatLt(intToF(I), F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:149` | rule | — | `rule applyCmp("<",  F:Float, I:Int) => floatLt(F, intToF(I))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:150` | rule | — | `rule applyCmp(">",  I:Int, F:Float) => gtF(intToF(I), F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:151` | rule | — | `rule applyCmp(">",  F:Float, I:Int) => gtF(F, intToF(I))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:154` | rule | — | `rule applyCmp("==", V:Val, noneV) => V ==K noneV` |
+| supplied | `/reference/reference-semantics/semantics/float.k:155` | rule | — | `rule applyCmp("!=", V:Val, noneV) => notBool (V ==K noneV)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:160` | syntax | function, total, symbol, no-evaluators | `syntax Float ::= decStrToF(IntSeq) [function, total, symbol(decStrToF), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:161` | rule | concrete | `rule decStrToF(iCons(45, CS:IntSeq)) => 0.0 -Float decStrToF(CS) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:162` | rule | concrete | `rule decStrToF(CS:IntSeq) => intToF(intPart(CS)) +Float (intToF(fracPart(CS)) /Float intToF(fracScale(CS))) requires isLen(CS) >Int 0 andBool headIS(CS) =/=Int 45 [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:165` | syntax | function | `syntax Int ::= headIS(IntSeq) [function]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:166` | rule | — | `rule headIS(iCons(C:Int, _:IntSeq)) => C` |
+| supplied | `/reference/reference-semantics/semantics/float.k:167` | syntax | function, total | `syntax Int ::= intPart(IntSeq) [function, total] \| intPartAcc(IntSeq, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:168` | rule | — | `rule intPart(CS:IntSeq) => intPartAcc(CS, 0)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:169` | rule | — | `rule intPartAcc(.IntSeq, A:Int) => A` |
+| supplied | `/reference/reference-semantics/semantics/float.k:170` | rule | — | `rule intPartAcc(iCons(46, _:IntSeq), A:Int) => A` |
+| supplied | `/reference/reference-semantics/semantics/float.k:171` | rule | — | `rule intPartAcc(iCons(C:Int, R:IntSeq), A:Int) => intPartAcc(R, A *Int 10 +Int (C -Int 48)) requires C =/=Int 46` |
+| supplied | `/reference/reference-semantics/semantics/float.k:173` | syntax | function, total | `syntax Int ::= fracPart(IntSeq) [function, total] \| fracAcc(IntSeq, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:174` | rule | — | `rule fracPart(.IntSeq) => 0` |
+| supplied | `/reference/reference-semantics/semantics/float.k:175` | rule | — | `rule fracPart(iCons(46, R:IntSeq)) => fracAcc(R, 0)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:176` | rule | — | `rule fracPart(iCons(C:Int, R:IntSeq)) => fracPart(R) requires C =/=Int 46` |
+| supplied | `/reference/reference-semantics/semantics/float.k:177` | rule | — | `rule fracAcc(.IntSeq, A:Int) => A` |
+| supplied | `/reference/reference-semantics/semantics/float.k:178` | rule | — | `rule fracAcc(iCons(C:Int, R:IntSeq), A:Int) => fracAcc(R, A *Int 10 +Int (C -Int 48))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:179` | syntax | function, total | `syntax Int ::= fracScale(IntSeq) [function, total] \| fscAcc(IntSeq, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:180` | rule | — | `rule fracScale(.IntSeq) => 1` |
+| supplied | `/reference/reference-semantics/semantics/float.k:181` | rule | — | `rule fracScale(iCons(46, R:IntSeq)) => fscAcc(R, 1)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:182` | rule | — | `rule fracScale(iCons(C:Int, R:IntSeq)) => fracScale(R) requires C =/=Int 46` |
+| supplied | `/reference/reference-semantics/semantics/float.k:183` | rule | — | `rule fscAcc(.IntSeq, A:Int) => A` |
+| supplied | `/reference/reference-semantics/semantics/float.k:184` | rule | — | `rule fscAcc(iCons(_:Int, R:IntSeq), A:Int) => fscAcc(R, A *Int 10)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:185` | rule | — | `rule applyBuiltin("float", str(CS:IntSeq), .Vals) => decStrToF(CS)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:186` | rule | — | `rule applyBuiltin("float", I:Int, .Vals)          => intToF(I)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:187` | rule | — | `rule applyBuiltin("float", F:Float, .Vals)        => F` |
+| supplied | `/reference/reference-semantics/semantics/float.k:190` | syntax | function, total, symbol, no-evaluators | `syntax Float ::= divFloatIntV(Float, Int) [function, total, symbol(divFloatIntV), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:191` | rule | concrete | `rule divFloatIntV(F:Float, I:Int) => F /Float Int2Float(I, 53, 11) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:192` | rule | — | `rule applyBin("/", F:Float, I:Int) => divFloatIntV(F, I)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:195` | syntax | function, total, symbol, no-evaluators | `syntax Float ::= intToF(Int) [function, total, symbol(intToF), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:196` | rule | concrete | `rule intToF(I:Int) => Int2Float(I, 53, 11) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:197` | rule | — | `rule applyBin("+", I:Int, F:Float) => addF(intToF(I), F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:198` | rule | — | `rule applyBin("+", F:Float, I:Int) => addF(F, intToF(I))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:199` | rule | — | `rule applyBin("-", I:Int, F:Float) => subF(intToF(I), F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:200` | rule | — | `rule applyBin("-", F:Float, I:Int) => subF(F, intToF(I))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:201` | rule | — | `rule applyBin("*", I:Int, F:Float) => mulF(intToF(I), F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:202` | rule | — | `rule applyBin("*", F:Float, I:Int) => mulF(F, intToF(I))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:203` | rule | — | `rule applyCmp("<", I:Int, F:Float) => floatLt(intToF(I), F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:204` | rule | — | `rule applyCmp("<", F:Float, I:Int) => floatLt(F, intToF(I))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:205` | rule | — | `rule applyCmp(">", I:Int, F:Float) => gtF(intToF(I), F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:206` | rule | — | `rule applyCmp(">", F:Float, I:Int) => gtF(F, intToF(I))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:209` | syntax | function, total, symbol, no-evaluators | `syntax Int ::= truncF(Float) [function, total, symbol(truncF), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:210` | rule | concrete | `rule truncF(F:Float) => #if F >=Float 0.0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:211` | rule | — | `rule applyBuiltin("int", F:Float, .Vals) => truncF(F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:213` | rule | — | `rule applyBuiltin("float", I:Int, .Vals)   => intToF(I)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:214` | rule | — | `rule applyBuiltin("float", F:Float, .Vals) => F` |
+| supplied | `/reference/reference-semantics/semantics/float.k:217` | syntax | function, total, symbol, no-evaluators | `syntax Int ::= roundF(Float) [function, total, symbol(roundF), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:218` | rule | concrete | `rule roundF(F:Float) => #if (F -Float floorFloat(F)) ==Float 0.5 #then (#if Float2Int(floorFloat(F)) %Int 2 ==Int 0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi) #else Float2Int(floorFloat(F +Float 0.5)) #fi [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:223` | syntax | function, total, symbol, no-evaluators | `syntax Float ::= roundFN(Float, Int) [function, total, symbol(roundFN), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:224` | rule | concrete | `rule roundFN(F:Float, N:Int) => Int2Float(roundF(F *Float Int2Float(10 ^Int N, 53, 11)), 53, 11) /Float Int2Float(10 ^Int N, 53, 11) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:227` | rule | — | `rule applyBuiltin("round", F:Float, .Vals)        => roundF(F)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:228` | rule | — | `rule applyBuiltin("round", F:Float, N:Int, .Vals) => roundFN(F, N)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:230` | syntax | function, total, symbol, no-evaluators | `syntax Float ::= sqrtF(Float) [function, total, symbol(sqrtF), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:231` | rule | concrete | `rule sqrtF(F:Float) => sqrtFloat(F) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:232` | syntax | — | `syntax KItem ::= "#mathSqrt"` |
+| supplied | `/reference/reference-semantics/semantics/float.k:233` | rule | priority | `rule <k> Call(Attribute(Name("math"), "sqrt"), (E:Expr, .Exprs)) => E ~> #mathSqrt ... </k> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/float.k:234` | rule | — | `rule <k> F:Float ~> #mathSqrt => sqrtF(F) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/float.k:235` | rule | — | `rule <k> I:Int ~> #mathSqrt => sqrtF(intToF(I)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/float.k:243` | syntax | — | `syntax KItem ::= #maxAccF(Iterable, Float) \| #maxContF(Float)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:244` | rule | — | `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAccF(R, {V}:>Float) ... </k> requires isFloat(V)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:245` | rule | — | `rule <k> #maxAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #maxContF(M) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/float.k:246` | rule | — | `rule <k> #iterDone ~> #maxContF(M:Float) => M ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/float.k:247` | rule | — | `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxContF(M:Float) => #maxAccF(R, maxFloat(M, {V}:>Float)) ... </k> requires isFloat(V)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:250` | syntax | — | `syntax KItem ::= #minAccF(Iterable, Float) \| #minContF(Float)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:251` | rule | — | `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAccF(R, {V}:>Float) ... </k> requires isFloat(V)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:252` | rule | — | `rule <k> #minAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #minContF(M) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/float.k:253` | rule | — | `rule <k> #iterDone ~> #minContF(M:Float) => M ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/float.k:254` | rule | — | `rule <k> #iterYield(V:Val, R:Iterable) ~> #minContF(M:Float) => #minAccF(R, minFloat(M, {V}:>Float)) ... </k> requires isFloat(V)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:261` | syntax | — | `syntax KItem ::= #sumAccF(Iterable, Float) \| #sumContF(Float)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:262` | rule | — | `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int) => #sumAccF(R, addF(intToF(ACC), {V}:>Float)) ... </k> requires isFloat(V) andBool notBool (isInt(V) orBool isBool(V))` |
+| supplied | `/reference/reference-semantics/semantics/float.k:265` | rule | — | `rule <k> #sumAccF(IT:Iterable, ACC:Float) => #iterNext(IT) ~> #sumContF(ACC) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/float.k:266` | rule | — | `rule <k> #iterDone ~> #sumContF(ACC:Float) => ACC ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/float.k:267` | rule | — | `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float) => #sumAccF(R, addF(ACC, {V}:>Float)) ... </k> requires isFloat(V)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:270` | rule | — | `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float) => #sumAccF(R, addF(ACC, intToF(intOf(V)))) ... </k> requires isInt(V) orBool isBool(V)` |
+| supplied | `/reference/reference-semantics/semantics/float.k:273` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:3` | module | — | `module MPY-FUNCTIONS` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:4` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:8` | syntax | — | `syntax KItem ::= frame(continuation: K, callerEnv: Int, savedLoc: Int) \| #bindP(ParamNames, Vals) \| "#pop" \| "#endcall"` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:14` | rule | — | `rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map => M [ F <- closureVal(PNS, BODY, L) ], _) ... </scopes>` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:18` | syntax | — | `syntax Expr ::= closureExpr(ParamNames, Stmts)` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:19` | rule | — | `rule <k> closureExpr(PNS:ParamNames, BODY:Stmts) => closureVal(PNS, BODY, L) ... </k> <env> L:Int </env>` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:27` | syntax | — | `syntax Val ::= closureValC(ParamNames, ParamNames, Stmts, Map)` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:31` | syntax | — | `syntax KItem ::= #mkClosure(String, ParamNames, ParamNames, ParamNames, Stmts, Map) \| #mkLambda(ParamNames, ParamNames, ParamNames, Stmts, Map)` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:33` | rule | — | `rule <k> FuncDef(F:String, Params(PNS:ParamNames), CellVars(CVS:ParamNames), FreeVars(FVS:ParamNames), BODY:Stmts) => #mkClosure(F, PNS, CVS, FVS, BODY, .Map) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:36` | rule | — | `rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames, (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map) => #mkClosure(F, PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map, _) ... </scopes> requires FV in_keys(M)` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:42` | rule | — | `rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map) => .K ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map => M [ F <- closureValC(PNS, CVS, BODY, CM) ], _) ... </scopes>` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:47` | rule | — | `rule <k> Lambda(Params(PNS:ParamNames), E:Expr) => closureVal(PNS, Return(E) .Stmts, L) ... </k> <env> L:Int </env>` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:50` | rule | — | `rule <k> Lambda(Params(PNS:ParamNames), CellVars(CVS:ParamNames), FreeVars(FVS:ParamNames), E:Expr) => #mkLambda(PNS, CVS, FVS, Return(E) .Stmts, .Map) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:53` | rule | — | `rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map) => #mkLambda(PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map, _) ... </scopes> requires FV in_keys(M)` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:59` | rule | — | `rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map) => closureValC(PNS, CVS, BODY, CM) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:63` | rule | — | `rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:64` | rule | — | `rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map => M [ P <- V ], _) ... </scopes>` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:68` | rule | priority | `rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #cellW({M[P]}:>Val, V) ~> #bindP(PS, VS) ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(P, cellsOf({M["$cells"]}:>Val)) andBool P in_keys(M) andBool isCellRef({M[P]}:>Val) [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:78` | rule | — | `rule <k> Return(V:Val) ~> _ => #pop </k> <ret> noRet => retV(V) </ret>` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:80` | rule | — | `rule <k> #endcall => #pop ... </k> <ret> noRet => retV(noneV) </ret>` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:85` | rule | — | `rule <k> #pop => V ~> CONT </k> <ret>   retV(V) => noRet </ret> <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack> <env>   L:Int => CALLERL </env> <scopes> SC:Map => SC [ L <- undef ] </scopes> <scopeLoc> _ => SAVEDL </scopeLoc>` |
+| supplied | `/reference/reference-semantics/semantics/functions.k:91` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/int.k:4` | module | — | `module MPY-INT` |
+| supplied | `/reference/reference-semantics/semantics/int.k:5` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/int.k:7` | rule | — | `rule applyUn("-", I:Int) => 0 -Int I` |
+| supplied | `/reference/reference-semantics/semantics/int.k:9` | rule | — | `rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2` |
+| supplied | `/reference/reference-semantics/semantics/int.k:11` | rule | — | `rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi` |
+| supplied | `/reference/reference-semantics/semantics/int.k:12` | rule | — | `rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I` |
+| supplied | `/reference/reference-semantics/semantics/int.k:13` | rule | — | `rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2` |
+| supplied | `/reference/reference-semantics/semantics/int.k:14` | rule | — | `rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2` |
+| supplied | `/reference/reference-semantics/semantics/int.k:15` | rule | — | `rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)` |
+| supplied | `/reference/reference-semantics/semantics/int.k:16` | rule | — | `rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2` |
+| supplied | `/reference/reference-semantics/semantics/int.k:17` | rule | — | `rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0` |
+| supplied | `/reference/reference-semantics/semantics/int.k:19` | syntax | function | `syntax Int ::= pyMod(Int, Int) [function]` |
+| supplied | `/reference/reference-semantics/semantics/int.k:20` | rule | — | `rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2` |
+| supplied | `/reference/reference-semantics/semantics/int.k:22` | rule | — | `rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2` |
+| supplied | `/reference/reference-semantics/semantics/int.k:23` | rule | — | `rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2` |
+| supplied | `/reference/reference-semantics/semantics/int.k:24` | rule | — | `rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2` |
+| supplied | `/reference/reference-semantics/semantics/int.k:25` | rule | — | `rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2` |
+| supplied | `/reference/reference-semantics/semantics/int.k:26` | rule | — | `rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2` |
+| supplied | `/reference/reference-semantics/semantics/int.k:27` | rule | — | `rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2` |
+| supplied | `/reference/reference-semantics/semantics/int.k:28` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/iter.k:6` | module | — | `module MPY-ITER` |
+| supplied | `/reference/reference-semantics/semantics/iter.k:7` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/iter.k:8` | syntax | — | `syntax KItem ::= #iterNext(Iterable) \| "#iterDone" \| #iterYield(Val, Iterable)` |
+| supplied | `/reference/reference-semantics/semantics/iter.k:9` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/list.k:3` | module | — | `module MPY-LIST` |
+| supplied | `/reference/reference-semantics/semantics/list.k:4` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/list.k:5` | imports | — | `imports MPY-ITER` |
+| supplied | `/reference/reference-semantics/semantics/list.k:6` | imports | — | `imports MPY-OPERATORS` |
+| supplied | `/reference/reference-semantics/semantics/list.k:9` | rule | — | `rule <k> #iterNext(list(.ValSeq))                => #iterDone ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/list.k:10` | rule | — | `rule <k> #iterNext(list(vCons(V:Val, R:ValSeq))) => #iterYield(V, list(R)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/list.k:13` | syntax | — | `syntax ApplyK ::= "toList"` |
+| supplied | `/reference/reference-semantics/semantics/list.k:14` | rule | — | `rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/list.k:15` | rule | — | `rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/list.k:18` | syntax | function, total | `syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/list.k:19` | rule | — | `rule valSeqConcat(.ValSeq, T:ValSeq)                => T` |
+| supplied | `/reference/reference-semantics/semantics/list.k:20` | rule | — | `rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))` |
+| supplied | `/reference/reference-semantics/semantics/list.k:24` | rule | priority | `rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k> [priority(45)]` |
+| supplied | `/reference/reference-semantics/semantics/list.k:27` | rule | — | `rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B` |
+| supplied | `/reference/reference-semantics/semantics/list.k:28` | rule | — | `rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B)` |
+| supplied | `/reference/reference-semantics/semantics/list.k:33` | syntax | function, total | `syntax Bool ::= hasRefVS(ValSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/list.k:34` | rule | — | `rule hasRefVS(.ValSeq)                => false` |
+| supplied | `/reference/reference-semantics/semantics/list.k:35` | rule | — | `rule hasRefVS(vCons(V:Val, R:ValSeq)) => isRefV(V) orBool hasRefVS(R)` |
+| supplied | `/reference/reference-semantics/semantics/list.k:37` | syntax | function | `syntax Bool ::= deepEqVS(ValSeq, ValSeq, Map) [function] \| deepEqV(Val, Val, Map)        [function]` |
+| supplied | `/reference/reference-semantics/semantics/list.k:39` | rule | — | `rule deepEqVS(.ValSeq, .ValSeq, _:Map)                   => true` |
+| supplied | `/reference/reference-semantics/semantics/list.k:40` | rule | — | `rule deepEqVS(.ValSeq, vCons(_:Val, _:ValSeq), _:Map)    => false` |
+| supplied | `/reference/reference-semantics/semantics/list.k:41` | rule | — | `rule deepEqVS(vCons(_:Val, _:ValSeq), .ValSeq, _:Map)    => false` |
+| supplied | `/reference/reference-semantics/semantics/list.k:42` | rule | — | `rule deepEqVS(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq), HP:Map) => deepEqV(A, B, HP) andBool deepEqVS(As, Bs, HP)` |
+| supplied | `/reference/reference-semantics/semantics/list.k:45` | rule | — | `rule deepEqV(ref(H:Int), B:Val, HP:Map) => deepEqV({HP[H]}:>Val, B, HP) requires H in_keys(HP)` |
+| supplied | `/reference/reference-semantics/semantics/list.k:47` | rule | — | `rule deepEqV(A:Val, ref(H:Int), HP:Map) => deepEqV(A, {HP[H]}:>Val, HP) requires notBool isRefV(A) andBool H in_keys(HP)` |
+| supplied | `/reference/reference-semantics/semantics/list.k:49` | rule | — | `rule deepEqV(list(A:ValSeq), list(B:ValSeq), HP:Map) => deepEqVS(A, B, HP)` |
+| supplied | `/reference/reference-semantics/semantics/list.k:50` | rule | owise | `rule deepEqV(A:Val, B:Val, _:Map) => A ==K B [owise]` |
+| supplied | `/reference/reference-semantics/semantics/list.k:53` | rule | priority | `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "append")), (V:Val, .Vals)) => noneV ... </k> <heap> ... H \|-> list(VS:ValSeq => valSeqConcat(VS, vCons(V, .ValSeq))) ... </heap> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/list.k:58` | syntax | — | `syntax KItem ::= #memberAcc(Val, Iterable) \| #memberCont(Val) \| "#notB"` |
+| supplied | `/reference/reference-semantics/semantics/list.k:59` | rule | — | `rule <k> Compare(LV:Val, CmpOp("in",     list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/list.k:60` | rule | — | `rule <k> Compare(LV:Val, CmpOp("not in", list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ~> #notB ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/list.k:61` | rule | — | `rule <k> #memberAcc(V:Val, IT:Iterable) => #iterNext(IT) ~> #memberCont(V) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/list.k:62` | rule | — | `rule <k> #iterDone ~> #memberCont(_V:Val) => false ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/list.k:63` | rule | — | `rule <k> #iterYield(E:Val, _:Iterable) ~> #memberCont(V:Val) => true ... </k> requires E ==K V` |
+| supplied | `/reference/reference-semantics/semantics/list.k:65` | rule | — | `rule <k> #iterYield(E:Val, R:Iterable) ~> #memberCont(V:Val) => #memberAcc(V, R) ... </k> requires notBool (E ==K V)` |
+| supplied | `/reference/reference-semantics/semantics/list.k:67` | rule | — | `rule <k> B:Bool ~> #notB => notBool B ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/list.k:68` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:3` | module | — | `module MPY-METHODS` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:4` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:5` | imports | — | `imports K-EQUAL` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:6` | imports | — | `imports MPY-STR` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:7` | imports | — | `imports MPY-LIST` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:10` | syntax | function | `syntax Val ::= applyMethod(Val, String, Vals) [function]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:13` | rule | — | `rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:14` | rule | — | `rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:15` | rule | — | `rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:16` | rule | — | `rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:19` | rule | — | `rule applyMethod(str(CS:IntSeq), "lower",    .Vals) => str(mapLower(CS))` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:20` | rule | — | `rule applyMethod(str(CS:IntSeq), "upper",    .Vals) => str(mapUpper(CS))` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:21` | rule | — | `rule applyMethod(str(CS:IntSeq), "swapcase", .Vals) => str(mapSwap(CS))` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:26` | rule | — | `rule applyMethod(str(SEP:IntSeq), "join", list(VS:ValSeq), .Vals) => str(joinCodes(SEP, VS))` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:27` | syntax | function, total | `syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:28` | rule | — | `rule joinCodes(_:IntSeq, .ValSeq) => .IntSeq` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:29` | rule | — | `rule joinCodes(_:IntSeq, vCons(str(CS:IntSeq), .ValSeq)) => CS` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:30` | rule | — | `rule joinCodes(SEP:IntSeq, vCons(str(CS:IntSeq), vCons(V:Val, R:ValSeq))) => seqConcat(CS, seqConcat(SEP, joinCodes(SEP, vCons(V, R))))` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:34` | rule | — | `rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:35` | syntax | function | `syntax Int ::= cntSub(IntSeq, IntSeq) [function]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:36` | rule | — | `rule cntSub(.IntSeq, _:IntSeq) => 0` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:37` | rule | — | `rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC) requires strPrefix(PC, iCons(C, R)) andBool isLen(PC) >Int 0` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:39` | rule | — | `rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => cntSub(R, PC) requires notBool strPrefix(PC, iCons(C, R)) orBool isLen(PC) <=Int 0` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:41` | syntax | function, total | `syntax IntSeq ::= dropIS(IntSeq, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:42` | rule | — | `rule dropIS(S:IntSeq, N:Int) => S requires N <=Int 0` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:43` | rule | owise | `rule dropIS(.IntSeq, _:Int) => .IntSeq [owise]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:44` | rule | — | `rule dropIS(iCons(_:Int, R:IntSeq), N:Int) => dropIS(R, N -Int 1) requires N >Int 0` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:47` | rule | — | `rule applyMethod(str(CS:IntSeq), "strip", .Vals) => str(revIS(trimWS(revIS(trimWS(CS)))))` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:48` | syntax | function, total | `syntax IntSeq ::= trimWS(IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:49` | rule | — | `rule trimWS(.IntSeq) => .IntSeq` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:50` | rule | — | `rule trimWS(iCons(C:Int, R:IntSeq)) => trimWS(R) requires isWSC(C)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:51` | rule | — | `rule trimWS(iCons(C:Int, R:IntSeq)) => iCons(C, R) requires notBool isWSC(C)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:52` | syntax | function, total | `syntax IntSeq ::= revIS(IntSeq) [function, total] \| revISAcc(IntSeq, IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:53` | rule | — | `rule revIS(S:IntSeq) => revISAcc(S, .IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:54` | rule | — | `rule revISAcc(.IntSeq, A:IntSeq) => A` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:55` | rule | — | `rule revISAcc(iCons(C:Int, R:IntSeq), A:IntSeq) => revISAcc(R, iCons(C, A))` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:58` | rule | — | `rule applyMethod(str(CS:IntSeq), "encode", str(_:IntSeq), .Vals) => str(CS)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:61` | rule | — | `rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:64` | rule | — | `rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:65` | syntax | function, total | `syntax Int ::= cntOccVS(ValSeq, Val) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:66` | rule | — | `rule cntOccVS(.ValSeq, _:Val)                => 0` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:67` | rule | — | `rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:68` | rule | — | `rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => cntOccVS(R, V)        requires notBool (A ==K V)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:72` | rule | priority | `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals) => #alloc(list(splitWS(CS, .IntSeq, .ValSeq))) ... </k> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:75` | syntax | function | `syntax ValSeq ::= splitWS(IntSeq, IntSeq, ValSeq) [function]  // remaining, current token, result` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:76` | rule | — | `rule splitWS(.IntSeq, CUR:IntSeq, ACC:ValSeq) => flushTok(ACC, CUR)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:77` | rule | — | `rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, .IntSeq, flushTok(ACC, CUR)) requires isWSC(C)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:79` | rule | — | `rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, seqConcat(CUR, iCons(C, .IntSeq)), ACC) requires notBool isWSC(C)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:82` | syntax | function | `syntax ValSeq ::= flushTok(ValSeq, IntSeq) [function]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:83` | rule | — | `rule flushTok(ACC:ValSeq, .IntSeq)            => ACC` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:84` | rule | — | `rule flushTok(ACC:ValSeq, iCons(C:Int, T:IntSeq)) => valSeqConcat(ACC, vCons(str(iCons(C, T)), .ValSeq))` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:85` | syntax | function, total | `syntax Bool ::= isWSC(Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:86` | rule | — | `rule isWSC(C:Int) => C ==Int 32 orBool C ==Int 9 orBool C ==Int 10 orBool C ==Int 13` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:89` | rule | priority | `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (kwV("sep", str(S:IntSeq)), .Vals)) => #applyK(toCall(boundMethodV(str(CS), "split")), (str(S), .Vals)) ... </k> [priority(39)]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:94` | rule | priority | `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (str(iCons(SEP:Int, .IntSeq)), .Vals)) => #alloc(list(splitSep(CS, SEP, .IntSeq))) ... </k> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:97` | syntax | function | `syntax ValSeq ::= splitSep(IntSeq, Int, IntSeq) [function]  // remaining, sep code, current token` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:98` | rule | — | `rule splitSep(.IntSeq, _SEP:Int, CUR:IntSeq)              => vCons(str(CUR), .ValSeq)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:99` | rule | — | `rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => vCons(str(CUR), splitSep(R, SEP, .IntSeq)) requires C ==Int SEP` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:101` | rule | — | `rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => splitSep(R, SEP, seqConcat(CUR, iCons(C, .IntSeq))) requires notBool (C ==Int SEP)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:104` | rule | — | `rule applyMethod(str(CS:IntSeq), "replace", str(iCons(A:Int, .IntSeq)), str(iCons(B:Int, .IntSeq)), .Vals) => str(replaceC(CS, A, B))` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:106` | syntax | function, total | `syntax IntSeq ::= replaceC(IntSeq, Int, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:107` | rule | — | `rule replaceC(.IntSeq, _:Int, _:Int)             => .IntSeq` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:108` | rule | — | `rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(B, replaceC(R, A, B)) requires C ==Int A` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:109` | rule | — | `rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(C, replaceC(R, A, B)) requires notBool (C ==Int A)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:112` | syntax | function, total | `syntax Bool ::= isUpperC(Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:113` | rule | — | `rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:115` | syntax | function, total | `syntax Bool ::= isLowerC(Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:116` | rule | — | `rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:118` | syntax | function, total | `syntax Bool ::= isAlphaC(Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:119` | rule | — | `rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:121` | syntax | function, total | `syntax Bool ::= isDigitC(Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:122` | rule | — | `rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:124` | syntax | function, total | `syntax Bool ::= hasUpper(IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:125` | rule | — | `rule hasUpper(.IntSeq) => false` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:126` | rule | — | `rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:128` | syntax | function, total | `syntax Bool ::= hasLower(IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:129` | rule | — | `rule hasLower(.IntSeq) => false` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:130` | rule | — | `rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:132` | syntax | function, total | `syntax Bool ::= allAlpha(IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:133` | rule | — | `rule allAlpha(.IntSeq) => true` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:134` | rule | — | `rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:136` | syntax | function, total | `syntax Bool ::= allDigit(IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:137` | rule | — | `rule allDigit(.IntSeq) => true` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:138` | rule | — | `rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:140` | syntax | function, total | `syntax Int ::= lowerC(Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:142` | rule | — | `rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:143` | rule | owise | `rule lowerC(C:Int) => C         [owise]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:145` | syntax | function, total | `syntax Int ::= upperC(Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:146` | rule | — | `rule upperC(C:Int) => C -Int 32 requires isLowerC(C)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:147` | rule | owise | `rule upperC(C:Int) => C         [owise]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:149` | syntax | function, total | `syntax Int ::= swapC(Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:150` | rule | — | `rule swapC(C:Int) => C +Int 32 requires isUpperC(C)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:151` | rule | — | `rule swapC(C:Int) => C -Int 32 requires isLowerC(C)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:152` | rule | owise | `rule swapC(C:Int) => C         [owise]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:154` | syntax | function, total | `syntax IntSeq ::= mapLower(IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:155` | rule | — | `rule mapLower(.IntSeq) => .IntSeq` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:156` | rule | — | `rule mapLower(iCons(C:Int, S:IntSeq)) => iCons(lowerC(C), mapLower(S))` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:158` | syntax | function, total | `syntax IntSeq ::= mapUpper(IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:159` | rule | — | `rule mapUpper(.IntSeq) => .IntSeq` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:160` | rule | — | `rule mapUpper(iCons(C:Int, S:IntSeq)) => iCons(upperC(C), mapUpper(S))` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:162` | syntax | function, total | `syntax IntSeq ::= mapSwap(IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:163` | rule | — | `rule mapSwap(.IntSeq) => .IntSeq` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:164` | rule | — | `rule mapSwap(iCons(C:Int, S:IntSeq)) => iCons(swapC(C), mapSwap(S))` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:166` | syntax | function, total | `syntax Bool ::= startsWith(IntSeq, IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:167` | rule | — | `rule startsWith(.IntSeq, _:IntSeq)               => true` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:168` | rule | — | `rule startsWith(iCons(_:Int, _:IntSeq), .IntSeq) => false` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:169` | rule | — | `rule startsWith(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool startsWith(As, Bs)` |
+| supplied | `/reference/reference-semantics/semantics/methods.k:170` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:6` | module | — | `module MPY-OPERATORS` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:7` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:8` | imports | — | `imports MPY-ITER` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:10` | rule | — | `rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:12` | rule | — | `rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:15` | context | — | `context Compare(HOLE, _)` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:16` | context | — | `context Compare(_:Val, CmpOp(_, HOLE))` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:17` | rule | owise | `rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:19` | rule | — | `rule applyCmp("is",     V:Val, noneV) => V ==K noneV` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:20` | rule | — | `rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:25` | rule | priority | `rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k> <heap> ... H \|-> V:Val ... </heap> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:28` | rule | priority | `rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k> <heap> ... H \|-> V:Val ... </heap> requires notBool isRefV(L) [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:34` | rule | priority | `rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k> <heap> ... H \|-> V:Val ... </heap> requires OP =/=String "in" andBool OP =/=String "not in" [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:38` | rule | priority | `rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k> <heap> ... H \|-> V:Val ... </heap> requires notBool isRefV(L) orBool OP ==String "in" orBool OP ==String "not in" [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:44` | rule | priority | `rule <k> UnaryOp(OP:String, ref(H:Int)) => UnaryOp(OP, V) ... </k> <heap> ... H \|-> V:Val ... </heap> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/operators.k:47` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/range.k:5` | module | — | `module MPY-RANGE` |
+| supplied | `/reference/reference-semantics/semantics/range.k:6` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/range.k:7` | imports | — | `imports MPY-ITER` |
+| supplied | `/reference/reference-semantics/semantics/range.k:9` | syntax | function, total | `syntax Bool ::= inRange(Int, Int, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/range.k:10` | rule | — | `rule inRange(I:Int, HI:Int, ST:Int) => (ST >Int 0 andBool I <Int HI) orBool (ST <Int 0 andBool I >Int HI)` |
+| supplied | `/reference/reference-semantics/semantics/range.k:12` | syntax | function | `syntax Int ::= rangeLen(Int, Int, Int) [function]` |
+| supplied | `/reference/reference-semantics/semantics/range.k:13` | rule | — | `rule rangeLen(LO:Int, HI:Int, ST:Int) => (HI -Int LO +Int ST -Int 1) /Int ST requires ST >Int 0 andBool HI >Int LO` |
+| supplied | `/reference/reference-semantics/semantics/range.k:15` | rule | — | `rule rangeLen(LO:Int, HI:Int, ST:Int) => (LO -Int HI -Int ST -Int 1) /Int (0 -Int ST) requires ST <Int 0 andBool HI <Int LO` |
+| supplied | `/reference/reference-semantics/semantics/range.k:17` | rule | — | `rule rangeLen(LO:Int, HI:Int, ST:Int) => 0 requires (ST >Int 0 andBool HI <=Int LO) orBool (ST <Int 0 andBool HI >=Int LO)` |
+| supplied | `/reference/reference-semantics/semantics/range.k:20` | rule | — | `rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterYield(I, rangeObj(I +Int ST, HI, ST)) ... </k> requires inRange(I, HI, ST)` |
+| supplied | `/reference/reference-semantics/semantics/range.k:23` | rule | — | `rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterDone ... </k> requires notBool inRange(I, HI, ST)` |
+| supplied | `/reference/reference-semantics/semantics/range.k:25` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/set.k:3` | module | — | `module MPY-SET` |
+| supplied | `/reference/reference-semantics/semantics/set.k:4` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/set.k:8` | syntax | — | `syntax Val ::= setV(IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/set.k:11` | syntax | function, total | `syntax Bool ::= codeIn(Int, IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/set.k:12` | rule | — | `rule codeIn(_:Int, .IntSeq)                => false` |
+| supplied | `/reference/reference-semantics/semantics/set.k:13` | rule | — | `rule codeIn(C:Int, iCons(H:Int, T:IntSeq)) => C ==Int H orBool codeIn(C, T)` |
+| supplied | `/reference/reference-semantics/semantics/set.k:16` | syntax | function, total | `syntax IntSeq ::= dedupCodes(IntSeq)         [function, total] \| dedupFrom(IntSeq, IntSeq)  [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/set.k:18` | rule | — | `rule dedupCodes(CS:IntSeq) => dedupFrom(CS, .IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/set.k:19` | rule | — | `rule dedupFrom(.IntSeq, ACC:IntSeq) => ACC` |
+| supplied | `/reference/reference-semantics/semantics/set.k:20` | rule | — | `rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, ACC) requires codeIn(C, ACC)` |
+| supplied | `/reference/reference-semantics/semantics/set.k:22` | rule | — | `rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, snocCode(ACC, C)) requires notBool codeIn(C, ACC)` |
+| supplied | `/reference/reference-semantics/semantics/set.k:25` | syntax | function, total | `syntax IntSeq ::= snocCode(IntSeq, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/set.k:26` | rule | — | `rule snocCode(.IntSeq, C:Int)                => iCons(C, .IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/set.k:27` | rule | — | `rule snocCode(iCons(H:Int, T:IntSeq), C:Int) => iCons(H, snocCode(T, C))` |
+| supplied | `/reference/reference-semantics/semantics/set.k:31` | syntax | function, total | `syntax Bool ::= subsetCodes(IntSeq, IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/set.k:32` | rule | — | `rule subsetCodes(.IntSeq, _:IntSeq)                => true` |
+| supplied | `/reference/reference-semantics/semantics/set.k:33` | rule | — | `rule subsetCodes(iCons(C:Int, S:IntSeq), B:IntSeq) => codeIn(C, B) andBool subsetCodes(S, B)` |
+| supplied | `/reference/reference-semantics/semantics/set.k:35` | syntax | function, total | `syntax Bool ::= sameSet(IntSeq, IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/set.k:36` | rule | — | `rule sameSet(A:IntSeq, B:IntSeq) => subsetCodes(A, B) andBool subsetCodes(B, A)` |
+| supplied | `/reference/reference-semantics/semantics/set.k:39` | rule | — | `rule applyCmp("==", setV(A:IntSeq), setV(B:IntSeq)) => sameSet(A, B)` |
+| supplied | `/reference/reference-semantics/semantics/set.k:40` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:10` | module | — | `module MPY-SORT` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:11` | imports | — | `imports MPY-BUILTINS` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:12` | imports | — | `imports MPY-SUBSCRIPT` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:18` | syntax | function, total, symbol, no-evaluators | `syntax ValSeq ::= sortVS(ValSeq) [function, total, symbol(sortVS), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:19` | syntax | function | `syntax ValSeq ::= insVS(Int, ValSeq) [function]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:20` | rule | concrete | `rule sortVS(.ValSeq)                => .ValSeq          [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:21` | rule | concrete | `rule sortVS(vCons(X:Int, R:ValSeq)) => insVS(X, sortVS(R)) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:22` | rule | concrete | `rule insVS(X:Int, .ValSeq)                => vCons(X, .ValSeq) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:23` | rule | concrete | `rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:24` | rule | concrete | `rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X  >Int Y [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:26` | syntax | function | `syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:27` | rule | concrete | `rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:28` | rule | concrete | `rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:29` | rule | concrete | `rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(A), vCons(str(B), R)) requires strLt(A, B) orBool A ==K B [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:31` | rule | concrete | `rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(B), insVSs(A, R)) requires notBool (strLt(A, B) orBool A ==K B) [concrete]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:36` | rule | — | `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), .Vals)) => #alloc(list(sortVS(VS))) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:40` | rule | priority | `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "sort")), .Vals) => noneV ... </k> <heap> ... H \|-> list(VS:ValSeq => sortVS(VS)) ... </heap> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:49` | syntax | function, total, symbol, no-evaluators | `syntax ValSeq ::= sortKeyVS(ValSeq, Val) [function, total, symbol(sortKeyVS), no-evaluators]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:51` | syntax | function, total | `syntax ValSeq ::= revVS(ValSeq) [function, total] \| revVSAcc(ValSeq, ValSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:53` | rule | — | `rule revVS(S:ValSeq) => revVSAcc(S, .ValSeq)` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:54` | rule | — | `rule revVSAcc(.ValSeq, A:ValSeq) => A` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:55` | rule | — | `rule revVSAcc(vCons(V:Val, R:ValSeq), A:ValSeq) => revVSAcc(R, vCons(V, A))` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:57` | syntax | function, total | `syntax ValSeq ::= condRev(ValSeq, Bool) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:58` | rule | — | `rule condRev(S:ValSeq, false) => S` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:59` | rule | — | `rule condRev(S:ValSeq, true)  => revVS(S)` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:61` | rule | — | `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals)) => #alloc(list(sortKeyVS(VS, KV))) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:63` | rule | — | `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals)) => #alloc(list(condRev(sortKeyVS(VS, KV), RB))) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:65` | rule | — | `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("reverse", RB:Bool), .Vals)) => #alloc(list(condRev(sortVS(VS), RB))) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/sort.k:72` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/str.k:3` | module | — | `module MPY-STR` |
+| supplied | `/reference/reference-semantics/semantics/str.k:4` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/str.k:5` | imports | — | `imports MPY-ITER` |
+| supplied | `/reference/reference-semantics/semantics/str.k:8` | rule | — | `rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/str.k:9` | rule | — | `rule <k> #iterNext(str(iCons(C:Int, R:IntSeq))) => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/str.k:13` | syntax | function | `syntax IntSeq ::= strToCodes(String) [function]` |
+| supplied | `/reference/reference-semantics/semantics/str.k:14` | rule | — | `rule <k> Str(S:String) => str(strToCodes(S)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/str.k:15` | rule | — | `rule strToCodes("") => .IntSeq` |
+| supplied | `/reference/reference-semantics/semantics/str.k:16` | rule | — | `rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S)))) requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128` |
+| supplied | `/reference/reference-semantics/semantics/str.k:20` | syntax | function, total | `syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/str.k:21` | rule | — | `rule seqConcat(.IntSeq, T:IntSeq)                => T` |
+| supplied | `/reference/reference-semantics/semantics/str.k:22` | rule | — | `rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))` |
+| supplied | `/reference/reference-semantics/semantics/str.k:24` | rule | — | `rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))` |
+| supplied | `/reference/reference-semantics/semantics/str.k:25` | rule | — | `rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B` |
+| supplied | `/reference/reference-semantics/semantics/str.k:26` | rule | — | `rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)` |
+| supplied | `/reference/reference-semantics/semantics/str.k:29` | rule | — | `rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)` |
+| supplied | `/reference/reference-semantics/semantics/str.k:30` | rule | — | `rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)` |
+| supplied | `/reference/reference-semantics/semantics/str.k:32` | syntax | function, total | `syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/str.k:33` | rule | — | `rule strPrefix(.IntSeq, _:IntSeq)               => true` |
+| supplied | `/reference/reference-semantics/semantics/str.k:34` | rule | — | `rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false` |
+| supplied | `/reference/reference-semantics/semantics/str.k:35` | rule | — | `rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)` |
+| supplied | `/reference/reference-semantics/semantics/str.k:37` | syntax | function, total | `syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/str.k:38` | rule | — | `rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)` |
+| supplied | `/reference/reference-semantics/semantics/str.k:39` | rule | — | `rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)` |
+| supplied | `/reference/reference-semantics/semantics/str.k:40` | rule | — | `rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs) requires notBool strPrefix(P, iCons(C, Xs))` |
+| supplied | `/reference/reference-semantics/semantics/str.k:48` | syntax | function, total | `syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/str.k:49` | rule | — | `rule strLt(.IntSeq, .IntSeq)                => false` |
+| supplied | `/reference/reference-semantics/semantics/str.k:50` | rule | — | `rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true` |
+| supplied | `/reference/reference-semantics/semantics/str.k:51` | rule | — | `rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false` |
+| supplied | `/reference/reference-semantics/semantics/str.k:52` | rule | — | `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true          requires A  <Int B` |
+| supplied | `/reference/reference-semantics/semantics/str.k:53` | rule | — | `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false         requires A  >Int B` |
+| supplied | `/reference/reference-semantics/semantics/str.k:54` | rule | — | `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B` |
+| supplied | `/reference/reference-semantics/semantics/str.k:56` | rule | — | `rule applyCmp("<",  str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)` |
+| supplied | `/reference/reference-semantics/semantics/str.k:57` | rule | — | `rule applyCmp(">",  str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)` |
+| supplied | `/reference/reference-semantics/semantics/str.k:58` | rule | — | `rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)` |
+| supplied | `/reference/reference-semantics/semantics/str.k:59` | rule | — | `rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)` |
+| supplied | `/reference/reference-semantics/semantics/str.k:60` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:3` | module | — | `module MPY-SUBSCRIPT` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:4` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:11` | syntax | function, total | `syntax Val ::= valSeqAt(ValSeq, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:12` | rule | — | `rule valSeqAt(vCons(V:Val, _:ValSeq), 0)     => V` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:13` | rule | — | `rule valSeqAt(vCons(_:Val, S:ValSeq), I:Int) => valSeqAt(S, I -Int 1) requires I >Int 0` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:16` | syntax | function | `syntax Int ::= intSeqAt(IntSeq, Int) [function]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:17` | rule | — | `rule intSeqAt(iCons(C:Int, _:IntSeq), 0)     => C` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:18` | rule | — | `rule intSeqAt(iCons(_:Int, S:IntSeq), I:Int) => intSeqAt(S, I -Int 1) requires I >Int 0` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:21` | syntax | function, total | `syntax Int ::= normIdx(Int, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:22` | rule | — | `rule normIdx(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:23` | rule | — | `rule normIdx(I:Int, _:Int)   => I          requires I >=Int 0` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:27` | context | — | `context Subscript(HOLE, _)` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:28` | context | — | `context Subscript(_:Val, HOLE:Expr)` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:31` | rule | priority | `rule <k> Subscript(ref(H:Int), IX:Index) => Subscript(V, IX) ... </k> <heap> ... H \|-> V:Val ... </heap> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:35` | rule | — | `rule <k> Subscript(OBJ:Val, I:Int) => applyIndex(OBJ, I) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:37` | syntax | function | `syntax Val ::= applyIndex(Val, Int) [function]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:38` | rule | — | `rule applyIndex(list(VS:ValSeq),  I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:39` | rule | — | `rule applyIndex(tuple(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:40` | rule | — | `rule applyIndex(str(IS:IntSeq),   I:Int) => str(iCons(intSeqAt(IS, normIdx(I, isLen(IS))), .IntSeq))` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:44` | syntax | — | `syntax KItem ::= #evalB(Bound) \| "#toSome" \| #slLo(Val, Bound, Bound) \| #slHi(Val, OptInt, Bound) \| #slStep(Val, OptInt, OptInt)` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:49` | syntax | — | `syntax OptInt ::= "noB" \| someB(Int)` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:50` | rule | — | `rule <k> #evalB(NoBound)  => noB ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:51` | rule | — | `rule <k> #evalB(E:Expr)   => E ~> #toSome ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:52` | rule | — | `rule <k> I:Int ~> #toSome => someB(I) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:54` | rule | — | `rule <k> Subscript(OBJ:Val, Slice(LO:Bound, HI:Bound, ST:Bound)) => #evalB(LO) ~> #slLo(OBJ, HI, ST) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:55` | rule | — | `rule <k> LO:OptInt ~> #slLo(OBJ:Val, HI:Bound, ST:Bound)   => #evalB(HI) ~> #slHi(OBJ, LO, ST) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:56` | rule | — | `rule <k> HI:OptInt ~> #slHi(OBJ:Val, LO:OptInt, ST:Bound)  => #evalB(ST) ~> #slStep(OBJ, LO, HI) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:58` | rule | priority | `rule <k> ST:OptInt ~> #slStep(list(VS:ValSeq), LO:OptInt, HI:OptInt) => #alloc(doSlice(list(VS), LO, HI, ST)) ... </k> [priority(45)]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:61` | rule | — | `rule <k> ST:OptInt ~> #slStep(OBJ:Val, LO:OptInt, HI:OptInt) => doSlice(OBJ, LO, HI, ST) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:63` | syntax | function | `syntax Val ::= doSlice(Val, OptInt, OptInt, OptInt) [function]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:64` | rule | — | `rule doSlice(list(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt) => list(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:66` | rule | — | `rule doSlice(tuple(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt) => tuple(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:68` | rule | — | `rule doSlice(str(IS:IntSeq), LO:OptInt, HI:OptInt, ST:OptInt) => str(buildIS(IS, slStart(LO, ST, isLen(IS)), slStop(HI, ST, isLen(IS)), slStep(ST)))` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:72` | syntax | function, total | `syntax Int ::= slStep(OptInt) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:73` | rule | — | `rule slStep(noB)          => 1` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:74` | rule | — | `rule slStep(someB(S:Int)) => S` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:76` | syntax | function | `syntax Int ::= slStart(OptInt, OptInt, Int) [function]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:77` | rule | — | `rule slStart(noB,          ST:OptInt, _LEN:Int) => 0 requires slStep(ST) >Int 0` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:79` | rule | — | `rule slStart(noB,          ST:OptInt, LEN:Int)  => LEN -Int 1 requires slStep(ST) <Int 0` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:81` | rule | — | `rule slStart(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:83` | syntax | function | `syntax Int ::= slStop(OptInt, OptInt, Int) [function]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:84` | rule | — | `rule slStop(noB,          ST:OptInt, LEN:Int)  => LEN requires slStep(ST) >Int 0` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:86` | rule | — | `rule slStop(noB,          ST:OptInt, _LEN:Int) => -1 requires slStep(ST) <Int 0` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:88` | rule | — | `rule slStop(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:90` | syntax | function, total | `syntax Int ::= slAdjust(Int, Int, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:91` | rule | — | `rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampLo(I +Int LEN, STEP) requires I  <Int 0` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:93` | rule | — | `rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampHi(I, LEN, STEP) requires I >=Int 0` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:96` | syntax | function, total | `syntax Int ::= clampLo(Int, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:97` | rule | — | `rule clampLo(J:Int, _STEP:Int) => J requires J >=Int 0` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:99` | rule | — | `rule clampLo(J:Int, STEP:Int)  => #if STEP <Int 0 #then -1 #else 0 #fi requires J <Int 0` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:102` | syntax | function, total | `syntax Int ::= clampHi(Int, Int, Int) [function, total]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:103` | rule | — | `rule clampHi(I:Int, LEN:Int, _STEP:Int) => I requires I  <Int LEN` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:105` | rule | — | `rule clampHi(I:Int, LEN:Int, STEP:Int)  => #if STEP <Int 0 #then LEN -Int 1 #else LEN #fi requires I >=Int LEN` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:109` | syntax | function | `syntax ValSeq ::= buildVS(ValSeq, Int, Int, Int) [function]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:110` | rule | — | `rule buildVS(VS:ValSeq, I:Int, STOP:Int, STEP:Int) => vCons(valSeqAt(VS, I), buildVS(VS, I +Int STEP, STOP, STEP)) requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:113` | rule | — | `rule buildVS(_:ValSeq, I:Int, STOP:Int, STEP:Int) => .ValSeq requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:116` | syntax | function | `syntax IntSeq ::= buildIS(IntSeq, Int, Int, Int) [function]` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:117` | rule | — | `rule buildIS(IS:IntSeq, I:Int, STOP:Int, STEP:Int) => iCons(intSeqAt(IS, I), buildIS(IS, I +Int STEP, STOP, STEP)) requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:120` | rule | — | `rule buildIS(_:IntSeq, I:Int, STOP:Int, STEP:Int) => .IntSeq requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))` |
+| supplied | `/reference/reference-semantics/semantics/subscript.k:122` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:3` | module | — | `module MPY-SYNTAX` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:4` | imports | — | `imports INT-SYNTAX` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:5` | imports | — | `imports FLOAT-SYNTAX` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:6` | imports | — | `imports BOOL-SYNTAX` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:7` | imports | — | `imports STRING-SYNTAX` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:9` | syntax | macro, strict, seqstrict | `syntax Expr ::= "Int"      "(" Int ")" \| "Float"    "(" Float ")" \| "Bool"     "(" Bool ")" \| "Name"     "(" String ")" \| "Str"      "(" String ")" \| "UnaryOp"  "(" String "," Expr ")" [strict(2)] \| "BinOp"    "(" String "," Expr "," Expr ")" [seqstrict(2, 3)] \| "BoolOp"    "(" String "," Exprs ")" \| "ListExpr"  "(" Exprs ")" \| "DictExpr"  "(" Entries ")" \| "ListComp"  "(" Expr "," CompFors ")" [macro] \| "GenExp"    "(" Expr "," CompFors ")" [macro] \| "TupleExpr" "(" Exprs ")" \| "Subscript" "(" Expr "," Index ")" \| "IfExp"     "(" Expr "," Expr "," Expr ")" [strict(1)] \| "Lambda"    "(" Params "," Expr ")" \| "KwArg"     "(" String "," Expr ")" \| "Lambda"    "(" Params "," CellVars "," FreeVars "," Expr ")" \| "NoneVal" \| "Call"      "(" Expr "," Exprs ")" \| "Attribute" "(" Expr "," String ")" [strict(1)] \| "Compare"   "(" Expr "," CmpOp ")"` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:32` | syntax | — | `syntax CmpOp    ::= "CmpOp" "(" String "," Expr ")"` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:33` | syntax | — | `syntax Entry    ::= "Entry" "(" Expr "," Expr ")"` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:34` | syntax | — | `syntax Entries  ::= List{Entry, ","}` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:35` | syntax | — | `syntax CompFor  ::= "CompFor" "(" Expr "," Expr "," Exprs ")"` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:36` | syntax | — | `syntax CompFors ::= List{CompFor, ""}` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:37` | syntax | — | `syntax Exprs    ::= List{Expr, ","}` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:38` | syntax | — | `syntax Index    ::= Expr \| "Slice" "(" Bound "," Bound "," Bound ")"` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:39` | syntax | — | `syntax Bound    ::= Expr \| "NoBound"` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:41` | syntax | strict | `syntax Stmt ::= "Assign"    "(" Expr "," Expr ")" [strict(2)] \| "Import"    "(" String ")" \| "ImportFrom" "(" String "," ParamNames ")" \| "AugAssign" "(" Expr "," String "," Expr ")" [strict(3)] \| "For"       "(" Expr "," Expr "," Stmts ")" [strict(2)] \| "While"     "(" Expr "," Stmts ")" \| "Break" \| "Continue" \| "If"        "(" Expr "," Stmts "," Stmts ")" [strict(1)] \| "Return"    "(" Expr ")" [strict] \| "Assert"    "(" Expr ")" [strict] \| "Expr"      "(" Expr ")" [strict] \| "FuncDef"   "(" String "," Params "," Stmts ")" \| "FuncDef"   "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:56` | syntax | — | `syntax Stmts      ::= List{Stmt, ""}` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:57` | syntax | — | `syntax Params     ::= "Params" "(" ParamNames ")"` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:58` | syntax | — | `syntax CellVars   ::= "CellVars" "(" ParamNames ")"` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:59` | syntax | — | `syntax FreeVars   ::= "FreeVars" "(" ParamNames ")"` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:60` | syntax | — | `syntax ParamNames ::= List{String, ","}` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:61` | syntax | — | `syntax Module     ::= "Module" "(" Stmts ")"` |
+| supplied | `/reference/reference-semantics/semantics/syntax.k:62` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:3` | module | — | `module MPY-TUPLE` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:4` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:5` | imports | — | `imports MPY-ITER` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:6` | imports | — | `imports MPY-LIST` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:7` | imports | — | `imports MPY-METHODS` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:10` | rule | — | `rule <k> #iterNext(tuple(.ValSeq))                => #iterDone ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:11` | rule | — | `rule <k> #iterNext(tuple(vCons(V:Val, R:ValSeq))) => #iterYield(V, tuple(R)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:14` | syntax | — | `syntax ApplyK ::= "toTuple"` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:15` | rule | — | `rule <k> TupleExpr(ES:Exprs) => #evalArgs(ES, .Vals, toTuple) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:16` | rule | — | `rule <k> #applyK(toTuple, ACC:Vals) => tuple(vals2valSeq(ACC)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:18` | rule | — | `rule applyCmp("==", tuple(A:ValSeq), tuple(B:ValSeq)) => A ==K B` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:20` | rule | — | `rule <k> Compare(LV:Val, CmpOp("in",     tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:21` | rule | — | `rule <k> Compare(LV:Val, CmpOp("not in", tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ~> #notB ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:23` | rule | — | `rule applyMethod(tuple(VS:ValSeq), "index", V:Val, .Vals) => idxOfVS(VS, V, 0)` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:24` | syntax | function | `syntax Int ::= idxOfVS(ValSeq, Val, Int) [function]` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:25` | rule | — | `rule idxOfVS(vCons(A:Val, _:ValSeq), V:Val, I:Int) => I requires A ==K V` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:26` | rule | — | `rule idxOfVS(vCons(A:Val, R:ValSeq), V:Val, I:Int) => idxOfVS(R, V, I +Int 1) requires notBool (A ==K V)` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:28` | rule | — | `rule applyCmp("!=", tuple(A:ValSeq), tuple(B:ValSeq)) => notBool (A ==K B)` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:31` | syntax | — | `syntax KItem ::= #bindTgt(Expr, Val)` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:32` | rule | — | `rule <k> #bindTgt(Name(X:String), V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map => M [ X <- V ], _) ... </scopes>` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:35` | rule | priority | `rule <k> #bindTgt(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k> <env> L:Int </env> <scopes> ... L \|-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool X in_keys(M) andBool isCellRef({M[X]}:>Val) [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:42` | rule | — | `rule <k> #bindTgt(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:43` | rule | — | `rule <k> #bindTgt(TupleExpr(TS:Exprs), list(VS:ValSeq))  => #unpackSeq(TS, VS) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:44` | rule | priority | `rule <k> #bindTgt(TupleExpr(TS:Exprs), ref(H:Int)) => #bindTgt(TupleExpr(TS), V) ... </k> <heap> ... H \|-> V:Val ... </heap> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:49` | syntax | — | `syntax KItem ::= #unpackSeq(Exprs, ValSeq)` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:50` | rule | — | `rule <k> Assign(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:51` | rule | — | `rule <k> Assign(TupleExpr(TS:Exprs), list(VS:ValSeq))  => #unpackSeq(TS, VS) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:52` | rule | priority | `rule <k> Assign(TupleExpr(TS:Exprs), ref(H:Int)) => Assign(TupleExpr(TS), V) ... </k> <heap> ... H \|-> V:Val ... </heap> [priority(40)]` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:55` | rule | — | `rule <k> #unpackSeq((T:Expr, TS:Exprs), vCons(V:Val, VS:ValSeq)) => #bindTgt(T, V) ~> #unpackSeq(TS, VS) ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:57` | rule | — | `rule <k> #unpackSeq(.Exprs, .ValSeq) => .K ... </k>` |
+| supplied | `/reference/reference-semantics/semantics/tuple.k:58` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics.k:34` | requires | — | `requires "semantics/syntax.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:35` | requires | — | `requires "semantics/core.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:36` | requires | — | `requires "semantics/iter.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:37` | requires | — | `requires "semantics/range.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:38` | requires | — | `requires "semantics/operators.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:39` | requires | — | `requires "semantics/int.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:40` | requires | — | `requires "semantics/bool.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:41` | requires | — | `requires "semantics/float.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:42` | requires | — | `requires "semantics/str.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:43` | requires | — | `requires "semantics/set.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:44` | requires | — | `requires "semantics/list.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:45` | requires | — | `requires "semantics/tuple.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:46` | requires | — | `requires "semantics/subscript.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:47` | requires | — | `requires "semantics/comprehension.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:48` | requires | — | `requires "semantics/methods.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:49` | requires | — | `requires "semantics/controls.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:50` | requires | — | `requires "semantics/functions.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:51` | requires | — | `requires "semantics/builtins.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:52` | requires | — | `requires "semantics/call.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:53` | requires | — | `requires "semantics/sort.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:54` | requires | — | `requires "semantics/assert.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:55` | requires | — | `requires "semantics/dict.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:56` | requires | concrete | `requires "semantics/concrete.k"` |
+| supplied | `/reference/reference-semantics/semantics.k:58` | module | — | `module MPY` |
+| supplied | `/reference/reference-semantics/semantics.k:59` | imports | — | `imports MPY-CORE` |
+| supplied | `/reference/reference-semantics/semantics.k:60` | imports | — | `imports MPY-ITER` |
+| supplied | `/reference/reference-semantics/semantics.k:61` | imports | — | `imports MPY-RANGE` |
+| supplied | `/reference/reference-semantics/semantics.k:62` | imports | — | `imports MPY-OPERATORS` |
+| supplied | `/reference/reference-semantics/semantics.k:63` | imports | — | `imports MPY-INT` |
+| supplied | `/reference/reference-semantics/semantics.k:64` | imports | — | `imports MPY-BOOL` |
+| supplied | `/reference/reference-semantics/semantics.k:65` | imports | — | `imports MPY-FLOAT` |
+| supplied | `/reference/reference-semantics/semantics.k:66` | imports | — | `imports MPY-STR` |
+| supplied | `/reference/reference-semantics/semantics.k:67` | imports | — | `imports MPY-SET` |
+| supplied | `/reference/reference-semantics/semantics.k:68` | imports | — | `imports MPY-LIST` |
+| supplied | `/reference/reference-semantics/semantics.k:69` | imports | — | `imports MPY-TUPLE` |
+| supplied | `/reference/reference-semantics/semantics.k:70` | imports | — | `imports MPY-SUBSCRIPT` |
+| supplied | `/reference/reference-semantics/semantics.k:71` | imports | — | `imports MPY-COMPREHENSION` |
+| supplied | `/reference/reference-semantics/semantics.k:72` | imports | — | `imports MPY-METHODS` |
+| supplied | `/reference/reference-semantics/semantics.k:73` | imports | — | `imports MPY-CONTROLS` |
+| supplied | `/reference/reference-semantics/semantics.k:74` | imports | — | `imports MPY-FUNCTIONS` |
+| supplied | `/reference/reference-semantics/semantics.k:75` | imports | — | `imports MPY-BUILTINS` |
+| supplied | `/reference/reference-semantics/semantics.k:76` | imports | — | `imports MPY-CALL` |
+| supplied | `/reference/reference-semantics/semantics.k:77` | imports | — | `imports MPY-SORT` |
+| supplied | `/reference/reference-semantics/semantics.k:78` | imports | — | `imports MPY-ASSERT` |
+| supplied | `/reference/reference-semantics/semantics.k:79` | imports | — | `imports MPY-DICT` |
+| supplied | `/reference/reference-semantics/semantics.k:80` | endmodule | — | `endmodule` |
+| supplied | `/reference/reference-semantics/semantics.k:87` | module | — | `module MPY-KRUN` |
+| supplied | `/reference/reference-semantics/semantics.k:88` | imports | — | `imports MPY` |
+| supplied | `/reference/reference-semantics/semantics.k:89` | imports | — | `imports MPY-CONCRETE` |
+| supplied | `/reference/reference-semantics/semantics.k:90` | endmodule | — | `endmodule` |
+| proof-local | `/candidate/connection-spec.k:1` | requires | — | `requires "connection-verification.k"` |
+| proof-local | `/candidate/connection-spec.k:3` | module | — | `module CONNECTION-SPEC` |
+| proof-local | `/candidate/connection-spec.k:4` | imports | — | `imports CONNECTION-VERIFICATION` |
+| proof-local | `/candidate/connection-spec.k:7` | claim | — | `claim [float-subtraction]: <k> applyBin("-", A:Float, B:Float) => subF(A, B) ... </k>` |
+| proof-local | `/candidate/connection-spec.k:9` | endmodule | — | `endmodule` |
+| proof-local | `/candidate/connection-verification.k:1` | requires | — | `requires "reference-semantics/semantics.k"` |
+| proof-local | `/candidate/connection-verification.k:3` | module | — | `module CONNECTION-VERIFICATION` |
+| proof-local | `/candidate/connection-verification.k:4` | imports | — | `imports MPY` |
+| proof-local | `/candidate/connection-verification.k:5` | endmodule | — | `endmodule` |
+| proof-local | `/candidate/spec.k:1` | requires | — | `requires "verification.k"` |
+| proof-local | `/candidate/spec.k:3` | module | — | `module SPEC` |
+| proof-local | `/candidate/spec.k:4` | imports | — | `imports VERIFICATION` |
+| proof-local | `/candidate/spec.k:6` | claim | — | `claim [inner-loop]: <k> #loop(list(REM:ValSeq), Name("number2"), If(Compare(Name("i"), CmpOp("<", Name("j"))), If( Compare( Call(Name("abs"), BinOp("-", Name("number1"), Name("number2"))), CmpOp("<", Name("threshold"))), Assign(Name("found"), Bool(true)), .Stmts), .Stmts) Assign(Name("j"), BinOp("+", Name("j"), Int(1)))) => .K ... </k> <env> 1 </env> <scopes> 0  \|-> scope("has_close_elements" \|-> _CLOSURE:Val, parent(-1)) -1 \|-> builtinsScope 1  \|-> scope( "numbers"  \|-> list(VS:ValSeq) "threshold"\|-> T:Float "found"    \|-> (B:Bool => rowAcc(B, asFloat(A), T, I, J, REM)) "i"        \|-> I:Int "j"        \|-> (J:Int => ?JFinal:Int) "number1"  \|-> A:Val "number2"  \|-> (_OLD:Val => ?LAST:Val), parent(0)) </scopes> <heap> .Map </heap> requires allFloats(VS) andBool allFloats(REM) andBool isFloat(A) andBool 0 <=Int I andBool 0 <=Int J` |
+| proof-local | `/candidate/spec.k:44` | claim | — | `claim [outer-loop]: <k> #loop(list(REM:ValSeq), Name("number1"), Assign(Name("j"), Int(0)) For(Name("number2"), Name("numbers"), If(Compare(Name("i"), CmpOp("<", Name("j"))), If( Compare( Call(Name("abs"), BinOp("-", Name("number1"), Name("number2"))), CmpOp("<", Name("threshold"))), Assign(Name("found"), Bool(true)), .Stmts), .Stmts) Assign(Name("j"), BinOp("+", Name("j"), Int(1)))) Assign(Name("i"), BinOp("+", Name("i"), Int(1)))) => .K ... </k> <env> 1 </env> <scopes> 0  \|-> scope("has_close_elements" \|-> _CLOSURE:Val, parent(-1)) -1 \|-> builtinsScope 1  \|-> scope( "numbers"  \|-> list(VS:ValSeq) "threshold"\|-> T:Float "found"    \|-> (B:Bool => outerAcc(B, VS, T, I, REM)) "i"        \|-> (I:Int => I +Int vsLen(REM)) "j"        \|-> (_J:Int => ?JFinal:Int) "number1"  \|-> (_N1:Val => ?N1Final:Val) "number2"  \|-> (_N2:Val => ?N2Final:Val), parent(0)) </scopes> <heap> .Map </heap> requires allFloats(VS) andBool allFloats(REM) andBool 0 <=Int I` |
+| proof-local | `/candidate/spec.k:82` | claim | — | `claim [has-close-elements]: <k> #loadAll( Module( ImportFrom("typing", "List") FuncDef("has_close_elements", Params("numbers", "threshold"), Assign(Name("found"), Bool(false)) Assign(Name("i"), Int(0)) Assign(Name("j"), Int(0)) Assign(Name("number1"), Float(0.0)) Assign(Name("number2"), Float(0.0)) For(Name("number1"), Name("numbers"), Assign(Name("j"), Int(0)) For(Name("number2"), Name("numbers"), If(Compare(Name("i"), CmpOp("<", Name("j"))), If( Compare( Call(Name("abs"), BinOp("-", Name("number1"), Name("number2"))), CmpOp("<", Name("threshold"))), Assign(Name("found"), Bool(true)), .Stmts), .Stmts) Assign(Name("j"), BinOp("+", Name("j"), Int(1)))) Assign(Name("i"), BinOp("+", Name("i"), Int(1)))) Return(Name("found"))))) ~> Call(Name("has_close_elements"), list(VS:ValSeq), T:Float) => outerAcc(false, VS, T, 0, VS) </k> <env> 0 </env> <scopes> 0  \|-> scope(.Map, parent(-1)) -1 \|-> builtinsScope => 0  \|-> scope( "has_close_elements" \|-> closureVal( ("numbers", "threshold"), Assign(Name("found"), Bool(false)) Assign(Name("i"), Int(0)) Assign(Name("j"), Int(0)) Assign(Name("number1"), Float(0.0)) Assign(Name("number2"), Float(0.0)) For(Name("number1"), Name("numbers"), Assign(Name("j"), Int(0)) For(Name("number2"), Name("numbers"), If(Compare(Name("i"), CmpOp("<", Name("j"))), If( Compare( Call(Name("abs"), BinOp("-", Name("number1"), Name("number2"))), CmpOp("<", Name("threshold"))), Assign(Name("found"), Bool(true)), .Stmts), .Stmts) Assign(Name("j"), BinOp("+", Name("j"), Int(1)))) Assign(Name("i"), BinOp("+", Name("i"), Int(1)))) Return(Name("found")), 0), parent(-1)) -1 \|-> builtinsScope </scopes> <scopeLoc> 1 </scopeLoc> <heap> .Map </heap> <heapLoc> 0 </heapLoc> <stack> .List </stack> <ret> noRet </ret> <exc> NoExc </exc> <exit-code> 0 </exit-code> requires allFloats(VS)` |
+| proof-local | `/candidate/spec.k:154` | endmodule | — | `endmodule` |
+| proof-local | `/candidate/verification.k:1` | requires | — | `requires "reference-semantics/semantics.k"` |
+| proof-local | `/candidate/verification.k:3` | module | — | `module VERIFICATION` |
+| proof-local | `/candidate/verification.k:4` | imports | — | `imports MPY` |
+| proof-local | `/candidate/verification.k:7` | syntax | function, total | `syntax Bool ::= allFloats(ValSeq) [function, total]` |
+| proof-local | `/candidate/verification.k:8` | rule | — | `rule allFloats(.ValSeq)           => true` |
+| proof-local | `/candidate/verification.k:9` | rule | — | `rule allFloats(vCons(V:Val, R))   => isFloat(V) andBool allFloats(R)` |
+| proof-local | `/candidate/verification.k:12` | syntax | function, total | `syntax Bool ::= pairNear(Float, Float, Float) [function, total]` |
+| proof-local | `/candidate/verification.k:13` | rule | — | `rule pairNear(A, B, T) => floatLt(absF(subF(A, B)), T)` |
+| proof-local | `/candidate/verification.k:15` | syntax | function, total | `syntax Float ::= asFloat(Val) [function, total]` |
+| proof-local | `/candidate/verification.k:16` | rule | — | `rule asFloat(F:Float) => F` |
+| proof-local | `/candidate/verification.k:17` | rule | — | `rule asFloat(V:Val)   => 0.0 requires notBool isFloat(V)` |
+| proof-local | `/candidate/verification.k:21` | rule | simplification | `rule applyBin("-", A:Val, B:Val) => subF(asFloat(A), asFloat(B)) requires isFloat(A) andBool isFloat(B) [simplification]` |
+| proof-local | `/candidate/verification.k:26` | syntax | function, total | `syntax Bool ::= rowAcc(Bool, Float, Float, Int, Int, ValSeq) [function, total]` |
+| proof-local | `/candidate/verification.k:28` | rule | — | `rule rowAcc(B, _, _, _, _, .ValSeq) => B` |
+| proof-local | `/candidate/verification.k:29` | rule | — | `rule rowAcc(B, A, T, I, J, vCons(V:Val, R)) => rowAcc( #if I <Int J #then B orBool pairNear(A, asFloat(V), T) #else B #fi, A, T, I, J +Int 1, R)` |
+| proof-local | `/candidate/verification.k:38` | syntax | function, total | `syntax Bool ::= outerAcc(Bool, ValSeq, Float, Int, ValSeq) [function, total]` |
+| proof-local | `/candidate/verification.k:40` | rule | — | `rule outerAcc(B, _, _, _, .ValSeq) => B` |
+| proof-local | `/candidate/verification.k:41` | rule | — | `rule outerAcc(B, VS, T, I, vCons(A:Val, R)) => outerAcc(rowAcc(B, asFloat(A), T, I, 0, VS), VS, T, I +Int 1, R)` |
+| proof-local | `/candidate/verification.k:44` | endmodule | — | `endmodule` |
+
+SCRIPT_EXIT=0

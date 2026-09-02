@@ -1,0 +1,224 @@
+Script started on 2026-07-28 01:50:44-05:00 [<not executed on terminal>]
+     1	module VERIFICATION
+     2	  imports MPY
+     3	
+     4	  // A mathematical, accumulator-based definition of stable prefix filtering.
+     5	  // It is independent of environments, statements, and all control machinery.
+     6	  syntax StrList ::= filterAcc(StrList, String, StrList) [function]
+     7	                   | filterByPrefix(StrList, String) [function]
+     8	
+     9	  rule filterByPrefix(INPUT, PREFIX) => filterAcc(INPUT, PREFIX, nil)
+    10	  rule filterAcc(nil, _, ACC) => ACC
+    11	  rule filterAcc(cons(S, REST), PREFIX, ACC) =>
+    12	    filterAcc(REST, PREFIX, appendOne(ACC, S))
+    13	    requires startsWith(S, PREFIX) ==Bool true [simplification]
+    14	  rule filterAcc(cons(S, REST), PREFIX, ACC) =>
+    15	    filterAcc(REST, PREFIX, ACC)
+    16	    requires startsWith(S, PREFIX) ==Bool false [simplification]
+    17	
+    18	  // Canonical syntax trees used by the proof.  solutionProgram is exactly the
+    19	  // term emitted in solution.mpy (SHA-256 7d10644743b0d635231400e73ff58c5755e17dd09b7a73f64b79fd8fa0a12269,
+    20	  // checked by prove.sh); loopBody is its for-loop body.
+    21	  syntax Stmts ::= loopBody() [function]
+    22	  syntax Module ::= solutionProgram() [function]
+    23	
+    24	  rule loopBody() =>
+    25	    If(Call(Attribute(Name("string"), "startswith"), Name("prefix")),
+    26	       Expr(Call(Attribute(Name("result"), "append"), Name("string"))) .Stmts,
+    27	       .Stmts) .Stmts
+    28	
+    29	  rule solutionProgram() =>
+    30	    Module(
+    31	      ImportFrom("typing", "List", .Strings)
+    32	      FuncDef("filter_by_prefix", Params("strings", "prefix", .Strings),
+    33	        Assign(Name("result"), ListExpr())
+    34	        For(Name("string"), Name("strings"), loopBody())
+    35	        Return(Name("result"))))
+    36	endmodule
+     1	requires "verification.k"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports BOOL-SYNTAX
+     5	  imports STRING-SYNTAX
+     6	
+     7	  // Concrete string lists used both for inputs and Python list values.
+     8	  syntax StrList ::= "nil"
+     9	                   | "cons" "(" String "," StrList ")"
+    10	
+    11	  syntax Module ::= "Module" "(" Stmts ")"
+    12	  syntax Stmts ::= List{Stmt, ""}
+    13	  syntax Strings ::= List{String, ","}
+    14	  syntax Params ::= "Params" "(" Strings ")"
+    15	
+    16	  syntax Stmt ::= "ImportFrom" "(" String "," Strings ")"
+    17	                | "FuncDef" "(" String "," Params "," Stmts ")"
+    18	                | "Assign" "(" Expr "," Expr ")"
+    19	                | "For" "(" Expr "," Expr "," Stmts ")"
+    20	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    21	                | "Expr" "(" Expr ")"
+    22	                | "Return" "(" Expr ")"
+    23	
+    24	  syntax Expr ::= Val
+    25	                | "Name" "(" String ")"
+    26	                | "ListExpr" "(" ")"
+    27	                | "Attribute" "(" Expr "," String ")"
+    28	                | "Call" "(" Expr "," Expr ")"
+    29	
+    30	  syntax Val ::= "strVal" "(" String ")"
+    31	               | "listVal" "(" StrList ")"
+    32	               | "boolVal" "(" Bool ")"
+    33	               | "noneVal"
+    34	               | "boundString" "(" String "," String ")"
+    35	               | "boundRef" "(" String "," String ")"
+    36	
+    37	  syntax Function ::= "function" "(" Params "," Stmts ")"
+    38	  syntax Output ::= "noOutput" | Val
+    39	endmodule
+    40	
+    41	module MPY
+    42	  imports MPY-SYNTAX
+    43	  imports BOOL
+    44	  imports INT
+    45	  imports STRING
+    46	  imports MAP-SYMBOLIC
+    47	
+    48	  configuration
+    49	    <t>
+    50	      <k> $PGM:Module </k>
+    51	      <env> .Map </env>
+    52	      <functions> .Map </functions>
+    53	      <input> $INPUT:StrList </input>
+    54	      <prefix> $PREFIX:String </prefix>
+    55	      <output> noOutput </output>
+    56	    </t>
+    57	
+    58	  syntax KItem ::= "launch"
+    59	                 | "assignTo" "(" String ")"
+    60	                 | "startFor" "(" String "," Stmts ")"
+    61	                 | "loop" "(" String "," Stmts "," StrList ")"
+    62	                 | "choose" "(" Stmts "," Stmts ")"
+    63	                 | "discard"
+    64	                 | "bindStartsWith"
+    65	                 | "callArg" "(" Expr ")"
+    66	                 | "apply" "(" Val ")"
+    67	                 | "doReturn"
+    68	                 | "functionEnd"
+    69	
+    70	  syntax StrList ::= appendOne(StrList, String) [function]
+    71	  rule appendOne(nil, S) => cons(S, nil)
+    72	  rule appendOne(cons(H, T), S) => cons(H, appendOne(T, S))
+    73	
+    74	  syntax Bool ::= startsWith(String, String) [function, total]
+    75	  rule startsWith(S, P) => false
+    76	       requires lengthString(P) >Int lengthString(S)
+    77	  rule startsWith(S, P) => substrString(S, 0, lengthString(P)) ==String P
+    78	       requires lengthString(P) <=Int lengthString(S)
+    79	
+    80	  // Load a translated module, ignore the type-only import, and register defs.
+    81	  rule <k> Module(SS) => SS ~> launch ...</k>
+    82	  rule <k> (S:Stmt SS:Stmts) => S ~> SS ...</k>
+    83	  rule <k> .Stmts => .K ...</k>
+    84	  rule <k> ImportFrom(_, _) => .K ...</k>
+    85	  rule <k> FuncDef(F, PS, BODY) => .K ...</k>
+    86	       <functions> FUNS => FUNS [ F <- function(PS, BODY) ] </functions>
+    87	
+    88	  // The task entry point has two positional arguments: a string list and prefix.
+    89	  rule <k> launch => BODY ~> functionEnd ...</k>
+    90	       <functions> ... "filter_by_prefix" |-> function(Params(P1:String, P2:String, .Strings), BODY) ...</functions>
+    91	       <input> IN </input>
+    92	       <prefix> PRE </prefix>
+    93	       <env> ENV => (ENV [ P1 <- listVal(IN) ]) [ P2 <- strVal(PRE) ] </env>
+    94	
+    95	  // Expressions and calls required by the translated implementation.
+    96	  rule <k> Name(X) => ENV [ X ] ...</k>
+    97	       <env> ENV </env>
+    98	  rule <k> ListExpr() => listVal(nil) ...</k>
+    99	  rule <k> Attribute(Name(X), "startswith") => ENV [ X ] ~> bindStartsWith ...</k>
+   100	       <env> ENV </env>
+   101	  rule <k> strVal(S) ~> bindStartsWith => boundString(S, "startswith") ...</k>
+   102	  rule <k> Attribute(Name(X), "append") => boundRef(X, "append") ...</k>
+   103	  rule <k> Call(F, A) => F ~> callArg(A) ...</k>
+   104	  rule <k> V:Val ~> callArg(A) => A ~> apply(V) ...</k>
+   105	  rule <k> strVal(P) ~> apply(boundString(S, "startswith"))
+   106	        => boolVal(startsWith(S, P)) ...</k>
+   107	  rule <k> strVal(S) ~> apply(boundRef(X, "append")) => noneVal ...</k>
+   108	       <env> ... X |-> (listVal(L) => listVal(appendOne(L, S))) ...</env>
+   109	
+   110	  // Statements, sequencing, and loop control.
+   111	  rule <k> Assign(Name(X), E) => E ~> assignTo(X) ...</k>
+   112	  rule <k> V:Val ~> assignTo(X) => .K ...</k>
+   113	       <env> ENV => ENV [ X <- V ] </env>
+   114	
+   115	  rule <k> For(Name(X), E, BODY) => E ~> startFor(X, BODY) ...</k>
+   116	  rule <k> listVal(L) ~> startFor(X, BODY) => loop(X, BODY, L) ...</k>
+   117	  rule <k> loop(_, _, nil) => .K ...</k>
+   118	  rule <k> loop(X, BODY, cons(H, T)) => BODY ~> loop(X, BODY, T) ...</k>
+   119	       <env> ENV => ENV [ X <- strVal(H) ] </env>
+   120	
+   121	  rule <k> If(E, THEN, ELSE) => E ~> choose(THEN, ELSE) ...</k>
+   122	  rule <k> boolVal(B) ~> choose(THEN, _) => THEN ...</k>
+   123	       requires B ==Bool true
+   124	  rule <k> boolVal(B) ~> choose(_, ELSE) => ELSE ...</k>
+   125	       requires B ==Bool false
+   126	
+   127	  rule <k> Expr(E) => E ~> discard ...</k>
+   128	  rule <k> _:Val ~> discard => .K ...</k>
+   129	
+   130	  rule <k> Return(E) => E ~> doReturn ...</k>
+   131	  rule <k> V:Val ~> doReturn ~> _REST => .K </k>
+   132	       <output> _ => V </output>
+   133	  rule <k> functionEnd => .K ...</k>
+   134	       <output> noOutput => noneVal </output>
+   135	endmodule
+   136	
+   137	module SEMANTIC
+   138	  imports MPY
+   139	  imports VERIFICATION
+   140	endmodule
+     1	module SPEC
+     2	  imports SEMANTIC
+     3	
+     4	  // Loop invariant: ACC is the stable result accumulated before INPUT.
+     5	  claim
+     6	    <k> (loop("string", loopBody(), INPUT)
+     7	         ~> (Return(Name("result")) .Stmts) ~> functionEnd ~> .K)
+     8	      => .K </k>
+     9	    <env> ("prefix" |-> strVal(PREFIX)
+    10	           "result" |-> listVal(ACC)
+    11	           _RESTENV) => ?_ </env>
+    12	    <functions> _FUNCTIONS </functions>
+    13	    <input> _ALLINPUT </input>
+    14	    <prefix> PREFIX </prefix>
+    15	    <output> noOutput => listVal(filterAcc(INPUT, PREFIX, ACC)) </output>
+    16	    [label(loop-correct)]
+    17	
+    18	  // End-to-end correctness for the exact translated solution and all inputs.
+    19	  claim
+    20	    <k> solutionProgram() => .K </k>
+    21	    <env> .Map => ?_ </env>
+    22	    <functions> .Map => ?_ </functions>
+    23	    <input> INPUT </input>
+    24	    <prefix> PREFIX </prefix>
+    25	    <output> noOutput => listVal(filterByPrefix(INPUT, PREFIX)) </output>
+    26	    [label(program-correct)]
+    27	endmodule
+     1	from typing import List
+     2	
+     3	
+     4	def filter_by_prefix(strings: List[str], prefix: str) -> List[str]:
+     5	    result = []
+     6	    for string in strings:
+     7	        if string.startswith(prefix):
+     8	            result.append(string)
+     9	    return result
+     1	Module(
+     2	  ImportFrom("typing", "List")
+     3	  FuncDef("filter_by_prefix", Params("strings", "prefix"),
+     4	    Assign(Name("result"), ListExpr())
+     5	    For(Name("string"), Name("strings"),
+     6	      If(Call(Attribute(Name("string"), "startswith"), Name("prefix")),
+     7	        Expr(Call(Attribute(Name("result"), "append"), Name("string"))),
+     8	        ))
+     9	    Return(Name("result"))))
+
+Script done on 2026-07-28 01:50:44-05:00 [COMMAND_EXIT_CODE="0"]

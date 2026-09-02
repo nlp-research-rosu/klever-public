@@ -1,0 +1,507 @@
+Script started on 2026-07-28 17:47:19-05:00 [<not executed on terminal>]
+   770	def target_statement(generated: Path) -> dict[str, Any] | None:
+   771	    obligation_map = _regular_json(generated / "obligation-map.json")
+   772	    obligations = obligation_map.get("obligations")
+   773	    parameters = obligation_map.get("trust_parameters")
+   774	    if not isinstance(obligations, list) or not isinstance(parameters, list):
+   775	        raise KleanExportError("generated obligation map is malformed")
+   776	    candidates: list[tuple[Path, str]] = []
+   777	    raw_count = 0
+   778	    for relative, kind, path in _tree_entries(generated):
+   779	        if kind != "file" or path.suffix != ".lean":
+   780	            continue
+   781	        text = path.read_text()
+   782	        raw_count += len(
+   783	            re.findall(r"(?m)^\s*def\s+targetStatement\b", text)
+   784	        )
+   785	        for match in re.finditer(
+   786	            r"(?ms)^\s*def\s+targetStatement\b.*?"
+   787	            r"(?=^\s*end\s+\S+\s*$)",
+   788	            text,
+   789	        ):
+   790	            candidates.append((path, match.group(0).strip()))
+   791	    if not obligations:
+   792	        if raw_count != 0:
+   793	            raise KleanExportError(
+   794	                "zero obligations must not generate a target proposition"
+   795	            )
+   796	        return None
+   797	    if raw_count != 1 or len(candidates) != 1:
+   798	        raise KleanExportError(
+   799	            "generated project must contain exactly one target proposition; "
+   800	            f"found {raw_count}"
+   801	        )
+   802	    path, definition = candidates[0]
+   803	    names: list[str] = []
+   804	    normalized_parameters: list[dict[str, Any]] = []
+   805	    for parameter in parameters:
+   806	        if not isinstance(parameter, dict):
+   807	            raise KleanExportError("target parameter is malformed")
+   808	        name = parameter.get("name")
+   809	        lean_type = parameter.get("type")
+   810	        kore_symbol = parameter.get("kore_symbol")
+   811	        source_rule_ids = parameter.get("source_rule_ids")
+   812	        binding_sha256 = parameter.get("binding_sha256")
+   813	        if not isinstance(name, str) or not name:
+   814	            raise KleanExportError("target parameter name is malformed")
+   815	        if not isinstance(lean_type, str) or not lean_type:
+   816	            raise KleanExportError("target parameter type is malformed")
+   817	        if not isinstance(kore_symbol, str) or not kore_symbol:
+   818	            raise KleanExportError("target KORE symbol binding is malformed")
+   819	        if (
+   820	            not isinstance(source_rule_ids, list)
+   821	            or not source_rule_ids
+   822	            or not all(
+   823	                isinstance(source_rule_id, str) and source_rule_id
+   824	                for source_rule_id in source_rule_ids
+   825	            )
+   826	        ):
+   827	            raise KleanExportError("target source-rule binding is malformed")
+   828	        binding = {
+   829	            "kore_symbol": kore_symbol,
+   830	            "name": name,
+   831	            "type": lean_type,
+   832	            "source_rule_ids": source_rule_ids,
+   833	        }
+   834	        expected_binding_sha256 = sha256_text(
+   835	            json.dumps(binding, sort_keys=True, separators=(",", ":"))
+   836	        )
+   837	        if binding_sha256 != expected_binding_sha256:
+   838	            raise KleanExportError("target parameter binding hash changed")
+   839	        names.append(name)
+   840	        normalized_parameters.append(
+   841	            {**binding, "binding_sha256": binding_sha256}
+   842	        )
+   843	    declaration = f"{path.parent.name}.Lemmas.targetStatement"
+   844	    statement = " ".join((declaration, *names))
+   845	    return {
+   846	        "declaration": declaration,
+   847	        "file": path.relative_to(generated).as_posix(),
+   848	        "statement": statement,
+   849	        "statement_sha256": sha256_text(statement),
+   850	        "definition_sha256": sha256_text(definition),
+   851	        "parameters": normalized_parameters,
+   852	    }
+   853	
+   854	
+   855	def expected_target_definition(obligation_map: dict[str, Any]) -> str | None:
+   856	    obligations = obligation_map.get("obligations")
+   857	    parameters = obligation_map.get("trust_parameters")
+   858	    if not isinstance(obligations, list) or not isinstance(parameters, list):
+   859	        raise KleanExportError("generated obligation map is malformed")
+   860	    if not obligations:
+   861	        return None
+   862	    lines = ["def targetStatement"]
+   863	    for parameter in parameters:
+   864	        if not isinstance(parameter, dict):
+   865	            raise KleanExportError("target parameter is malformed")
+   866	        name = parameter.get("name")
+   867	        lean_type = parameter.get("type")
+   868	        if not isinstance(name, str) or not isinstance(lean_type, str):
+   869	            raise KleanExportError("target parameter is malformed")
+   870	        lines.append(f"    ({name} : {lean_type})")
+   871	    conjuncts: list[str] = []
+   872	    for obligation in obligations:
+   873	        if not isinstance(obligation, dict):
+   874	            raise KleanExportError("generated obligation is malformed")
+   875	        conjunct = obligation.get("lean_conjunct")
+   876	        if not isinstance(conjunct, str) or not conjunct:
+   877	            raise KleanExportError("generated Lean conjunct is malformed")
+   878	        conjuncts.append(f"({conjunct})")
+   879	    lines.extend(("    : Prop :=", "    " + "\n    ∧ ".join(conjuncts)))
+   880	    return "\n".join(lines)
+   881	
+   882	
+   883	def _write_json(path: Path, document: dict[str, Any]) -> None:
+   884	    path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+   885	
+   886	
+   887	def _domain_source_rules(
+   888	    validated: dict[str, Any],
+   889	    discovery_manifest_sha256: str,
+   890	) -> list[dict[str, Any]]:
+   891	    inventory_sha256 = validated["inventory_sha256"]
+   892	    return [
+   893	        {
+   894	            **rule,
+   895	            "inventory_sha256": inventory_sha256,
+   896	            "discovery_manifest_sha256": discovery_manifest_sha256,
+   897	        }
+   898	        for rule in validated["domain_lemmas"]
+   899	    ]
+   900	
+   901	
+   902	def _klean_source_rules(
+   903	    domain_rules: list[dict[str, Any]],
+   904	    line_offset: int,
+   905	) -> list[dict[str, Any]]:
+   906	    return [
+   907	        {
+   908	            "source_rule_id": rule["source_rule_id"],
+   909	            "start_line": rule["start_line"] + line_offset,
+   910	            "end_line": rule["end_line"] + line_offset,
+   911	            "normalized_sha256": rule["normalized_sha256"],
+   912	            "classification": "TRUST_OBLIGATION",
+   913	        }
+   914	        for rule in domain_rules
+   915	    ]
+   916	
+   917	
+   918	def _bind_obligation_provenance(
+   919	    package: Path,
+   920	    domain_rules: list[dict[str, Any]],
+   921	    klean_rules: list[dict[str, Any]],
+   922	) -> dict[str, Any]:
+   923	    path = package / "obligation-map.json"
+   924	    document = _regular_json(path)
+   925	    obligations = document.get("obligations")
+   926	    parameters = document.get("trust_parameters")
+   927	    if not isinstance(obligations, list) or not isinstance(parameters, list):
+   928	        raise KleanExportError("generated obligation map is malformed")
+   929	    expected_ids = [rule["source_rule_id"] for rule in domain_rules]
+   930	    observed_ids = [
+   931	        obligation.get("source_rule_id")
+   932	        if isinstance(obligation, dict)
+   933	        else None
+   934	        for obligation in obligations
+   935	    ]
+   936	    if observed_ids != expected_ids:
+   937	        raise KleanExportError(
+   938	            "validated DOMAIN_LEMMA records and generated obligations "
+   939	            "are not bijective"
+   940	        )
+   941	    enriched: list[dict[str, Any]] = []
+   942	    for obligation, rule, klean_rule in zip(
+   943	        obligations, domain_rules, klean_rules, strict=True
+   944	    ):
+   945	        if obligation.get("source_span") != {
+   946	            "start_line": klean_rule["start_line"],
+   947	            "end_line": klean_rule["end_line"],
+   948	        }:
+   949	            raise KleanExportError(
+   950	                "generated obligation source span differs from Stage 1"
+   951	            )
+   952	        enriched.append(
+   953	            {
+   954	                **obligation,
+   955	                "source_span": {
+   956	                    "start_line": rule["start_line"],
+   957	                    "end_line": rule["end_line"],
+   958	                },
+   959	                "normalized_sha256": rule["normalized_sha256"],
+   960	                "inventory_sha256": rule["inventory_sha256"],
+   961	                "discovery_manifest_sha256": rule[
+   962	                    "discovery_manifest_sha256"
+   963	                ],
+   964	            }
+   965	        )
+   966	    document = {
+   967	        **document,
+   968	        "schema_version": 3,
+   969	        "source_rules": domain_rules,
+   970	        "obligations": enriched,
+   971	    }
+   972	    _write_json(path, document)
+   973	    return document
+   974	
+   975	
+  1038	    module = resolution.verification_module
+  1039	    if module != canonical_inventory["verification_module"]:
+  1040	        raise KleanExportError(
+  1041	            "Stage 1 inventory and K definition resolution disagree"
+  1042	        )
+  1043	    _parsed_module, functions = parse_verification(verification_text)
+  1044	    domain_rules = _domain_source_rules(
+  1045	        validated, discovery_manifest_sha256
+  1046	    )
+  1047	    # Preserve the exact accepted Stage 1 K definition.  Eligibility is now
+  1048	    # driven by the Stage 3 source-rule inventory, so stripping
+  1049	    # [simplification] from non-obligation rules is both unnecessary and can
+  1050	    # make otherwise valid K structurally illegal.
+  1051	    transformed = verification_text
+  1052	    source_rules = _klean_source_rules(domain_rules, 0)
+  1053	    export_module_name = f"{module.rsplit('-', 1)[0]}-KLEAN-EXPORT"
+  1054	    package_name = f"klean-{problem.lower()}"
+  1055	    library_name = lib_name(package_name)
+  1056	    environment = dict(os.environ)
+  1057	
+  1058	    publish_staging = Path(
+  1118	                cwd=scratch,
+  1119	                timeout=KLEAN_TIMEOUT,
+  1120	                env=environment,
+  1121	            )
+  1122	            package = lean_output / package_name
+  1123	            if code != 0 or not package.is_dir():
+  1124	                raise KleanExportError(f"klean failed ({code}): {output[-600:]}")
+  1125	            obligation_map = _bind_obligation_provenance(
+  1126	                package, domain_rules, source_rules
+  1127	            )
+  1128	            (package / "lean-toolchain").write_text(lock["lean_toolchain"] + "\n")
+  1129	            _patch_lake_build_directory(package)
+  1130	
+  1131	            function_file = package / library_name / "Func.lean"
+  1132	            axiomatized: set[str] = set()
+  1133	            noncomputable_repair = False
+  1134	            build_code = 1
+  1218	                "proved_derived_lemmas": validated[
+  1219	                    "proved_derived_lemmas"
+  1220	                ],
+  1221	                "source_rules": domain_rules,
+  1222	            }
+  1223	            obligations = obligation_map.get("obligations")
+  1224	            if not isinstance(obligations, list):
+  1225	                raise KleanExportError("generated obligations are malformed")
+  1226	            target = target_statement(generated)
+  1227	            generator_manifest = {
+  1228	                "schema_version": 3,
+  1229	                "toolchain": lock,
+  1230	                "klean_py_sha256": hashlib.sha256(KLEAN.read_bytes()).hexdigest(),
+  1231	                "exporter_sha256": hashlib.sha256(
+  1232	                    Path(__file__).read_bytes()
+  1233	                ).hexdigest(),
+  1234	                "generated_tree_sha256": tree_digest(generated),
+  1235	                "obligation_count": len(obligations),
+  1236	                "obligation_map_sha256": hashlib.sha256(
+  1237	                    (generated / "obligation-map.json").read_bytes()
+  1238	                ).hexdigest(),
+  1239	                "target": target,
+  1240	                "provenance": {
+  1241	                    "stage1_workspace_sha256": before_hash,
+  1242	                    "stage3_discovery_manifest_sha256": (
+  1243	                        discovery_manifest_sha256
+  1244	                    ),
+  1245	                    "inventory_sha256": validated["inventory_sha256"],
+  1246	                    "generator_image_id": generator_image_id,
+  1247	                },
+  1248	            }
+  1249	            result = {
+  1250	                "schema_version": 3,
+  1251	                "status": (
+  1252	                    "OK" if obligations else "KLEAN_NO_OBLIGATIONS"
+  1253	                ),
+  1254	                "problem": problem,
+  1255	                "generated_tree_sha256": generator_manifest[
+  1256	                    "generated_tree_sha256"
+  1257	                ],
+  1258	                "frozen_input_sha256": before_hash,
+  1259	                "stage3_discovery_manifest_sha256": (
+  1260	                    discovery_manifest_sha256
+  1261	                ),
+  1262	                "trust_inventory_sha256": "",
+  1263	                "obligation_count": len(obligations),
+  1264	            }
+  1265	            _write_json(publish_staging / "input-manifest.json", input_manifest)
+  1266	            _write_json(
+  1267	                publish_staging / "generator-manifest.json",
+  1268	                generator_manifest,
+  1269	            )
+  1270	            _write_json(publish_staging / "trust-inventory.json", inventory)
+   322	def _source_rule_lines(source_rule_inventory: Path) -> dict[int, dict[str, object]]:
+   323	    try:
+   324	        document = json.loads(source_rule_inventory.read_text())
+   325	        source_rules = document["source_rules"]
+   326	    except (OSError, ValueError, KeyError, TypeError) as error:
+   327	        raise RuntimeError("source rule inventory is malformed") from error
+   328	    if not isinstance(source_rules, list):
+   329	        raise RuntimeError("source rule inventory must contain a rule list")
+   330	    eligible_by_line: dict[int, dict[str, object]] = {}
+   331	    for item in source_rules:
+   332	        if not isinstance(item, dict):
+   333	            raise RuntimeError("source rule inventory entry is malformed")
+   334	        if item.get("classification") != "TRUST_OBLIGATION":
+   335	            continue
+   336	        start_line = item.get("start_line")
+   337	        if not isinstance(start_line, int) or start_line in eligible_by_line:
+   338	            raise RuntimeError(
+   339	                "source trust rules must have unique integer start lines"
+   340	            )
+   341	        eligible_by_line[start_line] = item
+   342	    return eligible_by_line
+   343	
+   344	
+   345	def _source_rule_for_axiom(
+   346	    axiom: object,
+   347	    source_marker: str,
+   348	    eligible_by_line: dict[int, dict[str, object]],
+   349	) -> tuple[int, dict[str, object]] | None:
+   350	    text = str(getattr(axiom, "text", ""))
+   351	    if f"{source_marker})" not in text:
+   352	        return None
+   353	    location = re.search(r"Location\((\d+),(\d+),(\d+),(\d+)\)", text)
+   354	    if location is None:
+   355	        return None
+   356	    observed_line = int(location.group(1))
+   357	    matches = [
+   358	        source_rule
+   359	        for source_rule in eligible_by_line.values()
+   360	        if isinstance(source_rule.get("start_line"), int)
+   361	        and isinstance(source_rule.get("end_line"), int)
+   362	        and source_rule["start_line"] <= observed_line <= source_rule["end_line"]
+   363	    ]
+   364	    if not matches:
+   365	        return None
+   366	    if len(matches) != 1:
+   367	        raise RuntimeError("KORE source location matches multiple trust rules")
+   368	    source_rule = matches[0]
+   369	    return int(source_rule["start_line"]), source_rule
+   370	
+   564	    eligible_by_line = _source_rule_lines(source_rule_inventory)
+   565	    source_rules = list(eligible_by_line.values())
+   566	    reserved_identifiers = _definition_reserved_identifiers(
+   567	        full_definition, _symbol_ident
+   568	    )
+   569	
+   570	    propositions: list[
+   571	        tuple[int, str, dict[str, object], set[str]]
+   572	    ] = []
+   573	    used_symbols: set[str] = set()
+   574	    for axiom in (
+   575	        sentence
+   576	        for module in definition.modules
+   577	        for sentence in module.sentences
+   578	    ):
+   579	        selected = _source_rule_for_axiom(
+   580	            axiom, source_marker, eligible_by_line
+   581	        )
+   582	        if selected is None or not Rule.is_rule(axiom):
+   583	            continue
+   584	        rule = Rule.from_axiom(axiom)
+   585	        start_line, source_rule = selected
+   586	        normalized_lhs = normalize_pattern(rule.lhs)
+   587	        normalized_rhs = normalize_pattern(rule.rhs)
+   588	        variables: dict[str, str] = {}
+   589	        collect_variables(normalized_lhs, variables)
+   590	        collect_variables(normalized_rhs, variables)
+   591	        rule_symbols = collect_symbols(normalized_lhs) | collect_symbols(
+   592	            normalized_rhs
+   593	        )
+   594	        used_symbols |= rule_symbols
+   595	        hypothesis = ""
+   596	        requires = getattr(rule, "req", None)
+   597	        if requires is not None:
+   598	            requires = normalize_pattern(requires)
+   599	            requires_term = str(
+   600	                converter._transform_pattern(requires, concrete=True)
+   601	            )
+   602	            if requires_term not in ("true", "(true)"):
+   603	                collect_variables(requires, variables)
+   604	                required_symbols = collect_symbols(requires)
+   605	                rule_symbols |= required_symbols
+   606	                used_symbols |= required_symbols
+   607	                hypothesis = f" (h : {requires_term} = true)"
+   608	        ensures = getattr(rule, "ens", None)
+   609	        if ensures is not None:
+   610	            ensures = normalize_pattern(ensures)
+   611	            collect_variables(ensures, variables)
+   612	            ensured_symbols = collect_symbols(ensures)
+   613	            rule_symbols |= ensured_symbols
+   614	            used_symbols |= ensured_symbols
+   615	        binders = (
+   616	            " ".join(
+   617	                f"({_quoted_identifier(_var_ident(name))} : {sort})"
+   618	                for name, sort in variables.items()
+   619	            )
+   620	            + hypothesis
+   621	        )
+   622	        proposition = conclusion(rule)
+   623	        if binders.strip():
+   624	            proposition = f"∀ {binders.strip()}, {proposition}"
+   625	        proposition = quote_reserved_lean_identifiers(
+   626	            proposition, reserved_identifiers
+   627	        )
+   628	        propositions.append(
+   629	            (start_line, proposition, source_rule, rule_symbols)
+   630	        )
+   631	
+   632	    propositions.sort(key=lambda item: item[0])
+   633	    seen_ids = [
+   634	        str(source_rule["source_rule_id"])
+   635	        for _line, _proposition, source_rule, _symbols in propositions
+   636	    ]
+   637	    expected_ids = [str(item["source_rule_id"]) for item in source_rules]
+   638	    if seen_ids != expected_ids:
+   639	        raise RuntimeError(
+   640	            "source trust rules and generated Lean obligations are not bijective"
+   641	        )
+   642	
+   643	    parameters: list[dict[str, str]] = []
+   644	    for symbol in sorted(used_symbols):
+   645	        if symbol == "inj" or symbol not in full_definition.symbols:
+   646	            continue
+   680	        "",
+   681	        "/- K trust-boundary goals. The second-pass agent must replace every",
+   682	        "   writable opaque stub with an honest definition and prove this",
+   683	        "   immutable proposition in the separate Proof.lean workspace. -/",
+   684	        "",
+   685	        f"namespace {namespace}",
+   686	        "",
+   687	    ]
+   688	    if propositions:
+   689	        lines.append("def targetStatement")
+   690	        for parameter in parameters:
+   691	            lines.append(
+   692	                f"    ({parameter['name']} : {parameter['type']})"
+   693	            )
+   694	        lines.extend(
+   695	            (
+   696	                "    : Prop :=",
+   697	                "    "
+   698	                + "\n    ∧ ".join(
+   699	                    f"({proposition})"
+   700	                    for _line, proposition, _source_rule, _symbols in propositions
+   701	                ),
+   702	                "",
+   703	            )
+   704	        )
+   705	    lines.append(f"end {namespace}")
+   706	    lemma_file = package_directory / library_name / "Lemmas.lean"
+   707	    lemma_file.write_text("\n".join(lines) + "\n")
+   708	    root = package_directory / f"{library_name}.lean"
+   709	    root_text = root.read_text()
+   710	    if f"{library_name}.Lemmas" not in root_text:
+   711	        root.write_text(root_text + f"import {library_name}.Lemmas\n")
+   712	    mappings = []
+   713	    for _line, proposition, source_rule, _symbols in propositions:
+   714	        mappings.append(
+   715	            {
+   716	                "source_rule_id": source_rule["source_rule_id"],
+   717	                "source_span": {
+   718	                    "start_line": source_rule["start_line"],
+   719	                    "end_line": source_rule["end_line"],
+   720	                },
+   721	                "lean_conjunct": proposition,
+   722	                "lean_conjunct_sha256": hashlib.sha256(
+   723	                    proposition.encode()
+   724	                ).hexdigest(),
+   725	            }
+   726	        )
+   727	    (package_directory / "obligation-map.json").write_text(
+   728	        json.dumps(
+   729	            {
+   730	                "schema_version": 1,
+   731	                "source_rules": source_rules,
+   732	                "obligations": mappings,
+   733	                "trust_parameters": parameters,
+   734	            },
+   735	            indent=2,
+   736	            sort_keys=True,
+   737	        )
+   738	        + "\n"
+   739	    )
+     1	import Klean54SameChars.Inj
+     2	
+     3	/- K trust-boundary goals. The second-pass agent must replace every
+     4	   writable opaque stub with an honest definition and prove this
+     5	   immutable proposition in the separate Proof.lean workspace. -/
+     6	
+     7	namespace Klean54SameChars.Lemmas
+     8	
+     9	end Klean54SameChars.Lemmas
+{
+  "obligations": [],
+  "schema_version": 3,
+  "source_rules": [],
+  "trust_parameters": []
+}
+
+Script done on 2026-07-28 17:47:19-05:00 [COMMAND_EXIT_CODE="0"]

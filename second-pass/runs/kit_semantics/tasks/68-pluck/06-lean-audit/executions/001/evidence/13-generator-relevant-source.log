@@ -1,0 +1,300 @@
+78-
+79-from tools import k_rule_inventory, lemma_discovery_contract
+80-
+81-
+82-class KleanExportError(RuntimeError):
+83-    pass
+84-
+85-
+86:@dataclass(frozen=True)
+87-class Func:
+88-    name: str
+89-    ret: str
+90-    args: list[str]
+91-
+92-
+93:@dataclass(frozen=True)
+94-class DefinitionResolution:
+95-    verification_file: Path
+96-    verification_module: str
+97-    syntax_module: str
+98-    required_files: tuple[Path, ...]
+99-    entry_files: tuple[Path, ...]
+100-
+101-
+102:@dataclass(frozen=True)
+103-class KompileCommand:
+104-    source: Path
+105-    main_module: str | None
+106-    syntax_module: str | None
+107-    backend: str | None
+108-
+109-
+110-def _proof_kompile_commands(workspace: Path) -> tuple[KompileCommand, ...]:
+111-    prove = workspace / "prove.sh"
+112-    if not prove.is_file() or prove.is_symlink():
+113-        return ()
+114-    logical_lines = prove.read_text().replace("\\\n", " ").splitlines()
+115-    commands: list[KompileCommand] = []
+116-    for line in logical_lines:
+117-        try:
+118:            words = shlex.split(line, comments=True)
+119-        except ValueError:
+120-            continue
+121-        try:
+122-            index = words.index("kompile")
+123-        except ValueError:
+124-            continue
+125-        arguments = words[index + 1 :]
+126-        source_word = next(
+--
+260-    except k_rule_inventory.KRuleInventoryError as error:
+261-        raise KleanExportError(str(error)) from error
+262-    if verification_module not in file_modules.get(verification_file, ()):
+263-        raise KleanExportError(
+264-            "selected verification module is not defined in verification.k"
+265-        )
+266-
+267-    def _requires_reaches(source: Path, target: Path) -> bool:
+268:        """True when ``target`` lies in ``source``'s transitive requires."""
+269-
+270-        seen: set[Path] = set()
+271-        stack = [source]
+272-        while stack:
+273-            current = stack.pop()
+274-            if current in seen:
+275-                continue
+276-            seen.add(current)
+277-            if current == target:
+278:                return True
+279-            stack.extend(file_requires.get(current, ()))
+280-        return False
+281-
+282-    commands = _proof_kompile_commands(workspace)
+283-    # A kompile command seeds the export closure only when its source is the
+284-    # frozen verification target or transitively requires it.  This keeps a
+285-    # legitimate reverse-require compilation root (a driver that requires
+286-    # verification.k) reachable while excluding mutation and bridge byproducts
+--
+448-    scratch = Path(scratch)
+449-    workspace = Path(workspace).resolve()
+450-    source_root = scratch / "definition-source"
+451-    source_root.mkdir()
+452-    staged: dict[Path, Path] = {}
+453-    for source in resolution.required_files:
+454-        relative = source.relative_to(workspace)
+455-        destination = source_root / relative
+456:        destination.parent.mkdir(parents=True, exist_ok=True)
+457-        shutil.copy2(source, destination)
+458-        staged[source] = destination
+459-    staged_verification = staged.get(resolution.verification_file)
+460-    if staged_verification is None:
+461-        raise KleanExportError("definition closure omitted verification.k")
+462-    staged_verification.write_text(transformed_verification)
+463-    entry_files: list[Path] = []
+464-    for source in resolution.entry_files:
+--
+651-    promote = {
+652-        name for name, count in production_counts.items() if count == 1
+653-    }
+654-    if not promote:
+655-        return verification_text, ()
+656-
+657-    observed: dict[str, int] = {name: 0 for name in promote}
+658-    transformed_lines: list[str] = []
+659:    for line in verification_text.splitlines(keepends=True):
+660-        newline = "\n" if line.endswith("\n") else ""
+661-        body = line[:-1] if newline else line
+662-        match = _SYNTAX_PRODUCTION_LINE_RE.fullmatch(body)
+663-        if match is None or match.group("name") not in promote:
+664-            transformed_lines.append(line)
+665-            continue
+666-        name = match.group("name")
+667-        observed[name] += 1
+--
+737-    quote = False
+738-    escaped = False
+739-    for index in range(open_paren, len(text)):
+740-        character = text[index]
+741-        if quote:
+742-            if escaped:
+743-                escaped = False
+744-            elif character == "\\":
+745:                escaped = True
+746-            elif character == '"':
+747-                quote = False
+748-            continue
+749-        if character == '"':
+750:            quote = True
+751-        elif character == "(":
+752-            depth += 1
+753-        elif character == ")":
+754-            depth -= 1
+755-            if depth == 0:
+756-                return index + 1
+757-    raise KleanExportError("referenced structural definition call is unbalanced")
+758-
+--
+1527-) -> tuple[int, str]:
+1528-    try:
+1529-        result = subprocess.run(
+1530-            command,
+1531-            cwd=cwd,
+1532-            timeout=timeout,
+1533-            shell=shell,
+1534-            env=env,
+1535:            text=True,
+1536-            stdout=subprocess.PIPE,
+1537-            stderr=subprocess.STDOUT,
+1538-        )
+1539-        return result.returncode, result.stdout
+1540-    except subprocess.TimeoutExpired:
+1541-        return 124, f"TIMEOUT after {timeout}s"
+1542-
+1543-
+--
+1610-        raise KleanExportError("generated obligation map is malformed")
+1611-    candidates: list[tuple[Path, str]] = []
+1612-    raw_count = 0
+1613-    for relative, kind, path in _tree_entries(generated):
+1614-        if kind != "file" or path.suffix != ".lean":
+1615-            continue
+1616-        text = path.read_text()
+1617-        raw_count += len(
+1618:            re.findall(r"(?m)^\s*def\s+targetStatement\b", text)
+1619-        )
+1620-        for match in re.finditer(
+1621:            r"(?ms)^\s*def\s+targetStatement\b.*?"
+1622-            r"(?=^\s*end\s+\S+\s*$)",
+1623-            text,
+1624-        ):
+1625-            candidates.append((path, match.group(0).strip()))
+1626-    if not obligations:
+1627-        if raw_count != 0:
+1628-            raise KleanExportError(
+1629-                "zero obligations must not generate a target proposition"
+--
+1662-            raise KleanExportError("target source-rule binding is malformed")
+1663-        binding = {
+1664-            "kore_symbol": kore_symbol,
+1665-            "name": name,
+1666-            "type": lean_type,
+1667-            "source_rule_ids": source_rule_ids,
+1668-        }
+1669-        expected_binding_sha256 = sha256_text(
+1670:            json.dumps(binding, sort_keys=True, separators=(",", ":"))
+1671-        )
+1672-        if binding_sha256 != expected_binding_sha256:
+1673-            raise KleanExportError("target parameter binding hash changed")
+1674-        names.append(name)
+1675-        normalized_parameters.append(
+1676-            {**binding, "binding_sha256": binding_sha256}
+1677-        )
+1678:    declaration = f"{path.parent.name}.Lemmas.targetStatement"
+1679-    statement = " ".join((declaration, *names))
+1680-    return {
+1681-        "declaration": declaration,
+1682-        "file": path.relative_to(generated).as_posix(),
+1683-        "statement": statement,
+1684-        "statement_sha256": sha256_text(statement),
+1685-        "definition_sha256": sha256_text(definition),
+1686-        "parameters": normalized_parameters,
+--
+1689-
+1690-def expected_target_definition(obligation_map: dict[str, Any]) -> str | None:
+1691-    obligations = obligation_map.get("obligations")
+1692-    parameters = obligation_map.get("trust_parameters")
+1693-    if not isinstance(obligations, list) or not isinstance(parameters, list):
+1694-        raise KleanExportError("generated obligation map is malformed")
+1695-    if not obligations:
+1696-        return None
+1697:    lines = ["def targetStatement"]
+1698-    for parameter in parameters:
+1699-        if not isinstance(parameter, dict):
+1700-            raise KleanExportError("target parameter is malformed")
+1701-        name = parameter.get("name")
+1702-        lean_type = parameter.get("type")
+1703-        if not isinstance(name, str) or not isinstance(lean_type, str):
+1704-            raise KleanExportError("target parameter is malformed")
+1705-        lines.append(f"    ({name} : {lean_type})")
+1706-    conjuncts: list[str] = []
+1707-    for obligation in obligations:
+1708-        if not isinstance(obligation, dict):
+1709-            raise KleanExportError("generated obligation is malformed")
+1710:        conjunct = obligation.get("lean_conjunct")
+1711-        if not isinstance(conjunct, str) or not conjunct:
+1712-            raise KleanExportError("generated Lean conjunct is malformed")
+1713-        conjuncts.append(f"({conjunct})")
+1714-    lines.extend(("    : Prop :=", "    " + "\n    ∧ ".join(conjuncts)))
+1715-    return "\n".join(lines)
+1716-
+1717-
+1718-def _write_json(path: Path, document: dict[str, Any]) -> None:
+1719:    path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+1720-
+1721-
+1722:def _domain_source_rules(
+1723-    validated: dict[str, Any],
+1724-    discovery_manifest_sha256: str,
+1725-) -> list[dict[str, Any]]:
+1726-    inventory_sha256 = validated["inventory_sha256"]
+1727-    return [
+1728-        {
+1729-            **rule,
+1730-            "inventory_sha256": inventory_sha256,
+1731-            "discovery_manifest_sha256": discovery_manifest_sha256,
+1732-        }
+1733-        for rule in validated["domain_lemmas"]
+1734-    ]
+1735-
+1736-
+1737:def _klean_source_rules(
+1738-    domain_rules: list[dict[str, Any]],
+1739-    line_offset: int,
+1740-) -> list[dict[str, Any]]:
+1741-    return [
+1742-        {
+1743-            "source_rule_id": rule["source_rule_id"],
+1744-            "start_line": rule["start_line"] + line_offset,
+1745-            "end_line": rule["end_line"] + line_offset,
+--
+1765-    observed_ids = [
+1766-        obligation.get("source_rule_id")
+1767-        if isinstance(obligation, dict)
+1768-        else None
+1769-        for obligation in obligations
+1770-    ]
+1771-    if observed_ids != expected_ids:
+1772-        raise KleanExportError(
+1773:            "validated DOMAIN_LEMMA records and generated obligations "
+1774-            "are not bijective"
+1775-        )
+1776-    enriched: list[dict[str, Any]] = []
+1777-    for obligation, rule, klean_rule in zip(
+1778:        obligations, domain_rules, klean_rules, strict=True
+1779-    ):
+1780-        if obligation.get("source_span") != {
+1781-            "start_line": klean_rule["start_line"],
+1782-            "end_line": klean_rule["end_line"],
+1783-        }:
+1784-            raise KleanExportError(
+1785-                "generated obligation source span differs from Stage 1"
+1786-            )
+--
+1796-                "discovery_manifest_sha256": rule[
+1797-                    "discovery_manifest_sha256"
+1798-                ],
+1799-            }
+1800-        )
+1801-    document = {
+1802-        **document,
+1803-        "schema_version": 3,
+1804:        "source_rules": domain_rules,
+1805-        "obligations": enriched,
+1806-    }
+1807-    _write_json(path, document)
+1808-    return document
+1809-
+1810-
+1811-def export_frozen(
+1812-    frozen_input: Path,

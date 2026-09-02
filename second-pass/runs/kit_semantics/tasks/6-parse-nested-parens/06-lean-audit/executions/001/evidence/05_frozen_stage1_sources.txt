@@ -1,0 +1,314 @@
+$ nl -ba /reference/k-proof/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Exact AST shorthands for the generated solution.mpy program.
+     7	  syntax Stmts ::= "loopBody" [function, total]
+     8	  rule loopBody =>
+     9	    If(Compare(Name("char"), CmpOp("==", Str("("))),
+    10	      AugAssign(Name("depth"), "+", Int(1))
+    11	      If(Compare(Name("depth"), CmpOp(">", Name("deepest"))),
+    12	        Assign(Name("deepest"), Name("depth")),
+    13	        .Stmts),
+    14	      If(Compare(Name("char"), CmpOp("==", Str(")"))),
+    15	        AugAssign(Name("depth"), "-", Int(1)),
+    16	        If(Compare(Name("deepest"), CmpOp(">", Int(0))),
+    17	          Expr(Call(Attribute(Name("depths"), "append"), Name("deepest")))
+    18	          Assign(Name("deepest"), Int(0)),
+    19	          .Stmts)))
+    20	
+    21	  syntax Stmts ::= "afterLoop" [function, total]
+    22	  rule afterLoop =>
+    23	    If(Compare(Name("deepest"), CmpOp(">", Int(0))),
+    24	      Expr(Call(Attribute(Name("depths"), "append"), Name("deepest"))),
+    25	      .Stmts)
+    26	    Return(Name("depths"))
+    27	
+    28	  syntax Stmts ::= "solutionBody" [function, total]
+    29	  rule solutionBody =>
+    30	    Assign(Name("depths"), ListExpr(.Exprs))
+    31	    Assign(Name("depth"), Int(0))
+    32	    Assign(Name("deepest"), Int(0))
+    33	    Assign(Name("char"), Str(""))
+    34	    For(Name("char"), Name("paren_string"), loopBody)
+    35	    afterLoop
+    36	
+    37	  syntax Module ::= "solutionModule" [function, total]
+    38	  rule solutionModule =>
+    39	    Module(
+    40	      ImportFrom("typing", "List")
+    41	      FuncDef("parse_nested_parens", Params("paren_string"), solutionBody))
+    42	
+    43	  // A total character scanner. Codes 40 and 41 are '(' and ')'; every other
+    44	  // code follows the program's delimiter branch. The target precondition below
+    45	  // narrows delimiters to ASCII space (32).
+    46	  syntax Int ::= scanDepth(IntSeq, Int) [function, total]
+    47	  syntax Int ::= nextDepth(Int, Int) [function, total]
+    48	  rule nextDepth(C, D) => D +Int 1
+    49	    requires C ==Int 40
+    50	  rule nextDepth(C, D) => D -Int 1
+    51	    requires C ==Int 41
+    52	  rule nextDepth(C, D) => D
+    53	    requires C =/=Int 40 andBool C =/=Int 41
+    54	
+    55	  rule scanDepth(.IntSeq, D) => D
+    56	  rule scanDepth(iCons(C, R), D) => scanDepth(R, nextDepth(C, D))
+    57	
+    58	  syntax Int ::= scanDeepest(IntSeq, Int, Int) [function, total]
+    59	  syntax Int ::= openDeepest(Int, Int) [function, total]
+    60	  rule openDeepest(D, M) => D +Int 1
+    61	    requires D +Int 1 >Int M
+    62	  rule openDeepest(D, M) => M
+    63	    requires D +Int 1 <=Int M
+    64	
+    65	  syntax Int ::= delimiterDeepest(Int) [function, total]
+    66	  rule delimiterDeepest(M) => 0
+    67	    requires M >Int 0
+    68	  rule delimiterDeepest(M) => M
+    69	    requires M <=Int 0
+    70	
+    71	  syntax Int ::= nextDeepest(Int, Int, Int) [function, total]
+    72	  rule nextDeepest(C, D, M) => openDeepest(D, M)
+    73	    requires C ==Int 40
+    74	  rule nextDeepest(C, _D, M) => M
+    75	    requires C ==Int 41
+    76	  rule nextDeepest(C, _D, M) => delimiterDeepest(M)
+    77	    requires C =/=Int 40 andBool C =/=Int 41
+    78	
+    79	  rule scanDeepest(.IntSeq, _D, M) => M
+    80	  rule scanDeepest(iCons(C, R), D, M)
+    81	    => scanDeepest(R, nextDepth(C, D), nextDeepest(C, D, M))
+    82	
+    83	  syntax ValSeq ::= scanOutput(IntSeq, Int, Int, ValSeq) [function, total]
+    84	  syntax ValSeq ::= delimiterOutput(Int, ValSeq) [function, total]
+    85	  rule delimiterOutput(M, OUT) => valSeqConcat(OUT, vCons(M, .ValSeq))
+    86	    requires M >Int 0
+    87	  rule delimiterOutput(M, OUT) => OUT
+    88	    requires M <=Int 0
+    89	
+    90	  syntax ValSeq ::= nextOutput(Int, Int, ValSeq) [function, total]
+    91	  rule nextOutput(C, _M, OUT) => OUT
+    92	    requires C ==Int 40
+    93	  rule nextOutput(C, _M, OUT) => OUT
+    94	    requires C ==Int 41
+    95	  rule nextOutput(C, M, OUT) => delimiterOutput(M, OUT)
+    96	    requires C =/=Int 40 andBool C =/=Int 41
+    97	
+    98	  rule scanOutput(.IntSeq, _D, _M, OUT) => OUT
+    99	  rule scanOutput(iCons(C, R), D, M, OUT)
+   100	    => scanOutput(R, nextDepth(C, D), nextDeepest(C, D, M),
+   101	                  nextOutput(C, M, OUT))
+   102	
+   103	  syntax Str ::= scanChar(IntSeq, Str) [function, total]
+   104	  rule scanChar(.IntSeq, CH) => CH
+   105	  rule scanChar(iCons(C, R), _CH) => scanChar(R, str(iCons(C, .IntSeq)))
+   106	
+   107	  syntax ValSeq ::= finishOutput(IntSeq, Int, Int, ValSeq) [function, total]
+   108	  rule finishOutput(CS, D, M, OUT)
+   109	    => valSeqConcat(scanOutput(CS, D, M, OUT),
+   110	                    vCons(scanDeepest(CS, D, M), .ValSeq))
+   111	    requires scanDeepest(CS, D, M) >Int 0
+   112	  rule finishOutput(CS, D, M, OUT) => scanOutput(CS, D, M, OUT)
+   113	    requires scanDeepest(CS, D, M) <=Int 0
+   114	
+   115	  syntax ValSeq ::= expectedDepths(IntSeq) [function, total]
+   116	  rule expectedDepths(CS) => finishOutput(CS, 0, 0, .ValSeq)
+   117	
+   118	  // The contract domain: a finite sequence of parentheses and ASCII spaces;
+   119	  // every prefix has nonnegative depth, spaces occur only at depth zero, and
+   120	  // the final depth is zero.
+   121	  syntax Bool ::= wellFormed(IntSeq, Int) [function, total]
+   122	  syntax Bool ::= wellFormedStep(Int, IntSeq, Int) [function, total]
+   123	  rule wellFormedStep(C, R, D) => wellFormed(R, D +Int 1)
+   124	    requires C ==Int 40
+   125	  rule wellFormedStep(C, R, D) => D >Int 0 andBool wellFormed(R, D -Int 1)
+   126	    requires C ==Int 41
+   127	  rule wellFormedStep(C, R, D) => D ==Int 0 andBool wellFormed(R, D)
+   128	    requires C ==Int 32
+   129	  rule wellFormedStep(C, _R, _D) => false
+   130	    requires C =/=Int 40 andBool C =/=Int 41 andBool C =/=Int 32
+   131	
+   132	  rule wellFormed(.IntSeq, D) => D ==Int 0
+   133	  rule wellFormed(iCons(C, R), D) => wellFormedStep(C, R, D)
+   134	
+   135	  syntax Bool ::= validInput(IntSeq) [function, total]
+   136	  rule validInput(CS) => wellFormed(CS, 0)
+   137	endmodule
+$ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Symbolic circularity for the one program loop. It executes the exact loop
+     7	  // body under MPY and summarizes only the resulting scalar/list state.
+     8	  claim [scan-loop]:
+     9	    <k> #loop(str(CS), Name("char"), loopBody) => .K ... </k>
+    10	    <env> L </env>
+    11	    <scopes>
+    12	      ... L |-> scope(
+    13	        ( "paren_string" |-> str(INPUT)
+    14	          "depth"  |-> (D:Int => scanDepth(CS, D))
+    15	          "deepest" |-> (M:Int => scanDeepest(CS, D, M))
+    16	          "depths" |-> ref(H)
+    17	          "char" |-> (CH:Str => scanChar(CS, CH)) ),
+    18	        parent(0))
+    19	      ...
+    20	    </scopes>
+    21	    <heap>
+    22	      ... H |-> list(OUT:ValSeq => scanOutput(CS, D, M, OUT)) ...
+    23	    </heap>
+    24	
+    25	  // Required target theorem: load the exact generated program, resolve the
+    26	  // named entry point, and execute it for every valid finite input sequence.
+    27	  claim [parse-nested-parens]:
+    28	    <k>
+    29	      #loadAll(solutionModule)
+    30	      ~> Call(Name("parse_nested_parens"), str(CS))
+    31	      => ref(0)
+    32	    </k>
+    33	    <env> 0 </env>
+    34	    <scopes>
+    35	      ( 0  |-> scope(.Map, parent(-1))
+    36	        -1 |-> builtinsScope )
+    37	      =>
+    38	      ( 0  |-> scope(
+    39	          "parse_nested_parens"
+    40	            |-> closureVal("paren_string", solutionBody, 0),
+    41	          parent(-1))
+    42	        -1 |-> builtinsScope )
+    43	    </scopes>
+    44	    <scopeLoc> 1 </scopeLoc>
+    45	    <heap> .Map => 0 |-> list(expectedDepths(CS)) </heap>
+    46	    <heapLoc> 0 => 1 </heapLoc>
+    47	    <stack> .List </stack>
+    48	    <ret> noRet </ret>
+    49	    <exc> NoExc </exc>
+    50	    <exit-code> 0 </exit-code>
+    51	    requires validInput(CS)
+    52	endmodule
+$ nl -ba /reference/k-proof/solution.py
+     1	from typing import List
+     2	
+     3	
+     4	def parse_nested_parens(paren_string: str) -> List[int]:
+     5	    depths = []
+     6	    depth = 0
+     7	    deepest = 0
+     8	    char = ""
+     9	
+    10	    for char in paren_string:
+    11	        if char == "(":
+    12	            depth += 1
+    13	            if depth > deepest:
+    14	                deepest = depth
+    15	        elif char == ")":
+    16	            depth -= 1
+    17	        elif deepest > 0:
+    18	            depths.append(deepest)
+    19	            deepest = 0
+    20	
+    21	    if deepest > 0:
+    22	        depths.append(deepest)
+    23	
+    24	    return depths
+$ nl -ba /reference/k-proof/solution.mpy
+     1	Module(
+     2	  ImportFrom("typing", "List")
+     3	  FuncDef("parse_nested_parens", Params("paren_string"),
+     4	    Assign(Name("depths"), ListExpr())
+     5	    Assign(Name("depth"), Int(0))
+     6	    Assign(Name("deepest"), Int(0))
+     7	    Assign(Name("char"), Str(""))
+     8	    For(Name("char"), Name("paren_string"),
+     9	      If(Compare(Name("char"), CmpOp("==", Str("("))),
+    10	        AugAssign(Name("depth"), "+", Int(1))
+    11	        If(Compare(Name("depth"), CmpOp(">", Name("deepest"))),
+    12	          Assign(Name("deepest"), Name("depth")),
+    13	          ),
+    14	        If(Compare(Name("char"), CmpOp("==", Str(")"))),
+    15	          AugAssign(Name("depth"), "-", Int(1)),
+    16	          If(Compare(Name("deepest"), CmpOp(">", Int(0))),
+    17	            Expr(
+    18	              Call(Attribute(Name("depths"), "append"), Name("deepest")))
+    19	            Assign(Name("deepest"), Int(0)),
+    20	            ))))
+    21	    If(Compare(Name("deepest"), CmpOp(">", Int(0))),
+    22	      Expr(Call(Attribute(Name("depths"), "append"), Name("deepest"))),
+    23	      )
+    24	    Return(Name("depths"))))
+$ nl -ba /reference/k-proof/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py smoke.py > smoke.mpy
+     6	
+     7	printf '%s  %s\n' \
+     8	  f1320cc5aa8f242a9ad1695acd5a0f3d12c0033053d911a8bd4f7ebae6b3848c \
+     9	  solution.mpy | sha256sum -c -
+    10	
+    11	python3 - <<'PY'
+    12	import ast
+    13	
+    14	def target_function(path):
+    15	    tree = ast.parse(open(path, encoding="utf-8").read())
+    16	    return next(node for node in tree.body
+    17	                if isinstance(node, ast.FunctionDef)
+    18	                and node.name == "parse_nested_parens")
+    19	
+    20	solution_function = target_function("solution.py")
+    21	smoke_function = target_function("smoke.py")
+    22	assert ast.dump(solution_function, include_attributes=False) == ast.dump(
+    23	    smoke_function, include_attributes=False
+    24	)
+    25	print("smoke function AST matches solution.py")
+    26	PY
+    27	
+    28	python3 test_differential.py
+    29	
+    30	kompile --backend llvm reference-semantics/semantics.k \
+    31	  --main-module MPY-KRUN \
+    32	  --syntax-module MPY-SYNTAX \
+    33	  --output-definition runtime-kompiled
+    34	
+    35	krun smoke.mpy --definition runtime-kompiled | tee concrete-run.log
+    36	grep -q '<k>' concrete-run.log
+    37	grep -q '    .K' concrete-run.log
+    38	grep -q '    NoExc' concrete-run.log
+    39	
+    40	kompile --backend haskell verification.k \
+    41	  --main-module VERIFICATION \
+    42	  --syntax-module MPY-SYNTAX \
+    43	  --output-definition verification-kompiled
+    44	
+    45	kprove spec.k \
+    46	  --definition verification-kompiled \
+    47	  --spec-module SPEC | tee positive-proof.log
+    48	grep -qx '#Top' positive-proof.log
+    49	
+    50	if kprove spec-vacuity.k \
+    51	     --definition verification-kompiled \
+    52	     --spec-module SPEC-VACUITY > vacuity-probe.log 2>&1; then
+    53	  echo "ERROR: false-result mutation unexpectedly proved" >&2
+    54	  exit 1
+    55	else
+    56	  vacuity_status=$?
+    57	fi
+    58	grep -q 'WarnStuckClaimState' vacuity-probe.log
+    59	grep -q 'list ( vCons ( 1 , .ValSeq ) )' vacuity-probe.log
+    60	echo "false-result mutation: expected failure (exit ${vacuity_status})"
+    61	
+    62	if kprove spec-body-mutation.k \
+    63	     --definition verification-kompiled \
+    64	     --spec-module SPEC-BODY-MUTATION > body-mutation-probe.log 2>&1; then
+    65	  echo "ERROR: mutated body unexpectedly proved" >&2
+    66	  exit 1
+    67	else
+    68	  body_status=$?
+    69	fi
+    70	grep -q 'WarnStuckClaimState' body-mutation-probe.log
+    71	grep -q 'list ( vCons ( 2 , .ValSeq ) )' body-mutation-probe.log
+    72	echo "body mutation: expected failure (exit ${body_status})"

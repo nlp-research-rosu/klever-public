@@ -1,0 +1,232 @@
+Script started on 2026-07-27 23:40:51-05:00 [<not executed on terminal>]
+Recorded-hash Klean source ordering sites (read-only provenance evidence)
+ddec66db87398459ff0c2b5aad7121fe1029b58b8d576db4203c68bf5b647d13  /opt/humaneval/tools/klean.py
+    original = k2lean4.K2Lean4._transform_dv
+
+    def transform(instance: object, sort: str, value: str):
+        if sort == "SortFloat":
+            return Term(float_literal(value))
+        return original(instance, sort, value)
+
+    k2lean4.K2Lean4._transform_dv = transform
+
+
+def _trust_lemma_symbols(
+    definition_directory: Path,
+    summary_functions: tuple[str, ...],
+    source_marker: str,
+) -> set[str]:
+    from pyk.kore.manip import collect_symbols
+    from pyk.kore.parser import KoreParser
+    from pyk.kore.rule import AppRule, Rule
+
+    definition = KoreParser(
+        (definition_directory / "definition.kore").read_text()
+    ).definition()
+    symbols: set[str] = set()
+    for axiom in (
+        sentence
+        for module in definition.modules
+        for sentence in module.sentences
+    ):
+        if (
+            "simplification" not in axiom.attrs_by_key
+            or f"{source_marker})" not in axiom.text
+            or not Rule.is_rule(axiom)
+        ):
+            continue
+        rule = Rule.from_axiom(axiom)
+        if not isinstance(rule, AppRule):
+            continue
+        if any(function in rule.lhs.symbol for function in summary_functions):
+            continue
+        symbols |= collect_symbols(rule.lhs) | collect_symbols(rule.rhs)
+        requires = getattr(rule, "req", None)
+        if requires is not None:
+            symbols |= collect_symbols(requires)
+    symbols.discard("inj")
+    return symbols
+
+
+def _widen_projection(definition: object, extra_symbols: set[str]) -> object:
+    from pyk.kore.manip import collect_symbols
+    from pyk.utils import FrozenDict
+
+    keep = set(definition._config_symbols()) | set(
+        definition._rewrite_symbols()
+    )
+    pending = {
+        symbol for symbol in extra_symbols if symbol in definition.symbols
+    }
+    while pending:
+        symbol = pending.pop()
+        if symbol in keep:
+            continue
+        keep.add(symbol)
+        for rule in definition.functions.get(symbol, ()):
+            pending |= collect_symbols(rule.to_axiom().pattern)
+        for sort in definition._symbol_sorts(symbol):
+            if sort in definition.collections:
+                collection = definition.collections[sort]
+                pending |= {
+                    collection.concat,
+                    collection.element,
+                    collection.unit,
+                }
+    symbols = FrozenDict(
+        (symbol, declaration)
+        for symbol, declaration in definition.symbols.items()
+        if symbol in keep
+    )
+    return definition.let(symbols=symbols).project_to_symbols()
+
+
+def _emit_lemmas(
+    definition_directory: Path,
+    package_directory: Path,
+    library_name: str,
+    summary_functions: tuple[str, ...],
+    source_marker: str,
+    source_rule_inventory: Path,
+) -> int:
+    from pyk.klean.__main__ import _load_defn
+    from pyk.klean.k2lean4 import (
+        K2Lean4,
+        proposition = f"{lhs} = {rhs}"
+        if binders.strip():
+            proposition = f"∀ {binders.strip()}, {proposition}"
+        propositions.append(
+            (start_line, proposition, source_rule, rule_symbols)
+        )
+
+    propositions.sort(key=lambda item: item[0])
+    seen_ids = [
+        str(source_rule["source_rule_id"])
+        for _line, _proposition, source_rule, _symbols in propositions
+    ]
+    expected_ids = [
+        str(item["source_rule_id"])
+        for item in source_rules
+        if isinstance(item, dict)
+        and item.get("classification") == "TRUST_OBLIGATION"
+    ]
+    if seen_ids != expected_ids:
+        raise RuntimeError(
+            "source trust rules and generated Lean obligations are not bijective"
+        )
+
+    parameters: list[dict[str, str]] = []
+    for symbol in sorted(used_symbols):
+        if symbol == "inj" or symbol not in full_definition.symbols:
+            continue
+        declaration = full_definition.symbols[symbol]
+        if "function" not in declaration.attrs_by_key:
+            continue
+        parameter_sorts = list(_param_sorts(declaration))
+        lean_type = (
+            " → ".join(parameter_sorts + [declaration.sort.name])
+            if parameter_sorts
+            else declaration.sort.name
+        )
+        binding = {
+            "kore_symbol": symbol,
+            "name": _symbol_ident(symbol),
+            "type": lean_type,
+            "source_rule_ids": [
+                str(source_rule["source_rule_id"])
+                for _line, _proposition, source_rule, symbols in propositions
+                if symbol in symbols
+            ],
+        }
+        binding["binding_sha256"] = hashlib.sha256(
+            json.dumps(
+                binding, sort_keys=True, separators=(",", ":")
+            ).encode()
+        ).hexdigest()
+        parameters.append(binding)
+
+    namespace = f"{library_name}.Lemmas"
+    lines = [
+        f"import {library_name}.Inj",
+        "",
+        "/- K trust-boundary goals. The second-pass agent must replace every",
+        "   writable opaque stub with an honest definition and prove this",
+        "   immutable proposition in the separate Proof.lean workspace. -/",
+        "",
+        f"namespace {namespace}",
+        "",
+    ]
+    if propositions:
+        lines.append("def targetStatement")
+        for parameter in parameters:
+            lines.append(
+                f"    ({parameter['name']} : {parameter['type']})"
+            )
+        lines.extend(
+            (
+                "    : Prop :=",
+                "    "
+                + "\n    ∧ ".join(
+                    f"({proposition})"
+                    for _line, proposition, _source_rule, _symbols in propositions
+                ),
+                "",
+            )
+        )
+    lines.append(f"end {namespace}")
+    lemma_file = package_directory / library_name / "Lemmas.lean"
+    lemma_file.write_text("\n".join(lines) + "\n")
+    root = package_directory / f"{library_name}.lean"
+    root_text = root.read_text()
+    if f"{library_name}.Lemmas" not in root_text:
+        root.write_text(root_text + f"import {library_name}.Lemmas\n")
+    mappings = []
+    for _line, proposition, source_rule, _symbols in propositions:
+        mappings.append(
+            {
+                "source_rule_id": source_rule["source_rule_id"],
+                "source_span": {
+                    "start_line": source_rule["start_line"],
+                    "end_line": source_rule["end_line"],
+                },
+                "lean_conjunct": proposition,
+                "lean_conjunct_sha256": hashlib.sha256(
+                    proposition.encode()
+                ).hexdigest(),
+            }
+        )
+    (package_directory / "obligation-map.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_rules": source_rules,
+                "obligations": mappings,
+                "trust_parameters": parameters,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    return len(propositions)
+
+
+def _patch_prelude(package_directory: Path, library_name: str) -> None:
+    prelude = package_directory / library_name / "Prelude.lean"
+    text = prelude.read_text()
+    if "SortFloat" in text:
+        return
+    if _PRELUDE_ANCHOR not in text:
+        raise RuntimeError(
+            "generated Prelude.lean layout changed; Float patch cannot apply"
+        )
+    prelude.write_text(
+        text.replace(
+            _PRELUDE_ANCHOR,
+112:    symbols: set[str] = set()
+141:    keep = set(definition._config_symbols()) | set(
+226:    used_symbols: set[str] = set()
+304:    for symbol in sorted(used_symbols):
+469:    lemma_symbols: set[str] = set()
+
+Script done on 2026-07-27 23:40:51-05:00 [COMMAND_EXIT_CODE="0"]

@@ -1,0 +1,120 @@
++ sed -n 1695,1755p /reference/tools/klean_export.py
+    if not obligations:
+        return None
+    lines = ["def targetStatement"]
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanExportError("target parameter is malformed")
+        name = parameter.get("name")
+        lean_type = parameter.get("type")
+        if not isinstance(name, str) or not isinstance(lean_type, str):
+            raise KleanExportError("target parameter is malformed")
+        lines.append(f"    ({name} : {lean_type})")
+    conjuncts: list[str] = []
+    for obligation in obligations:
+        if not isinstance(obligation, dict):
+            raise KleanExportError("generated obligation is malformed")
+        conjunct = obligation.get("lean_conjunct")
+        if not isinstance(conjunct, str) or not conjunct:
+            raise KleanExportError("generated Lean conjunct is malformed")
+        conjuncts.append(f"({conjunct})")
+    lines.extend(("    : Prop :=", "    " + "\n    ∧ ".join(conjuncts)))
+    return "\n".join(lines)
+
+
+def _write_json(path: Path, document: dict[str, Any]) -> None:
+    path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+
+
+def _domain_source_rules(
+    validated: dict[str, Any],
+    discovery_manifest_sha256: str,
+) -> list[dict[str, Any]]:
+    inventory_sha256 = validated["inventory_sha256"]
+    return [
+        {
+            **rule,
+            "inventory_sha256": inventory_sha256,
+            "discovery_manifest_sha256": discovery_manifest_sha256,
+        }
+        for rule in validated["domain_lemmas"]
+    ]
+
+
+def _klean_source_rules(
+    domain_rules: list[dict[str, Any]],
+    line_offset: int,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "source_rule_id": rule["source_rule_id"],
+            "start_line": rule["start_line"] + line_offset,
+            "end_line": rule["end_line"] + line_offset,
+            "normalized_sha256": rule["normalized_sha256"],
+            "classification": "TRUST_OBLIGATION",
+        }
+        for rule in domain_rules
+    ]
+
+
+def _bind_obligation_provenance(
+    package: Path,
+    domain_rules: list[dict[str, Any]],
++ sed -n 332,388p /reference/tools/klean_preflight.py
+def validate_trust_parameter_links(
+    expected_ids: list[str], parameters: list[object]
+) -> set[str]:
+    """Validate every opaque parameter without requiring one per theorem."""
+
+    bound_rule_ids: set[str] = set()
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanPreflightError("generated trust parameter is malformed")
+        source_rule_ids = parameter.get("source_rule_ids")
+        if (
+            not isinstance(source_rule_ids, list)
+            or not source_rule_ids
+            or not all(
+                isinstance(source_rule_id, str)
+                and source_rule_id in expected_ids
+                for source_rule_id in source_rule_ids
+            )
+        ):
+            raise KleanPreflightError(
+                "trust parameter is not bound to source obligations"
+            )
+        bound_rule_ids.update(source_rule_ids)
+    return bound_rule_ids
+
+
+def _check_imports(generated: Path, sources: list[Path]) -> None:
+    for source in sources:
+        for line in source.read_text().splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("import "):
+                continue
+            imported = stripped.removeprefix("import ").strip()
+            if (
+                not imported
+                or imported.startswith(("/", "."))
+                or ".." in imported
+                or '"' in imported
+                or "\\" in imported
+            ):
+                raise KleanPreflightError(
+                    f"untrusted Lean import in {source}: {imported!r}"
+                )
+    for name in ("lakefile.toml", "lakefile.lean", "lean-toolchain"):
+        path = generated / name
+        if path.exists() and (not path.is_file() or path.is_symlink()):
+            raise KleanPreflightError(
+                f"generated dependency metadata is not regular: {path}"
+            )
+        if path.is_file():
+            text = path.read_text()
+            if re.search(r"(?m)^\s*(?:path|dir)\s*=\s*\"/", text):
+                raise KleanPreflightError(
+                    f"absolute dependency path in generated {name}"
+                )
+
+

@@ -1,0 +1,250 @@
+COMMAND: bash -lc printf\ \"%s\\n\"\ \"semantic.k\"\;\ nl\ -ba\ /candidate/semantic.k\;\ printf\ \"%s\\n\"\ \"verification.k\"\;\ nl\ -ba\ /candidate/verification.k\;\ printf\ \"%s\\n\"\ \"attribute/search\ summary\"\;\ rg\ -n\ \"syntax\|configuration\|rule\|claim\|\\\[\(function\|total\|functional\|simplification\|concrete\|priority\)\|\\\[owise\|opaque\"\ /candidate/semantic.k\ /candidate/verification.k
+semantic.k
+     1	// A small, executable semantics for the py2mpy constructors used by
+     2	// solution.py.  The source term is kept as a genuine AST: py2mpy does not
+     3	// perform any of the semantic work below.
+     4	
+     5	module MPY-SYNTAX
+     6	  imports DOMAINS-SYNTAX
+     7	
+     8	  syntax Module
+     9	  syntax Stmt
+    10	  syntax Stmts    ::= List{Stmt, ""}
+    11	  syntax Expr
+    12	  syntax Exprs    ::= List{Expr, ","}
+    13	  syntax Strings  ::= List{String, ","}
+    14	  syntax CmpOp
+    15	  syntax CmpOps   ::= List{CmpOp, ","}
+    16	  syntax CompFor
+    17	  syntax CompFors ::= List{CompFor, ""}
+    18	
+    19	  syntax Module ::= "Module" "(" Stmts ")"
+    20	
+    21	  syntax Stmt ::= "FuncDef" "(" String ","
+    22	                              "Params" "(" Strings ")" ","
+    23	                              Stmts ")"
+    24	                | "FuncDef" "(" String ","
+    25	                              "Params" "(" Strings ")" ","
+    26	                              "CellVars" "(" Strings ")" ","
+    27	                              "FreeVars" "(" Strings ")" ","
+    28	                              Stmts ")"
+    29	                | "Return" "(" Expr ")"
+    30	                | "Expr" "(" Expr ")"
+    31	
+    32	  syntax Expr ::= "Name" "(" String ")"
+    33	                | "Str" "(" String ")"
+    34	                | "Int" "(" Int ")"
+    35	                | "Attribute" "(" Expr "," String ")"
+    36	                | "Call" "(" Expr "," Exprs ")"
+    37	                | "ListComp" "(" Expr "," CompFors ")"
+    38	                | "Compare" "(" Expr "," CmpOps ")"
+    39	
+    40	  syntax CmpOp   ::= "CmpOp" "(" String "," Expr ")"
+    41	  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+    42	endmodule
+    43	
+    44	module SEMANTIC
+    45	  imports MPY-SYNTAX
+    46	  imports BOOL
+    47	  imports INT
+    48	  imports STRING
+    49	
+    50	  // Words is both the internal sequence used by split/filter and the payload
+    51	  // of the observable Python-list value.  WCons preserves source order.
+    52	  syntax Words ::= ".Words"
+    53	                 | "WCons" "(" String "," Words ")"
+    54	  syntax PyValue ::= "pyList" "(" Words ")"
+    55	  syntax Result ::= "noResult" | PyValue
+    56	
+    57	  syntax KItem ::= "exec" "(" Stmts ")"
+    58	                 | "eval" "(" Expr "," String "," Int ")"
+    59	                 | "finish"
+    60	
+    61	  syntax Words ::= words(String)                       [function]
+    62	                 | scanWords(String, String, Words)   [function]
+    63	                 | appendWord(Words, String)          [function]
+    64	                 | filterWords(Words, Int)            [function]
+    65	  syntax Int ::= countConsonants(String)              [function]
+    66	
+    67	  configuration
+    68	    <select-words>
+    69	      <k> $PGM:Module </k>
+    70	      <inputS> $S:String </inputS>
+    71	      <inputN> $N:Int </inputN>
+    72	      <result> noResult </result>
+    73	    </select-words>
+    74	
+    75	  // Loading the translated module selects its required entry point.  Both
+    76	  // ordinary and closure-annotated FuncDef forms have a meaning.
+    77	  rule <k> Module(FuncDef("select_words", Params("s", "n"), BODY))
+    78	        => exec(BODY) ... </k>
+    79	  rule <k> Module(FuncDef("select_words", Params("s", "n"),
+    80	                          CellVars(_), FreeVars(_), BODY))
+    81	        => exec(BODY) ... </k>
+    82	
+    83	  // A leading string expression is a Python docstring and has no value effect.
+    84	  rule <k> exec(Expr(Str(_)) REST) => exec(REST) ... </k>
+    85	
+    86	  rule <k> exec(Return(E))
+    87	        => eval(E, S, N) ~> finish ... </k>
+    88	       <inputS> S </inputS>
+    89	       <inputN> N </inputN>
+    90	
+    91	  rule <k> V:PyValue ~> finish => .K ... </k>
+    92	       <result> _ => V </result>
+    93	
+    94	  // Denotation of this nested-comprehension shape:
+    95	  //
+    96	  // [word for word in s.split()
+    97	  //       if len([letter for letter in word
+    98	  //                    if letter.lower() not in "aeiou"]) == n]
+    99	  //
+   100	  // The rule is symbolic in S and N.  Its right side is an executable fold,
+   101	  // rather than a table of examples or a call out to Python.
+   102	  rule eval(
+   103	         ListComp(
+   104	           Name("word"),
+   105	           CompFor(
+   106	             Name("word"),
+   107	             Call(Attribute(Name("s"), "split"), .Exprs),
+   108	             Compare(
+   109	               Call(
+   110	                 Name("len"),
+   111	                 ListComp(
+   112	                   Name("letter"),
+   113	                   CompFor(
+   114	                     Name("letter"),
+   115	                     Name("word"),
+   116	                     Compare(
+   117	                       Call(Attribute(Name("letter"), "lower"), .Exprs),
+   118	                       CmpOp("not in", Str("aeiou")))))),
+   119	               CmpOp("==", Name("n"))))),
+   120	         S, N)
+   121	       => pyList(filterWords(words(S), N))
+   122	
+   123	  // Python str.split() with no argument, under the prompt's stated alphabet
+   124	  // (letters and spaces): discard empty fields from any run of spaces.
+   125	  rule words(S) => scanWords(S, "", .Words)
+   126	
+   127	  rule scanWords("", "", WS) => WS
+   128	  rule scanWords("", CUR, WS) => appendWord(WS, CUR)
+   129	    requires CUR =/=String ""
+   130	
+   131	  rule scanWords(S, CUR, WS)
+   132	       => scanWords(
+   133	            substrString(S, 1, lengthString(S)),
+   134	            "",
+   135	            WS)
+   136	    requires S =/=String ""
+   137	     andBool substrString(S, 0, 1) ==String " "
+   138	     andBool CUR ==String ""
+   139	
+   140	  rule scanWords(S, CUR, WS)
+   141	       => scanWords(
+   142	            substrString(S, 1, lengthString(S)),
+   143	            "",
+   144	            appendWord(WS, CUR))
+   145	    requires S =/=String ""
+   146	     andBool substrString(S, 0, 1) ==String " "
+   147	     andBool CUR =/=String ""
+   148	
+   149	  rule scanWords(S, CUR, WS)
+   150	       => scanWords(
+   151	            substrString(S, 1, lengthString(S)),
+   152	            CUR +String substrString(S, 0, 1),
+   153	            WS)
+   154	    requires S =/=String ""
+   155	     andBool substrString(S, 0, 1) =/=String " "
+   156	
+   157	  rule appendWord(.Words, W) => WCons(W, .Words)
+   158	  rule appendWord(WCons(W, WS), NEW)
+   159	       => WCons(W, appendWord(WS, NEW))
+   160	
+   161	  // For letters, testing against both cases of the five vowels is equivalent
+   162	  // to solution.py's lower() followed by membership in "aeiou".
+   163	  rule countConsonants("") => 0
+   164	  rule countConsonants(S)
+   165	       => countConsonants(substrString(S, 1, lengthString(S)))
+   166	    requires S =/=String ""
+   167	     andBool findString(
+   168	               "aeiouAEIOU", substrString(S, 0, 1), 0) >=Int 0
+   169	  rule countConsonants(S)
+   170	       => 1 +Int countConsonants(
+   171	                     substrString(S, 1, lengthString(S)))
+   172	    requires S =/=String ""
+   173	     andBool findString(
+   174	               "aeiouAEIOU", substrString(S, 0, 1), 0) ==Int -1
+   175	
+   176	  rule filterWords(.Words, _) => .Words
+   177	  rule filterWords(WCons(W, WS), N)
+   178	       => WCons(W, filterWords(WS, N))
+   179	    requires countConsonants(W) ==Int N
+   180	  rule filterWords(WCons(W, WS), N)
+   181	       => filterWords(WS, N)
+   182	    requires countConsonants(W) =/=Int N
+   183	endmodule
+verification.k
+     1	// The contract is stated independently of the AST evaluator.  It says:
+     2	// split into words, retain exactly those whose mathematical consonant count
+     3	// equals N, and retain their order.
+     4	
+     5	requires "semantic.k"
+     6	
+     7	module VERIFICATION
+     8	  imports SEMANTIC
+     9	
+    10	  syntax PyValue ::= selectWordsSpec(String, Int) [function]
+    11	
+    12	  rule selectWordsSpec(S, N)
+    13	       => pyList(filterWords(words(S), N))
+    14	endmodule
+attribute/search summary
+/candidate/verification.k:10:  syntax PyValue ::= selectWordsSpec(String, Int) [function]
+/candidate/verification.k:12:  rule selectWordsSpec(S, N)
+/candidate/semantic.k:8:  syntax Module
+/candidate/semantic.k:9:  syntax Stmt
+/candidate/semantic.k:10:  syntax Stmts    ::= List{Stmt, ""}
+/candidate/semantic.k:11:  syntax Expr
+/candidate/semantic.k:12:  syntax Exprs    ::= List{Expr, ","}
+/candidate/semantic.k:13:  syntax Strings  ::= List{String, ","}
+/candidate/semantic.k:14:  syntax CmpOp
+/candidate/semantic.k:15:  syntax CmpOps   ::= List{CmpOp, ","}
+/candidate/semantic.k:16:  syntax CompFor
+/candidate/semantic.k:17:  syntax CompFors ::= List{CompFor, ""}
+/candidate/semantic.k:19:  syntax Module ::= "Module" "(" Stmts ")"
+/candidate/semantic.k:21:  syntax Stmt ::= "FuncDef" "(" String ","
+/candidate/semantic.k:32:  syntax Expr ::= "Name" "(" String ")"
+/candidate/semantic.k:40:  syntax CmpOp   ::= "CmpOp" "(" String "," Expr ")"
+/candidate/semantic.k:41:  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+/candidate/semantic.k:52:  syntax Words ::= ".Words"
+/candidate/semantic.k:54:  syntax PyValue ::= "pyList" "(" Words ")"
+/candidate/semantic.k:55:  syntax Result ::= "noResult" | PyValue
+/candidate/semantic.k:57:  syntax KItem ::= "exec" "(" Stmts ")"
+/candidate/semantic.k:61:  syntax Words ::= words(String)                       [function]
+/candidate/semantic.k:62:                 | scanWords(String, String, Words)   [function]
+/candidate/semantic.k:63:                 | appendWord(Words, String)          [function]
+/candidate/semantic.k:64:                 | filterWords(Words, Int)            [function]
+/candidate/semantic.k:65:  syntax Int ::= countConsonants(String)              [function]
+/candidate/semantic.k:67:  configuration
+/candidate/semantic.k:77:  rule <k> Module(FuncDef("select_words", Params("s", "n"), BODY))
+/candidate/semantic.k:79:  rule <k> Module(FuncDef("select_words", Params("s", "n"),
+/candidate/semantic.k:84:  rule <k> exec(Expr(Str(_)) REST) => exec(REST) ... </k>
+/candidate/semantic.k:86:  rule <k> exec(Return(E))
+/candidate/semantic.k:91:  rule <k> V:PyValue ~> finish => .K ... </k>
+/candidate/semantic.k:100:  // The rule is symbolic in S and N.  Its right side is an executable fold,
+/candidate/semantic.k:102:  rule eval(
+/candidate/semantic.k:125:  rule words(S) => scanWords(S, "", .Words)
+/candidate/semantic.k:127:  rule scanWords("", "", WS) => WS
+/candidate/semantic.k:128:  rule scanWords("", CUR, WS) => appendWord(WS, CUR)
+/candidate/semantic.k:131:  rule scanWords(S, CUR, WS)
+/candidate/semantic.k:140:  rule scanWords(S, CUR, WS)
+/candidate/semantic.k:149:  rule scanWords(S, CUR, WS)
+/candidate/semantic.k:157:  rule appendWord(.Words, W) => WCons(W, .Words)
+/candidate/semantic.k:158:  rule appendWord(WCons(W, WS), NEW)
+/candidate/semantic.k:163:  rule countConsonants("") => 0
+/candidate/semantic.k:164:  rule countConsonants(S)
+/candidate/semantic.k:169:  rule countConsonants(S)
+/candidate/semantic.k:176:  rule filterWords(.Words, _) => .Words
+/candidate/semantic.k:177:  rule filterWords(WCons(W, WS), N)
+/candidate/semantic.k:180:  rule filterWords(WCons(W, WS), N)
+EXIT STATUS: 0

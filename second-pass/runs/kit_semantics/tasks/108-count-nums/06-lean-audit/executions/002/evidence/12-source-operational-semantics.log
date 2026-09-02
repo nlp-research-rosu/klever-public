@@ -1,0 +1,241 @@
+Script started on 2026-07-31 07:08:01-05:00 [<not executed on terminal>]
+COMMAND: nl -ba verification.k | sed -n selected-ranges
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	  imports INT
+     6	  imports BOOL
+     7	
+     8	  // Candidate-domain predicate: every element is an integer.
+     9	  syntax Bool ::= allInts(ValSeq) [function, total]
+    10	  rule allInts(.ValSeq) => true
+    11	  rule allInts(vCons(V:Val, R:ValSeq))
+    12	    => isInt(V) andBool allInts(R)
+    13	
+    14	  // The Haskell backend does not refine V:Val to Int from an isInt(V) path
+    15	  // condition.  This guarded total projection is the standard K cast-boundary
+    16	  // idiom; it creates no integer value unless the fixed subsort cast is
+    17	  // defined.
+    18	  syntax Bool ::= definedProjectInt(Val) [function, total]
+    19	  rule definedProjectInt(V:Val) => isInt(V)
+    20	
+    21	  syntax Int ::= projectIntTotal(Val)
+    22	    [function, total, symbol(projectIntTotal), no-evaluators]
+    23	
+    24	  rule #Ceil({@V:Val}:>Int)
+    25	    => ({ definedProjectInt(@V) #Equals true } #And #Ceil(@V))
+    26	    [simplification]
+    27	
+    28	  rule projectIntTotal(V:Val) => {V}:>Int
+    29	    requires definedProjectInt(V)
+    30	    [concrete, simplification(10), preserves-definedness]
+    31	  rule {V:Val}:>Int => projectIntTotal(V)
+    32	    requires definedProjectInt(V)
+    33	    [symbolic(V), simplification, preserves-definedness]
+    34	  rule projectIntTotal(I:Int) => I [simplification]
+    35	  rule projectIntTotal(projectIntTotal(V:Val))
+    36	    => projectIntTotal(V)
+    37	    [simplification]
+    38	
+    39	  // Guarded dispatch twins of the supplied Int equations used after list
+    40	  // iteration yields a dynamically sorted Val.
+    41	  rule applyCmp("<", V:Val, J:Int)
+    42	    => projectIntTotal(V) <Int J
+    43	    requires isInt(V)
+    44	    [simplification]
+    45	  rule applyUn("-", V:Val)
+    46	    => 0 -Int projectIntTotal(V)
+    47	    requires isInt(V)
+    48	    [simplification]
+    49	
+    50	  syntax Int ::= magnitude(Int) [function, total]
+    51	  rule magnitude(I:Int) => 0 -Int I requires I <Int 0
+    52	  rule magnitude(I:Int) => I        requires I >=Int 0
+    53	
+    54	  // A proof-side name for the code sequence returned by the supplied
+    55	  // Int2String/strToCodes primitive.  The concrete rule remains in the fixed
+    56	  // semantics; this simplification names its already-produced result.
+    57	  syntax IntSeq ::= decimalCodes(Int)
+    58	    [function, total, no-evaluators]
+    59	  rule strToCodes(Int2String(N:Int)) => decimalCodes(N)
+    60	    requires N >=Int 0
+    61	    [simplification]
+    62	
+    63	  rule applyBuiltin("str", V:Val, .Vals)
+    64	    => str(decimalCodes(projectIntTotal(V)))
+    65	    requires isInt(V)
+    66	     andBool projectIntTotal(V) >=Int 0
+    67	    [simplification]
+    68	
+    69	  syntax Bool ::= allDigitCodes(IntSeq) [function, total]
+    70	  rule allDigitCodes(.IntSeq) => true
+    71	  rule allDigitCodes(iCons(C:Int, R:IntSeq))
+    72	    => (48 <=Int C andBool C <=Int 57) andBool allDigitCodes(R)
+    73	
+    74	  // Contract of the fixed Int2String primitive on non-negative integers.
+    75	  // This is the only value-level trust boundary in the proof.
+    76	  rule allDigitCodes(decimalCodes(N:Int)) => true
+    77	    requires N >=Int 0
+    78	    [simplification]
+    79	
+    80	  syntax Int ::= codeDigitSum(IntSeq) [function, total]
+    81	  rule codeDigitSum(.IntSeq) => 0
+    82	  rule codeDigitSum(iCons(C:Int, R:IntSeq))
+    83	    => (C -Int 48) +Int codeDigitSum(R)
+    84	
+    85	  // Result of the source loop's "first nonzero digit seen" accumulator.
+    86	  syntax Int ::= chooseFirst(Int, IntSeq) [function, total]
+    87	  rule chooseFirst(F:Int, .IntSeq) => F
+    88	  rule chooseFirst(0, iCons(C:Int, R:IntSeq))
+    89	    => chooseFirst(C -Int 48, R)
+    90	  rule chooseFirst(F:Int, iCons(_:Int, R:IntSeq))
+    91	    => chooseFirst(F, R)
+    92	    requires F =/=Int 0
+    93	    [simplification]
+    94	
+    95	  syntax Int ::= lastCode(Int, IntSeq) [function, total]
+    96	  rule lastCode(C:Int, .IntSeq) => C
+    97	  rule lastCode(_:Int, iCons(C:Int, R:IntSeq)) => lastCode(C, R)
+    98	
+    99	  syntax Int ::= signedDigitSum(Int) [function, total]
+   100	  rule signedDigitSum(I:Int)
+   101	    => codeDigitSum(decimalCodes(magnitude(I)))
+   102	       -Int (2 *Int chooseFirst(0, decimalCodes(magnitude(I))))
+   103	    requires I <Int 0
+   104	  rule signedDigitSum(I:Int)
+   105	    => codeDigitSum(decimalCodes(magnitude(I)))
+   106	    requires I >=Int 0
+   107	
+   108	  syntax Int ::= countNumsSpec(ValSeq) [function, total]
+   109	  rule countNumsSpec(.ValSeq) => 0
+   110	  rule countNumsSpec(vCons(V:Val, R:ValSeq))
+   111	    => (#if signedDigitSum(projectIntTotal(V)) >Int 0
+   112	         #then 1 #else 0 #fi)
+   113	       +Int countNumsSpec(R)
+   114	    requires isInt(V)
+   115	  rule countNumsSpec(vCons(V:Val, R:ValSeq))
+   116	    => countNumsSpec(R)
+   117	    requires notBool isInt(V)
+   118	endmodule
+COMMAND: nl -ba int.k | sed -n 1,30p
+     1	// reference/src/semantics/int.k — MPY-INT
+     2	// Int cases of the operator dispatch; Python // and % are floored (pyMod).
+     3	
+     4	module MPY-INT
+     5	  imports MPY-CORE
+     6	
+     7	  rule applyUn("-", I:Int) => 0 -Int I
+     8	
+     9	  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    10	  // Bool participates in int arithmetic (x += (a == b))
+    11	  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+    12	  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+    13	  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+    14	  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+    15	  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+    16	  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+    17	  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+    18	
+    19	  syntax Int ::= pyMod(Int, Int) [function]
+    20	  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+    21	
+    22	  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+    23	  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+    24	  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+    25	  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+    26	  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+    27	  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+    28	endmodule
+COMMAND: nl -ba builtins.k | sed -n 132,156p
+   132	  rule <k> #applyK(toCall(builtinV("map")), (typeV("str"), list(VS:ValSeq), .Vals))
+   133	        => #alloc(list(mapStrVS(VS))) ... </k>
+   134	  syntax ValSeq ::= mapStrVS(ValSeq) [function, total]
+   135	  rule mapStrVS(.ValSeq) => .ValSeq
+   136	  rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))
+   137	  rule mapStrVS(vCons(str(CS:IntSeq), R:ValSeq)) => vCons(str(CS), mapStrVS(R))
+   138	
+   139	  // ==== int(x) identities (int(round(x)) composes through) ====================
+   140	  rule applyBuiltin("int", I:Int, .Vals) => I
+   141	
+   142	  // ==== ord / chr ===========================================================
+   143	  rule applyBuiltin("ord", str(iCons(C:Int, .IntSeq)), .Vals) => C
+   144	  rule applyBuiltin("chr", I:Int, .Vals) => str(iCons(I, .IntSeq))
+   145	       requires 0 <=Int I andBool I <Int 128
+   146	
+   147	  // ==== str(int) / str(str) =================================================
+   148	  rule applyBuiltin("str", I:Int, .Vals)       => str(strToCodes(Int2String(I)))
+   149	  rule applyBuiltin("str", str(CS:IntSeq), .Vals) => str(CS)
+   150	
+   151	  // ==== int(str) — a single digit char ('0'..'9', code 48..57) to its value =====
+   152	  rule applyBuiltin("int", str(iCons(C:Int, .IntSeq)), .Vals) => C -Int 48
+   153	       requires 48 <=Int C andBool C <=Int 57
+   154	
+   155	  // ==== int(str) — a multi-digit non-negative numeral (Horner fold; the single-char rule covers len 1)
+   156	  rule applyBuiltin("int", str(CS:IntSeq), .Vals) => intDigAcc(CS, 0)
+COMMAND: nl -ba str.k | sed -n 1,20p
+     1	// reference/src/semantics/str.k — MPY-STR
+     2	
+     3	module MPY-STR
+     4	  imports MPY-CORE
+     5	  imports MPY-ITER
+     6	
+     7	  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+     8	  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+     9	  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+    10	        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+    11	
+    12	  // ==== str literal (ASCII-only) ============================================
+    13	  syntax IntSeq ::= strToCodes(String) [function]
+    14	  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+    15	  rule strToCodes("") => .IntSeq
+    16	  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    17	    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+    18	
+    19	  // ==== operators: + / == / != / in =========================================
+    20	  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+COMMAND: nl -ba solution.py
+     1	def count_nums(arr):
+     2	    count = 0
+     3	    for num in arr:
+     4	        if num < 0:
+     5	            n = -num
+     6	        else:
+     7	            n = num
+     8	
+     9	        digit_sum = 0
+    10	        first_digit = 0
+    11	        char = "0"
+    12	        digit = 0
+    13	        for char in str(n):
+    14	            digit = int(char)
+    15	            if first_digit == 0:
+    16	                first_digit = digit
+    17	            digit_sum += digit
+    18	
+    19	        if num < 0:
+    20	            digit_sum -= 2 * first_digit
+    21	
+    22	        if digit_sum > 0:
+    23	            count += 1
+    24	
+    25	    return count
+COMMAND: rg module/import/claim in spec.k and validation.k
+/reference/k-proof/validation.k
+3:module VALIDATION
+4:  imports VERIFICATION
+85:endmodule
+
+/reference/k-proof/spec.k
+3:module SPEC
+4:  imports VERIFICATION
+8:  claim [digit-loop]:
+54:  claim [outer-loop-empty]:
+120:  claim [outer-loop-step]:
+187:  claim [call-setup-nonempty]:
+325:  claim [outer-loop-initial]:
+385:  claim [count-nums-empty]:
+442:  claim [count-nums-nonempty]:
+499:endmodule
+
+Script done on 2026-07-31 07:08:01-05:00 [COMMAND_EXIT_CODE="0"]

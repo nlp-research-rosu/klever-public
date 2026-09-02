@@ -1,0 +1,258 @@
+requires "semantic.k"
+
+module VERIFICATION
+  imports SEMANTIC
+
+  // The independently stated mathematical contract for the rabbit task.
+  rule carrotContract(NUMBER, NEED, REMAINING)
+    => result(NUMBER +Int NEED, REMAINING -Int NEED)
+    requires NEED <=Int REMAINING
+  rule carrotContract(NUMBER, NEED, REMAINING)
+    => result(NUMBER +Int REMAINING, 0)
+    requires REMAINING <Int NEED
+
+  rule validInput(NUMBER, NEED, REMAINING)
+    => (0 <=Int NUMBER andBool NUMBER <=Int 1000)
+       andBool (0 <=Int NEED andBool NEED <=Int 1000)
+       andBool (0 <=Int REMAINING andBool REMAINING <=Int 1000)
+
+  // This is exactly the constructor tree generated in solution.mpy.
+  rule solutionProgram
+    => Module(
+         FuncDef("eat", Params("number", "need", "remaining"),
+           If(Compare(Name("need"), CmpOp("<=", Name("remaining"))),
+             Return(ListExpr(
+               BinOp("+", Name("number"), Name("need")),
+               BinOp("-", Name("remaining"), Name("need"))
+             )),
+             .Stmts
+           )
+           Return(ListExpr(
+             BinOp("+", Name("number"), Name("remaining")),
+             Int(0)
+           ))
+         )
+       )
+endmodule
+requires "verification.k"
+
+module SPEC
+  imports VERIFICATION
+
+  claim <mpy>
+          <k> run(solutionProgram, args(NUMBER, NEED, REMAINING))
+            => carrotContract(NUMBER, NEED, REMAINING)
+          </k>
+        </mpy>
+    requires validInput(NUMBER, NEED, REMAINING)
+             andBool NEED <=Int REMAINING
+
+  claim <mpy>
+          <k> run(solutionProgram, args(NUMBER, NEED, REMAINING))
+            => carrotContract(NUMBER, NEED, REMAINING)
+          </k>
+        </mpy>
+    requires validInput(NUMBER, NEED, REMAINING)
+             andBool REMAINING <Int NEED
+
+  claim <mpy>
+          <k> run(solutionProgram, args(5, 6, 10))
+            => result(11, 4)
+          </k>
+        </mpy>
+
+  claim <mpy>
+          <k> run(solutionProgram, args(4, 8, 9))
+            => result(12, 1)
+          </k>
+        </mpy>
+
+  claim <mpy>
+          <k> run(solutionProgram, args(1, 10, 10))
+            => result(11, 0)
+          </k>
+        </mpy>
+
+  claim <mpy>
+          <k> run(solutionProgram, args(2, 11, 5))
+            => result(7, 0)
+          </k>
+        </mpy>
+endmodule
+module MPY-SYNTAX
+  imports INT
+  imports BOOL
+  imports STRING
+
+  syntax Pgm ::= "Module" "(" Stmts ")"
+
+  syntax Stmts ::= List{Stmt, ""}
+  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+                | "Return" "(" Expr ")"
+                | "If" "(" Expr "," Stmts "," Stmts ")"
+
+  syntax Params ::= "Params" "(" Strings ")"
+  syntax Strings ::= List{String, ","}
+
+  syntax Expr ::= "Int" "(" Int ")"
+                | "Name" "(" String ")"
+                | "BinOp" "(" String "," Expr "," Expr ")"
+                | "Compare" "(" Expr "," CmpOps ")"
+                | "ListExpr" "(" Exprs ")"
+
+  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+  syntax CmpOps ::= List{CmpOp, ","}
+  syntax Exprs ::= List{Expr, ","}
+
+  syntax Args ::= "args" "(" Int "," Int "," Int ")"
+  syntax Result ::= "result" "(" Int "," Int ")"
+endmodule
+
+module SEMANTIC
+  imports MPY-SYNTAX
+  imports MAP
+
+  syntax PyVal ::= "intVal" "(" Int ")"
+                 | "boolVal" "(" Bool ")"
+                 | "listVal" "(" PyVals ")"
+  syntax PyVals ::= List{PyVal, ","}
+
+  syntax Outcome ::= "normal"
+                   | "returned" "(" PyVal ")"
+
+  syntax KItem ::= "run" "(" Pgm "," Args ")"
+
+  // Symbols whose defining equations live in the proof layer.
+  syntax Result ::= carrotContract(Int, Int, Int) [function, total]
+  syntax Bool ::= validInput(Int, Int, Int) [function, total]
+  syntax Pgm ::= "solutionProgram" [function]
+
+  syntax PyVal ::= lookup(String, Map) [function, total]
+  rule lookup(X, (X |-> V:PyVal) _REST) => V
+
+  syntax PyVal ::= evalExpr(Expr, Map) [function, total]
+  rule evalExpr(Int(I), _) => intVal(I)
+  rule evalExpr(Name(X), RHO) => lookup(X, RHO)
+  rule evalExpr(BinOp("+", LEFT, RIGHT), RHO)
+    => addVals(evalExpr(LEFT, RHO), evalExpr(RIGHT, RHO))
+  rule evalExpr(BinOp("-", LEFT, RIGHT), RHO)
+    => subVals(evalExpr(LEFT, RHO), evalExpr(RIGHT, RHO))
+  rule evalExpr(Compare(LEFT, CmpOp("<=", RIGHT)), RHO)
+    => leVals(evalExpr(LEFT, RHO), evalExpr(RIGHT, RHO))
+  rule evalExpr(ListExpr(FIRST, SECOND), RHO)
+    => listVal(evalExpr(FIRST, RHO), evalExpr(SECOND, RHO))
+
+  syntax PyVal ::= addVals(PyVal, PyVal) [function, total]
+                 | subVals(PyVal, PyVal) [function, total]
+                 | leVals(PyVal, PyVal) [function, total]
+  rule addVals(intVal(A), intVal(B)) => intVal(A +Int B)
+  rule subVals(intVal(A), intVal(B)) => intVal(A -Int B)
+  rule leVals(intVal(A), intVal(B)) => boolVal(true)
+    requires A <=Int B
+  rule leVals(intVal(A), intVal(B)) => boolVal(false)
+    requires B <Int A
+
+  syntax Outcome ::= evalStmts(Stmts, Map) [function, total]
+                   | evalStmt(Stmt, Map) [function, total]
+                   | continueWith(Outcome, Stmts, Map) [function, total]
+                   | chooseBranch(PyVal, Stmts, Stmts, Map) [function, total]
+  rule evalStmts(.Stmts, _) => normal
+  rule evalStmts(S:Stmt REST:Stmts, RHO)
+    => continueWith(evalStmt(S, RHO), REST, RHO)
+  rule continueWith(normal, REST, RHO) => evalStmts(REST, RHO)
+  rule continueWith(returned(V), _, _) => returned(V)
+
+  rule evalStmt(Return(E), RHO) => returned(evalExpr(E, RHO))
+  rule evalStmt(If(COND, THEN, ELSE), RHO)
+    => chooseBranch(evalExpr(COND, RHO), THEN, ELSE, RHO)
+  rule chooseBranch(boolVal(true), THEN, _, RHO) => evalStmts(THEN, RHO)
+  rule chooseBranch(boolVal(false), _, ELSE, RHO) => evalStmts(ELSE, RHO)
+
+  syntax Result ::= resultOf(Outcome) [function, total]
+  rule resultOf(returned(listVal(intVal(A), intVal(B)))) => result(A, B)
+
+  configuration
+    <mpy>
+      <k> run($PGM:Pgm, $ARGS:Args) </k>
+    </mpy>
+
+  rule run(
+         Module(FuncDef("eat", Params("number", "need", "remaining"), BODY)),
+         args(NUMBER, NEED, REMAINING)
+       )
+    => resultOf(evalStmts(
+         BODY,
+         ("number" |-> intVal(NUMBER))
+         ("need" |-> intVal(NEED))
+         ("remaining" |-> intVal(REMAINING))
+       ))
+endmodule
+def eat(number, need, remaining):
+    if need <= remaining:
+        return [number + need, remaining - need]
+    return [number + remaining, 0]
+Module(
+  FuncDef("eat", Params("number", "need", "remaining"),
+    If(Compare(Name("need"), CmpOp("<=", Name("remaining"))),
+      Return(
+        ListExpr(
+          BinOp("+", Name("number"), Name("need")),
+          BinOp("-", Name("remaining"), Name("need")))),
+      )
+    Return(
+      ListExpr(BinOp("+", Name("number"), Name("remaining")), Int(0)))))
+
+def eat(number, need, remaining):
+    """
+    You're a hungry rabbit, and you already have eaten a certain number of carrots,
+    but now you need to eat more carrots to complete the day's meals.
+    you should return an array of [ total number of eaten carrots after your meals,
+                                    the number of carrots left after your meals ]
+    if there are not enough remaining carrots, you will eat all remaining carrots, but will still be hungry.
+    
+    Example:
+    * eat(5, 6, 10) -> [11, 4]
+    * eat(4, 8, 9) -> [12, 1]
+    * eat(1, 10, 10) -> [11, 0]
+    * eat(2, 11, 5) -> [7, 0]
+    
+    Variables:
+    @number : integer
+        the number of carrots that you have eaten.
+    @need : integer
+        the number of carrots that you need to eat.
+    @remaining : integer
+        the number of remaining carrots thet exist in stock
+    
+    Constrain:
+    * 0 <= number <= 1000
+    * 0 <= need <= 1000
+    * 0 <= remaining <= 1000
+
+    Have fun :)
+    """
+#!/usr/bin/env bash
+set -euo pipefail
+
+python3 py2mpy.py solution.py > solution.mpy
+
+kompile semantic.k \
+  --backend haskell \
+  --main-module SEMANTIC \
+  --syntax-module MPY-SYNTAX
+
+krun solution.mpy --definition semantic-kompiled \
+  -cARGS='args(5, 6, 10)'
+krun solution.mpy --definition semantic-kompiled \
+  -cARGS='args(4, 8, 9)'
+krun solution.mpy --definition semantic-kompiled \
+  -cARGS='args(1, 10, 10)'
+krun solution.mpy --definition semantic-kompiled \
+  -cARGS='args(2, 11, 5)'
+
+kompile verification.k \
+  --backend haskell \
+  --main-module VERIFICATION \
+  --syntax-module MPY-SYNTAX
+
+kprove spec.k --definition verification-kompiled

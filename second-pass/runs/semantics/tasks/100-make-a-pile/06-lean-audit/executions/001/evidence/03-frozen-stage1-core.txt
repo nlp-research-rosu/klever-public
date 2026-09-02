@@ -1,0 +1,192 @@
+$ nl -ba /reference/k-proof/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module PILE-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  syntax Expr ::= "pileCondition" [macro]
+     7	  rule pileCondition
+     8	    => Compare(Name("i"), CmpOp("<", Name("n")))
+     9	
+    10	  syntax Stmts ::= "pileLoopBody" [macro]
+    11	  rule pileLoopBody
+    12	    => Expr(
+    13	         Call(
+    14	           Attribute(Name("stones"), "append"),
+    15	           BinOp("+", Name("n"), BinOp("*", Int(2), Name("i")))))
+    16	       AugAssign(Name("i"), "+", Int(1))
+    17	
+    18	  syntax Stmts ::= "pileBody" [macro]
+    19	  rule pileBody
+    20	    => Assign(Name("stones"), ListExpr(.Exprs))
+    21	       Assign(Name("i"), Int(0))
+    22	       While(pileCondition, pileLoopBody)
+    23	       Return(Name("stones"))
+    24	
+    25	  syntax Val ::= "pileClosure" [macro]
+    26	  rule pileClosure => closureVal(("n", .ParamNames), pileBody, 0)
+    27	
+    28	  syntax Module ::= "pileModule" [macro]
+    29	  rule pileModule
+    30	    => Module(FuncDef("make_a_pile", Params("n"), pileBody))
+    31	
+    32	  // pile(N, I) is the mathematical suffix at level index I:
+    33	  // [N + 2*I, N + 2*(I+1), ..., N + 2*(N-1)].
+    34	  syntax ValSeq ::= pile(Int, Int) [function, total]
+    35	  rule pile(N:Int, I:Int) => .ValSeq
+    36	    requires I >=Int N
+    37	  rule pile(N:Int, I:Int)
+    38	    => vCons(N +Int (2 *Int I), pile(N, I +Int 1))
+    39	    requires I <Int N
+    40	
+    41	  // Two standard list-concatenation identities orient symbolic accumulators
+    42	  // into the same form on successive induction steps.
+    43	  rule valSeqConcat(VS:ValSeq, .ValSeq) => VS [simplification]
+    44	  rule valSeqConcat(valSeqConcat(A:ValSeq, B:ValSeq), C:ValSeq)
+    45	    => valSeqConcat(A, valSeqConcat(B, C))
+    46	    [simplification]
+    47	endmodule
+$ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module PILE-LOOP-SPEC
+     4	  imports PILE-VERIFICATION
+     5	
+     6	  claim
+     7	    <k>
+     8	      #while(pileCondition, pileLoopBody)
+     9	      ~> (Return(Name("stones")) .Stmts):Stmts
+    10	      ~> #endcall
+    11	    =>
+    12	      ref(0)
+    13	    </k>
+    14	    <env> 1 => 0 </env>
+    15	    <scopes>
+    16	      -1 |-> BUILTINS:Scope
+    17	      0 |-> scope(
+    18	        MODULE:Map,
+    19	        parent(-1))
+    20	      1 |-> scope(
+    21	        ("n" |-> N:Int)
+    22	        ("stones" |-> ref(0))
+    23	        ("i" |-> I:Int),
+    24	        parent(0))
+    25	    =>
+    26	      -1 |-> BUILTINS
+    27	      0 |-> scope(
+    28	        MODULE,
+    29	        parent(-1))
+    30	    </scopes>
+    31	    <scopeLoc> 2 => 1 </scopeLoc>
+    32	    <heap>
+    33	      0 |-> list(VS:ValSeq)
+    34	    =>
+    35	      0 |-> list(
+    36	        valSeqConcat(
+    37	          VS,
+    38	          pile(N, I)))
+    39	    </heap>
+    40	    <heapLoc> 1 </heapLoc>
+    41	    <stack> ListItem(frame(.K, 0, 1)) => .List </stack>
+    42	    <ret> noRet </ret>
+    43	    <exc> NoExc </exc>
+    44	    requires
+    45	      N >Int 0
+    46	      andBool I >=Int 0
+    47	      andBool I <=Int N
+    48	endmodule
+    49	
+    50	module PILE-PREFIX-SPEC
+    51	  imports PILE-VERIFICATION
+    52	
+    53	  claim
+    54	    <k>
+    55	      #loadAll(pileModule)
+    56	      ~> Call(Name("make_a_pile"), Int(N:Int))
+    57	    =>
+    58	      #while(pileCondition, pileLoopBody)
+    59	      ~> (Return(Name("stones")) .Stmts):Stmts
+    60	      ~> #endcall
+    61	    </k>
+    62	    <env> 0 => 1 </env>
+    63	    <scopes>
+    64	      0 |-> scope(.Map, parent(-1))
+    65	      -1 |-> BUILTINS:Scope
+    66	    =>
+    67	      -1 |-> BUILTINS
+    68	      0 |-> scope(
+    69	        ?MODULE:Map,
+    70	        parent(-1))
+    71	      1 |-> scope(
+    72	        ("n" |-> N)
+    73	        ("stones" |-> ref(0))
+    74	        ("i" |-> 0),
+    75	        parent(0))
+    76	    </scopes>
+    77	    <scopeLoc> 1 => 2 </scopeLoc>
+    78	    <heap> .Map => 0 |-> list(.ValSeq) </heap>
+    79	    <heapLoc> 0 => 1 </heapLoc>
+    80	    <stack>
+    81	      .List => ListItem(frame(.K, 0, 1))
+    82	    </stack>
+    83	    <ret> noRet </ret>
+    84	    <exc> NoExc </exc>
+    85	    requires N >Int 0
+    86	endmodule
+$ nl -ba /reference/k-proof/solution.py
+     1	def make_a_pile(n):
+     2	    stones = []
+     3	    i = 0
+     4	    while i < n:
+     5	        stones.append(n + 2 * i)
+     6	        i += 1
+     7	    return stones
+$ nl -ba /reference/k-proof/prompt.py
+     1	
+     2	def make_a_pile(n):
+     3	    """
+     4	    Given a positive integer n, you have to make a pile of n levels of stones.
+     5	    The first level has n stones.
+     6	    The number of stones in the next level is:
+     7	        - the next odd number if n is odd.
+     8	        - the next even number if n is even.
+     9	    Return the number of stones in each level in a list, where element at index
+    10	    i represents the number of stones in the level (i+1).
+    11	
+    12	    Examples:
+    13	    >>> make_a_pile(3)
+    14	    [3, 5, 7]
+    15	    """
+$ nl -ba /reference/k-proof/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Translate the submitted implementation with the fixed front end.
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	
+     7	# Build the required concrete LLVM semantics and exercise representative
+     8	# positive odd/even inputs, including the smallest allowed input.
+     9	kompile reference-semantics/semantics.k \
+    10	  --backend llvm \
+    11	  --main-module MPY-KRUN \
+    12	  --syntax-module MPY-SYNTAX \
+    13	  --output-definition runtime-kompiled
+    14	python3 py2mpy.py concrete_tests.py > concrete_tests.mpy
+    15	krun concrete_tests.mpy --definition runtime-kompiled
+    16	
+    17	# Build the symbolic definition from the supplied MPY modules plus the
+    18	# mathematical sequence and list lemmas in verification.k.
+    19	kompile verification.k \
+    20	  --backend haskell \
+    21	  --main-module PILE-VERIFICATION \
+    22	  --syntax-module MPY-SYNTAX \
+    23	  --output-definition verification-kompiled
+    24	
+    25	# The two #Top results compose at the exact loop-entry configuration:
+    26	# public entry point -> initialized invariant -> returned progression.
+    27	kprove spec.k \
+    28	  --definition verification-kompiled \
+    29	  --spec-module PILE-PREFIX-SPEC
+    30	kprove spec.k \
+    31	  --definition verification-kompiled \
+    32	  --spec-module PILE-LOOP-SPEC

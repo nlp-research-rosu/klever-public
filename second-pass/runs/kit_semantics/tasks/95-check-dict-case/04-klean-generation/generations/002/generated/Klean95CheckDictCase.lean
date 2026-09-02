@@ -1,0 +1,2 @@
+import Klean95CheckDictCase.Rewrite
+import Klean95CheckDictCase.Lemmas

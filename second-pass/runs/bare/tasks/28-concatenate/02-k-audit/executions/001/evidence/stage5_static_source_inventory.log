@@ -1,0 +1,241 @@
+Script started on 2026-07-23 06:55:28-05:00 [<not executed on terminal>]
++ find /tmp/audit-work/fresh -maxdepth 1 -type f -name '*.k' -printf '%f\n'
++ sort
+semantic.k
+spec.k
+verification.k
++ nl -ba /tmp/audit-work/fresh/semantic.k
+     1	requires "verification.k"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports STRING
+     5	
+     6	  syntax Pgm ::= PyProgram
+     7	
+     8	  syntax PyProgram ::= "Module" "(" PyStmts ")"
+     9	  syntax PyStmts ::= List{PyStmt, ""}
+    10	
+    11	  syntax Params ::= "Params" "(" String ")"
+    12	
+    13	  syntax PyStmt ::= "ImportFrom" "(" String "," String ")"
+    14	                  | "FuncDef" "(" String "," Params "," PyStmts ")"
+    15	                  | "Assign" "(" PyExpr "," PyExpr ")"
+    16	                  | "For" "(" PyExpr "," PyExpr "," PyStmts ")"
+    17	                  | "Return" "(" PyExpr ")"
+    18	
+    19	  syntax PyExpr ::= "Name" "(" String ")"
+    20	                  | "Str" "(" String ")"
+    21	                  | "BinOp" "(" String "," PyExpr "," PyExpr ")"
+    22	
+    23	  syntax StrList ::= ".StrList"
+    24	                   | String "::" StrList
+    25	  syntax PyVal ::= "sVal" "(" String ")"
+    26	                 | "lVal" "(" StrList ")"
+    27	
+    28	  syntax Function ::= "noFunction"
+    29	                    | "function" "(" String "," String "," PyStmts ")"
+    30	  syntax Result ::= "noResult" | PyVal
+    31	
+    32	  syntax KItem ::= "load" "(" PyProgram ")"
+    33	                 | "moduleLoaded"
+    34	                 | "invoke" "(" String "," PyVal ")"
+    35	                 | "assignTo" "(" String ")"
+    36	                 | "addLeft" "(" PyExpr ")"
+    37	                 | "addRight" "(" PyVal ")"
+    38	                 | "startFor" "(" String "," PyStmts ")"
+    39	                 | "loop" "(" String "," StrList "," PyStmts ")"
+    40	                 | "bindLoop" "(" String "," PyVal ")"
+    41	                 | "finishReturn"
+    42	                 | "cleanup"
+    43	endmodule
+    44	
+    45	module MPY-SEMANTICS
+    46	  imports MPY-SYNTAX
+    47	  imports VERIFICATION
+    48	
+    49	  configuration
+    50	    <py>
+    51	      <k> load($PGM:PyProgram) ~> invoke("concatenate", $ARG:PyVal) </k>
+    52	      <function> noFunction </function>
+    53	      <argument> lVal(.StrList) </argument>
+    54	      <accumulator> sVal("") </accumulator>
+    55	      <iterationItem> sVal("") </iterationItem>
+    56	      <result> noResult </result>
+    57	    </py>
+    58	
+    59	  // Module loading.
+    60	  rule <k> load(Module(STMTS)) => STMTS ~> moduleLoaded ... </k>
+    61	  rule <k> .PyStmts => .K ... </k>
+    62	  rule <k> (S:PyStmt REST:PyStmts) => S ~> REST ... </k>
+    63	  rule <k> ImportFrom(_, _) => .K ... </k>
+    64	  rule <k> FuncDef(F, Params(P), BODY) => .K ... </k>
+    65	       <function> _ => function(F, P, BODY) </function>
+    66	  rule <k> moduleLoaded => .K ... </k>
+    67	
+    68	  // The sole call frame needed by this first-order task.
+    69	  rule <k> invoke(F, ARG) => BODY ~> cleanup ... </k>
+    70	       <function> function(F, "strings", BODY) </function>
+    71	       <argument> _ => ARG </argument>
+    72	
+    73	  // Expressions and assignment.
+    74	  rule <k> Str(S) => sVal(S) ... </k>
+    75	  rule <k> Name("strings") => V ... </k>
+    76	       <argument> V </argument>
+    77	  rule <k> Name("result") => V ... </k>
+    78	       <accumulator> V </accumulator>
+    79	  rule <k> Name("string") => V ... </k>
+    80	       <iterationItem> V </iterationItem>
+    81	  rule <k> Assign(Name(X), E) => E ~> assignTo(X) ... </k>
+    82	  rule <k> V:PyVal ~> assignTo("result") => .K ... </k>
+    83	       <accumulator> _ => V </accumulator>
+    84	  rule <k> BinOp("+", LEFT, RIGHT) => LEFT ~> addLeft(RIGHT) ... </k>
+    85	  rule <k> V:PyVal ~> addLeft(RIGHT) => RIGHT ~> addRight(V) ... </k>
+    86	  rule <k> sVal(S2) ~> addRight(sVal(S1)) => sVal(S1 +String S2) ... </k>
+    87	
+    88	  // For loops consume the list from left to right and execute their body once
+    89	  // for each element.
+    90	  rule <k> For(Name(X), ITER, BODY) => ITER ~> startFor(X, BODY) ... </k>
+    91	  rule <k> lVal(ITEMS) ~> startFor(X, BODY) => loop(X, ITEMS, BODY) ... </k>
+    92	  rule <k> loop(_, .StrList, _) => .K ... </k>
+    93	  rule <k> loop(X, S :: REST, BODY)
+    94	        => bindLoop(X, sVal(S)) ~> BODY ~> loop(X, REST, BODY) ... </k>
+    95	  rule <k> bindLoop("string", V) => .K ... </k>
+    96	       <iterationItem> _ => V </iterationItem>
+    97	
+    98	  // Return publishes a value; cleanup restores the call-local cells so that
+    99	  // claims can state a closed final configuration.
+   100	  rule <k> Return(E) => E ~> finishReturn ... </k>
+   101	  rule <k> V:PyVal ~> finishReturn => .K ... </k>
+   102	       <result> _ => V </result>
+   103	  rule <k> cleanup => .K ... </k>
+   104	       <function> _ => noFunction </function>
+   105	       <argument> _ => lVal(.StrList) </argument>
+   106	       <accumulator> _ => sVal("") </accumulator>
+   107	       <iterationItem> _ => sVal("") </iterationItem>
+   108	endmodule
++ nl -ba /tmp/audit-work/fresh/verification.k
+     1	module VERIFICATION
+     2	  imports MPY-SYNTAX
+     3	
+     4	  // Mathematical left fold used by the reachability claims.
+     5	  syntax String ::= concatAcc(String, StrList) [function]
+     6	  rule concatAcc(ACC, .StrList) => ACC
+     7	  rule concatAcc(ACC, S :: REST) => concatAcc(ACC +String S, REST)
+     8	endmodule
++ nl -ba /tmp/audit-work/fresh/spec.k
+     1	requires "semantic.k"
+     2	
+     3	module SPEC
+     4	  imports MPY-SEMANTICS
+     5	
+     6	  // Loop invariant: starting with accumulator ACC and unconsumed ITEMS,
+     7	  // execution returns ACC followed by every remaining string.  The saved
+     8	  // values in the argument and iteration-variable cells are irrelevant to the
+     9	  // accumulator except when the loop body explicitly reads the current item.
+    10	  claim [concatenate-loop]:
+    11	    <py>
+    12	      <k>
+    13	        loop("string", ITEMS:StrList,
+    14	          Assign(Name("result"),
+    15	            BinOp("+", Name("result"), Name("string"))))
+    16	        ~> (Return(Name("result")) .PyStmts) ~> cleanup
+    17	        => .K
+    18	      </k>
+    19	      <function> _FUN:Function => noFunction </function>
+    20	      <argument> lVal(_ALL:StrList) => lVal(.StrList) </argument>
+    21	      <accumulator> sVal(ACC:String) => sVal("") </accumulator>
+    22	      <iterationItem> sVal(_CURRENT:String) => sVal("") </iterationItem>
+    23	      <result> noResult => sVal(concatAcc(ACC, ITEMS)) </result>
+    24	    </py>
+    25	
+    26	  // End-to-end correctness of the exact constructor tree emitted in
+    27	  // solution.mpy, for an arbitrary finite list of strings.
+    28	  claim [concatenate-correct]:
+    29	    <py>
+    30	      <k>
+    31	        load(Module(
+    32	          ImportFrom("typing", "List")
+    33	          FuncDef("concatenate", Params("strings"),
+    34	            Assign(Name("result"), Str(""))
+    35	            For(Name("string"), Name("strings"),
+    36	              Assign(Name("result"),
+    37	                BinOp("+", Name("result"), Name("string"))))
+    38	            Return(Name("result")))))
+    39	        ~> invoke("concatenate", lVal(INPUT:StrList))
+    40	        => .K
+    41	      </k>
+    42	      <function> noFunction </function>
+    43	      <argument> lVal(.StrList) </argument>
+    44	      <accumulator> sVal("") </accumulator>
+    45	      <iterationItem> sVal("") </iterationItem>
+    46	      <result> noResult => sVal(concatAcc("", INPUT)) </result>
+    47	    </py>
+    48	endmodule
++ nl -ba /tmp/audit-work/fresh/solution.mpy
+     1	Module(
+     2	  ImportFrom("typing", "List")
+     3	  FuncDef("concatenate", Params("strings"),
+     4	    Assign(Name("result"), Str(""))
+     5	    For(Name("string"), Name("strings"),
+     6	      Assign(Name("result"), BinOp("+", Name("result"), Name("string"))))
+     7	    Return(Name("result"))))
++ rg -n '^\s*(syntax|rule|claim|configuration|requires|module|imports)|\[(function|total|functional|simplification|priority|owise|anywhere|concrete)' /tmp/audit-work/fresh/semantic.k /tmp/audit-work/fresh/verification.k /tmp/audit-work/fresh/spec.k
+/tmp/audit-work/fresh/spec.k
+1:requires "semantic.k"
+3:module SPEC
+4:  imports MPY-SEMANTICS
+10:  claim [concatenate-loop]:
+28:  claim [concatenate-correct]:
+
+/tmp/audit-work/fresh/semantic.k
+1:requires "verification.k"
+3:module MPY-SYNTAX
+4:  imports STRING
+6:  syntax Pgm ::= PyProgram
+8:  syntax PyProgram ::= "Module" "(" PyStmts ")"
+9:  syntax PyStmts ::= List{PyStmt, ""}
+11:  syntax Params ::= "Params" "(" String ")"
+13:  syntax PyStmt ::= "ImportFrom" "(" String "," String ")"
+19:  syntax PyExpr ::= "Name" "(" String ")"
+23:  syntax StrList ::= ".StrList"
+25:  syntax PyVal ::= "sVal" "(" String ")"
+28:  syntax Function ::= "noFunction"
+30:  syntax Result ::= "noResult" | PyVal
+32:  syntax KItem ::= "load" "(" PyProgram ")"
+45:module MPY-SEMANTICS
+46:  imports MPY-SYNTAX
+47:  imports VERIFICATION
+49:  configuration
+60:  rule <k> load(Module(STMTS)) => STMTS ~> moduleLoaded ... </k>
+61:  rule <k> .PyStmts => .K ... </k>
+62:  rule <k> (S:PyStmt REST:PyStmts) => S ~> REST ... </k>
+63:  rule <k> ImportFrom(_, _) => .K ... </k>
+64:  rule <k> FuncDef(F, Params(P), BODY) => .K ... </k>
+66:  rule <k> moduleLoaded => .K ... </k>
+69:  rule <k> invoke(F, ARG) => BODY ~> cleanup ... </k>
+74:  rule <k> Str(S) => sVal(S) ... </k>
+75:  rule <k> Name("strings") => V ... </k>
+77:  rule <k> Name("result") => V ... </k>
+79:  rule <k> Name("string") => V ... </k>
+81:  rule <k> Assign(Name(X), E) => E ~> assignTo(X) ... </k>
+82:  rule <k> V:PyVal ~> assignTo("result") => .K ... </k>
+84:  rule <k> BinOp("+", LEFT, RIGHT) => LEFT ~> addLeft(RIGHT) ... </k>
+85:  rule <k> V:PyVal ~> addLeft(RIGHT) => RIGHT ~> addRight(V) ... </k>
+86:  rule <k> sVal(S2) ~> addRight(sVal(S1)) => sVal(S1 +String S2) ... </k>
+90:  rule <k> For(Name(X), ITER, BODY) => ITER ~> startFor(X, BODY) ... </k>
+91:  rule <k> lVal(ITEMS) ~> startFor(X, BODY) => loop(X, ITEMS, BODY) ... </k>
+92:  rule <k> loop(_, .StrList, _) => .K ... </k>
+93:  rule <k> loop(X, S :: REST, BODY)
+95:  rule <k> bindLoop("string", V) => .K ... </k>
+100:  rule <k> Return(E) => E ~> finishReturn ... </k>
+101:  rule <k> V:PyVal ~> finishReturn => .K ... </k>
+103:  rule <k> cleanup => .K ... </k>
+
+/tmp/audit-work/fresh/verification.k
+1:module VERIFICATION
+2:  imports MPY-SYNTAX
+5:  syntax String ::= concatAcc(String, StrList) [function]
+6:  rule concatAcc(ACC, .StrList) => ACC
+7:  rule concatAcc(ACC, S :: REST) => concatAcc(ACC +String S, REST)
+
+Script done on 2026-07-23 06:55:28-05:00 [COMMAND_EXIT_CODE="0"]

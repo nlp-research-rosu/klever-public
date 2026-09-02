@@ -1,0 +1,399 @@
+CANDIDATE_FILES
+.lake/lakefile.olean
+.lake/lakefile.olean.trace
+Proof.lean
+lakefile.lean
+lean-toolchain
+
+LAKEFILE
+     1	import Lake
+     2	open Lake DSL
+     3	package "proof"
+     4	require «klean-135-can-arrange» from "./Base"
+     5	@[default_target]
+     6	lean_lib Proof
+
+PROOF
+     1	import Klean135CanArrange.Lemmas
+     2	
+     3	namespace Proof
+     4	
+     5	/- Structural equality used by frozen `==K` rules.  Direct float comparison
+     6	   below uses the frozen Float hooks instead. -/
+     7	local instance operationalStructuralFloatBEq : BEq SortFloat where
+     8	  beq left right := left.toBits == right.toBits
+     9	
+    10	deriving instance BEq for SortExc, SortIntSeq, SortStr, SortExcCell, SortEnvCell,
+    11	  SortExitCodeCell, SortGeneratedCounterCell, SortHeapLocCell,
+    12	  SortOptInt, SortScopeLocCell, SortParamNames, SortCellVars, SortFreeVars,
+    13	  SortParams
+    14	
+    15	deriving instance BEq for SortApplyK, SortBound, SortCmpOp, SortEntries,
+    16	  SortEntry, SortExpr, SortExprs, SortGeneratedTopCell, SortHeapCell, SortIndex,
+    17	  SortIterable, SortK, SortKCell, SortKItem, SortList, SortMap, SortModule,
+    18	  SortRetCell, SortRetState, SortScopesCell, SortStackCell, SortStmt, SortStmts,
+    19	  SortVal, SortValSeq, SortVals
+    20	
+    21	def operationalIsNumericVal : SortVal → SortBool
+    22	  | .inj_SortBool _ => true
+    23	  | .inj_SortFloat _ => true
+    24	  | .inj_SortInt _ => true
+    25	  | _ => false
+    26	
+    27	def operationalIsStrVal : SortVal → SortBool
+    28	  | .inj_SortStr _ => true
+    29	  | _ => false
+    30	
+    31	def operationalOrderablePair (left right : SortVal) : SortBool :=
+    32	  (operationalIsNumericVal left && operationalIsNumericVal right) ||
+    33	    (operationalIsStrVal left && operationalIsStrVal right)
+    34	
+    35	def operationalBoolAsInt : SortBool → SortInt
+    36	  | false => 0
+    37	  | true => 1
+    38	
+    39	/- These are exactly the frozen `<Float`, `>Float`, and `==Float` hooks on
+    40	   Base's binary64 SortFloat representation. -/
+    41	def operationalFloatLt (left right : SortFloat) : SortBool :=
+    42	  decide (left < right)
+    43	
+    44	def operationalFloatGt (left right : SortFloat) : SortBool :=
+    45	  decide (right < left)
+    46	
+    47	/- Exact binary64 decomposition for MPY-FLOAT's unbounded Int/Float bridge. -/
+    48	def operationalFiniteFloatParts
+    49	    (value : SortFloat) : SortBool × Nat × SortInt :=
+    50	  let bits := value.toBits.toNat
+    51	  let negative := decide (bits / (2 ^ 63) = 1)
+    52	  let storedExponent := (bits / (2 ^ 52)) % (2 ^ 11)
+    53	  let fraction := bits % (2 ^ 52)
+    54	  if storedExponent = 0 then
+    55	    (negative, fraction, -1074)
+    56	  else
+    57	    (negative, (2 ^ 52) + fraction, Int.ofNat storedExponent - 1075)
+    58	
+    59	def operationalSplitFloatMagnitude
+    60	    (significand : Nat) (binaryExponent : SortInt) : Nat × Nat :=
+    61	  if binaryExponent ≥ 0 then
+    62	    (significand * (2 ^ binaryExponent.toNat), 0)
+    63	  else
+    64	    let denominator := 2 ^ (-binaryExponent).toNat
+    65	    (significand / denominator, significand % denominator)
+    66	
+    67	def operationalFloorFiniteFloat (value : SortFloat) : SortInt :=
+    68	  let (negative, significand, binaryExponent) := operationalFiniteFloatParts value
+    69	  let (quotient, remainder) :=
+    70	    operationalSplitFloatMagnitude significand binaryExponent
+    71	  if negative then
+    72	    -Int.ofNat (quotient + if remainder = 0 then 0 else 1)
+    73	  else
+    74	    Int.ofNat quotient
+    75	
+    76	def operationalCeilFiniteFloat (value : SortFloat) : SortInt :=
+    77	  let (negative, significand, binaryExponent) := operationalFiniteFloatParts value
+    78	  let (quotient, remainder) :=
+    79	    operationalSplitFloatMagnitude significand binaryExponent
+    80	  if negative then
+    81	    -Int.ofNat quotient
+    82	  else
+    83	    Int.ofNat (quotient + if remainder = 0 then 0 else 1)
+    84	
+    85	def operationalNegativeFloat (value : SortFloat) : SortBool :=
+    86	  decide (value.toBits.toNat / (2 ^ 63) = 1)
+    87	
+    88	/- MPFR's binary64 Int2Float hook overflows at the round-to-nearest midpoint
+    89	   between the largest finite value and infinity. -/
+    90	def operationalIntFloatOverflowBoundary : SortInt :=
+    91	  (2 : SortInt) ^ 1024 - (2 : SortInt) ^ 970
+    92	
+    93	def operationalIntRoundsToPositiveInfinity (integer : SortInt) : SortBool :=
+    94	  decide (integer ≥ operationalIntFloatOverflowBoundary)
+    95	
+    96	def operationalIntRoundsToNegativeInfinity (integer : SortInt) : SortBool :=
+    97	  decide (integer ≤ -operationalIntFloatOverflowBoundary)
+    98	
+    99	def operationalLtFI (value : SortFloat) (integer : SortInt) : SortBool :=
+   100	  if value.isFinite then
+   101	    decide (operationalFloorFiniteFloat value < integer)
+   102	  else if value.isNaN then
+   103	    false
+   104	  else if operationalNegativeFloat value then
+   105	    !(operationalIntRoundsToNegativeInfinity integer)
+   106	  else
+   107	    false
+   108	
+   109	def operationalLtIF (integer : SortInt) (value : SortFloat) : SortBool :=
+   110	  if value.isFinite then
+   111	    decide (integer < operationalCeilFiniteFloat value)
+   112	  else if value.isNaN then
+   113	    false
+   114	  else if operationalNegativeFloat value then
+   115	    false
+   116	  else
+   117	    !(operationalIntRoundsToPositiveInfinity integer)
+   118	
+   119	def operationalEqIF (integer : SortInt) (value : SortFloat) : SortBool :=
+   120	  if value.isFinite then
+   121	    decide (
+   122	      operationalFloorFiniteFloat value = operationalCeilFiniteFloat value ∧
+   123	      operationalFloorFiniteFloat value = integer)
+   124	  else if value.isNaN then
+   125	    false
+   126	  else if operationalNegativeFloat value then
+   127	    operationalIntRoundsToNegativeInfinity integer
+   128	  else
+   129	    operationalIntRoundsToPositiveInfinity integer
+   130	
+   131	def operationalCompareInts
+   132	    (operator : SortString) (left right : SortInt) : SortBool :=
+   133	  match operator with
+   134	  | "<" => decide (left < right)
+   135	  | "<=" => decide (left ≤ right)
+   136	  | ">" => decide (left > right)
+   137	  | ">=" => decide (left ≥ right)
+   138	  | "==" => decide (left = right)
+   139	  | "!=" => decide (left ≠ right)
+   140	  | _ => false
+   141	
+   142	def operationalCompareFloats
+   143	    (operator : SortString) (left right : SortFloat) : SortBool :=
+   144	  match operator with
+   145	  | "<" => operationalFloatLt left right
+   146	  | "<=" => !(operationalFloatGt left right)
+   147	  | ">" => operationalFloatGt left right
+   148	  | ">=" => !(operationalFloatLt left right)
+   149	  | "==" => Float.beq left right
+   150	  | "!=" => !(Float.beq left right)
+   151	  | _ => false
+   152	
+   153	def operationalCompareIntFloat
+   154	    (operator : SortString) (integer : SortInt) (value : SortFloat) : SortBool :=
+   155	  match operator with
+   156	  | "<" => operationalLtIF integer value
+   157	  | "<=" => !(operationalLtFI value integer)
+   158	  | ">" => operationalLtFI value integer
+   159	  | ">=" => !(operationalLtIF integer value)
+   160	  | "==" => operationalEqIF integer value
+   161	  | "!=" => !(operationalEqIF integer value)
+   162	  | _ => false
+   163	
+   164	def operationalCompareFloatInt
+   165	    (operator : SortString) (value : SortFloat) (integer : SortInt) : SortBool :=
+   166	  match operator with
+   167	  | "<" => operationalLtFI value integer
+   168	  | "<=" => !(operationalLtIF integer value)
+   169	  | ">" => operationalLtIF integer value
+   170	  | ">=" => !(operationalLtFI value integer)
+   171	  | "==" => operationalEqIF integer value
+   172	  | "!=" => !(operationalEqIF integer value)
+   173	  | _ => false
+   174	
+   175	def operationalStrPrefix : SortIntSeq → SortIntSeq → SortBool
+   176	  | SortIntSeq.«.IntSeq_MPY-CORE_IntSeq», _ => true
+   177	  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» _ _,
+   178	      SortIntSeq.«.IntSeq_MPY-CORE_IntSeq» => false
+   179	  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» leftHead leftTail,
+   180	      SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» rightHead rightTail =>
+   181	      decide (leftHead = rightHead) && operationalStrPrefix leftTail rightTail
+   182	
+   183	def operationalStrContains (pattern : SortIntSeq) : SortIntSeq → SortBool
+   184	  | SortIntSeq.«.IntSeq_MPY-CORE_IntSeq» =>
+   185	      operationalStrPrefix pattern SortIntSeq.«.IntSeq_MPY-CORE_IntSeq»
+   186	  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» head tail =>
+   187	      if operationalStrPrefix pattern
+   188	          (SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» head tail) then
+   189	        true
+   190	      else
+   191	        operationalStrContains pattern tail
+   192	
+   193	def operationalStrLt : SortIntSeq → SortIntSeq → SortBool
+   194	  | SortIntSeq.«.IntSeq_MPY-CORE_IntSeq»,
+   195	      SortIntSeq.«.IntSeq_MPY-CORE_IntSeq» => false
+   196	  | SortIntSeq.«.IntSeq_MPY-CORE_IntSeq»,
+   197	      SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» _ _ => true
+   198	  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» _ _,
+   199	      SortIntSeq.«.IntSeq_MPY-CORE_IntSeq» => false
+   200	  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» leftHead leftTail,
+   201	      SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» rightHead rightTail =>
+   202	      if leftHead < rightHead then true
+   203	      else if leftHead > rightHead then false
+   204	      else operationalStrLt leftTail rightTail
+   205	
+   206	def operationalCompareStrings
+   207	    (operator : SortString) (left right : SortIntSeq) : SortBool :=
+   208	  match operator with
+   209	  | "==" => left == right
+   210	  | "!=" => !(left == right)
+   211	  | "in" => operationalStrContains left right
+   212	  | "not in" => !(operationalStrContains left right)
+   213	  | "<" => operationalStrLt left right
+   214	  | ">" => operationalStrLt right left
+   215	  | "<=" => !(operationalStrLt right left)
+   216	  | ">=" => !(operationalStrLt left right)
+   217	  | _ => false
+   218	
+   219	def operationalOrderGe : SortVal → SortVal → SortBool
+   220	  | .inj_SortInt left, .inj_SortInt right => decide (left ≥ right)
+   221	  | .inj_SortBool left, .inj_SortBool right =>
+   222	      decide (operationalBoolAsInt left ≥ operationalBoolAsInt right)
+   223	  | .inj_SortBool left, .inj_SortInt right =>
+   224	      decide (operationalBoolAsInt left ≥ right)
+   225	  | .inj_SortInt left, .inj_SortBool right =>
+   226	      decide (left ≥ operationalBoolAsInt right)
+   227	  | .inj_SortFloat left, .inj_SortFloat right => !(operationalFloatLt left right)
+   228	  | .inj_SortInt left, .inj_SortFloat right => !(operationalLtIF left right)
+   229	  | .inj_SortFloat left, .inj_SortInt right => !(operationalLtFI left right)
+   230	  | .inj_SortBool left, .inj_SortFloat right =>
+   231	      !(operationalLtIF (operationalBoolAsInt left) right)
+   232	  | .inj_SortFloat left, .inj_SortBool right =>
+   233	      !(operationalLtFI left (operationalBoolAsInt right))
+   234	  | .inj_SortStr (SortStr.«str(_)_MPY-CORE_Str_IntSeq» left),
+   235	      .inj_SortStr (SortStr.«str(_)_MPY-CORE_Str_IntSeq» right) =>
+   236	      !(operationalStrLt left right)
+   237	  | .inj_SortStr _, _ => false
+   238	  | _, .inj_SortStr _ => false
+   239	  | _, _ => false
+   240	
+   241	def operationalCodeIn (code : SortInt) : SortIntSeq → SortBool
+   242	  | SortIntSeq.«.IntSeq_MPY-CORE_IntSeq» => false
+   243	  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» head tail =>
+   244	      decide (code = head) || operationalCodeIn code tail
+   245	
+   246	def operationalSubsetCodes : SortIntSeq → SortIntSeq → SortBool
+   247	  | SortIntSeq.«.IntSeq_MPY-CORE_IntSeq», _ => true
+   248	  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» head tail, right =>
+   249	      operationalCodeIn head right && operationalSubsetCodes tail right
+   250	
+   251	def operationalSameSet (left right : SortIntSeq) : SortBool :=
+   252	  operationalSubsetCodes left right && operationalSubsetCodes right left
+   253	
+   254	def operationalValSeqLength : SortValSeq → Nat
+   255	  | SortValSeq.«.ValSeq_MPY-CORE_ValSeq» => 0
+   256	  | SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» _ tail =>
+   257	      operationalValSeqLength tail + 1
+   258	
+   259	def operationalHasDictKey (key : SortVal) : SortValSeq → SortBool
+   260	  | SortValSeq.«.ValSeq_MPY-CORE_ValSeq» => false
+   261	  | SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» head tail =>
+   262	      (head == key) || operationalHasDictKey key tail
+   263	
+   264	def operationalGetDictValue
+   265	    (key : SortVal) : SortValSeq → SortValSeq → Option SortVal
+   266	  | SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» candidate keyTail,
+   267	      SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» value valueTail =>
+   268	      if candidate == key then some value
+   269	      else operationalGetDictValue key keyTail valueTail
+   270	  | _, _ => none
+   271	
+   272	def operationalDictSubset :
+   273	    SortValSeq → SortValSeq → SortValSeq → SortValSeq → SortBool
+   274	  | SortValSeq.«.ValSeq_MPY-CORE_ValSeq»,
+   275	      SortValSeq.«.ValSeq_MPY-CORE_ValSeq», _, _ => true
+   276	  | SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» key keyTail,
+   277	      SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» value valueTail,
+   278	      rightKeys, rightValues =>
+   279	      operationalHasDictKey key rightKeys &&
+   280	        match operationalGetDictValue key rightKeys rightValues with
+   281	        | some found =>
+   282	            (found == value) &&
+   283	              operationalDictSubset keyTail valueTail rightKeys rightValues
+   284	        | none => false
+   285	  | _, _, _, _ => false
+   286	
+   287	def operationalDictEq
+   288	    (leftKeys leftValues rightKeys rightValues : SortValSeq) : SortBool :=
+   289	  decide (operationalValSeqLength leftKeys = operationalValSeqLength rightKeys) &&
+   290	    operationalDictSubset leftKeys leftValues rightKeys rightValues
+   291	
+   292	def operationalIsNone : SortVal → SortBool
+   293	  | SortVal.«noneV_MPY-CORE_Val» => true
+   294	  | _ => false
+   295	
+   296	/- Complete frozen applyCmp table relative to the immutable Base value universe. -/
+   297	def operationalApplyCmp
+   298	    (operator : SortString) (left right : SortVal) : SortBool :=
+   299	  if operator = ">=" then
+   300	    if operationalOrderablePair left right then operationalOrderGe left right
+   301	    else false
+   302	  else
+   303	    match operator, left, right with
+   304	    | "==", value, SortVal.«noneV_MPY-CORE_Val» => operationalIsNone value
+   305	    | "!=", value, SortVal.«noneV_MPY-CORE_Val» => !(operationalIsNone value)
+   306	    | "is", value, SortVal.«noneV_MPY-CORE_Val» => operationalIsNone value
+   307	    | "is not", value, SortVal.«noneV_MPY-CORE_Val» => !(operationalIsNone value)
+   308	    | op, .inj_SortInt leftInt, .inj_SortInt rightInt =>
+   309	        operationalCompareInts op leftInt rightInt
+   310	    | op, .inj_SortBool leftBool, .inj_SortBool rightBool =>
+   311	        operationalCompareInts op (operationalBoolAsInt leftBool)
+   312	          (operationalBoolAsInt rightBool)
+   313	    | op, .inj_SortBool leftBool, .inj_SortInt rightInt =>
+   314	        operationalCompareInts op (operationalBoolAsInt leftBool) rightInt
+   315	    | op, .inj_SortInt leftInt, .inj_SortBool rightBool =>
+   316	        operationalCompareInts op leftInt (operationalBoolAsInt rightBool)
+   317	    | op, .inj_SortFloat leftFloat, .inj_SortFloat rightFloat =>
+   318	        operationalCompareFloats op leftFloat rightFloat
+   319	    | op, .inj_SortInt leftInt, .inj_SortFloat rightFloat =>
+   320	        operationalCompareIntFloat op leftInt rightFloat
+   321	    | op, .inj_SortFloat leftFloat, .inj_SortInt rightInt =>
+   322	        operationalCompareFloatInt op leftFloat rightInt
+   323	    | op, .inj_SortBool leftBool, .inj_SortFloat rightFloat =>
+   324	        operationalCompareIntFloat op (operationalBoolAsInt leftBool) rightFloat
+   325	    | op, .inj_SortFloat leftFloat, .inj_SortBool rightBool =>
+   326	        operationalCompareFloatInt op leftFloat (operationalBoolAsInt rightBool)
+   327	    | op,
+   328	        .inj_SortStr (SortStr.«str(_)_MPY-CORE_Str_IntSeq» leftCodes),
+   329	        .inj_SortStr (SortStr.«str(_)_MPY-CORE_Str_IntSeq» rightCodes) =>
+   330	        operationalCompareStrings op leftCodes rightCodes
+   331	    | "==", .inj_SortIterable
+   332	          (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq» leftValues),
+   333	        .inj_SortIterable
+   334	          (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq» rightValues) =>
+   335	        leftValues == rightValues
+   336	    | "!=", .inj_SortIterable
+   337	          (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq» leftValues),
+   338	        .inj_SortIterable
+   339	          (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq» rightValues) =>
+   340	        !(leftValues == rightValues)
+   341	    | "==", .inj_SortIterable
+   342	          (SortIterable.«tuple(_)_MPY-CORE_Iterable_ValSeq» leftValues),
+   343	        .inj_SortIterable
+   344	          (SortIterable.«tuple(_)_MPY-CORE_Iterable_ValSeq» rightValues) =>
+   345	        leftValues == rightValues
+   346	    | "!=", .inj_SortIterable
+   347	          (SortIterable.«tuple(_)_MPY-CORE_Iterable_ValSeq» leftValues),
+   348	        .inj_SortIterable
+   349	          (SortIterable.«tuple(_)_MPY-CORE_Iterable_ValSeq» rightValues) =>
+   350	        !(leftValues == rightValues)
+   351	    | "==", SortVal.«setV(_)_MPY-SET_Val_IntSeq» leftCodes,
+   352	        SortVal.«setV(_)_MPY-SET_Val_IntSeq» rightCodes =>
+   353	        operationalSameSet leftCodes rightCodes
+   354	    | "==", SortVal.«dictV(_,_)_MPY-DICT_Val_ValSeq_ValSeq» leftKeys leftValues,
+   355	        SortVal.«dictV(_,_)_MPY-DICT_Val_ValSeq_ValSeq» rightKeys rightValues =>
+   356	        operationalDictEq leftKeys leftValues rightKeys rightValues
+   357	    | _, _, _ => false
+   358	
+   359	/- KORE symbol: LblapplyCmp'LParUndsCommUndsCommUndsRParUnds'MPY-CORE'Unds'Bool'Unds'String'Unds'Val'Unds'Val; frozen source obligations: rule-2fd1883e1dbbdfd9717b1321447ac996a4962a56a877371e6e1bee92b5b19050. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   360	def «applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val»
+   361	    (operator : SortString) (left right : SortVal) : SortBool :=
+   362	  operationalApplyCmp operator left right
+   363	/- KORE symbol: LblorderGe'LParUndsCommUndsRParUnds'VERIFICATION-BASE'Unds'Bool'Unds'Val'Unds'Val; frozen source obligations: rule-2fd1883e1dbbdfd9717b1321447ac996a4962a56a877371e6e1bee92b5b19050. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   364	def «orderGe(_,_)_VERIFICATION-BASE_Bool_Val_Val»
+   365	    (left right : SortVal) : SortBool := operationalOrderGe left right
+   366	/- KORE symbol: LblorderablePair'LParUndsCommUndsRParUnds'VERIFICATION-BASE'Unds'Bool'Unds'Val'Unds'Val; frozen source obligations: rule-2fd1883e1dbbdfd9717b1321447ac996a4962a56a877371e6e1bee92b5b19050. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   367	def «orderablePair(_,_)_VERIFICATION-BASE_Bool_Val_Val»
+   368	    (left right : SortVal) : SortBool := operationalOrderablePair left right
+   369	
+   370	theorem final :
+   371	    Klean135CanArrange.Lemmas.targetStatement «applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val» «orderGe(_,_)_VERIFICATION-BASE_Bool_Val_Val» «orderablePair(_,_)_VERIFICATION-BASE_Bool_Val_Val» := by
+   372	  unfold Klean135CanArrange.Lemmas.targetStatement
+   373	  intro W V h
+   374	  unfold «applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val»
+   375	  unfold «orderGe(_,_)_VERIFICATION-BASE_Bool_Val_Val»
+   376	  unfold «orderablePair(_,_)_VERIFICATION-BASE_Bool_Val_Val» at h
+   377	  unfold operationalApplyCmp
+   378	  rw [if_pos rfl]
+   379	  rw [if_pos h]
+   380	
+   381	end Proof
+
+FORBIDDEN_TOKEN_SCAN_CANDIDATE

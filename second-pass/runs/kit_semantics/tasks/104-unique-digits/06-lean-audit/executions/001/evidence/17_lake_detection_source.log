@@ -1,0 +1,199 @@
+Script started on 2026-07-31 07:46:55-05:00 [<not executed on terminal>]
+
+/--
+Attempt to detect the installation of the given `lean` command
+by calling `findLeanSysroot?`. See `LeanInstall.get` for how it assumes the
+Lean install is organized.
+-/
+def findLeanCmdInstall? (lean := "lean") : BaseIO (Option LeanInstall) :=
+  OptionT.run do LeanInstall.get (← findLeanSysroot? lean)
+
+/--
+Check if the running Lake's executable is co-located with Lean, and, if so,
+try to return their joint home by assuming they are both located at `<home>/bin`.
+-/
+def findLakeLeanJointHome? : BaseIO (Option FilePath) := do
+  if let .ok appPath ← IO.appPath.toBaseIO then
+    if let some appDir := appPath.parent then
+      let leanExe := appDir / "lean" |>.addExtension FilePath.exeExtension
+      if (← leanExe.pathExists) then
+        return appDir.parent
+  return none
+
+/--
+Get the root of Lake's installation by assuming the executable
+is located at `<lake-home>/.lake/build/bin/lake`.
+-/
+def lakeBuildHome? (lake : FilePath) : Option FilePath := do
+  (← (← (← lake.parent).parent).parent).parent
+
+/--
+Heuristically validate that `getLakeBuildHome?` is a proper Lake installation
+by check for `Lake.olean` in the installation's `lib` directory.
+-/
+def getLakeInstall? (lake : FilePath) : BaseIO (Option LakeInstall) := do
+  let some home := lakeBuildHome? lake | return none
+  let lake : LakeInstall := {home, lake}
+  if (← lake.libDir / "Lake.olean" |>.pathExists) then
+    return lake
+  return none
+
+/--
+Attempt to detect Lean's installation by using the `LEAN` and `LEAN_SYSROOT`
+environment variables.
+
+If `LEAN_SYSROOT` is set, use it. Otherwise, check `LEAN` for the `lean`
+executable. If `LEAN` is set but empty, Lean will be considered disabled.
+Otherwise, Lean's location will be determined by trying `findLeanSysroot?`
+using value of `LEAN` or, if unset, the `lean` in `PATH`.
+
+See `LeanInstall.get` for how it assumes the Lean install is organized.
+-/
+def findLeanInstall? : BaseIO (Option LeanInstall) := do
+  if let some sysroot ← IO.getEnv "LEAN_SYSROOT" then
+    return some <| ← LeanInstall.get sysroot
+  let lean ← do
+    if let some lean ← IO.getEnv "LEAN" then
+      if lean.trim.isEmpty then
+        return none
+      else
+        pure lean
+    else
+      pure "lean"
+  if let some sysroot ← findLeanSysroot? lean then
+    return some <| ← LeanInstall.get sysroot
+  return none
+
+/--
+Attempt to detect Lake's installation by first checking the `lakeBuildHome?`
+of the running executable, then trying the `LAKE_HOME` environment variable.
+
+It assumes that the Lake installation is organized the same way it is built.
+That is, with its binary located at `<lake-home>/.lake/build/bin/lake` and its
+static library and `.olean` files in `<lake-home>/.lake/build/lib`, and
+its source files located directly in `<lake-home>`.
+-/
+def findLakeInstall? : BaseIO (Option LakeInstall) := do
+  if let Except.ok lake ← IO.appPath.toBaseIO then
+    if let some lake ← getLakeInstall? lake then
+      return lake
+  if let some home ← IO.getEnv "LAKE_HOME" then
+    return some {home}
+  return none
+
+/--
+Attempt to automatically detect an Elan, Lake, and Lean installation.
+
+First, it calls `findElanInstall?` to detect a Elan installation.
+Then it attempts to detect if Lake and Lean are part of a single installation
+where the `lake` executable is co-located with the `lean` executable (i.e., they
+are in the same directory). If Lean and Lake are not co-located, Lake will
+attempt  to find the their installations separately by calling
+`findLeanInstall?` and `findLakeInstall?`. Setting `LAKE_OVERRIDE_LEAN` to true
+will force Lake to use `findLeanInstall?` even if co-located.
+
+When co-located, Lake will assume that Lean and Lake's binaries are located in
+`<sysroot>/bin`, their Lean libraries  in `<sysroot>/lib/lean`, Lean's source files
+in `<sysroot>/src/lean`, and Lake's source files in `<sysroot>/src/lean/lake`,
+following the pattern of a regular Lean toolchain.
+-/
+def findInstall? : BaseIO (Option ElanInstall × Option LeanInstall × Option LakeInstall) := do
+  let elan? ← findElanInstall?
+  if let some sysroot ← findLakeLeanJointHome? then
+    if (← IO.getEnv "LAKE_OVERRIDE_LEAN").bind envToBool? |>.getD false then
+      let lake := LakeInstall.ofLean {sysroot}
+      return (elan?, ← findLeanInstall?, lake)
+    else
+      let lean ← LeanInstall.get sysroot (collocated := true)
+      let lake := LakeInstall.ofLean lean
+      return (elan?, lean, lake)
+  else
+    return (elan?, ← findLeanInstall?, ← findLakeInstall?)
+"Print a script's docstring
+
+USAGE:
+  lake script doc [<package>/]<script>
+
+Print the docstring of `script` in the workspace or the specific `package`."
+
+def helpServe :=
+"Start the Lean language server
+
+USAGE:
+  lake serve [-- <args>...]
+
+Run the language server of the Lean installation (i.e., via `lean --server`)
+with the package configuration's `moreServerArgs` field and `args`.
+"
+
+def helpEnv :=
+"Execute a command in Lake's environment
+
+USAGE:
+  lake env [<cmd>] [<args>...]
+
+Spawns a new process executing `cmd` with the given `args` and with
+the environment set based on the detected Lean/Lake installations and
+the workspace configuration (if it exists).
+
+Specifically, this command sets the following environment variables:
+
+  LAKE                  set to the detected Lake executable
+  LAKE_HOME             set to the detected Lake home
+  LEAN_SYSROOT          set to the detected Lean toolchain directory
+  LEAN_AR               set to the detected Lean `ar` binary
+  LEAN_CC               set to the detected `cc` (if not using the bundled one)
+  LEAN_PATH             adds Lake's and the workspace's Lean library dirs
+  LEAN_SRC_PATH         adds Lake's and the workspace's source dirs
+  PATH                  adds Lean's, Lake's, and the workspace's binary dirs
+  PATH                  adds Lean's and the workspace's library dirs (Windows)
+  DYLD_LIBRARY_PATH     adds Lean's and the workspace's library dirs (MacOS)
+  LD_LIBRARY_PATH       adds Lean's and the workspace's library dirs (other)
+
+A bare `lake env` will print out the variables set and their values,
+using the form NAME=VALUE like the POSIX `env` command."
+
+def helpExe :=
+"Build an executable target and run it in Lake's environment
+
+USAGE:
+  lake exe <exe-target> [<args>...]
+
+ALIAS: lake exec
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Help.lean:370:  LAKE_HOME             set to the detected Lake home
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Error.lean:48:| unknownLakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Error.lean:86:| unknownLakeInstall      => "could not detect the configuration of the Lake installation"
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:34:  lakeInstall? : Option LakeInstall := none
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:62:def LakeOptions.getLakeInstall (opts : LakeOptions) : Except CliError LakeInstall :=
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:64:  | none => .error CliError.unknownLakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:68:def LakeOptions.getInstall (opts : LakeOptions) : Except CliError (LeanInstall × LakeInstall) := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:69:  return (← opts.getLeanInstall, ← opts.getLakeInstall)
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:73:  Env.compute (← opts.getLakeInstall) (← opts.getLeanInstall) opts.elanInstall?
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Monad.lean:249:@[inline] def getLakeInstall : m LakeInstall :=
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Monad.lean:252:/-- Get the root directory of the detected Lake installation (e.g., `LAKE_HOME`). -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Monad.lean:254:  (·.home) <$> getLakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Monad.lean:258:  (·.srcDir) <$> getLakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Monad.lean:262:  (·.libDir) <$> getLakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Monad.lean:266:  (·.lake) <$> getLakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:133:structure LakeInstall where
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:145:@[inline] def LakeInstall.sharedLib (self : LakeInstall) : FilePath :=
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:149:def LakeInstall.ofLean (lean : LeanInstall) : LakeInstall where
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:283:def findLakeLeanJointHome? : BaseIO (Option FilePath) := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:302:def getLakeInstall? (lake : FilePath) : BaseIO (Option LakeInstall) := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:304:  let lake : LakeInstall := {home, lake}
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:337:of the running executable, then trying the `LAKE_HOME` environment variable.
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:344:def findLakeInstall? : BaseIO (Option LakeInstall) := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:346:    if let some lake ← getLakeInstall? lake then
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:348:  if let some home ← IO.getEnv "LAKE_HOME" then
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:360:`findLeanInstall?` and `findLakeInstall?`. Setting `LAKE_OVERRIDE_LEAN` to true
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:368:def findInstall? : BaseIO (Option ElanInstall × Option LeanInstall × Option LakeInstall) := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:370:  if let some sysroot ← findLakeLeanJointHome? then
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:372:      let lake := LakeInstall.ofLean {sysroot}
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:376:      let lake := LakeInstall.ofLean lean
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean:379:    return (elan?, ← findLeanInstall?, ← findLakeInstall?)
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean:26:  lake : LakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean:108:  (lake : LakeInstall) (lean : LeanInstall) (elan? : Option ElanInstall)
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean:198:    ("LAKE_HOME", none),
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean:212:    ("LAKE_HOME", env.lake.home.toString),
+
+Script done on 2026-07-31 07:46:55-05:00 [COMMAND_EXIT_CODE="0"]

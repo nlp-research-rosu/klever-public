@@ -1,0 +1,247 @@
++ sed -n 212,340p /reference/tools/klean_preflight.py
+def _source_and_obligation_gate(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generated: Path,
+    input_manifest: dict[str, Any],
+    generator_manifest: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    verification = frozen_input / "verification.k"
+    if not verification.is_file() or verification.is_symlink():
+        raise KleanPreflightError("frozen input is missing regular verification.k")
+    try:
+        validated = lemma_discovery_contract.validate_trust_boundary(
+            frozen_input, discovery_manifest
+        )
+    except lemma_discovery_contract.LemmaDiscoveryContractError as error:
+        raise KleanPreflightError(str(error)) from error
+    discovery_hash = hashlib.sha256(discovery_manifest.read_bytes()).hexdigest()
+    if input_manifest.get("inventory_sha256") != validated[
+        "inventory_sha256"
+    ]:
+        raise KleanPreflightError(
+            "Stage 1/Stage 3 inventory hash changed after deterministic export"
+        )
+    source_rules = klean_export._domain_source_rules(
+        validated, discovery_hash
+    )
+    if input_manifest.get("source_rules") != source_rules:
+        raise KleanPreflightError(
+            "Stage 3 DOMAIN_LEMMA inventory changed after deterministic export"
+        )
+    if input_manifest.get("verification_sha256") != hashlib.sha256(
+        verification.read_bytes()
+    ).hexdigest():
+        raise KleanPreflightError("verification.k hash changed after export")
+
+    mapping_path = generated / "obligation-map.json"
+    obligation_map = _regular_json(mapping_path, "obligation map")
+    if obligation_map.get("source_rules") != source_rules:
+        raise KleanPreflightError(
+            "source rules and generated obligations are not bijective"
+        )
+    obligations = obligation_map.get("obligations")
+    if not isinstance(obligations, list):
+        raise KleanPreflightError("generated obligation list is malformed")
+    eligible = source_rules
+    expected_ids = [rule["source_rule_id"] for rule in eligible]
+    observed_ids: list[str] = []
+    for obligation in obligations:
+        if not isinstance(obligation, dict):
+            raise KleanPreflightError("generated obligation is malformed")
+        source_rule_id = obligation.get("source_rule_id")
+        if not isinstance(source_rule_id, str):
+            raise KleanPreflightError("generated obligation ID is malformed")
+        observed_ids.append(source_rule_id)
+        lean_conjunct = obligation.get("lean_conjunct")
+        if not isinstance(lean_conjunct, str) or not lean_conjunct:
+            raise KleanPreflightError("generated Lean conjunct is malformed")
+        if obligation.get("lean_conjunct_sha256") != klean_export.sha256_text(
+            lean_conjunct
+        ):
+            raise KleanPreflightError("generated Lean conjunct hash changed")
+        source_rule = eligible[len(observed_ids) - 1] if len(
+            observed_ids
+        ) <= len(eligible) else None
+        if source_rule is None or obligation.get("source_span") != {
+            "start_line": source_rule["start_line"],
+            "end_line": source_rule["end_line"],
+        }:
+            raise KleanPreflightError(
+                "source rules and generated obligations are not bijective"
+            )
+        for key in (
+            "normalized_sha256",
+            "inventory_sha256",
+            "discovery_manifest_sha256",
+        ):
+            if obligation.get(key) != source_rule[key]:
+                raise KleanPreflightError(
+                    "generated obligation provenance differs from "
+                    f"Stage 1/Stage 3: {key}"
+                )
+    if observed_ids != expected_ids or len(set(observed_ids)) != len(
+        observed_ids
+    ):
+        raise KleanPreflightError(
+            "source rules and generated obligations are not bijective"
+        )
+    parameters = obligation_map.get("trust_parameters")
+    if not isinstance(parameters, list):
+        raise KleanPreflightError("generated trust-parameter list is malformed")
+    validate_trust_parameter_links(expected_ids, parameters)
+    if generator_manifest.get("obligation_count") != len(obligations):
+        raise KleanPreflightError("generator obligation count changed")
+    if generator_manifest.get("obligation_map_sha256") != hashlib.sha256(
+        mapping_path.read_bytes()
+    ).hexdigest():
+        raise KleanPreflightError("generated obligation map hash changed")
+    expected_definition = klean_export.expected_target_definition(
+        obligation_map
+    )
+    try:
+        target = klean_export.target_statement(generated)
+    except klean_export.KleanExportError as error:
+        raise KleanPreflightError(str(error)) from error
+    if expected_definition is None:
+        if target is not None:
+            raise KleanPreflightError(
+                "zero obligations unexpectedly generated a target proposition"
+            )
+    elif (
+        target is None
+        or target.get("definition_sha256")
+        != klean_export.sha256_text(expected_definition)
+    ):
+        raise KleanPreflightError(
+            "generated target is not the exact conjunction of mapped obligations"
+        )
+    return source_rules, obligations
+
+
+def validate_trust_parameter_links(
+    expected_ids: list[str], parameters: list[object]
+) -> set[str]:
+    """Validate every opaque parameter without requiring one per theorem."""
+
+    bound_rule_ids: set[str] = set()
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanPreflightError("generated trust parameter is malformed")
++ sed -n 1580,1695p /reference/tools/klean_export.py
+                        if kind == "opaque"
+                        else "Klean-generated trust boundary"
+                    )
+                ),
+            }
+        noncomputable.update(_NONCOMPUTABLE_RE.findall(text))
+        count = len(re.findall(r"\bsorry\b", text))
+        if path.name == "Lemmas.lean":
+            designated_sorries += count
+        else:
+            other_sorries += count
+    return {
+        "axioms": sorted(axioms),
+        "automatic_axiomatization": sorted(axiomatized),
+        "modeled_collection_hooks": list(modeled_collection_hooks),
+        "modeled_operational_hooks": list(modeled_operational_hooks),
+        "modeled_recursive_functions": list(modeled_recursive_functions),
+        "noncomputable_definitions": sorted(noncomputable),
+        "automatic_noncomputable_repair": noncomputable_repair,
+        "designated_sorries": designated_sorries,
+        "other_sorries": other_sorries,
+        "allowlist": [allowlist[name] for name in sorted(allowlist)],
+    }
+
+
+def target_statement(generated: Path) -> dict[str, Any] | None:
+    obligation_map = _regular_json(generated / "obligation-map.json")
+    obligations = obligation_map.get("obligations")
+    parameters = obligation_map.get("trust_parameters")
+    if not isinstance(obligations, list) or not isinstance(parameters, list):
+        raise KleanExportError("generated obligation map is malformed")
+    candidates: list[tuple[Path, str]] = []
+    raw_count = 0
+    for relative, kind, path in _tree_entries(generated):
+        if kind != "file" or path.suffix != ".lean":
+            continue
+        text = path.read_text()
+        raw_count += len(
+            re.findall(r"(?m)^\s*def\s+targetStatement\b", text)
+        )
+        for match in re.finditer(
+            r"(?ms)^\s*def\s+targetStatement\b.*?"
+            r"(?=^\s*end\s+\S+\s*$)",
+            text,
+        ):
+            candidates.append((path, match.group(0).strip()))
+    if not obligations:
+        if raw_count != 0:
+            raise KleanExportError(
+                "zero obligations must not generate a target proposition"
+            )
+        return None
+    if raw_count != 1 or len(candidates) != 1:
+        raise KleanExportError(
+            "generated project must contain exactly one target proposition; "
+            f"found {raw_count}"
+        )
+    path, definition = candidates[0]
+    names: list[str] = []
+    normalized_parameters: list[dict[str, Any]] = []
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanExportError("target parameter is malformed")
+        name = parameter.get("name")
+        lean_type = parameter.get("type")
+        kore_symbol = parameter.get("kore_symbol")
+        source_rule_ids = parameter.get("source_rule_ids")
+        binding_sha256 = parameter.get("binding_sha256")
+        if not isinstance(name, str) or not name:
+            raise KleanExportError("target parameter name is malformed")
+        if not isinstance(lean_type, str) or not lean_type:
+            raise KleanExportError("target parameter type is malformed")
+        if not isinstance(kore_symbol, str) or not kore_symbol:
+            raise KleanExportError("target KORE symbol binding is malformed")
+        if (
+            not isinstance(source_rule_ids, list)
+            or not source_rule_ids
+            or not all(
+                isinstance(source_rule_id, str) and source_rule_id
+                for source_rule_id in source_rule_ids
+            )
+        ):
+            raise KleanExportError("target source-rule binding is malformed")
+        binding = {
+            "kore_symbol": kore_symbol,
+            "name": name,
+            "type": lean_type,
+            "source_rule_ids": source_rule_ids,
+        }
+        expected_binding_sha256 = sha256_text(
+            json.dumps(binding, sort_keys=True, separators=(",", ":"))
+        )
+        if binding_sha256 != expected_binding_sha256:
+            raise KleanExportError("target parameter binding hash changed")
+        names.append(name)
+        normalized_parameters.append(
+            {**binding, "binding_sha256": binding_sha256}
+        )
+    declaration = f"{path.parent.name}.Lemmas.targetStatement"
+    statement = " ".join((declaration, *names))
+    return {
+        "declaration": declaration,
+        "file": path.relative_to(generated).as_posix(),
+        "statement": statement,
+        "statement_sha256": sha256_text(statement),
+        "definition_sha256": sha256_text(definition),
+        "parameters": normalized_parameters,
+    }
+
+
+def expected_target_definition(obligation_map: dict[str, Any]) -> str | None:
+    obligations = obligation_map.get("obligations")
+    parameters = obligation_map.get("trust_parameters")
+    if not isinstance(obligations, list) or not isinstance(parameters, list):
+        raise KleanExportError("generated obligation map is malformed")
+    if not obligations:

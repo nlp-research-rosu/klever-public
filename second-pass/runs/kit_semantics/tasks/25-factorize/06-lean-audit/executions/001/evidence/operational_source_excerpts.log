@@ -1,0 +1,156 @@
+COMMAND: nl -ba verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Mathematical tail-recursive summary of the loop's result sequence.
+     7	  // It does not rewrite or replace any program computation.
+     8	  syntax ValSeq ::= factorAcc(ValSeq, Int, Int) [function]
+     9	
+    10	  rule factorAcc(A:ValSeq, N:Int, D:Int) => A
+    11	    requires N <Int D
+    12	
+    13	  rule factorAcc(A:ValSeq, N:Int, D:Int)
+    14	    => factorAcc(
+    15	         valSeqConcat(A, vCons(D, .ValSeq)),
+    16	         (N -Int pyMod(N, D)) /Int D,
+    17	         D)
+    18	    requires D <=Int N andBool pyMod(N, D) ==Int 0
+    19	
+    20	  rule factorAcc(A:ValSeq, N:Int, D:Int)
+    21	    => factorAcc(A, N, D +Int 1)
+    22	    requires D <=Int N andBool pyMod(N, D) =/=Int 0
+    23	endmodule
+COMMAND: nl -ba solution.py
+     1	from typing import List
+     2	
+     3	
+     4	def factorize(n: int) -> List[int]:
+     5	    factors = []
+     6	    divisor = 2
+     7	    while divisor <= n:
+     8	        if n % divisor == 0:
+     9	            factors.append(divisor)
+    10	            n = n // divisor
+    11	        else:
+    12	            divisor = divisor + 1
+    13	    return factors
+COMMAND: nl -ba prompt.py
+     1	from typing import List
+     2	
+     3	
+     4	def factorize(n: int) -> List[int]:
+     5	    """ Return list of prime factors of given integer in the order from smallest to largest.
+     6	    Each of the factors should be listed number of times corresponding to how many times it appeares in factorization.
+     7	    Input number should be equal to the product of all factors
+     8	    >>> factorize(8)
+     9	    [2, 2, 2]
+    10	    >>> factorize(25)
+    11	    [5, 5]
+    12	    >>> factorize(70)
+    13	    [2, 5, 7]
+    14	    """
+COMMAND: int semantics lines 9-27
+     9	  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    10	  // Bool participates in int arithmetic (x += (a == b))
+    11	  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+    12	  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+    13	  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+    14	  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+    15	  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+    16	  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+    17	  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+    18	
+    19	  syntax Int ::= pyMod(Int, Int) [function]
+    20	  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+    21	
+    22	  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+    23	  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+    24	  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+    25	  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+    26	  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+    27	  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+COMMAND: control semantics lines 46-82
+    46	  // ==== Expr statement: evaluate for effect, discard the value ===============
+    47	  // (bare calls — mutator methods, docstrings; the WP0 statement-trivia rung)
+    48	  rule <k> Expr(_:Val) => .K ... </k>
+    49	
+    50	  // ==== If (condition evaluated by strictness) ==============================
+    51	  syntax KItem ::= #branch(Bool, Stmts, Stmts)
+    52	  rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>
+    53	  rule <k> #branch(true,  T:Stmts, _:Stmts) => T ... </k>
+    54	  rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>
+    55	
+    56	  // ==== IfExp: ternary T if C else E ========================================
+    57	  rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k>
+    58	       requires truthy(V)
+    59	  rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k>
+    60	       requires notBool truthy(V)
+    61	
+    62	  // ==== For: one loop, in-cell continuation, over #iterNext =================
+    63	  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+    64	  // circularities anchor on #loop and narrowing substitutes the structure)
+    65	  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+    66	                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+    67	                 | #loopLbl(K) | "#cont" | "#brk"
+    68	
+    69	  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+    70	
+    71	  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+    72	  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+    73	  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+    74	        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+    75	
+    76	  // ==== While ==============================================================
+    77	  rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>
+    78	  rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>
+    79	  rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k>
+    80	       requires truthy(V)
+    81	  rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k>
+    82	       requires notBool truthy(V)
+COMMAND: list semantics lines 12-55
+    12	  // ==== ListExpr: [...] literal -> a fresh heap object =======================
+    13	  syntax ApplyK ::= "toList"
+    14	  rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>
+    15	  rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>
+    16	
+    17	  // ==== list ops: + / == / != ===============================================
+    18	  syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]
+    19	  rule valSeqConcat(.ValSeq, T:ValSeq)                => T
+    20	  rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))
+    21	
+    22	  // list + list constructs a NEW object (k-cell — it allocates; operands land here
+    23	  // already deref'd). priority(45) beats the generic BinOp dispatch.
+    24	  rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k>
+    25	       [priority(45)]
+    26	
+    27	  rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B
+    28	  rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B)
+    29	
+    30	  // ==== deep equality when elements are heap objects (list-of-lists) ========
+    31	  // Python == is structural at every depth. Fires ONLY when a ref is present
+    32	  // (the guard decides on concrete seqs); the plain ==K path above is unchanged.
+    33	  syntax Bool ::= hasRefVS(ValSeq) [function, total]
+    34	  rule hasRefVS(.ValSeq)                => false
+    35	  rule hasRefVS(vCons(V:Val, R:ValSeq)) => isRefV(V) orBool hasRefVS(R)
+    36	
+    37	  syntax Bool ::= deepEqVS(ValSeq, ValSeq, Map) [function]
+    38	                | deepEqV(Val, Val, Map)        [function]
+    39	  rule deepEqVS(.ValSeq, .ValSeq, _:Map)                   => true
+    40	  rule deepEqVS(.ValSeq, vCons(_:Val, _:ValSeq), _:Map)    => false
+    41	  rule deepEqVS(vCons(_:Val, _:ValSeq), .ValSeq, _:Map)    => false
+    42	  rule deepEqVS(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq), HP:Map)
+    43	    => deepEqV(A, B, HP) andBool deepEqVS(As, Bs, HP)
+    44	
+    45	  rule deepEqV(ref(H:Int), B:Val, HP:Map) => deepEqV({HP[H]}:>Val, B, HP)
+    46	       requires H in_keys(HP)
+    47	  rule deepEqV(A:Val, ref(H:Int), HP:Map) => deepEqV(A, {HP[H]}:>Val, HP)
+    48	       requires notBool isRefV(A) andBool H in_keys(HP)
+    49	  rule deepEqV(list(A:ValSeq), list(B:ValSeq), HP:Map) => deepEqVS(A, B, HP)
+    50	  rule deepEqV(A:Val, B:Val, _:Map) => A ==K B [owise]
+    51	
+    52	  // ==== mutator: xs.append(v) — an in-place heap write ======================
+    53	  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "append")), (V:Val, .Vals)) => noneV ... </k>
+    54	       <heap> ... H |-> list(VS:ValSeq => valSeqConcat(VS, vCons(V, .ValSeq))) ... </heap>
+    55	       [priority(40)]

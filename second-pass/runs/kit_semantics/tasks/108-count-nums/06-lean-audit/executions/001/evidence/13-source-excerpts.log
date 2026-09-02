@@ -1,0 +1,581 @@
+COMMAND: nl -ba /reference/k-proof/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	  imports INT
+     6	  imports BOOL
+     7	
+     8	  // Candidate-domain predicate: every element is an integer.
+     9	  syntax Bool ::= allInts(ValSeq) [function, total]
+    10	  rule allInts(.ValSeq) => true
+    11	  rule allInts(vCons(V:Val, R:ValSeq))
+    12	    => isInt(V) andBool allInts(R)
+    13	
+    14	  // The Haskell backend does not refine V:Val to Int from an isInt(V) path
+    15	  // condition.  This guarded total projection is the standard K cast-boundary
+    16	  // idiom; it creates no integer value unless the fixed subsort cast is
+    17	  // defined.
+    18	  syntax Bool ::= definedProjectInt(Val) [function, total]
+    19	  rule definedProjectInt(V:Val) => isInt(V)
+    20	
+    21	  syntax Int ::= projectIntTotal(Val)
+    22	    [function, total, symbol(projectIntTotal), no-evaluators]
+    23	
+    24	  rule #Ceil({@V:Val}:>Int)
+    25	    => ({ definedProjectInt(@V) #Equals true } #And #Ceil(@V))
+    26	    [simplification]
+    27	
+    28	  rule projectIntTotal(V:Val) => {V}:>Int
+    29	    requires definedProjectInt(V)
+    30	    [concrete, simplification(10), preserves-definedness]
+    31	  rule {V:Val}:>Int => projectIntTotal(V)
+    32	    requires definedProjectInt(V)
+    33	    [symbolic(V), simplification, preserves-definedness]
+    34	  rule projectIntTotal(I:Int) => I [simplification]
+    35	  rule projectIntTotal(projectIntTotal(V:Val))
+    36	    => projectIntTotal(V)
+    37	    [simplification]
+    38	
+    39	  // Guarded dispatch twins of the supplied Int equations used after list
+    40	  // iteration yields a dynamically sorted Val.
+    41	  rule applyCmp("<", V:Val, J:Int)
+    42	    => projectIntTotal(V) <Int J
+    43	    requires isInt(V)
+    44	    [simplification]
+    45	  rule applyUn("-", V:Val)
+    46	    => 0 -Int projectIntTotal(V)
+    47	    requires isInt(V)
+    48	    [simplification]
+    49	
+    50	  syntax Int ::= magnitude(Int) [function, total]
+    51	  rule magnitude(I:Int) => 0 -Int I requires I <Int 0
+    52	  rule magnitude(I:Int) => I        requires I >=Int 0
+    53	
+    54	  // A proof-side name for the code sequence returned by the supplied
+    55	  // Int2String/strToCodes primitive.  The concrete rule remains in the fixed
+    56	  // semantics; this simplification names its already-produced result.
+    57	  syntax IntSeq ::= decimalCodes(Int)
+    58	    [function, total, no-evaluators]
+    59	  rule strToCodes(Int2String(N:Int)) => decimalCodes(N)
+    60	    requires N >=Int 0
+    61	    [simplification]
+    62	
+    63	  rule applyBuiltin("str", V:Val, .Vals)
+    64	    => str(decimalCodes(projectIntTotal(V)))
+    65	    requires isInt(V)
+    66	     andBool projectIntTotal(V) >=Int 0
+    67	    [simplification]
+    68	
+    69	  syntax Bool ::= allDigitCodes(IntSeq) [function, total]
+    70	  rule allDigitCodes(.IntSeq) => true
+    71	  rule allDigitCodes(iCons(C:Int, R:IntSeq))
+    72	    => (48 <=Int C andBool C <=Int 57) andBool allDigitCodes(R)
+    73	
+    74	  // Contract of the fixed Int2String primitive on non-negative integers.
+    75	  // This is the only value-level trust boundary in the proof.
+    76	  rule allDigitCodes(decimalCodes(N:Int)) => true
+    77	    requires N >=Int 0
+    78	    [simplification]
+    79	
+    80	  syntax Int ::= codeDigitSum(IntSeq) [function, total]
+    81	  rule codeDigitSum(.IntSeq) => 0
+    82	  rule codeDigitSum(iCons(C:Int, R:IntSeq))
+    83	    => (C -Int 48) +Int codeDigitSum(R)
+    84	
+    85	  // Result of the source loop's "first nonzero digit seen" accumulator.
+    86	  syntax Int ::= chooseFirst(Int, IntSeq) [function, total]
+    87	  rule chooseFirst(F:Int, .IntSeq) => F
+    88	  rule chooseFirst(0, iCons(C:Int, R:IntSeq))
+    89	    => chooseFirst(C -Int 48, R)
+    90	  rule chooseFirst(F:Int, iCons(_:Int, R:IntSeq))
+    91	    => chooseFirst(F, R)
+    92	    requires F =/=Int 0
+    93	    [simplification]
+    94	
+    95	  syntax Int ::= lastCode(Int, IntSeq) [function, total]
+    96	  rule lastCode(C:Int, .IntSeq) => C
+    97	  rule lastCode(_:Int, iCons(C:Int, R:IntSeq)) => lastCode(C, R)
+    98	
+    99	  syntax Int ::= signedDigitSum(Int) [function, total]
+   100	  rule signedDigitSum(I:Int)
+   101	    => codeDigitSum(decimalCodes(magnitude(I)))
+   102	       -Int (2 *Int chooseFirst(0, decimalCodes(magnitude(I))))
+   103	    requires I <Int 0
+   104	  rule signedDigitSum(I:Int)
+   105	    => codeDigitSum(decimalCodes(magnitude(I)))
+   106	    requires I >=Int 0
+   107	
+   108	  syntax Int ::= countNumsSpec(ValSeq) [function, total]
+   109	  rule countNumsSpec(.ValSeq) => 0
+   110	  rule countNumsSpec(vCons(V:Val, R:ValSeq))
+   111	    => (#if signedDigitSum(projectIntTotal(V)) >Int 0
+   112	         #then 1 #else 0 #fi)
+   113	       +Int countNumsSpec(R)
+   114	    requires isInt(V)
+   115	  rule countNumsSpec(vCons(V:Val, R:ValSeq))
+   116	    => countNumsSpec(R)
+   117	    requires notBool isInt(V)
+   118	endmodule
+
+COMMAND: nl -ba /reference/k-proof/solution.py
+     1	def count_nums(arr):
+     2	    count = 0
+     3	    for num in arr:
+     4	        if num < 0:
+     5	            n = -num
+     6	        else:
+     7	            n = num
+     8	
+     9	        digit_sum = 0
+    10	        first_digit = 0
+    11	        char = "0"
+    12	        digit = 0
+    13	        for char in str(n):
+    14	            digit = int(char)
+    15	            if first_digit == 0:
+    16	                first_digit = digit
+    17	            digit_sum += digit
+    18	
+    19	        if num < 0:
+    20	            digit_sum -= 2 * first_digit
+    21	
+    22	        if digit_sum > 0:
+    23	            count += 1
+    24	
+    25	    return count
+
+COMMAND: nl -ba /reference/k-proof/reference-semantics/semantics/int.k
+     1	// reference/src/semantics/int.k — MPY-INT
+     2	// Int cases of the operator dispatch; Python // and % are floored (pyMod).
+     3	
+     4	module MPY-INT
+     5	  imports MPY-CORE
+     6	
+     7	  rule applyUn("-", I:Int) => 0 -Int I
+     8	
+     9	  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    10	  // Bool participates in int arithmetic (x += (a == b))
+    11	  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+    12	  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+    13	  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+    14	  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+    15	  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+    16	  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+    17	  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+    18	
+    19	  syntax Int ::= pyMod(Int, Int) [function]
+    20	  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+    21	
+    22	  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+    23	  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+    24	  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+    25	  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+    26	  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+    27	  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+    28	endmodule
+
+COMMAND: nl -ba /reference/k-proof/reference-semantics/semantics/builtins.k | sed -n 130,165p
+   130	
+   131	  // ==== map(str, xs) — eager (only the str case is in the subset) =============
+   132	  rule <k> #applyK(toCall(builtinV("map")), (typeV("str"), list(VS:ValSeq), .Vals))
+   133	        => #alloc(list(mapStrVS(VS))) ... </k>
+   134	  syntax ValSeq ::= mapStrVS(ValSeq) [function, total]
+   135	  rule mapStrVS(.ValSeq) => .ValSeq
+   136	  rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))
+   137	  rule mapStrVS(vCons(str(CS:IntSeq), R:ValSeq)) => vCons(str(CS), mapStrVS(R))
+   138	
+   139	  // ==== int(x) identities (int(round(x)) composes through) ====================
+   140	  rule applyBuiltin("int", I:Int, .Vals) => I
+   141	
+   142	  // ==== ord / chr ===========================================================
+   143	  rule applyBuiltin("ord", str(iCons(C:Int, .IntSeq)), .Vals) => C
+   144	  rule applyBuiltin("chr", I:Int, .Vals) => str(iCons(I, .IntSeq))
+   145	       requires 0 <=Int I andBool I <Int 128
+   146	
+   147	  // ==== str(int) / str(str) =================================================
+   148	  rule applyBuiltin("str", I:Int, .Vals)       => str(strToCodes(Int2String(I)))
+   149	  rule applyBuiltin("str", str(CS:IntSeq), .Vals) => str(CS)
+   150	
+   151	  // ==== int(str) — a single digit char ('0'..'9', code 48..57) to its value =====
+   152	  rule applyBuiltin("int", str(iCons(C:Int, .IntSeq)), .Vals) => C -Int 48
+   153	       requires 48 <=Int C andBool C <=Int 57
+   154	
+   155	  // ==== int(str) — a multi-digit non-negative numeral (Horner fold; the single-char rule covers len 1)
+   156	  rule applyBuiltin("int", str(CS:IntSeq), .Vals) => intDigAcc(CS, 0)
+   157	       requires isLen(CS) >=Int 2
+   158	  syntax Int ::= intDigAcc(IntSeq, Int) [function, total]
+   159	  rule intDigAcc(.IntSeq, ACC:Int)             => ACC
+   160	  rule intDigAcc(iCons(C:Int, R:IntSeq), ACC:Int) => intDigAcc(R, (ACC *Int 10) +Int (C -Int 48))
+   161	
+   162	  // ==== zip(a, b) — parallel iterable of pairs, truncating to the shorter =====
+   163	  rule applyBuiltin("zip", list(A:ValSeq), list(B:ValSeq), .Vals) => zipObj(A, B)
+   164	  rule applyBuiltin("zip", str(A:IntSeq), str(B:IntSeq), .Vals)   => zipObjS(A, B)
+   165	
+
+COMMAND: nl -ba /reference/k-proof/reference-semantics/semantics/str.k | sed -n 1,65p
+     1	// reference/src/semantics/str.k — MPY-STR
+     2	
+     3	module MPY-STR
+     4	  imports MPY-CORE
+     5	  imports MPY-ITER
+     6	
+     7	  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+     8	  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+     9	  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+    10	        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+    11	
+    12	  // ==== str literal (ASCII-only) ============================================
+    13	  syntax IntSeq ::= strToCodes(String) [function]
+    14	  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+    15	  rule strToCodes("") => .IntSeq
+    16	  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    17	    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+    18	
+    19	  // ==== operators: + / == / != / in =========================================
+    20	  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+    21	  rule seqConcat(.IntSeq, T:IntSeq)                => T
+    22	  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+    23	
+    24	  rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+    25	  rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+    26	  rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)
+    27	
+    28	  // substring membership: `P in X` iff the code-seq P occurs contiguously in X
+    29	  rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)
+    30	  rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)
+    31	
+    32	  syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]
+    33	  rule strPrefix(.IntSeq, _:IntSeq)               => true
+    34	  rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false
+    35	  rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)
+    36	
+    37	  syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]
+    38	  rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)
+    39	  rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)
+    40	  rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs)
+    41	       requires notBool strPrefix(P, iCons(C, Xs))
+    42	
+    43	  // ==== lexicographic order: < / <= / > / >= by code point (= Python str order on the code
+    44	  // model). strLt reduces on GROUND code-seqs (krun) but is inert/OPAQUE on symbolic ones
+    45	  // (a proof's codesProj(V) is an abstract IntSeq — no constructor rule matches), so a symbolic
+    46	  // str `<` stays a trusted opaque term the way sortVS / intFloatDiv do. Additive: fires only on
+    47	  // str </<=/>/>= comparisons.
+    48	  syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]
+    49	  rule strLt(.IntSeq, .IntSeq)                => false
+    50	  rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true
+    51	  rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false
+    52	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true          requires A  <Int B
+    53	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false         requires A  >Int B
+    54	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B
+    55	
+    56	  rule applyCmp("<",  str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+    57	  rule applyCmp(">",  str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)
+    58	  rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)
+    59	  rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)
+    60	endmodule
+
+COMMAND: nl -ba /reference/k-proof/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Translate the preserved source and the concrete assertion harness.
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	python3 py2mpy.py concrete-tests.py > concrete-tests.mpy
+     7	
+     8	# Concrete and independent executable checks.
+     9	python3 concrete-tests.py
+    10	python3 differential_test.py
+    11	
+    12	# Concrete execution uses the supplied semantics without proof extensions.
+    13	kompile --backend llvm reference-semantics/semantics.k \
+    14	  --main-module MPY-KRUN \
+    15	  --syntax-module MPY-SYNTAX \
+    16	  --output-definition runtime-kompiled
+    17	krun concrete-tests.mpy --definition runtime-kompiled \
+    18	  2> concrete-krun.err | tee concrete-krun.out
+    19	
+    20	# Symbolic proof definition: import the supplied MPY semantics read-only.
+    21	kompile --backend haskell verification.k \
+    22	  --main-module VERIFICATION \
+    23	  --syntax-module MPY-SYNTAX \
+    24	  --output-definition verification-kompiled
+    25	
+    26	# Together these two positive commands prove all seven claims in spec.k.
+    27	kprove spec.k \
+    28	  --definition verification-kompiled \
+    29	  --spec-module SPEC \
+    30	  --claims SPEC.digit-loop,SPEC.outer-loop-empty,SPEC.outer-loop-step,SPEC.call-setup-nonempty,SPEC.outer-loop-initial,SPEC.count-nums-nonempty \
+    31	  2>&1 | tee kprove-entry-nonempty.log
+    32	kprove spec.k \
+    33	  --definition verification-kompiled \
+    34	  --spec-module SPEC \
+    35	  --claims SPEC.count-nums-empty \
+    36	  2>&1 | tee kprove-entry-empty.log
+    37	
+    38	# Gate A validation definition and expected-failure probes.
+    39	kompile --backend haskell validation.k \
+    40	  --main-module VALIDATION \
+    41	  --syntax-module MPY-SYNTAX \
+    42	  --output-definition validation-kompiled
+    43	
+    44	set +e
+    45	kprove spec-vacuity.k \
+    46	  --definition validation-kompiled \
+    47	  --spec-module SPEC-VACUITY \
+    48	  2>&1 | tee kprove-vacuity.log
+    49	vacuity_status=${PIPESTATUS[0]}
+    50	set -e
+    51	echo "EXPECTED_NONZERO_STATUS=$vacuity_status"
+    52	if (( vacuity_status == 0 )); then
+    53	  echo "The false-postcondition probe unexpectedly proved." >&2
+    54	  exit 1
+    55	fi
+    56	
+    57	set +e
+    58	kprove spec-body-mutation.k \
+    59	  --definition validation-kompiled \
+    60	  --spec-module SPEC-BODY-MUTATION \
+    61	  2>&1 | tee kprove-body-mutation.log
+    62	mutation_status=${PIPESTATUS[0]}
+    63	set -e
+    64	echo "EXPECTED_NONZERO_STATUS=$mutation_status"
+    65	if (( mutation_status == 0 )); then
+    66	  echo "The body-mutation probe unexpectedly proved." >&2
+    67	  exit 1
+    68	fi
+
+COMMAND: nl -ba /candidate/Proof.lean
+     1	import Klean108CountNums.Lemmas
+     2	import Init.Omega
+     3	
+     4	namespace Proof
+     5	
+     6	private def allDigitCodesImpl : SortIntSeq → SortBool
+     7	  | .«.IntSeq_MPY-CORE_IntSeq» => true
+     8	  | .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» c rest =>
+     9	      (decide (48 ≤ c) && decide (c ≤ 57)) && allDigitCodesImpl rest
+    10	
+    11	private def intSeqSnoc : SortIntSeq → SortInt → SortIntSeq
+    12	  | .«.IntSeq_MPY-CORE_IntSeq», c =>
+    13	      .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» c
+    14	        .«.IntSeq_MPY-CORE_IntSeq»
+    15	  | .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» head tail, c =>
+    16	      .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» head (intSeqSnoc tail c)
+    17	
+    18	private theorem allDigitCodesImpl_intSeqSnoc
+    19	    (codes : SortIntSeq) (c : SortInt) :
+    20	    allDigitCodesImpl (intSeqSnoc codes c) =
+    21	      (allDigitCodesImpl codes && (decide (48 ≤ c) && decide (c ≤ 57))) := by
+    22	  induction codes with
+    23	  | «.IntSeq_MPY-CORE_IntSeq» =>
+    24	      simp [intSeqSnoc, allDigitCodesImpl]
+    25	  | «iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» head tail ih =>
+    26	      simp [intSeqSnoc, allDigitCodesImpl, ih, Bool.and_assoc]
+    27	
+    28	private theorem singletonDigitValid (n : Nat) (h : n < 10) :
+    29	    allDigitCodesImpl
+    30	      (.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» (48 + (n : Int))
+    31	        .«.IntSeq_MPY-CORE_IntSeq») = true := by
+    32	  have hlo : (48 : Int) ≤ 48 + (n : Int) := by
+    33	    have hn := Int.natCast_nonneg n
+    34	    simpa using Int.add_le_add_left hn 48
+    35	  have hn : (n : Int) < (10 : Nat) := Int.ofNat_lt.mpr h
+    36	  have hs : 48 + (n : Int) < 48 + (10 : Nat) :=
+    37	    Int.add_lt_add_left hn 48
+    38	  have hhi : 48 + (n : Int) ≤ (57 : Int) := by
+    39	    have : 48 + (n : Int) ≤ (48 + (10 : Nat)) - 1 :=
+    40	      Int.le_sub_one_iff.mpr hs
+    41	    simpa using this
+    42	  simp [allDigitCodesImpl, hlo, hhi]
+    43	
+    44	/- Standard base-10 conversion. Each recursive step converts the quotient
+    45	   first and appends ASCII '0' plus the remainder; the initial fuel `n`
+    46	   exceeds the number of decimal divisions needed for `n`. -/
+    47	private def natDecimalCodesAux : Nat → Nat → SortIntSeq
+    48	  | 0, n =>
+    49	      .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq»
+    50	        (48 + ((n % 10) : Int))
+    51	        .«.IntSeq_MPY-CORE_IntSeq»
+    52	  | fuel + 1, n =>
+    53	      if n < 10 then
+    54	        .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» (48 + (n : Int))
+    55	          .«.IntSeq_MPY-CORE_IntSeq»
+    56	      else
+    57	        intSeqSnoc (natDecimalCodesAux fuel (n / 10))
+    58	          (48 + ((n % 10) : Int))
+    59	
+    60	private theorem natDecimalCodesAuxValid (fuel n : Nat) :
+    61	    allDigitCodesImpl (natDecimalCodesAux fuel n) = true := by
+    62	  induction fuel generalizing n with
+    63	  | zero =>
+    64	      exact singletonDigitValid (n % 10)
+    65	        (Nat.mod_lt n (by decide))
+    66	  | succ fuel ih =>
+    67	      by_cases h : n < 10
+    68	      · simpa [natDecimalCodesAux, h] using singletonDigitValid n h
+    69	      · rw [natDecimalCodesAux]
+    70	        simp only [h, ↓reduceIte]
+    71	        rw [allDigitCodesImpl_intSeqSnoc]
+    72	        have htail := ih (n / 10)
+    73	        have hlast := singletonDigitValid (n % 10)
+    74	          (Nat.mod_lt n (by decide))
+    75	        simp [htail]
+    76	        simpa [allDigitCodesImpl] using hlast
+    77	
+    78	private def decimalCodesImpl : SortInt → SortIntSeq
+    79	  | .ofNat n => natDecimalCodesAux n n
+    80	  | .negSucc n =>
+    81	      .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» 45
+    82	        (natDecimalCodesAux (n + 1) (n + 1))
+    83	
+    84	private theorem decimalCodesImplNonnegative (n : SortInt) (h : n ≥ 0) :
+    85	    allDigitCodesImpl (decimalCodesImpl n) = true := by
+    86	  cases n with
+    87	  | ofNat n => exact natDecimalCodesAuxValid n n
+    88	  | negSucc n =>
+    89	      have hn : Int.negSucc n < 0 := Int.negSucc_lt_zero n
+    90	      exact False.elim ((Int.not_lt_of_ge h) hn)
+    91	
+    92	private def isIntImpl : SortK → SortBool
+    93	  | .kseq (.inj_SortInt _) .dotk => true
+    94	  | _ => false
+    95	
+    96	private def definedProjectIntImpl : SortVal → SortBool
+    97	  | .inj_SortInt _ => true
+    98	  | _ => false
+    99	
+   100	/- The K total projector is operationally used only under `isInt`.
+   101	   Its integer constructor is projected exactly; zero is the canonical total
+   102	   value outside the partial cast's defined domain. -/
+   103	private def projectIntTotalImpl : SortVal → SortInt
+   104	  | .inj_SortInt i => i
+   105	  | _ => 0
+   106	
+   107	private def projectIntOptionImpl : SortK → Option SortInt
+   108	  | .kseq (.inj_SortInt i) .dotk => some i
+   109	  | _ => none
+   110	
+   111	private def applyCmpImpl : SortString → SortVal → SortVal → SortBool
+   112	  | "<", .inj_SortInt i, .inj_SortInt j => decide (i < j)
+   113	  | "<=", .inj_SortInt i, .inj_SortInt j => decide (i ≤ j)
+   114	  | ">", .inj_SortInt i, .inj_SortInt j => decide (i > j)
+   115	  | ">=", .inj_SortInt i, .inj_SortInt j => decide (i ≥ j)
+   116	  | "==", .inj_SortInt i, .inj_SortInt j => decide (i = j)
+   117	  | "!=", .inj_SortInt i, .inj_SortInt j => decide (i ≠ j)
+   118	  | _, _, _ => false
+   119	
+   120	private def applyUnImpl : SortString → SortVal → SortVal
+   121	  | "-", .inj_SortInt i => .inj_SortInt (0 - i)
+   122	  | _, _ => .«noneV_MPY-CORE_Val»
+   123	
+   124	private def applyBuiltinImpl : SortString → SortVals → SortVal
+   125	  | "str",
+   126	      .«_,__MPY-CORE_Vals_Val_Vals» (.inj_SortInt i)
+   127	        .«.List{"_,__MPY-CORE_Vals_Val_Vals"}_Vals» =>
+   128	      .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» (decimalCodesImpl i))
+   129	  | "str",
+   130	      .«_,__MPY-CORE_Vals_Val_Vals» (.inj_SortStr s)
+   131	        .«.List{"_,__MPY-CORE_Vals_Val_Vals"}_Vals» =>
+   132	      .inj_SortStr s
+   133	  | _, _ => .«noneV_MPY-CORE_Val»
+   134	
+   135	/- KORE symbol: Lbl'Unds'-Int'Unds'; frozen source obligations: rule-dd0c5a6695115ef6c4608553ba13c7b4e2cd91e78ce50bf59e458ba0a5eb5be2. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   136	def «_-Int_» (x y : SortInt) : SortInt := x - y
+   137	/- KORE symbol: Lbl'Unds'andBool'Unds'; frozen source obligations: rule-96422d110466a9240b0e25343046e54b8fa06a0bdf0abc4c25fcd195583f54da. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   138	def _andBool_ (x y : SortBool) : SortBool := x && y
+   139	/- KORE symbol: Lbl'Unds-GT-Eqls'Int'Unds'; frozen source obligations: rule-96422d110466a9240b0e25343046e54b8fa06a0bdf0abc4c25fcd195583f54da, rule-5af48b88759940f404acea3042b6fa69d00290648ae1c95910aaad61bea89344. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   140	def «_>=Int_» (x y : SortInt) : SortBool := decide (x ≥ y)
+   141	/- KORE symbol: Lbl'Unds-LT-'Int'Unds'; frozen source obligations: rule-f0bc44c15424da687bfa0aeb3e970f71a2cc9dbd9a38c4ac04629f27cea4ac69. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   142	def «_<Int_» (x y : SortInt) : SortBool := decide (x < y)
+   143	/- KORE symbol: LblallDigitCodes'LParUndsRParUnds'VERIFICATION'Unds'Bool'Unds'IntSeq; frozen source obligations: rule-5af48b88759940f404acea3042b6fa69d00290648ae1c95910aaad61bea89344. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   144	def «allDigitCodes(_)_VERIFICATION_Bool_IntSeq» : SortIntSeq → SortBool :=
+   145	  allDigitCodesImpl
+   146	/- KORE symbol: LblapplyBuiltin'LParUndsCommUndsRParUnds'MPY-BUILTINS'Unds'Val'Unds'String'Unds'Vals; frozen source obligations: rule-96422d110466a9240b0e25343046e54b8fa06a0bdf0abc4c25fcd195583f54da. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   147	def «applyBuiltin(_,_)_MPY-BUILTINS_Val_String_Vals» :
+   148	    SortString → SortVals → SortVal := applyBuiltinImpl
+   149	/- KORE symbol: LblapplyCmp'LParUndsCommUndsCommUndsRParUnds'MPY-CORE'Unds'Bool'Unds'String'Unds'Val'Unds'Val; frozen source obligations: rule-f0bc44c15424da687bfa0aeb3e970f71a2cc9dbd9a38c4ac04629f27cea4ac69. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   150	def «applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val» :
+   151	    SortString → SortVal → SortVal → SortBool := applyCmpImpl
+   152	/- KORE symbol: LblapplyUn'LParUndsCommUndsRParUnds'MPY-CORE'Unds'Val'Unds'String'Unds'Val; frozen source obligations: rule-dd0c5a6695115ef6c4608553ba13c7b4e2cd91e78ce50bf59e458ba0a5eb5be2. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   153	def «applyUn(_,_)_MPY-CORE_Val_String_Val» :
+   154	    SortString → SortVal → SortVal := applyUnImpl
+   155	/- KORE symbol: LbldecimalCodes'LParUndsRParUnds'VERIFICATION'Unds'IntSeq'Unds'Int; frozen source obligations: rule-96422d110466a9240b0e25343046e54b8fa06a0bdf0abc4c25fcd195583f54da, rule-5af48b88759940f404acea3042b6fa69d00290648ae1c95910aaad61bea89344. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   156	def «decimalCodes(_)_VERIFICATION_IntSeq_Int» : SortInt → SortIntSeq :=
+   157	  decimalCodesImpl
+   158	/- KORE symbol: LbldefinedProjectInt'LParUndsRParUnds'VERIFICATION'Unds'Bool'Unds'Val; frozen source obligations: rule-0312858a8718cb93d212cdb7b679a2875534dc14191dff8edf7bccf9a96d8b43. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   159	def «definedProjectInt(_)_VERIFICATION_Bool_Val» : SortVal → SortBool :=
+   160	  definedProjectIntImpl
+   161	/- KORE symbol: LblisInt; frozen source obligations: rule-f0bc44c15424da687bfa0aeb3e970f71a2cc9dbd9a38c4ac04629f27cea4ac69, rule-dd0c5a6695115ef6c4608553ba13c7b4e2cd91e78ce50bf59e458ba0a5eb5be2, rule-96422d110466a9240b0e25343046e54b8fa06a0bdf0abc4c25fcd195583f54da. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   162	def isInt : SortK → SortBool := isIntImpl
+   163	/- KORE symbol: LblprojectIntTotal; frozen source obligations: rule-f0bc44c15424da687bfa0aeb3e970f71a2cc9dbd9a38c4ac04629f27cea4ac69, rule-dd0c5a6695115ef6c4608553ba13c7b4e2cd91e78ce50bf59e458ba0a5eb5be2, rule-96422d110466a9240b0e25343046e54b8fa06a0bdf0abc4c25fcd195583f54da. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   164	def projectIntTotal : SortVal → SortInt := projectIntTotalImpl
+   165	/- KORE symbol: Lblproject'Coln'Int; frozen source obligations: rule-0312858a8718cb93d212cdb7b679a2875534dc14191dff8edf7bccf9a96d8b43. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   166	def «project:Int?» : SortK → Option SortInt := projectIntOptionImpl
+   167	
+   168	theorem final :
+   169	    Klean108CountNums.Lemmas.targetStatement «_-Int_» _andBool_ «_>=Int_» «_<Int_» «allDigitCodes(_)_VERIFICATION_Bool_IntSeq» «applyBuiltin(_,_)_MPY-BUILTINS_Val_String_Vals» «applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val» «applyUn(_,_)_MPY-CORE_Val_String_Val» «decimalCodes(_)_VERIFICATION_IntSeq_Int» «definedProjectInt(_)_VERIFICATION_Bool_Val» isInt projectIntTotal «project:Int?» := by
+   170	  unfold Klean108CountNums.Lemmas.targetStatement
+   171	  constructor
+   172	  · intro V
+   173	    cases V <;>
+   174	      simp [«project:Int?», projectIntOptionImpl,
+   175	        «definedProjectInt(_)_VERIFICATION_Bool_Val»,
+   176	        definedProjectIntImpl, inj]
+   177	  constructor
+   178	  · intro J V h
+   179	    cases V <;>
+   180	      simp [isInt, isIntImpl, inj,
+   181	        «applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val», applyCmpImpl,
+   182	        projectIntTotal, projectIntTotalImpl, «_<Int_»] at h ⊢
+   183	  constructor
+   184	  · intro V h
+   185	    cases V <;>
+   186	      simp [isInt, isIntImpl, inj,
+   187	        «applyUn(_,_)_MPY-CORE_Val_String_Val», applyUnImpl,
+   188	        projectIntTotal, projectIntTotalImpl, «_-Int_»] at h ⊢
+   189	  constructor
+   190	  · intro V h
+   191	    cases V <;>
+   192	      simp [isInt, isIntImpl, inj,
+   193	        «applyBuiltin(_,_)_MPY-BUILTINS_Val_String_Vals», applyBuiltinImpl,
+   194	        «decimalCodes(_)_VERIFICATION_IntSeq_Int», projectIntTotal,
+   195	        projectIntTotalImpl, _andBool_, «_>=Int_»] at h ⊢
+   196	  · intro N h
+   197	    have hn : N ≥ 0 := by
+   198	      simpa [«_>=Int_»] using h
+   199	    exact decimalCodesImplNonnegative N hn
+   200	
+   201	end Proof
+
+COMMAND: nl -ba /reference/k-proof/reference-semantics/semantics/bool.k | sed -n 1,30p
+     1	// reference/src/semantics/bool.k — MPY-BOOL
+     2	// Bool operator cases + the truthy boolean operations (not / and / or; and-or are
+     3	// value-returning short-circuit over any Vals, per Python).
+     4	
+     5	module MPY-BOOL
+     6	  imports MPY-CORE
+     7	
+     8	  rule applyUn("not", V:Val) => notBool truthy(V)
+     9	
+    10	  rule applyCmp("==", B1:Bool, B2:Bool) => B1 ==Bool B2
+    11	  rule applyCmp("!=", B1:Bool, B2:Bool) => B1 =/=Bool B2
+    12	
+    13	  // ==== BoolOp: short-circuit, value-returning and / or =====================
+    14	  // the node is its own accumulator: heat the HEAD element only, then either return it
+    15	  // (short-circuit) or drop it and continue
+    16	  context BoolOp(_, (HOLE:Expr, _:Exprs))
+    17	  rule <k> BoolOp(_:String, (V:Val, .Exprs)) => V ... </k>
+    18	  rule <k> BoolOp("and", (V:Val, A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>
+    19	       requires truthy(V)
+    20	  rule <k> BoolOp("and", (V:Val, _:Expr, _:Exprs)) => V ... </k>
+    21	       requires notBool truthy(V)
+    22	  rule <k> BoolOp("or",  (V:Val, _:Expr, _:Exprs)) => V ... </k>
+    23	       requires truthy(V)
+    24	  rule <k> BoolOp("or",  (V:Val, A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>
+    25	       requires notBool truthy(V)
+    26	
+    27	  // ==== heap-object head: decide truthiness THROUGH the heap, never rewrite the
+    28	  // operand — and/or return the OBJECT itself (Python identity), not its structure
+    29	  rule <k> BoolOp(_:String, (ref(H:Int), .Exprs)) => ref(H) ... </k>
+    30	       [priority(40)]

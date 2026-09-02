@@ -1,0 +1,124 @@
+COMMAND
+nl -ba /reference/k-proof/verification.k
+nl -ba /reference/k-proof/spec.k | sed -n '1,48p'
+nl -ba /reference/k-proof/solution.py
+nl -ba /reference/k-proof/reference-semantics/semantics/core.k | sed -n '118,155p'
+nl -ba /reference/k-proof/reference-semantics/semantics/functions.k | sed -n '10,22p;70,101p'
+nl -ba /reference/k-proof/reference-semantics/semantics/call.k | sed -n '14,25p;65,79p'
+nl -ba /reference/k-proof/reference-semantics/semantics/operators.k | sed -n '7,17p'
+nl -ba /reference/k-proof/reference-semantics/semantics/int.k | sed -n '5,22p'
+
+RESULT (relevant lines)
+verification.k:
+     1  requires "reference-semantics/semantics.k"
+     2
+     3  module VERIFICATION
+     4    imports MPY
+     5  endmodule
+
+spec.k:
+     1  requires "verification.k"
+     2
+     3  module SPEC
+     4    imports VERIFICATION
+     5
+     6    claim [car-race-collision]:
+     7      <k>
+     8        #loadAll(
+     9          Module(
+    10            FuncDef(
+    11              "car_race_collision",
+    12              Params("n"),
+    13              Return(BinOp("*", Name("n"), Name("n")))
+    14            )
+    15          )
+    16        )
+    17        ~> Call(Name("car_race_collision"), Int(N:Int))
+    18        => N *Int N
+    19      </k>
+    20      <env> 0 </env>
+    21      <scopes>
+    22        0  |-> scope(.Map, parent(-1))
+    23        -1 |-> builtinsScope
+    24        =>
+    25        0  |-> scope(
+    26                 "car_race_collision"
+    27                   |-> closureVal(
+    28                         ("n", .ParamNames),
+    29                         (Return(BinOp("*", Name("n"), Name("n"))) .Stmts),
+    30                         0
+    31                       ),
+    32                 parent(-1)
+    33               )
+    34        -1 |-> builtinsScope
+    35      </scopes>
+    36      <scopeLoc> 1 </scopeLoc>
+    37      <heap> .Map </heap>
+    38      <heapLoc> 0 </heapLoc>
+    39      <stack> .List </stack>
+    40      <ret> noRet </ret>
+    41      <exc> NoExc </exc>
+    42      <exit-code> 0 </exit-code>
+    43  endmodule
+
+solution.py:
+     1  def car_race_collision(n: int):
+     2      return n * n
+
+semantics/core.k:
+   123    // ==== module load + statement sequencing ==================================
+   124    syntax KItem ::= #loadAll(Module)
+   125    rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>
+   126    rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>
+   127    rule <k> .Stmts => .K ... </k>
+   129    // ==== Name lookup (walk the scope chain; builtins live in the -1 scope) ====
+   130    syntax KItem ::= #look(String, Int)
+   131    rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>
+   132    rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k>
+   133         <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+   134         requires X in_keys(M)
+
+semantics/functions.k:
+    13    // ==== def / anonymous closure =============================================
+    14    rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k>
+    15         <env> L:Int </env>
+    16         <scopes> ... L |-> scope(M:Map => M [ F <- closureVal(PNS, BODY, L) ], _) ... </scopes>
+    77    // ==== return / pop the frame (the returned expr evaluates by strictness) ==
+    78    rule <k> Return(V:Val) ~> _ => #pop </k>
+    79         <ret> noRet => retV(V) </ret>
+    80    rule <k> #endcall => #pop ... </k>
+    81         <ret> noRet => retV(noneV) </ret>
+    85    rule <k> #pop => V ~> CONT </k>
+    86         <ret>   retV(V) => noRet </ret>
+    87         <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack>
+    88         <env>   L:Int => CALLERL </env>
+    89         <scopes> SC:Map => SC [ L <- undef ] </scopes>
+    90         <scopeLoc> _ => SAVEDL </scopeLoc>
+
+semantics/call.k:
+    18    // evaluate callee, then args ([owise]: problem-local Call interceptions beat this)
+    19    syntax KItem ::= #callee(Exprs)
+    20    rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]
+    21    rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>
+    69    rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT
+    70          => #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+    71         <env>     CALLERL:Int => NEWL </env>
+    72         <scopes>   STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes>
+    73         <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+    74         <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+
+semantics/operators.k:
+    12    rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+
+semantics/int.k:
+     9    rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    13    rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+    14    rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+
+JUDGMENT
+The frozen source body and claim are identical at the operation level: both
+compute multiplication of the same integer parameter. Supplied rules load the
+function, bind/call the closure, evaluate names, dispatch BinOp, map integer
+multiplication to K's *Int, return the value, and restore the frame. No
+problem-local bridge, summary, recurrence, named proof term, derived theorem,
+or mathematical domain lemma is inserted by verification.k.

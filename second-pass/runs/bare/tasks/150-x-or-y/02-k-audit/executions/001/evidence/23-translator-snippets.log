@@ -1,0 +1,152 @@
+LABEL: 23-translator-snippets
+WORKDIR: /tmp/audit-work/build
+COMMAND: bash -lc nl\ -ba\ py2mpy.py\ \|\ sed\ -n\ \"132\,195p\"\;\ nl\ -ba\ py2mpy.py\ \|\ sed\ -n\ \"285\,365p\"
+EXIT_STATUS: 0
+OUTPUT_LINES: 145
+OUTPUT_BYTES: 6805
+--- OUTPUT (bounded) ---
+   132	def emit_expr(node: ast.expr):
+   133	    if isinstance(node, ast.Constant):
+   134	        v = node.value
+   135	        if v is None:
+   136	            return "NoneVal"
+   137	        if isinstance(v, bool):                 # MUST precede int (bool ⊂ int)
+   138	            return Ctor("Bool", "true" if v else "false")
+   139	        if isinstance(v, int):
+   140	            return Ctor("Int", str(v))
+   141	        if isinstance(v, float):
+   142	            return Ctor("Float", repr(v))
+   143	        if isinstance(v, str):
+   144	            return Ctor("Str", q(v))
+   145	        raise Unsupported(f"Constant {type(v).__name__}")
+   146	
+   147	    if isinstance(node, ast.Name):
+   148	        return Ctor("Name", q(node.id))
+   149	
+   150	    if isinstance(node, ast.Lambda):
+   151	        a = node.args
+   152	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   153	            raise Unsupported("complex lambda signature")
+   154	        names = [p.arg for p in (a.posonlyargs + a.args)]
+   155	        params = Ctor("Params", *(q(n) for n in names))
+   156	        info = scope_info("lambda", node.lineno)
+   157	        if info and (info[0] or info[1] or info[2]):
+   158	            cells, frees, _ = info
+   159	            return Ctor("Lambda", params,
+   160	                        Ctor("CellVars", *(q(n) for n in cells)),
+   161	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   162	                        emit_expr(node.body))
+   163	        return Ctor("Lambda", params, emit_expr(node.body))
+   164	
+   165	    if isinstance(node, ast.BinOp):
+   166	        op = _BINOP.get(type(node.op))
+   167	        if op is None:
+   168	            raise Unsupported(f"BinOp {type(node.op).__name__}")
+   169	        return Ctor("BinOp", q(op), emit_expr(node.left), emit_expr(node.right))
+   170	
+   171	    if isinstance(node, ast.UnaryOp):
+   172	        op = _UNARY.get(type(node.op))
+   173	        if op is None:
+   174	            raise Unsupported(f"UnaryOp {type(node.op).__name__}")
+   175	        return Ctor("UnaryOp", q(op), emit_expr(node.operand))
+   176	
+   177	    if isinstance(node, ast.BoolOp):
+   178	        op = _BOOLOP[type(node.op)]
+   179	        return Ctor("BoolOp", q(op), *(emit_expr(v) for v in node.values))
+   180	
+   181	    if isinstance(node, ast.Compare):
+   182	        # Faithful, non-desugared: left operand + a chain of (op, comparator).
+   183	        # Single comparison => one CmpOp; `a < b < c` => two CmpOps.
+   184	        chain = [
+   185	            Ctor("CmpOp", q(_op_or_raise(_CMPOP, op, "Compare")), emit_expr(c))
+   186	            for op, c in zip(node.ops, node.comparators)
+   187	        ]
+   188	        return Ctor("Compare", emit_expr(node.left), *chain)
+   189	
+   190	    if isinstance(node, ast.List):
+   191	        return Ctor("ListExpr", *(emit_expr(e) for e in node.elts))
+   192	
+   193	    if isinstance(node, ast.Tuple):
+   194	        return Ctor("TupleExpr", *(emit_expr(e) for e in node.elts))
+   195	
+   285	def emit_stmt(node: ast.stmt):
+   286	    if isinstance(node, ast.FunctionDef):
+   287	        a = node.args
+   288	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   289	            raise Unsupported("complex function signature (defaults/varargs/kwonly)")
+   290	        if node.decorator_list:
+   291	            raise Unsupported("decorators")
+   292	        names = [p.arg for p in (a.posonlyargs + a.args)]  # type annotations ignored
+   293	        params = Ctor("Params", *(q(n) for n in names))
+   294	        info = scope_info(node.name, node.lineno)
+   295	        if info and (info[0] or info[1] or info[2]):
+   296	            cells, frees, _ = info
+   297	            return Ctor("FuncDef", q(node.name), params,
+   298	                        Ctor("CellVars", *(q(n) for n in cells)),
+   299	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   300	                        emit_stmts(node.body))
+   301	        return Ctor("FuncDef", q(node.name), params, emit_stmts(node.body))
+   302	
+   303	    if isinstance(node, ast.Return):
+   304	        if node.value is None:
+   305	            return Ctor("Return")
+   306	        return Ctor("Return", emit_expr(node.value))
+   307	
+   308	    if isinstance(node, ast.Assign):
+   309	        if len(node.targets) != 1:
+   310	            raise Unsupported("chained assignment (a = b = ...)")
+   311	        # Target is just an expression in store position (Name / Tuple / Subscript / Attribute).
+   312	        return Ctor("Assign", emit_expr(node.targets[0]), emit_expr(node.value))
+   313	
+   314	    if isinstance(node, ast.AugAssign):
+   315	        op = _BINOP.get(type(node.op))
+   316	        if op is None:
+   317	            raise Unsupported(f"AugAssign {type(node.op).__name__}")
+   318	        return Ctor("AugAssign", emit_expr(node.target), q(op), emit_expr(node.value))
+   319	
+   320	    if isinstance(node, ast.If):
+   321	        return Ctor("If", emit_expr(node.test),
+   322	                    emit_stmts(node.body), emit_stmts(node.orelse))
+   323	
+   324	    if isinstance(node, ast.For):
+   325	        if node.orelse:
+   326	            raise Unsupported("for-else")
+   327	        return Ctor("For", emit_expr(node.target), emit_expr(node.iter),
+   328	                    emit_stmts(node.body))
+   329	
+   330	    if isinstance(node, ast.While):
+   331	        if node.orelse:
+   332	            raise Unsupported("while-else")
+   333	        return Ctor("While", emit_expr(node.test), emit_stmts(node.body))
+   334	
+   335	    if isinstance(node, ast.Break):
+   336	        return "Break"
+   337	    if isinstance(node, ast.Continue):
+   338	        return "Continue"
+   339	    if isinstance(node, ast.Pass):
+   340	        return "Pass"
+   341	
+   342	    if isinstance(node, ast.Assert):
+   343	        if node.msg is not None:
+   344	            return Ctor("Assert", emit_expr(node.test), emit_expr(node.msg))
+   345	        return Ctor("Assert", emit_expr(node.test))
+   346	
+   347	    if isinstance(node, ast.Expr):
+   348	        return Ctor("Expr", emit_expr(node.value))
+   349	
+   350	    if isinstance(node, ast.Import):
+   351	        return Ctor("Import", *(q(n.name) for n in node.names))
+   352	    if isinstance(node, ast.ImportFrom):
+   353	        mod = node.module if node.module is not None else ""
+   354	        return Ctor("ImportFrom", q(mod), *(q(n.name) for n in node.names))
+   355	
+   356	    raise Unsupported(f"Stmt {type(node).__name__}")
+   357	
+   358	
+   359	def emit_stmts(stmts) -> Seq:
+   360	    return Seq([emit_stmt(s) for s in stmts])
+   361	
+   362	
+   363	def emit_module(tree: ast.Module) -> Ctor:
+   364	    return Ctor("Module", emit_stmts(tree.body))
+   365	

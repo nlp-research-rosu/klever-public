@@ -1,0 +1,119 @@
+Script started on 2026-07-27 23:37:09-05:00 [<not executed on terminal>]
+    if destination.exists() or destination.is_symlink():
+        raise KleanExportError(f"destination already exists: {destination}")
+    if not destination.parent.is_dir() or destination.parent.is_symlink():
+        raise KleanExportError("destination parent must be a real directory")
+    verification = frozen_input / "verification.k"
+    if not verification.is_file() or verification.is_symlink():
+        raise KleanExportError("frozen input is missing regular verification.k")
+    lock = _regular_json(toolchain_lock)
+    for key in (
+        "runtimeverification_k_commit",
+        "pyk_project",
+        "lean_toolchain",
+    ):
+        if not isinstance(lock.get(key), str) or not lock[key]:
+            raise KleanExportError(f"toolchain lock is missing {key}")
+    verification_text = verification.read_text()
+    canonical_inventory = validated
+    resolution = resolve_definition_closure(frozen_input)
+    module = resolution.verification_module
+    if module != canonical_inventory["verification_module"]:
+        raise KleanExportError(
+            "Stage 1 inventory and K definition resolution disagree"
+        )
+    _parsed_module, functions = parse_verification(verification_text)
+    domain_rules = _domain_source_rules(
+        validated, discovery_manifest_sha256
+    )
+    # Preserve the exact accepted Stage 1 K definition.  Eligibility is now
+    # driven by the Stage 3 source-rule inventory, so stripping
+    # [simplification] from non-obligation rules is both unnecessary and can
+    # make otherwise valid K structurally illegal.
+    transformed = verification_text
+    source_rules = _klean_source_rules(domain_rules, 0)
+    export_module_name = f"{module.rsplit('-', 1)[0]}-KLEAN-EXPORT"
+    package_name = f"klean-{problem.lower()}"
+    library_name = lib_name(package_name)
+    environment = dict(os.environ)
+
+    publish_staging = Path(
+        tempfile.mkdtemp(prefix=f".{destination.name}.", dir=destination.parent)
+    )
+    try:
+        with tempfile.TemporaryDirectory(prefix=f"klean-{problem}-") as temporary:
+            scratch = Path(temporary)
+            export_k = stage_definition_driver(
+                scratch,
+                frozen_input,
+                resolution,
+                transformed,
+                export_module(module, functions),
+            )
+            source_inventory_path = scratch / "source-rule-inventory.json"
+            _write_json(
+                source_inventory_path,
+                {"schema_version": 1, "source_rules": source_rules},
+            )
+            definition = scratch / "kompiled"
+            command = [
+                "kompile",
+                str(export_k),
+                "--backend",
+                "haskell",
+                "--main-module",
+                export_module_name,
+                "--syntax-module",
+                resolution.syntax_module,
+                "--output-definition",
+                str(definition),
+            ]
+            code, output = run_command(
+                command,
+                cwd=scratch,
+                timeout=KOMPILE_TIMEOUT,
+                env=environment,
+            )
+            if code != 0:
+                raise KleanExportError(f"kompile failed ({code}): {output[-600:]}")
+            lean_output = scratch / "lean-output"
+            lean_output.mkdir()
+            command = [
+                sys.executable,
+                str(KLEAN),
+                str(definition),
+                package_name,
+                "-o",
+                str(lean_output),
+                "-r",
+                "kxExport",
+                "--lemmas",
+                "--lemma-source",
+                verification.name,
+                "--source-rule-inventory",
+                str(source_inventory_path),
+            ]
+            for function in functions:
+                command.extend(("--spec-func", function.name))
+            code, output = run_command(
+                command,
+                cwd=scratch,
+                timeout=KLEAN_TIMEOUT,
+                env=environment,
+            )
+            package = lean_output / package_name
+            if code != 0 or not package.is_dir():
+                raise KleanExportError(f"klean failed ({code}): {output[-600:]}")
+            obligation_map = _bind_obligation_provenance(
+                package, domain_rules, source_rules
+            )
+            (package / "lean-toolchain").write_text(lock["lean_toolchain"] + "\n")
+            _patch_lake_build_directory(package)
+
+            function_file = package / library_name / "Func.lean"
+            axiomatized: set[str] = set()
+            noncomputable_repair = False
+            build_code = 1
+            build_output = ""
+
+Script done on 2026-07-27 23:37:09-05:00 [COMMAND_EXIT_CODE="0"]

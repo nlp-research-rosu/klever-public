@@ -1,0 +1,634 @@
++ sed -n 1,360p /reference/tools/k_rule_inventory.py
+#!/usr/bin/env python3
+"""Canonical lexical inventory of simplification rules in verification.k."""
+
+from __future__ import annotations
+
+import dataclasses
+import hashlib
+import json
+import re
+import stat
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+_MODULE_NAME_RE = re.compile(
+    r"^[ \t]+(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"(?:[ \t]+\[[^\]\r\n]*\])?[ \t]*$"
+)
+_TRAILING_ATTRIBUTES_RE = re.compile(
+    r"\[(?P<attributes>[^\[\]]*)\][ \t\r\n]*\Z", re.S
+)
+_CELL_TAG_RE = re.compile(
+    r"<(?P<close>/)?(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"[ \t]*(?P<self_close>/)?>"
+)
+_OUTER_SENTENCE_KEYWORDS = {
+    "imports",
+    "syntax",
+    "rule",
+    "configuration",
+    "context",
+    "claim",
+    "alias",
+}
+
+
+class KRuleInventoryError(RuntimeError):
+    """Raised when verification.k cannot produce a canonical inventory."""
+
+
+@dataclass(frozen=True)
+class KRule:
+    source_rule_id: str
+    module: str
+    start_line: int
+    end_line: int
+    normalized_sha256: str
+    attributes: list[str]
+    text: str
+
+
+@dataclass(frozen=True)
+class _Sentence:
+    keyword: str
+    start: int
+
+
+@dataclass(frozen=True)
+class _Module:
+    name: str
+    content_start: int
+    content_end: int
+    imports: tuple[str, ...]
+    sentences: tuple[_Sentence, ...]
+
+
+@dataclass(frozen=True)
+class _RuleSpan:
+    rule: KRule
+    start_offset: int
+    end_offset: int
+    attribute_start: int | None
+    attribute_end: int | None
+
+
+def canonical_json_sha256(document: Any) -> str:
+    encoded = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _mask_non_code(text: str) -> str:
+    """Mask comments and string bodies without changing source offsets."""
+
+    output = list(text)
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                state = "code"
+            else:
+                output[index] = " "
+            index += 1
+            continue
+        if state == "string":
+            if character == "\\" and following:
+                output[index] = " "
+                output[index + 1] = " "
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            elif character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                output[index] = output[index + 1] = " "
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                output[index] = output[index + 1] = " "
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output[index] = output[index + 1] = " "
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output[index] = output[index + 1] = " "
+            state = "block-comment"
+            block_depth = 1
+            index += 2
+            continue
+        if character == '"':
+            state = "string"
+        index += 1
+    return "".join(output)
+
+
+def _line_ranges(text: str, start: int = 0) -> list[tuple[int, int, int]]:
+    ranges: list[tuple[int, int, int]] = []
+    line_start = start
+    while line_start < len(text):
+        newline = text.find("\n", line_start)
+        next_start = len(text) if newline < 0 else newline + 1
+        line_end = len(text) if newline < 0 else newline
+        content_end = (
+            line_end - 1
+            if line_end > line_start and text[line_end - 1] == "\r"
+            else line_end
+        )
+        ranges.append((line_start, content_end, next_start))
+        if newline < 0:
+            break
+        line_start = next_start
+    return ranges
+
+
+def _line_heads(text: str) -> list[tuple[int, int, str, str]]:
+    """Return physical-line word heads without assigning K grammar meaning."""
+
+    heads: list[tuple[int, int, str, str]] = []
+    for line_start, content_end, _next_start in _line_ranges(text):
+        index = line_start
+        while index < content_end and text[index] in " \t":
+            index += 1
+        word_end = index
+        while word_end < content_end and (
+            text[word_end].isalnum() or text[word_end] in "_'"
+        ):
+            word_end += 1
+        if word_end > index:
+            heads.append(
+                (
+                    line_start,
+                    content_end,
+                    text[index:word_end],
+                    text[word_end:content_end],
+                )
+            )
+    return heads
+
+
+def _line_word(line: str) -> tuple[str, str, int]:
+    stripped = line.lstrip()
+    indent = len(line) - len(stripped)
+    word_end = 0
+    while word_end < len(stripped) and (
+        stripped[word_end].isalnum() or stripped[word_end] in "_'"
+    ):
+        word_end += 1
+    return stripped[:word_end], stripped[word_end:], indent + word_end
+
+
+def _rule_continuation(line: str) -> tuple[str, int] | None:
+    stripped = line.lstrip()
+    if stripped.startswith("["):
+        return "attributes", len(line) - len(stripped)
+    word, rest, word_end = _line_word(line)
+    for keyword in ("requires", "ensures"):
+        if word == keyword and (
+            not rest
+            or not (
+                rest[0].isalnum()
+                or rest[0] in "_'"
+            )
+        ):
+            return keyword, word_end
+    return None
+
+
+def _starts_outer_transition(line: str) -> bool:
+    keyword, rest, _word_end = _line_word(line)
+    separated = bool(rest) and rest[0] in " \t"
+    if keyword == "module":
+        return separated and _MODULE_NAME_RE.fullmatch(rest) is not None
+    if keyword == "endmodule":
+        return not rest.strip()
+    if keyword == "rule":
+        return not rest or separated
+    return keyword in _OUTER_SENTENCE_KEYWORDS and separated
+
+
+def _terminal_attribute_line(line: str) -> bool:
+    match = _TRAILING_ATTRIBUTES_RE.search(line)
+    if match is None:
+        return False
+    start = match.start()
+    return start == 0 or line[start - 1].isspace()
+
+
+def _scan_rule_delimiters(
+    line: str,
+    delimiters: list[str],
+) -> None:
+    closing = {")": "(", "]": "[", "}": "{"}
+    index = 0
+    while index < len(line):
+        if line[index] == "<":
+            cell = _CELL_TAG_RE.match(line, index)
+            if cell is not None:
+                marker = f"<{cell.group('name')}>"
+                if cell.group("close"):
+                    if delimiters and delimiters[-1] == marker:
+                        delimiters.pop()
+                elif not cell.group("self_close"):
+                    delimiters.append(marker)
+                index = cell.end()
+                continue
+        character = line[index]
+        if character in "([{":
+            delimiters.append(character)
+        elif character in closing:
+            if delimiters and delimiters[-1] == closing[character]:
+                delimiters.pop()
+        index += 1
+
+
+def _rule_bubble_end(masked_text: str, start: int) -> int:
+    """Find when an outer rule bubble returns control to outer parsing."""
+
+    seen_rewrite = False
+    clause_has_content = False
+    candidate_end: int | None = None
+    delimiters: list[str] = []
+    ranges = _line_ranges(masked_text, start)
+    for line_start, line_end, next_start in ranges:
+        line = masked_text[line_start:line_end]
+        if not line.strip():
+            continue
+
+        continuation = (
+            _rule_continuation(line)
+            if seen_rewrite and candidate_end is not None
+            else None
+        )
+        if candidate_end is not None:
+            if continuation is None and _starts_outer_transition(line):
+                return candidate_end
+            candidate_end = None
+
+        content_start = 0
+        if continuation is not None:
+            kind, content_start = continuation
+            if kind in {"requires", "ensures"}:
+                clause_has_content = False
+
+        if not seen_rewrite:
+            rewrite = line.find("=>")
+            if rewrite >= 0:
+                seen_rewrite = True
+                content_start = rewrite + 2
+            else:
+                content_start = len(line)
+
+        _scan_rule_delimiters(line, delimiters)
+        if seen_rewrite and line[content_start:].strip():
+            clause_has_content = True
+
+        if (
+            seen_rewrite
+            and clause_has_content
+            and not delimiters
+            and _terminal_attribute_line(line)
+        ):
+            return next_start
+        if seen_rewrite and clause_has_content and not delimiters:
+            candidate_end = next_start
+    if candidate_end is not None:
+        return candidate_end
+    return len(masked_text) + 1
+
+
+def _modules(masked_text: str) -> tuple[_Module, ...]:
+    modules: list[_Module] = []
+    open_module: tuple[
+        str, int, list[str], list[_Sentence]
+    ] | None = None
+    open_rule_until = 0
+    for line_start, line_end, keyword, rest in _line_heads(masked_text):
+        if line_start < open_rule_until:
+            continue
+        open_rule_until = 0
+        separated = bool(rest) and rest[0] in " \t"
+        if keyword == "module":
+            if not separated:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            named = _MODULE_NAME_RE.fullmatch(rest)
+            if named is None or open_module is not None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            open_module = (named.group("name"), line_end, [], [])
+            continue
+        if keyword == "endmodule":
+            if rest.strip():
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            if open_module is None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            name, content_start, imports, sentences = open_module
+            modules.append(
+                _Module(
+                    name=name,
+                    content_start=content_start,
++ sed -n 200,290p /reference/tools/klean_audit_contract.py
+                "Stage 5 invocation evidence changed after success"
+            )
+        return workspace, invocation, result
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _stage1_source_hashes(workspace: Path) -> dict[str, str]:
+    try:
+        return {
+            path.relative_to(workspace).as_posix(): (
+                pipeline_contract.sha256_file(path)
+            )
+            for path in pipeline_contract._walk_regular_files(
+                workspace, "Stage 1 source workspace"
+            )
+        }
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _generation_producer_sources(
+    repo: Path, generator_manifest: dict[str, Any]
+) -> tuple[Path, str]:
+    provenance = generator_manifest.get("provenance")
+    image_id = (
+        provenance.get("generator_image_id")
+        if isinstance(provenance, dict)
+        else None
+    )
+    if not isinstance(image_id, str) or not image_id.startswith("sha256:"):
+        raise KleanAuditContractError(
+            "generator image ID is missing from Stage 4 provenance"
+        )
+    image_key = image_id.removeprefix("sha256:")
+    try:
+        image_key = pipeline_contract.validate_safe_component(
+            image_key, "generator image ID"
+        )
+        bundle = pipeline_contract._require_direct_directory(
+            repo / "data/stage4-producer-sources",
+            image_key,
+            "Stage 4 producer source bundle",
+        )
+        source_manifest = pipeline_contract._read_regular_json(
+            bundle / "source-manifest.json",
+            "Stage 4 producer source manifest",
+        )
+        expected_files = {
+            "klean_export.py": generator_manifest.get("exporter_sha256"),
+            "klean.py": generator_manifest.get("klean_py_sha256"),
+        }
+        if (
+            set(source_manifest) != {
+                "schema_version",
+                "generator_image_id",
+                "files",
+            }
+            or source_manifest.get("schema_version") != 1
+            or source_manifest.get("generator_image_id") != image_id
+            or source_manifest.get("files") != expected_files
+        ):
+            raise KleanAuditContractError(
+                "Stage 4 producer source manifest differs from generator "
+                "provenance"
+            )
+        observed_names = {
+            path.relative_to(bundle).as_posix()
+            for path in pipeline_contract._walk_regular_files(
+                bundle, "Stage 4 producer source bundle"
+            )
+        }
+        if observed_names != {
+            "source-manifest.json",
+            "klean_export.py",
+            "klean.py",
+        }:
+            raise KleanAuditContractError(
+                "Stage 4 producer source bundle has unexpected files"
+            )
+        for name, expected in expected_files.items():
+            digest = _validate_sha256(
+                expected, f"Stage 4 producer source {name} SHA-256"
+            )
+            source = pipeline_contract.require_regular_file(
+                bundle / name, f"Stage 4 producer source {name}"
+            )
+            if pipeline_contract.sha256_file(source) != digest:
+                raise KleanAuditContractError(
+                    f"Stage 4 producer source {name} SHA-256 differs "
+                    "from generator provenance"
++ sed -n 1,180p /reference/tools/klean_preflight.py
+#!/usr/bin/env python3
+"""Hard, model-free sanity gate for a deterministic Klean generation."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
+
+REPO = Path(__file__).resolve().parent.parent
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from tools import klean_export
+from tools import lemma_discovery_contract
+
+
+class KleanPreflightError(RuntimeError):
+    pass
+
+
+_SIDECAR_NAMES = (
+    "input-manifest.json",
+    "generator-manifest.json",
+    "trust-inventory.json",
+    "export-result.json",
+)
+
+
+@dataclass(frozen=True)
+class PreflightSnapshot:
+    stage1_workspace_sha256: str
+    stage3_discovery_manifest_sha256: str
+    generated_tree_sha256: str
+    sidecar_sha256: tuple[tuple[str, str], ...]
+
+
+def _preflight_snapshot(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+) -> PreflightSnapshot:
+    generated = generation / "generated"
+    try:
+        sidecars = tuple(
+            (
+                name,
+                hashlib.sha256(
+                    pipeline_path.read_bytes()
+                ).hexdigest(),
+            )
+            for name in _SIDECAR_NAMES
+            if (
+                pipeline_path := generation / name
+            ).is_file()
+            and not pipeline_path.is_symlink()
+        )
+        if len(sidecars) != len(_SIDECAR_NAMES):
+            raise KleanPreflightError(
+                "preflight sidecar set is incomplete or unsafe"
+            )
+        return PreflightSnapshot(
+            stage1_workspace_sha256=klean_export.tree_digest(
+                frozen_input
+            ),
+            stage3_discovery_manifest_sha256=hashlib.sha256(
+                discovery_manifest.read_bytes()
+            ).hexdigest(),
+            generated_tree_sha256=klean_export.tree_digest(generated),
+            sidecar_sha256=sidecars,
+        )
+    except (OSError, klean_export.KleanExportError) as error:
+        raise KleanPreflightError(
+            "cannot snapshot immutable preflight inputs"
+        ) from error
+
+
+def _require_unchanged_snapshot(
+    expected: PreflightSnapshot,
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+) -> None:
+    current = _preflight_snapshot(
+        frozen_input, discovery_manifest, generation
+    )
+    if current.stage1_workspace_sha256 != (
+        expected.stage1_workspace_sha256
+    ):
+        raise KleanPreflightError(
+            "frozen Stage 1 input changed during preflight"
+        )
+    if current.stage3_discovery_manifest_sha256 != (
+        expected.stage3_discovery_manifest_sha256
+    ):
+        raise KleanPreflightError(
+            "validated Stage 3 discovery manifest changed during preflight"
+        )
+    if current.generated_tree_sha256 != expected.generated_tree_sha256:
+        raise KleanPreflightError(
+            "generated project changed during preflight"
+        )
+    if current.sidecar_sha256 != expected.sidecar_sha256:
+        raise KleanPreflightError(
+            "generation sidecar changed during preflight"
+        )
+
+
+def _regular_json(path: Path, label: str) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise KleanPreflightError(f"{label} must be a regular file: {path}")
+    try:
+        document = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise KleanPreflightError(f"{label} is malformed: {path}") from error
+    if not isinstance(document, dict):
+        raise KleanPreflightError(f"{label} must be a JSON object")
+    return document
+
+
+def _run(
+    command: list[str],
+    *,
+    cwd: Path,
+    timeout: int,
+) -> tuple[int, str]:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            timeout=timeout,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        return result.returncode, result.stdout
+    except subprocess.TimeoutExpired:
+        return 124, f"TIMEOUT after {timeout}s"
+
+
+def _lean_sources(generated: Path) -> list[Path]:
+    return [
+        path
+        for _relative, kind, path in klean_export._tree_entries(generated)
+        if kind == "file" and path.suffix == ".lean"
+    ]
+
+
+def _trust_declarations(sources: list[Path]) -> dict[str, tuple[str, str]]:
+    declarations: dict[str, tuple[str, str]] = {}
+    for source in sources:
+        for declaration in klean_export.lean_trust_declarations(source):
+            name = declaration["name"]
+            if name in declarations:
+                raise KleanPreflightError(
+                    f"duplicate trust declaration: {name}"
+                )
+            declarations[name] = (
+                declaration["kind"],
+                declaration["type"],
+            )
+    return declarations
+
+
+def _reject_proposition_trust(
+    generated: Path,
+    sources: list[Path],
+    declarations: dict[str, tuple[str, str]],
+) -> None:
+    """Apply a policy that is independent of the generator's allowlist.
+

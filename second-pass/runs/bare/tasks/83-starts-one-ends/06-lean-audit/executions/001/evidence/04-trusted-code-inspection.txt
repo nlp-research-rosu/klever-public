@@ -1,0 +1,744 @@
+COMMAND: sed trusted producer-source resolution code
+                "Stage 5 invocation evidence changed after success"
+            )
+        return workspace, invocation, result
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _stage1_source_hashes(workspace: Path) -> dict[str, str]:
+    try:
+        return {
+            path.relative_to(workspace).as_posix(): (
+                pipeline_contract.sha256_file(path)
+            )
+            for path in pipeline_contract._walk_regular_files(
+                workspace, "Stage 1 source workspace"
+            )
+        }
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _generation_producer_sources(
+    repo: Path, generator_manifest: dict[str, Any]
+) -> tuple[Path, str]:
+    provenance = generator_manifest.get("provenance")
+    image_id = (
+        provenance.get("generator_image_id")
+        if isinstance(provenance, dict)
+        else None
+    )
+    if not isinstance(image_id, str) or not image_id.startswith("sha256:"):
+        raise KleanAuditContractError(
+            "generator image ID is missing from Stage 4 provenance"
+        )
+    image_key = image_id.removeprefix("sha256:")
+    try:
+        image_key = pipeline_contract.validate_safe_component(
+            image_key, "generator image ID"
+        )
+        bundle = pipeline_contract._require_direct_directory(
+            repo / "data/stage4-producer-sources",
+            image_key,
+            "Stage 4 producer source bundle",
+        )
+        source_manifest = pipeline_contract._read_regular_json(
+            bundle / "source-manifest.json",
+            "Stage 4 producer source manifest",
+        )
+        expected_files = {
+            "klean_export.py": generator_manifest.get("exporter_sha256"),
+            "klean.py": generator_manifest.get("klean_py_sha256"),
+            task, "04-klean-generation", "generations"
+        )
+        generation_status = generation_selection.get("status")
+        if generation_status not in {
+            "PASS",
+            "KLEAN_NO_OBLIGATIONS",
+        }:
+            raise KleanAuditContractError(
+                "Stage 4 must have a selected passing Klean generation"
+            )
+        preflight = pipeline_contract._read_regular_json(
+            generation / "preflight.json", "Stage 4 preflight"
+        )
+        if preflight.get("status") != generation_status:
+            raise KleanAuditContractError(
+                "Stage 4 selection status differs from its preflight"
+            )
+        generator_manifest = pipeline_contract._read_regular_json(
+            generation / "generator-manifest.json", "generator manifest"
+        )
+        generation_producer_sources, producer_sources_hash = (
+            _generation_producer_sources(repo, generator_manifest)
+        )
+        generated = pipeline_contract.require_real_directory(
+            generation / "generated", "generated Klean project"
+        )
+        generated_hash = klean_export.tree_digest(generated)
+        if generator_manifest.get("generated_tree_sha256") != generated_hash:
+            raise KleanAuditContractError(
+                "selected Stage 4 generation changed after preflight"
+            )
+        provenance = generator_manifest.get("provenance")
+        if (
+            not isinstance(provenance, dict)
+            or provenance.get("stage1_workspace_sha256")
+            != stage1_export_hash
+            or provenance.get("stage3_discovery_manifest_sha256")
+            != discovery.sha256
+        ):
+            raise KleanAuditContractError(
+                "selected Stage 4 generation provenance is invalid"
+            )
+        target = generator_manifest.get("target")
+        if generation_status == "PASS" and not isinstance(target, dict):
+            raise KleanAuditContractError(
+                "Stage 4 target manifest is malformed"
+            )
+        if (
+            generation_status == "KLEAN_NO_OBLIGATIONS"
+            and target is not None
+        ):
+            raise KleanAuditContractError(
+                "no-obligation Stage 4 generation has an unexpected target"
+            )
+
+        lean_workspace: Path | None = None
+        lean_invocation: Path | None = None
+        lean_result: dict[str, Any] | None = None
+        if generation_status == "PASS":
+            mode = "CLASSIFICATION_AND_PROOF"
+            lean_workspace, lean_invocation, lean_result = (
+                _require_stage5(task)
+            )
+        else:
+            mode = "CLASSIFICATION_ONLY"
+            stage5_result = task / "05-lean-proof/result.json"
+            if stage5_result.exists() or stage5_result.is_symlink():
+                raise KleanAuditContractError(
+                    "KLEAN_NO_OBLIGATIONS must not have a Stage 5 result"
+                )
+        condition = run.get("condition")
+        if not isinstance(condition, dict):
+            raise KleanAuditContractError("run condition is malformed")
+        resolved = {
+            "schema_version": stage6_resolution_contract.SCHEMA_VERSION,
+            "run_id": run_id,
+            "problem_id": problem,
+            "condition": condition.get("name"),
+            "mode": mode,
+            "semantics_mode": (
+                "SUPPLIED_SEMANTICS"
+                if condition.get("semantics") is True
+                else "GENERATED_SEMANTICS"
+            ),
+            "k_workspace": str(k_workspace),
+            "k_audit": str(k_audit),
+            "discovery_manifest": str(discovery.path),
+            "klean_generation": str(generation),
+            "generation_producer_sources": str(
+                generation_producer_sources
+            ),
+            "lean_workspace": (
+                str(lean_workspace)
+                if lean_workspace is not None
+                else None
+            ),
+            "lean_invocation": (
+                str(lean_invocation)
+                if lean_invocation is not None
+                else None
+            ),
+            "target": target,
+            "stage1_source_hashes": stage1_source_hashes,
+            "trust_inventory": str(
+                pipeline_contract.require_regular_file(
+                    generation / "trust-inventory.json",
+                    "Stage 4 trust inventory",
+                )
+            ),
+            "hashes": {
+                "k_workspace_sha256": k_hash,
+                "stage1_export_sha256": stage1_export_hash,
+                "discovery_manifest_sha256": discovery.sha256,
+                "k_audit_sha256": pipeline_contract.sha256_tree(k_audit),
+                "klean_generation_sha256": pipeline_contract.sha256_tree(
+                    generation
+                ),
+                "generation_producer_sources_sha256": (
+                    producer_sources_hash
+                ),
+                "generated_tree_sha256": generated_hash,
+                "lean_workspace_sha256": (
+                    pipeline_contract.sha256_tree(lean_workspace)
+                    if lean_workspace is not None
+                    else None
+                ),
+                "lean_invocation_sha256": (
+                    pipeline_contract.sha256_tree(lean_invocation)
+                    if lean_invocation is not None
+                    else None
+                ),
+COMMAND: sed trusted tree hashing implementations
+/reference/tools/klean_export.py:670:def tree_digest(root: Path) -> str:
+/reference/tools/pipeline_contract.py:190:def sha256_tree(root: Path) -> str:
+KLEAN_TIMEOUT = 300
+BUILD_TIMEOUT = 600
+
+K_IDENTIFIER = r"[A-Za-z][A-Za-z0-9_'-]*"
+SYNTAX_BLOCK_RE = re.compile(
+    rf"(?ms)^[ \t]*syntax\s+(?P<ret>{K_IDENTIFIER})\s*::=\s*"
+    r"(?P<body>.*?)"
+    r"(?=^[ \t]*(?:syntax|rule|module|endmodule|imports)\b|\Z)"
+)
+FUNC_PRODUCTION_RE = re.compile(
+    r"(?:\A|^[ \t]*\|)\s*"
+    rf"(?P<name>{K_IDENTIFIER})\s*\((?P<args>[^)]*)\)\s*"
+    r"\[(?P<attrs>[^\]]*)\]",
+    re.M,
+)
+K_IDENTIFIER_END = r"(?![A-Za-z0-9_'-])"
+MODULE_RE = re.compile(
+    rf"(?m)^[ \t]*module\s+({K_IDENTIFIER}){K_IDENTIFIER_END}"
+)
+MODULE_BLOCK_RE = re.compile(
+    rf"(?ms)^[ \t]*module\s+(?P<name>{K_IDENTIFIER}){K_IDENTIFIER_END}"
+    r"(?P<body>.*?)\bendmodule\b"
+)
+IMPORT_RE = re.compile(
+    rf"(?m)^[ \t]*imports\s+({K_IDENTIFIER}){K_IDENTIFIER_END}"
+)
+REQUIRES_RE = re.compile(r'requires\s+"([^"]+)"')
+_TERM_HEAD_RE = re.compile(r"fail to show termination for\s*\n\s*(«[^»]+»|\S+)")
+_TERM_CALL_RE = re.compile(r"Call from («[^»]+»|\S+) to («[^»]+»|\S+)")
+_ELAB_LINE_RE = re.compile(
+    r"error:\s+\S*Func\.lean:(\d+):\d+:\s+"
+    r"(?:unknown identifier|Application type mismatch)"
+)
+_DEF_RE = re.compile(r"^(\s*)(?:noncomputable\s+)?def\s+(\S+)\b")
+_NONCOMPUTABLE_RE = re.compile(r"(?m)^\s*noncomputable\s+def\s+(\S+)")
+_LEAN_NAMESPACE_RE = re.compile(r"^\s*namespace\s+(\S+)\s*$")
+_LEAN_END_RE = re.compile(r"^\s*end(?:\s+(\S+))?\s*$")
+_LEAN_TRUST_DECL_RE = re.compile(
+    r"^\s*(axiom|opaque)\s+(\S+)\s+(.+?)\s*$"
+)
+
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from tools import k_rule_inventory, lemma_discovery_contract
+
+
+class KleanExportError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class Func:
+    name: str
+    ret: str
+    args: list[str]
+
+
+@dataclass(frozen=True)
+class DefinitionResolution:
+    verification_file: Path
+    verification_module: str
+    syntax_module: str
+    required_files: tuple[Path, ...]
+    entry_files: tuple[Path, ...]
+
+190:def sha256_tree(root: Path) -> str:
+429:        sha256_tree(semantics)
+449:                    sha256_tree(semantics) if semantics is not None else None
+944:            "workspace_sha256": sha256_tree(stage_root / "workspace"),
+995:    current_workspace = sha256_tree(stage_root / "workspace")
+1098:    current_workspace = sha256_tree(stage_root / "workspace")
+1217:    current_workspace = sha256_tree(stage_root / "workspace")
+1396:        "workspace_sha256": sha256_tree(workspace),
+1941:    candidate_sha256 = sha256_tree(candidate)
+#!/usr/bin/env python3
+"""Contracts and filesystem layout for resumable benchmark pipeline runs."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+import fcntl
+import hashlib
+import json
+import os
+import re
+import shutil
+import stat
+import tempfile
+import uuid
+from pathlib import Path
+from typing import Any, Callable, Iterable
+
+
+SCHEMA_VERSION = 3
+CODEX_CLI_VERSION = "0.144.6"
+K_VERSION = "7.1.293"
+K_BASE_IMAGE = (
+    "runtimeverificationinc/kframework-k:ubuntu-jammy-7.1.293@"
+    "sha256:f3f64ab72bd7b560082d50e4c6c23e107025cf217ca62ab73700104fc45de09a"
+)
+K_COMMIT = "ff15baac9e66426612ec45ff912af7f14965b64a"
+PYK_VERSION = "7.1.293"
+PYK_PROJECT = "pyk@runtimeverification/k"
+LEAN_TOOLCHAIN = "leanprover/lean4:v4.22.0"
+LEAN_COMMIT = "ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05"
+FROZEN_TOOLCHAIN_LOCK = {
+    "codex_cli_version": CODEX_CLI_VERSION,
+    "k_base_image": K_BASE_IMAGE,
+    "k_version": K_VERSION,
+    "lean_commit": LEAN_COMMIT,
+    "lean_toolchain": LEAN_TOOLCHAIN,
+    "pyk_version": PYK_VERSION,
+    "pyk_project": PYK_PROJECT,
+    "runtimeverification_k_commit": K_COMMIT,
+}
+STAGE_NAMES = (
+    "01-k-proof",
+    "02-k-audit",
+    "03-lemma-discovery",
+    "04-klean-generation",
+    "05-lean-proof",
+    "06-lean-audit",
+)
+_INVOCATION_STAGES = {
+    "01-k-proof": ("k_initial_s", "k_total_s"),
+    "03-lemma-discovery": ("lemma_initial_s", "lemma_total_s"),
+    "05-lean-proof": ("lean_initial_s", "lean_total_s"),
+}
+
+_CONDITIONS = (
+    ("kit-semantics", True, True, "kit-semantics.md"),
+    ("semantics", False, True, "with-semantics.md"),
+    ("kit", True, False, "kit-bare.md"),
+    ("bare", False, False, "bare.md"),
+)
+_CODEX_CONFIG = re.compile(r"^codex-(?P<model>.+)-xhigh-(?P<condition>.+)$")
+_HASH_CHUNK_SIZE = 1024 * 1024
+_BWRAP_NAMESPACE_DENIAL = (
+    b"bwrap: No permissions to create a new namespace"
+)
+
+
+class PipelineContractError(RuntimeError):
+    """Raised when a pipeline path, manifest, or state violates the contract."""
+
+
+def _usage_accounting_module():
+    try:
+        from tools import usage_accounting
+    except ImportError as error:
+        raise PipelineContractError(
+            "usage accounting support is unavailable"
+        ) from error
+    return usage_accounting
+
+
+@dataclass(frozen=True)
+class Condition:
+    name: str
+    kit: bool
+    semantics: bool
+    prompt_file: str
+
+COMMAND: inspect k_rule_inventory CLI and core
+#!/usr/bin/env python3
+"""Canonical lexical inventory of simplification rules in verification.k."""
+
+from __future__ import annotations
+
+import dataclasses
+import hashlib
+import json
+import re
+import stat
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+_MODULE_NAME_RE = re.compile(
+    r"^[ \t]+(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"(?:[ \t]+\[[^\]\r\n]*\])?[ \t]*$"
+)
+_TRAILING_ATTRIBUTES_RE = re.compile(
+    r"\[(?P<attributes>[^\[\]]*)\][ \t\r\n]*\Z", re.S
+)
+_CELL_TAG_RE = re.compile(
+    r"<(?P<close>/)?(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"[ \t]*(?P<self_close>/)?>"
+)
+_OUTER_SENTENCE_KEYWORDS = {
+    "imports",
+    "syntax",
+    "rule",
+    "configuration",
+    "context",
+    "claim",
+    "alias",
+}
+
+
+class KRuleInventoryError(RuntimeError):
+    """Raised when verification.k cannot produce a canonical inventory."""
+
+
+@dataclass(frozen=True)
+class KRule:
+    source_rule_id: str
+    module: str
+    start_line: int
+    end_line: int
+    normalized_sha256: str
+    attributes: list[str]
+    text: str
+
+
+@dataclass(frozen=True)
+class _Sentence:
+    keyword: str
+    start: int
+
+
+@dataclass(frozen=True)
+class _Module:
+    name: str
+    content_start: int
+    content_end: int
+    imports: tuple[str, ...]
+    sentences: tuple[_Sentence, ...]
+
+
+@dataclass(frozen=True)
+class _RuleSpan:
+    rule: KRule
+    start_offset: int
+    end_offset: int
+    attribute_start: int | None
+    attribute_end: int | None
+
+
+def canonical_json_sha256(document: Any) -> str:
+    encoded = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _mask_non_code(text: str) -> str:
+    """Mask comments and string bodies without changing source offsets."""
+
+    output = list(text)
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                state = "code"
+            else:
+                output[index] = " "
+            index += 1
+            continue
+        if state == "string":
+            if character == "\\" and following:
+                output[index] = " "
+                output[index + 1] = " "
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            elif character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                output[index] = output[index + 1] = " "
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                output[index] = output[index + 1] = " "
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output[index] = output[index + 1] = " "
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output[index] = output[index + 1] = " "
+            state = "block-comment"
+            start = index + 1
+    final = _without_comments(text[start:]).strip()
+    if final:
+        tokens.append(final)
+    return tokens
+
+
+def _rule_spans(text: str, module: _Module) -> list[_RuleSpan]:
+    masked_text = _mask_non_code(text)
+    sentences = module.sentences
+    rules: list[_RuleSpan] = []
+    seen_hashes: set[str] = set()
+    for index, sentence in enumerate(sentences):
+        if sentence.keyword != "rule":
+            continue
+        end_offset = (
+            sentences[index + 1].start
+            if index + 1 < len(sentences)
+            else module.content_end
+        )
+        start_offset = sentence.start
+        raw_segment = text[start_offset:end_offset]
+        masked_segment = masked_text[start_offset:end_offset]
+        logical_length = len(masked_segment.rstrip(" \t\r\n"))
+        if logical_length == 0:
+            continue
+        rule_text = raw_segment[:logical_length].rstrip(" \t\r\n")
+        masked_rule = _mask_non_code(rule_text)
+        attribute_match = _TRAILING_ATTRIBUTES_RE.search(masked_rule)
+        attribute_start = None
+        attribute_end = None
+        attributes: list[str] = []
+        if attribute_match is not None:
+            attribute_start = attribute_match.start("attributes")
+            attribute_end = attribute_match.end("attributes")
+            attributes = _attribute_tokens(
+                rule_text[attribute_start:attribute_end],
+                masked_rule[attribute_start:attribute_end],
+            )
+        normalized = " ".join(rule_text.split())
+        digest = hashlib.sha256(normalized.encode()).hexdigest()
+        if digest in seen_hashes:
+            raise KRuleInventoryError(
+                f"duplicate normalized simplification rule hash: {digest}"
+            )
+        seen_hashes.add(digest)
+        start_line = text.count("\n", 0, start_offset) + 1
+        end_line = start_line + rule_text.count("\n")
+        rule = KRule(
+            source_rule_id=f"rule-{digest}",
+            module=module.name,
+            start_line=start_line,
+            end_line=end_line,
+            normalized_sha256=digest,
+            attributes=attributes,
+            text=rule_text,
+        )
+        rules.append(
+            _RuleSpan(
+                rule=rule,
+                start_offset=start_offset,
+                end_offset=start_offset + len(rule_text),
+                attribute_start=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.start()
+                ),
+                attribute_end=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.end()
+                ),
+            )
+        )
+    return rules
+
+
+def _rule_documents(
+    text: str, modules: tuple[_Module, ...]
+) -> list[dict[str, Any]]:
+    spans = [span for module in modules for span in _rule_spans(text, module)]
+    spans.sort(key=lambda span: span.start_offset)
+    return [dataclasses.asdict(span.rule) for span in spans]
+
+
+def _attribute_token_spans(
+    text: str,
+    masked_text: str,
+) -> list[tuple[int, int, str]]:
+    spans: list[tuple[int, int, str]] = []
+    start = 0
+    depth = 0
+    for index, character in enumerate(masked_text):
+        if character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth = max(depth - 1, 0)
+        elif character == "," and depth == 0:
+            spans.append(
+                (
+                    start,
+                    index,
+                    _without_comments(text[start:index]).strip(),
+                )
+            )
+            start = index + 1
+    spans.append(
+        (
+            start,
+            len(text),
+            _without_comments(text[start:]).strip(),
+        )
+    )
+    return spans
+
+
+def _blank_non_newlines(text: str) -> str:
+    return "".join(
+        character if character in "\r\n" else " "
+        for character in text
+    )
+
+
+def desimplify_rule_ids(
+    text: str,
+    source_rule_ids: list[str],
+) -> str:
+    """Remove simplification from exactly the selected canonical rule IDs."""
+
+    if len(source_rule_ids) != len(set(source_rule_ids)):
+        raise KRuleInventoryError(
+            "exact rule transformation contains a duplicate source rule ID"
+        )
+    selected = set(source_rule_ids)
+    modules = _modules(_mask_non_code(text))
+    spans = [
+        span
+        for local_module in modules
+        for span in _rule_spans(text, local_module)
+    ]
+    by_id = {span.rule.source_rule_id: span for span in spans}
+    unknown = sorted(selected - set(by_id))
+    if unknown:
+        raise KRuleInventoryError(
+            "exact rule transformation names an unknown source rule ID: "
+            + ", ".join(unknown)
+        )
+
+    edits: list[tuple[int, int]] = []
+    for source_rule_id in source_rule_ids:
+        span = by_id[source_rule_id]
+        if span.attribute_start is None or span.attribute_end is None:
+            raise KRuleInventoryError(
+                "selected source rule has no simplification attribute: "
+                f"{source_rule_id}"
+            )
+        attribute_text = text[
+            span.attribute_start + 1 : span.attribute_end - 1
+        ]
+        masked_attributes = _mask_non_code(attribute_text)
+        tokens = _attribute_token_spans(
+            attribute_text,
+            masked_attributes,
+        )
+        matches = [
+            index
+            for index, (_start, _end, token) in enumerate(tokens)
+            if token == "simplification"
+        ]
+        if len(matches) != 1:
+            raise KRuleInventoryError(
+                "selected source rule has ambiguous simplification "
+                f"attributes: {source_rule_id}"
+            )
+        token_index = matches[0]
+        if len(tokens) == 1:
+            edit_start = span.attribute_start
+            edit_end = span.attribute_end
+        elif token_index < len(tokens) - 1:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index][0]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index + 1][0]
+            )
+        else:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index - 1][1]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index][1]
+            )
+        edits.append((edit_start, edit_end))
+
+    transformed = text
+    for start, end in sorted(edits, reverse=True):
+        transformed = (
+            transformed[:start]
+            + _blank_non_newlines(transformed[start:end])
+            + transformed[end:]
+        )
+    return transformed
+
+
+def inventory_verification(workspace: Path) -> dict[str, Any]:
+    workspace = Path(workspace)
+    try:
+        workspace_mode = workspace.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        ) from error
+    if not stat.S_ISDIR(workspace_mode):
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        )
+    verification = workspace / "verification.k"
+    try:
+        verification_mode = verification.stat(
+            follow_symlinks=False
+        ).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace has no regular verification.k: {verification}"
+        ) from error
+    if not stat.S_ISREG(verification_mode):
+        raise KRuleInventoryError(
+            f"workspace has no regular verification.k: {verification}"
+        )
+    try:
+        verification_bytes = verification.read_bytes()
+        text = verification_bytes.decode()
+    except (OSError, UnicodeError) as error:
+        raise KRuleInventoryError(
+            f"cannot read verification.k: {verification}"
+        ) from error
+    masked_text = _mask_non_code(text)
+    modules = _modules(masked_text)
+    module = _verification_module(
+        modules, _last_verification_main_module(workspace)
+    )
+    closure = _verification_closure(modules, module)
+    rule_documents = _rule_documents(text, closure)
+    return {
+        "schema_version": 2,
+        "verification_file": "verification.k",
+        "verification_sha256": hashlib.sha256(verification_bytes).hexdigest(),
+        "verification_module": module.name,
+        "verification_modules": [module.name for module in closure],
+        "rules": rule_documents,
+        "inventory_sha256": canonical_json_sha256(rule_documents),
+    }

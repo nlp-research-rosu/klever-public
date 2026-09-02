@@ -1,0 +1,375 @@
+Script started on 2026-07-27 23:38:46-05:00 [<not executed on terminal>]
+/opt/humaneval git state
+sh: 1: git: not found
+sh: 1: git: not found
+sh: 1: git: not found
+
+Tool source hashes
+58a12dd315d31411aa6d0be44d3a76edf7318d0d33f15f188d743f081b77fe12  /opt/humaneval/tools/klean_export.py
+ddec66db87398459ff0c2b5aad7121fe1029b58b8d576db4203c68bf5b647d13  /opt/humaneval/tools/klean.py
+0c18ea7997ddd34d3cabbeb0f271e17eb8a01cd03342319facf749ba92df18f0  /reference/tools/klean_export.py
+92e9515ae1e4c5275b0cd366e5ff5c16ad35af1afdaf070ef1ae7c0980998964  /reference/tools/klean.py
+
+Diff exporter variants
+--- /opt/humaneval/tools/klean_export.py	2026-07-27 05:47:43.369060881 -0500
++++ /reference/tools/klean_export.py	2026-07-27 12:25:56.035832849 -0500
+@@ -9,6 +9,7 @@
+ import os
+ import re
+ import shutil
++import shlex
+ import stat
+ import subprocess
+ import sys
+@@ -50,6 +51,10 @@
+ REQUIRES_RE = re.compile(r'requires\s+"([^"]+)"')
+ _TERM_HEAD_RE = re.compile(r"fail to show termination for\s*\n\s*(«[^»]+»|\S+)")
+ _TERM_CALL_RE = re.compile(r"Call from («[^»]+»|\S+) to («[^»]+»|\S+)")
++_ELAB_LINE_RE = re.compile(
++    r"error:\s+\S*Func\.lean:(\d+):\d+:\s+"
++    r"(?:unknown identifier|Application type mismatch)"
++)
+ _DEF_RE = re.compile(r"^(\s*)(?:noncomputable\s+)?def\s+(\S+)\b")
+ _NONCOMPUTABLE_RE = re.compile(r"(?m)^\s*noncomputable\s+def\s+(\S+)")
+ _LEAN_NAMESPACE_RE = re.compile(r"^\s*namespace\s+(\S+)\s*$")
+@@ -81,6 +86,68 @@
+     verification_module: str
+     syntax_module: str
+     required_files: tuple[Path, ...]
++    entry_files: tuple[Path, ...]
++
++
++@dataclass(frozen=True)
++class KompileCommand:
++    source: Path
++    main_module: str | None
++    syntax_module: str | None
++    backend: str | None
++
++
++def _proof_kompile_commands(workspace: Path) -> tuple[KompileCommand, ...]:
++    prove = workspace / "prove.sh"
++    if not prove.is_file() or prove.is_symlink():
++        return ()
++    logical_lines = prove.read_text().replace("\\\n", " ").splitlines()
++    commands: list[KompileCommand] = []
++    for line in logical_lines:
++        try:
++            words = shlex.split(line, comments=True)
++        except ValueError:
++            continue
++        try:
++            index = words.index("kompile")
++        except ValueError:
++            continue
++        arguments = words[index + 1 :]
++        source_word = next(
++            (
++                word
++                for word in arguments
++                if not word.startswith("-") and word.endswith(".k")
++            ),
++            None,
++        )
++        if source_word is None:
++            continue
++        source = (workspace / source_word).resolve()
++        try:
++            source.relative_to(workspace)
++        except ValueError:
++            continue
++        if not source.is_file() or source.is_symlink():
++            continue
++
++        def option(name: str) -> str | None:
++            if name not in arguments:
++                return None
++            option_index = arguments.index(name)
++            if option_index + 1 >= len(arguments):
++                return None
++            return arguments[option_index + 1]
++
++        commands.append(
++            KompileCommand(
++                source=source,
++                main_module=option("--main-module"),
++                syntax_module=option("--syntax-module"),
++                backend=option("--backend"),
++            )
++        )
++    return tuple(commands)
+ 
+ 
+ def _workspace_k_files(workspace: Path) -> tuple[Path, ...]:
+@@ -174,21 +241,27 @@
+             is not None
+         )
+ 
+-    verification_modules = [
+-        name
+-        for name in file_modules.get(verification_file, ())
+-        if name.endswith("VERIFICATION")
+-        and not name.endswith("-SYNTAX")
+-    ]
+-    if len(verification_modules) != 1:
++    try:
++        verification_module = k_rule_inventory.inventory_verification(
++            workspace
++        )["verification_module"]
++    except k_rule_inventory.KRuleInventoryError as error:
++        raise KleanExportError(str(error)) from error
++    if verification_module not in file_modules.get(verification_file, ()):
+         raise KleanExportError(
+-            "verification.k must define exactly one verification module"
++            "selected verification module is not defined in verification.k"
+         )
+-    verification_module = verification_modules[0]
++    commands = _proof_kompile_commands(workspace)
+     reached_modules: set[str] = set()
+     reached_files: set[Path] = set()
+     pending_modules = [verification_module]
+-    pending_files = [verification_file]
++    pending_files = [verification_file, *(command.source for command in commands)]
++    pending_modules.extend(
++        module
++        for command in commands
++        for module in (command.main_module, command.syntax_module)
++        if module is not None and module in modules
++    )
+     while pending_modules or pending_files:
+         while pending_files:
+             path = pending_files.pop()
+@@ -210,6 +283,17 @@
+             pending_files.append(path)
+         pending_modules.extend(imports)
+ 
++    explicit_syntax_modules = [
++        command.syntax_module
++        for command in commands
++        if command.syntax_module in reached_modules
++    ]
++    haskell_syntax_modules = [
++        command.syntax_module
++        for command in commands
++        if command.backend == "haskell"
++        and command.syntax_module in reached_modules
++    ]
+     syntax_modules = sorted(
+         name
+         for name in reached_modules
+@@ -218,7 +302,11 @@
+     preferred = (
+         verification_module.removesuffix("-VERIFICATION") + "-SYNTAX"
+     )
+-    if preferred in syntax_modules:
++    if haskell_syntax_modules:
++        syntax_module = haskell_syntax_modules[-1]
++    elif explicit_syntax_modules:
++        syntax_module = explicit_syntax_modules[-1]
++    elif preferred in syntax_modules:
+         syntax_module = preferred
+     elif len(syntax_modules) == 1:
+         syntax_module = syntax_modules[0]
+@@ -231,12 +319,70 @@
+             "multiple reachable -SYNTAX modules: "
+             + ", ".join(syntax_modules)
+         )
++    required_by: dict[Path, set[Path]] = {
++        path: set() for path in reached_files
++    }
++    for parent in reached_files:
++        for dependency in file_requires.get(parent, ()):
++            if dependency in reached_files:
++                required_by[dependency].add(parent)
++    entry_files = tuple(
++        sorted(
++            (
++                path
++                for path in reached_files
++                if not required_by[path]
++            ),
++            key=str,
++        )
++    )
++    if not entry_files:
++        entry_files = (verification_file,)
+     return DefinitionResolution(
+         verification_file=verification_file,
+         verification_module=verification_module,
+         syntax_module=syntax_module,
+         required_files=tuple(sorted(reached_files, key=str)),
++        entry_files=entry_files,
++    )
++
++
++def stage_definition_driver(
++    scratch: Path,
++    workspace: Path,
++    resolution: DefinitionResolution,
++    transformed_verification: str,
++    export_module_text: str,
++) -> Path:
++    """Mirror the frozen K closure and require each root exactly once."""
++
++    scratch = Path(scratch)
++    workspace = Path(workspace).resolve()
++    source_root = scratch / "definition-source"
++    source_root.mkdir()
++    staged: dict[Path, Path] = {}
++    for source in resolution.required_files:
++        relative = source.relative_to(workspace)
++        destination = source_root / relative
++        destination.parent.mkdir(parents=True, exist_ok=True)
++        shutil.copy2(source, destination)
++        staged[source] = destination
++    staged_verification = staged.get(resolution.verification_file)
++    if staged_verification is None:
++        raise KleanExportError("definition closure omitted verification.k")
++    staged_verification.write_text(transformed_verification)
++    entry_files: list[Path] = []
++    for source in resolution.entry_files:
++        entry = staged.get(source)
++        if entry is None:
++            raise KleanExportError("definition entry file is outside closure")
++        entry_files.append(entry)
++    driver = scratch / "export.k"
++    driver.write_text(
++        "".join(f'requires "{path}"\n' for path in entry_files)
++        + export_module_text
+     )
++    return driver
+ 
+ 
+ def lib_name(package: str) -> str:
+@@ -371,6 +517,25 @@
+     return {name for name in flagged if name and name != "at"}
+ 
+ 
++def elaboration_failures(
++    function_text: str, build_output: str
++) -> set[str]:
++    """Map narrowly recognized generated Func.lean errors to their definitions."""
++
++    lines = function_text.splitlines()
++    flagged: set[str] = set()
++    for match in _ELAB_LINE_RE.finditer(build_output):
++        line_number = int(match.group(1))
++        if not 1 <= line_number <= len(lines):
++            continue
++        for line in reversed(lines[:line_number]):
++            definition = _DEF_RE.match(line)
++            if definition is not None:
++                flagged.add(definition.group(2))
++                break
++    return flagged
++
++
+ def _defname_re(flagged: set[str]) -> re.Pattern[str]:
+     return re.compile(
+         r"^\s*(?:noncomputable )?def ("
+@@ -460,9 +625,17 @@
+     if not lakefile.is_file() or lakefile.is_symlink():
+         raise KleanExportError("generated package is missing regular lakefile.toml")
+     text = lakefile.read_text()
+-    setting = 'buildDir = "/tmp/klean-generated-build"\n'
+-    if setting in text:
++    build_setting = 'buildDir = "/tmp/klean-generated-build"\n'
++    stack_setting = (
++        'moreLeanArgs = ["-D maxRecDepth=100000", "-s", "65536"]\n'
++    )
++    if build_setting in text and stack_setting in text:
+         return
++    setting = ""
++    if build_setting not in text:
++        setting += build_setting
++    if stack_setting not in text:
++        setting += stack_setting
+     marker = "[[lean_lib]]"
+     if marker in text:
+         text = text.replace(marker, setting + "\n" + marker, 1)
+@@ -568,7 +741,7 @@
+                 "source": path.relative_to(package).as_posix(),
+                 "line": declaration["line"],
+                 "reason": (
+-                    "deterministic termination repair"
++                    "deterministic Klean definition repair"
+                     if declaration_name in axiomatized
+                     else (
+                         "Klean-generated opaque definition"
+@@ -871,37 +1044,12 @@
+     domain_rules = _domain_source_rules(
+         validated, discovery_manifest_sha256
+     )
+-    if domain_rules and not functions:
+-        raise KleanExportError(
+-            "verification.k contains no declared summary function scope"
+-        )
+-    try:
+-        transformed = k_rule_inventory.desimplify_rule_ids(
+-            verification_text,
+-            [
+-                rule["source_rule_id"]
+-                for rule in validated["summary_definitions"]
+-            ],
+-        )
+-    except k_rule_inventory.KRuleInventoryError as error:
+-        raise KleanExportError(str(error)) from error
+-    dependencies = [
+-        path
+-        for path in resolution.required_files
+-        if path != resolution.verification_file
+-    ]
+-    if dependencies:
+-        preamble = "".join(
+-            f'requires "{path}"\n' for path in dependencies
+-        )
+-        transformed = preamble + transformed
+-    else:
+-        preamble = ""
+-    source_rules = _klean_source_rules(
+-        domain_rules, preamble.count("\n")
+-    )
+-    transformed += "\n" + export_module(module, functions)
+-    transformed = absolutize_requires(transformed, frozen_input)
++    # Preserve the exact accepted Stage 1 K definition.  Eligibility is now
++    # driven by the Stage 3 source-rule inventory, so stripping
++    # [simplification] from non-obligation rules is both unnecessary and can
++    # make otherwise valid K structurally illegal.
++    transformed = verification_text
++    source_rules = _klean_source_rules(domain_rules, 0)
+     export_module_name = f"{module.rsplit('-', 1)[0]}-KLEAN-EXPORT"
+     package_name = f"klean-{problem.lower()}"
+     library_name = lib_name(package_name)
+@@ -913,8 +1061,13 @@
+     try:
+         with tempfile.TemporaryDirectory(prefix=f"klean-{problem}-") as temporary:
+             scratch = Path(temporary)
+-            export_k = scratch / "export.k"
+-            export_k.write_text(transformed)
++            export_k = stage_definition_driver(
++                scratch,
++                frozen_input,
++                resolution,
++                transformed,
++                export_module(module, functions),
++            )
+             source_inventory_path = scratch / "source-rule-inventory.json"
+             _write_json(
+                 source_inventory_path,
+@@ -954,7 +1107,7 @@
+                 "kxExport",
+                 "--lemmas",
+                 "--lemma-source",
+-                export_k.name,
++                verification.name,
+                 "--source-rule-inventory",
+                 str(source_inventory_path),
+             ]
+@@ -992,8 +1145,11 @@
+                 if not function_file.is_file():
+                     break
+                 newly_flagged = (
+-                    termination_failures(build_output) - axiomatized
+-                )
+
+Script done on 2026-07-27 23:38:46-05:00 [COMMAND_EXIT_CODE="0"]

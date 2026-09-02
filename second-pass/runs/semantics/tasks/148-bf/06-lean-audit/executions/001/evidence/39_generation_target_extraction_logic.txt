@@ -1,0 +1,186 @@
+770:def target_statement(generated: Path) -> dict[str, Any] | None:
+771-    obligation_map = _regular_json(generated / "obligation-map.json")
+772-    obligations = obligation_map.get("obligations")
+773-    parameters = obligation_map.get("trust_parameters")
+774-    if not isinstance(obligations, list) or not isinstance(parameters, list):
+775-        raise KleanExportError("generated obligation map is malformed")
+776-    candidates: list[tuple[Path, str]] = []
+777-    raw_count = 0
+778-    for relative, kind, path in _tree_entries(generated):
+779-        if kind != "file" or path.suffix != ".lean":
+780-            continue
+781-        text = path.read_text()
+782-        raw_count += len(
+783-            re.findall(r"(?m)^\s*def\s+targetStatement\b", text)
+784-        )
+785-        for match in re.finditer(
+786-            r"(?ms)^\s*def\s+targetStatement\b.*?"
+787-            r"(?=^\s*end\s+\S+\s*$)",
+788-            text,
+789-        ):
+790-            candidates.append((path, match.group(0).strip()))
+791-    if not obligations:
+792-        if raw_count != 0:
+793-            raise KleanExportError(
+794-                "zero obligations must not generate a target proposition"
+795-            )
+796-        return None
+797-    if raw_count != 1 or len(candidates) != 1:
+798-        raise KleanExportError(
+799-            "generated project must contain exactly one target proposition; "
+800-            f"found {raw_count}"
+801-        )
+802-    path, definition = candidates[0]
+803-    names: list[str] = []
+804-    normalized_parameters: list[dict[str, Any]] = []
+805-    for parameter in parameters:
+806-        if not isinstance(parameter, dict):
+807-            raise KleanExportError("target parameter is malformed")
+808-        name = parameter.get("name")
+809-        lean_type = parameter.get("type")
+810-        kore_symbol = parameter.get("kore_symbol")
+811-        source_rule_ids = parameter.get("source_rule_ids")
+812-        binding_sha256 = parameter.get("binding_sha256")
+813-        if not isinstance(name, str) or not name:
+814-            raise KleanExportError("target parameter name is malformed")
+815-        if not isinstance(lean_type, str) or not lean_type:
+816-            raise KleanExportError("target parameter type is malformed")
+817-        if not isinstance(kore_symbol, str) or not kore_symbol:
+818-            raise KleanExportError("target KORE symbol binding is malformed")
+819-        if (
+820-            not isinstance(source_rule_ids, list)
+821-            or not source_rule_ids
+822-            or not all(
+823-                isinstance(source_rule_id, str) and source_rule_id
+824-                for source_rule_id in source_rule_ids
+825-            )
+826-        ):
+827-            raise KleanExportError("target source-rule binding is malformed")
+828-        binding = {
+829-            "kore_symbol": kore_symbol,
+830-            "name": name,
+831-            "type": lean_type,
+832-            "source_rule_ids": source_rule_ids,
+833-        }
+834-        expected_binding_sha256 = sha256_text(
+835-            json.dumps(binding, sort_keys=True, separators=(",", ":"))
+836-        )
+837-        if binding_sha256 != expected_binding_sha256:
+838-            raise KleanExportError("target parameter binding hash changed")
+839-        names.append(name)
+840-        normalized_parameters.append(
+841-            {**binding, "binding_sha256": binding_sha256}
+842-        )
+843-    declaration = f"{path.parent.name}.Lemmas.targetStatement"
+844-    statement = " ".join((declaration, *names))
+845-    return {
+846-        "declaration": declaration,
+847-        "file": path.relative_to(generated).as_posix(),
+848-        "statement": statement,
+849-        "statement_sha256": sha256_text(statement),
+850-        "definition_sha256": sha256_text(definition),
+851-        "parameters": normalized_parameters,
+852-    }
+853-
+854-
+855:def expected_target_definition(obligation_map: dict[str, Any]) -> str | None:
+856-    obligations = obligation_map.get("obligations")
+857-    parameters = obligation_map.get("trust_parameters")
+858-    if not isinstance(obligations, list) or not isinstance(parameters, list):
+859-        raise KleanExportError("generated obligation map is malformed")
+860-    if not obligations:
+861-        return None
+862-    lines = ["def targetStatement"]
+863-    for parameter in parameters:
+864-        if not isinstance(parameter, dict):
+865-            raise KleanExportError("target parameter is malformed")
+866-        name = parameter.get("name")
+867-        lean_type = parameter.get("type")
+868-        if not isinstance(name, str) or not isinstance(lean_type, str):
+869-            raise KleanExportError("target parameter is malformed")
+870-        lines.append(f"    ({name} : {lean_type})")
+871-    conjuncts: list[str] = []
+872-    for obligation in obligations:
+873-        if not isinstance(obligation, dict):
+874-            raise KleanExportError("generated obligation is malformed")
+875-        conjunct = obligation.get("lean_conjunct")
+876-        if not isinstance(conjunct, str) or not conjunct:
+877-            raise KleanExportError("generated Lean conjunct is malformed")
+878-        conjuncts.append(f"({conjunct})")
+879-    lines.extend(("    : Prop :=", "    " + "\n    ∧ ".join(conjuncts)))
+880-    return "\n".join(lines)
+881-
+882-
+883-def _write_json(path: Path, document: dict[str, Any]) -> None:
+884-    path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+885-
+886-
+887-def _domain_source_rules(
+888-    validated: dict[str, Any],
+889-    discovery_manifest_sha256: str,
+890-) -> list[dict[str, Any]]:
+891-    inventory_sha256 = validated["inventory_sha256"]
+892-    return [
+893-        {
+894-            **rule,
+895-            "inventory_sha256": inventory_sha256,
+896-            "discovery_manifest_sha256": discovery_manifest_sha256,
+897-        }
+898-        for rule in validated["domain_lemmas"]
+899-    ]
+900-
+901-
+902-def _klean_source_rules(
+903-    domain_rules: list[dict[str, Any]],
+904-    line_offset: int,
+905-) -> list[dict[str, Any]]:
+906-    return [
+907-        {
+908-            "source_rule_id": rule["source_rule_id"],
+909-            "start_line": rule["start_line"] + line_offset,
+910-            "end_line": rule["end_line"] + line_offset,
+911-            "normalized_sha256": rule["normalized_sha256"],
+912-            "classification": "TRUST_OBLIGATION",
+913-        }
+914-        for rule in domain_rules
+915-    ]
+916-
+917-
+918-def _bind_obligation_provenance(
+919-    package: Path,
+920-    domain_rules: list[dict[str, Any]],
+921-    klean_rules: list[dict[str, Any]],
+922-) -> dict[str, Any]:
+923-    path = package / "obligation-map.json"
+924-    document = _regular_json(path)
+925-    obligations = document.get("obligations")
+926-    parameters = document.get("trust_parameters")
+927-    if not isinstance(obligations, list) or not isinstance(parameters, list):
+928-        raise KleanExportError("generated obligation map is malformed")
+929-    expected_ids = [rule["source_rule_id"] for rule in domain_rules]
+930-    observed_ids = [
+931-        obligation.get("source_rule_id")
+932-        if isinstance(obligation, dict)
+933-        else None
+934-        for obligation in obligations
+935-    ]
+936-    if observed_ids != expected_ids:
+937-        raise KleanExportError(
+938-            "validated DOMAIN_LEMMA records and generated obligations "
+939-            "are not bijective"
+940-        )
+941-    enriched: list[dict[str, Any]] = []
+942-    for obligation, rule, klean_rule in zip(
+943-        obligations, domain_rules, klean_rules, strict=True
+944-    ):
+945-        if obligation.get("source_span") != {
+946-            "start_line": klean_rule["start_line"],
+947-            "end_line": klean_rule["end_line"],
+948-        }:
+949-            raise KleanExportError(
+950-                "generated obligation source span differs from Stage 1"
+951-            )
+952-        enriched.append(
+953-            {
+954-                **obligation,
+955-                "source_span": {

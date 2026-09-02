@@ -1,0 +1,208 @@
+Script started on 2026-07-31 08:05:34-05:00 [<not executed on terminal>]
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION-SYNTAX
+     4	  imports MPY-SYNTAX
+     5	  imports INT-SYNTAX
+     6	
+     7	  syntax Int ::= triValue(Int) [function, total]
+     8	  syntax ValSeq ::= triComplete(ValSeq, Int, Int) [function, total]
+     9	                  | triResult(Int) [function, total]
+    10	
+    11	  // Parse-time aliases for the exact translated implementation.
+    12	  syntax Expr ::= "triLoopCondition" [macro]
+    13	  rule triLoopCondition
+    14	    => Compare(Name("i"), CmpOp("<=", Name("n")))
+    15	
+    16	  syntax Stmts ::= "triLoopBody" [macro]
+    17	  rule triLoopBody
+    18	    => If(Compare(Name("i"), CmpOp("==", Int(0))),
+    19	          Expr(Call(Attribute(Name("values"), "append"), Int(1))),
+    20	          If(Compare(Name("i"), CmpOp("==", Int(1))),
+    21	            Expr(Call(Attribute(Name("values"), "append"), Int(3))),
+    22	            If(Compare(BinOp("%", Name("i"), Int(2)),
+    23	                       CmpOp("==", Int(0))),
+    24	              Expr(Call(Attribute(Name("values"), "append"),
+    25	                        BinOp("+", Int(1),
+    26	                                   BinOp("//", Name("i"), Int(2))))),
+    27	              Expr(Call(Attribute(Name("values"), "append"),
+    28	                        BinOp("*",
+    29	                          BinOp("+", BinOp("//", Name("i"), Int(2)), Int(1)),
+    30	                          BinOp("+", BinOp("//", Name("i"), Int(2)), Int(3))))))))
+    31	       AugAssign(Name("i"), "+", Int(1))
+    32	
+    33	  syntax Stmts ::= "triFunctionBody" [macro]
+    34	  rule triFunctionBody
+    35	    => Assign(Name("values"), ListExpr(.Exprs))
+    36	       Assign(Name("i"), Int(0))
+    37	       While(triLoopCondition, triLoopBody)
+    38	       Return(Name("values"))
+    39	
+    40	  syntax Stmts ::= "triDefinition" [macro]
+    41	  rule triDefinition
+    42	    => FuncDef("tri", Params("n"), triFunctionBody)
+    43	endmodule
+    44	
+    45	module VERIFICATION
+    46	  imports VERIFICATION-SYNTAX
+    47	  imports MPY
+    48	
+    49	  // Mathematical value at an index. Negative indices are outside the task
+    50	  // domain; assigning them 0 makes this proof-local function total.
+    51	  rule triValue(I:Int) => 0
+    52	    requires I <Int 0
+    53	  rule triValue(I:Int)
+    54	    => ((I -Int pyMod(I, 2)) /Int 2 +Int 1)
+    55	       *Int ((I -Int pyMod(I, 2)) /Int 2 +Int 3)
+    56	    requires I >=Int 0 andBool pyMod(I, 2) ==Int 1
+    57	  rule triValue(I:Int)
+    58	    => 1 +Int (I -Int pyMod(I, 2)) /Int 2
+    59	    requires I >=Int 0 andBool pyMod(I, 2) ==Int 0
+    60	
+    61	  // Complete an arbitrary prefix P by appending values I through N. The two
+    62	  // guards are disjoint and cover every integer I,N pair; recursion increases
+    63	  // I and therefore terminates after max(N-I+1, 0) steps.
+    64	  rule triComplete(P:ValSeq, I:Int, N:Int) => P
+    65	    requires I >Int N
+    66	  rule triComplete(P:ValSeq, I:Int, N:Int)
+    67	    => triComplete(
+    68	         valSeqConcat(P, vCons(triValue(I), .ValSeq)),
+    69	         I +Int 1,
+    70	         N)
+    71	    requires I <=Int N
+    72	
+    73	  rule triResult(N:Int) => triComplete(.ValSeq, 0, N)
+    74	endmodule
+--- spec.k ---
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Circularity for the one source while-loop. At a loop head, the heap list
+     7	  // is an arbitrary prefix P. On exit it is P extended with values I through N.
+     8	  claim [tri-loop]:
+     9	    <k> #while(triLoopCondition, triLoopBody) => .K ... </k>
+    10	    <env> L:Int </env>
+    11	    <scopes>
+    12	      ... L |-> scope("i" |-> (I:Int => N +Int 1)
+    13	                       "n" |-> N:Int
+    14	                       "values" |-> ref(H:Int),
+    15	                       parent(0))
+    16	      ...
+    17	    </scopes>
+    18	    <heap>
+    19	      ... H |-> (list(P:ValSeq) => list(triComplete(P, I, N))) ...
+    20	    </heap>
+    21	    requires N >=Int 0
+    22	     andBool I >=Int 0
+    23	     andBool I <=Int N +Int 1
+    24	
+    25	  // Exact entry: load the translated definition into an empty module scope,
+    26	  // resolve its binding normally, call it, and observe the returned heap list.
+    27	  claim [tri-entry]:
+    28	    <k> #loadAll(Module(triDefinition))
+    29	         ~> Call(Name("tri"), Int(N:Int))
+    30	      => ref(0)
+    31	    </k>
+    32	    <env> 0 </env>
+    33	    <scopes>
+    34	      (0 |-> scope(.Map, parent(-1))
+    35	       -1 |-> builtinsScope)
+    36	      =>
+    37	      (0 |-> scope(
+    38	              "tri" |-> closureVal(
+    39	                ("n", .ParamNames),
+    40	                triFunctionBody,
+    41	                0),
+    42	              parent(-1))
+    43	       -1 |-> builtinsScope)
+    44	    </scopes>
+    45	    <scopeLoc> 1 </scopeLoc>
+    46	    <heap> .Map => 0 |-> list(triResult(N)) </heap>
+    47	    <heapLoc> 0 => 1 </heapLoc>
+    48	    <stack> .List </stack>
+    49	    <ret> noRet </ret>
+    50	    <exc> NoExc </exc>
+    51	    <exit-code> 0 </exit-code>
+    52	    requires N >=Int 0
+    53	
+    54	  // The proof-side sequence definition matches every clause of the prompt.
+    55	  claim [tri-at-zero]:
+    56	    <k> triValue(0) => 1 </k>
+    57	
+    58	  claim [tri-at-one]:
+    59	    <k> triValue(1) => 3 </k>
+    60	
+    61	  claim [tri-at-even]:
+    62	    <k> triValue(N:Int) => 1 +Int N /Int 2 </k>
+    63	    requires N >=Int 2 andBool pyMod(N, 2) ==Int 0
+    64	
+    65	  claim [tri-at-odd-recurrence]:
+    66	    <k> triValue(N:Int)
+    67	      => triValue(N -Int 1)
+    68	         +Int triValue(N -Int 2)
+    69	         +Int triValue(N +Int 1)
+    70	    </k>
+    71	    requires N >=Int 3 andBool pyMod(N, 2) ==Int 1
+    72	endmodule
+--- solution.py ---
+     1	def tri(n):
+     2	    values = []
+     3	    i = 0
+     4	    while i <= n:
+     5	        if i == 0:
+     6	            values.append(1)
+     7	        elif i == 1:
+     8	            values.append(3)
+     9	        elif i % 2 == 0:
+    10	            values.append(1 + i // 2)
+    11	        else:
+    12	            values.append((i // 2 + 1) * (i // 2 + 3))
+    13	        i += 1
+    14	    return values
+--- solution.mpy ---
+     1	Module(
+     2	  FuncDef("tri", Params("n"),
+     3	    Assign(Name("values"), ListExpr())
+     4	    Assign(Name("i"), Int(0))
+     5	    While(Compare(Name("i"), CmpOp("<=", Name("n"))),
+     6	      If(Compare(Name("i"), CmpOp("==", Int(0))),
+     7	        Expr(Call(Attribute(Name("values"), "append"), Int(1))),
+     8	        If(Compare(Name("i"), CmpOp("==", Int(1))),
+     9	          Expr(Call(Attribute(Name("values"), "append"), Int(3))),
+    10	          If(Compare(BinOp("%", Name("i"), Int(2)), CmpOp("==", Int(0))),
+    11	            Expr(
+    12	              Call(
+    13	                Attribute(Name("values"), "append"),
+    14	                BinOp("+", Int(1), BinOp("//", Name("i"), Int(2))))),
+    15	            Expr(
+    16	              Call(
+    17	                Attribute(Name("values"), "append"),
+    18	                BinOp(
+    19	                  "*",
+    20	                  BinOp("+", BinOp("//", Name("i"), Int(2)), Int(1)),
+    21	                  BinOp("+", BinOp("//", Name("i"), Int(2)), Int(3))))))))
+    22	      AugAssign(Name("i"), "+", Int(1)))
+    23	    Return(Name("values"))))
+--- prompt.py ---
+     1	
+     2	def tri(n):
+     3	    """Everyone knows Fibonacci sequence, it was studied deeply by mathematicians in 
+     4	    the last couple centuries. However, what people don't know is Tribonacci sequence.
+     5	    Tribonacci sequence is defined by the recurrence:
+     6	    tri(1) = 3
+     7	    tri(n) = 1 + n / 2, if n is even.
+     8	    tri(n) =  tri(n - 1) + tri(n - 2) + tri(n + 1), if n is odd.
+     9	    For example:
+    10	    tri(2) = 1 + (2 / 2) = 2
+    11	    tri(4) = 3
+    12	    tri(3) = tri(2) + tri(1) + tri(4)
+    13	           = 2 + 3 + 3 = 8 
+    14	    You are given a non-negative integer number n, you have to a return a list of the 
+    15	    first n + 1 numbers of the Tribonacci sequence.
+    16	    Examples:
+    17	    tri(3) = [1, 3, 2, 8]
+    18	    """
+
+Script done on 2026-07-31 08:05:34-05:00 [COMMAND_EXIT_CODE="0"]

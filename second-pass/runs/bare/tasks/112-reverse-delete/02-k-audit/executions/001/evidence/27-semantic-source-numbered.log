@@ -1,0 +1,150 @@
+COMMAND: nl -ba semantic.k
+CWD: /tmp/audit-work/112-reverse-delete
+STARTED_UTC: 2026-07-23T17:53:43.494290+00:00
+TIMEOUT_SECONDS: 60
+TIMED_OUT: false
+EXIT_STATUS: 0
+STDOUT_BYTES: 6092
+STDERR_BYTES: 0
+----- STDOUT -----
+     1	// A deliberately small Python semantics for the AST constructors emitted by
+     2	// py2mpy.py.  It covers exactly the fragment used by solution.mpy.  Runtime
+     3	// Python strings and booleans are wrapped in Val so that they cannot be
+     4	// confused with source-level Str(...) and Bool(...) expressions.
+     5	
+     6	module MPY-SYNTAX
+     7	  imports DOMAINS
+     8	
+     9	  syntax Pgm ::= "Module" "(" Stmts ")"
+    10	
+    11	  syntax Stmts ::= List{Stmt, ""}
+    12	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    13	                | "Assign" "(" Expr "," Expr ")"
+    14	                | "For" "(" Expr "," Expr "," Stmts ")"
+    15	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    16	                | "Return" "(" Expr ")"
+    17	
+    18	  syntax Strings ::= List{String, ","}
+    19	  syntax Params ::= "Params" "(" Strings ")"
+    20	
+    21	  syntax Expr ::= "Name" "(" String ")"
+    22	                | "Str" "(" String ")"
+    23	                | "Int" "(" Int ")"
+    24	                | "UnaryOp" "(" String "," Expr ")"
+    25	                | "BinOp" "(" String "," Expr "," Expr ")"
+    26	                | "Compare" "(" Expr "," CmpOps ")"
+    27	                | "TupleExpr" "(" Exprs ")"
+    28	                | "Subscript" "(" Expr "," Index ")"
+    29	
+    30	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    31	  syntax CmpOps ::= List{CmpOp, ","}
+    32	  syntax Exprs ::= List{Expr, ","}
+    33	  syntax Index ::= Expr
+    34	                 | "Slice" "(" Bound "," Bound "," Bound ")"
+    35	  syntax Bound ::= Expr | "NoBound"
+    36	endmodule
+    37	
+    38	module SEMANTIC
+    39	  imports MPY-SYNTAX
+    40	  imports MAP
+    41	
+    42	  syntax Val ::= strVal(String)
+    43	               | boolVal(Bool)
+    44	               | tupleVal(Val, Val)
+    45	
+    46	  syntax ExecResult ::= normal(Map) | returned(Val)
+    47	
+    48	  // krun supplies the two Python arguments as configuration variables.
+    49	  configuration <k> execute($PGM:Pgm, $S:String, $C:String) </k>
+    50	
+    51	  syntax KItem ::= execute(Pgm, String, String)
+    52	  syntax ExecResult ::= exec(Stmts, Map) [function]
+    53	  syntax Val ::= eval(Expr, Map) [function]
+    54	  syntax Val ::= getVal(Map, String) [function]
+    55	  syntax String ::= asString(Val) [function]
+    56	  syntax Bool ::= asBool(Val) [function]
+    57	
+    58	  // Mathematical string operations used by Python's loop and [::-1].
+    59	  syntax String ::= deleteChars(String, String) [function]
+    60	                  | reverseString(String) [function]
+    61	
+    62	  rule getVal((X:String |-> V:Val) _REST:Map, X) => V
+    63	  rule asString(strVal(S)) => S
+    64	  rule asBool(boolVal(B)) => B
+    65	
+    66	  // The hooked concatenation evaluates concrete operands.  This algebraic
+    67	  // identity is also needed when the right operand is a symbolic string.
+    68	  rule "" +String S => S [simplification]
+    69	
+    70	  rule deleteChars("", _) => ""
+    71	  rule deleteChars(S, C)
+    72	    => deleteChars(substrString(S, 1, lengthString(S)), C)
+    73	    requires lengthString(S) >Int 0
+    74	     andBool findString(C, substrString(S, 0, 1), 0) >=Int 0
+    75	  rule deleteChars(S, C)
+    76	    => substrString(S, 0, 1)
+    77	       +String deleteChars(substrString(S, 1, lengthString(S)), C)
+    78	    requires lengthString(S) >Int 0
+    79	     andBool findString(C, substrString(S, 0, 1), 0) <Int 0
+    80	
+    81	  rule reverseString("") => ""
+    82	  rule reverseString(S)
+    83	    => reverseString(substrString(S, 1, lengthString(S)))
+    84	       +String substrString(S, 0, 1)
+    85	    requires lengthString(S) >Int 0
+    86	
+    87	  rule eval(Name(X), ENV) => getVal(ENV, X)
+    88	  rule eval(Str(S), _) => strVal(S)
+    89	  rule eval(BinOp("+", E1, E2), ENV)
+    90	    => strVal(asString(eval(E1, ENV)) +String asString(eval(E2, ENV)))
+    91	  rule eval(Compare(E1, CmpOp("not in", E2)), ENV)
+    92	    => boolVal(findString(asString(eval(E2, ENV)),
+    93	                          asString(eval(E1, ENV)), 0) <Int 0)
+    94	  rule eval(Compare(E1, CmpOp("==", E2)), ENV)
+    95	    => boolVal(asString(eval(E1, ENV)) ==String asString(eval(E2, ENV)))
+    96	  rule eval(TupleExpr(E1, E2), ENV)
+    97	    => tupleVal(eval(E1, ENV), eval(E2, ENV))
+    98	  rule eval(Subscript(E, Slice(NoBound, NoBound, UnaryOp("-", Int(1)))), ENV)
+    99	    => strVal(reverseString(asString(eval(E, ENV))))
+   100	
+   101	  rule exec(.Stmts, ENV) => normal(ENV)
+   102	  rule exec(Assign(Name(X), E) REST, ENV)
+   103	    => exec(REST, ENV [ X <- eval(E, ENV) ])
+   104	  rule exec(If(COND, THEN, _ELSE) REST, ENV)
+   105	    => exec(THEN REST, ENV)
+   106	    requires asBool(eval(COND, ENV))
+   107	  rule exec(If(COND, _THEN, ELSE) REST, ENV)
+   108	    => exec(ELSE REST, ENV)
+   109	    requires notBool asBool(eval(COND, ENV))
+   110	  rule exec(Return(E) _REST, ENV) => returned(eval(E, ENV))
+   111	
+   112	  // The source-level loop iterates over s one character at a time.  Its body
+   113	  // is kept syntactic in solution.mpy; this rule gives that filtering idiom
+   114	  // the same left-to-right behavior as repeated Python loop iterations.
+   115	  rule exec(
+   116	         For(Name(CH), Name(SVAR),
+   117	           If(Compare(Name(CH), CmpOp("not in", Name(CVAR))),
+   118	             Assign(Name(RVAR), BinOp("+", Name(RVAR), Name(CH))),
+   119	             .Stmts))
+   120	         REST,
+   121	         ENV)
+   122	    => exec(
+   123	         REST,
+   124	         ENV [ RVAR <- strVal(
+   125	           asString(getVal(ENV, RVAR))
+   126	           +String deleteChars(asString(getVal(ENV, SVAR)),
+   127	                                asString(getVal(ENV, CVAR)))) ])
+   128	
+   129	  rule <k>
+   130	         execute(
+   131	           Module(FuncDef("reverse_delete", Params("s", "c"), BODY)),
+   132	           S, C)
+   133	         => exec(BODY,
+   134	              ("s" |-> strVal(S))
+   135	              ("c" |-> strVal(C)))
+   136	       </k>
+   137	endmodule
+
+----- STDERR -----
+
+----- END -----

@@ -1,0 +1,676 @@
+COMMAND: bash /audit-output/evidence/05_static_inventory.sh
+
+== Candidate-local declarations/rules/claims in the positive proof closure ==
+FILE domain.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module STRING-SEQUENCE-DOMAIN
+     4	  imports MPY
+     5	
+     6	  // Total projection used only to expose the unique code sequence of a string
+     7	  // value.  The default makes every non-string unequal to str(stringCodes(V)).
+     8	  syntax IntSeq ::= stringCodes(Val) [function, total]
+     9	  rule stringCodes(str(S:IntSeq)) => S
+    10	  rule stringCodes(_:Val) => .IntSeq [owise]
+    11	
+    12	  syntax Bool ::= isStringVal(Val) [function, total]
+    13	  rule isStringVal(V:Val) => V ==K str(stringCodes(V))
+    14	
+    15	  syntax Bool ::= allStrings(ValSeq) [function, total]
+    16	  rule allStrings(.ValSeq) => true
+    17	  rule allStrings(vCons(V:Val, REST:ValSeq))
+    18	    => isStringVal(V) andBool allStrings(REST)
+    19	endmodule
+FILE verification-core.k
+     1	requires "domain.k"
+     2	
+     3	module VERIFICATION-CORE
+     4	  imports STRING-SEQUENCE-DOMAIN
+     5	
+     6	  // Exact AST fragments shared by the entry and loop claims.
+     7	  syntax Stmts ::= "filterLoopBody" [macro]
+     8	  rule filterLoopBody
+     9	    => If(
+    10	         Call(Attribute(Name("string"), "startswith"), Name("prefix")),
+    11	         Expr(Call(Attribute(Name("result"), "append"), Name("string"))),
+    12	         .Stmts)
+    13	
+    14	  syntax Stmts ::= "filterFunctionBody" [macro]
+    15	  rule filterFunctionBody
+    16	    => Assign(Name("result"), ListExpr(.Exprs))
+    17	       Assign(Name("string"), Str(""))
+    18	       For(Name("string"), Name("strings"), filterLoopBody)
+    19	       Return(Name("result"))
+    20	
+    21	  syntax Module ::= "filterByPrefixProgram" [macro]
+    22	  rule filterByPrefixProgram
+    23	    => Module(
+    24	         ImportFrom("typing", "List")
+    25	         FuncDef(
+    26	           "filter_by_prefix",
+    27	           Params("strings", "prefix"),
+    28	           filterFunctionBody))
+    29	
+    30	  // Stable prefix filter with an explicit accumulator.  It is totalized by
+    31	  // projecting arbitrary off-domain values through stringCodes; on the
+    32	  // theorem's allStrings domain that projection is the value's exact codes.
+    33	  // The second argument strictly shrinks and the guards are complementary.
+    34	  syntax ValSeq ::= filterPrefixAcc(ValSeq, ValSeq, IntSeq)
+    35	                    [function, total]
+    36	  rule filterPrefixAcc(ACC:ValSeq, .ValSeq, _:IntSeq) => ACC
+    37	  rule filterPrefixAcc(
+    38	         ACC:ValSeq,
+    39	         vCons(V:Val, REST:ValSeq),
+    40	         P:IntSeq)
+    41	    => filterPrefixAcc(
+    42	         valSeqConcat(
+    43	           ACC,
+    44	           vCons(str(stringCodes(V)), .ValSeq)),
+    45	         REST,
+    46	         P)
+    47	    requires startsWith(P, stringCodes(V))
+    48	    [simplification]
+    49	  rule filterPrefixAcc(
+    50	         ACC:ValSeq,
+    51	         vCons(V:Val, REST:ValSeq),
+    52	         P:IntSeq)
+    53	    => filterPrefixAcc(ACC, REST, P)
+    54	    requires notBool startsWith(P, stringCodes(V))
+    55	    [simplification]
+    56	
+    57	  // Operational bridge justified by the bridge-free universal claim
+    58	  // CONNECTION-SPEC.string-iterator-normalization.  It preserves the
+    59	  // arbitrary continuation and touches no state cell.
+    60	  rule <k>
+    61	         #iterNext(list(vCons(V:Val, REST:ValSeq)))
+    62	         => #iterYield(str(stringCodes(V)), list(REST))
+    63	         ...
+    64	       </k>
+    65	    requires isStringVal(V)
+    66	    [priority(40)]
+    67	
+    68	  // The function-call semantics has already performed this deletion.  This
+    69	  // derived map identity exposes its normal form to the symbolic simplifier.
+    70	  rule ((1 |-> _:Scope) SC:Map)[1 <- undef] => SC
+    71	    requires notBool (1 in_keys(SC))
+    72	    [simplification]
+    73	endmodule
+FILE verification.k
+     1	requires "verification-core.k"
+     2	
+     3	module VERIFICATION
+     4	  imports VERIFICATION-CORE
+     5	
+     6	  // Exact operational summary established bridge-free by
+     7	  // LOOP-CONNECTION-SPEC.filter-loop-connection.  The match domain is the
+     8	  // theorem's complete configuration: exact continuation, call stack,
+     9	  // bindings, state cells, and allStrings guard.
+    10	  rule
+    11	    <k>
+    12	      #loop(
+    13	        list(INPUT:ValSeq),
+    14	        Name("string"),
+    15	        filterLoopBody)
+    16	      ~> (Return(Name("result")) .Stmts):Stmts
+    17	      ~> #endcall
+    18	      => ref(H:Int)
+    19	    </k>
+    20	    <env> 1 => 0 </env>
+    21	    <scopes>
+    22	      (SC:Map
+    23	       1 |-> scope(
+    24	              "strings" |-> list(ORIGINAL:ValSeq)
+    25	              "prefix" |-> str(P:IntSeq)
+    26	              "result" |-> ref(H)
+    27	              "string" |-> str(OLD:IntSeq),
+    28	              parent(0)))
+    29	      => SC
+    30	    </scopes>
+    31	    <scopeLoc> 2 => 1 </scopeLoc>
+    32	    <heap>
+    33	      HP:Map
+    34	      H |-> list(
+    35	             ACC:ValSeq
+    36	             => filterPrefixAcc(ACC, INPUT, P))
+    37	    </heap>
+    38	    <heapLoc> NEXT:Int </heapLoc>
+    39	    <stack> ListItem(frame(.K, 0, 1)) => .List </stack>
+    40	    <ret> noRet </ret>
+    41	    <exc> NoExc </exc>
+    42	    requires allStrings(INPUT)
+    43	    [priority(40)]
+    44	endmodule
+FILE connection-spec.k
+     1	requires "domain.k"
+     2	
+     3	module CONNECTION-SPEC
+     4	  imports STRING-SEQUENCE-DOMAIN
+     5	
+     6	  claim [string-iterator-normalization]:
+     7	    <k>
+     8	      #iterNext(list(vCons(V:Val, REST:ValSeq))) ~> CONT:K
+     9	      =>
+    10	      #iterYield(
+    11	        str(stringCodes(V)),
+    12	        list(REST))
+    13	      ~> CONT
+    14	    </k>
+    15	    requires isStringVal(V)
+    16	endmodule
+FILE loop-connection-spec.k
+     1	requires "verification-core.k"
+     2	
+     3	module LOOP-CONNECTION-SPEC
+     4	  imports VERIFICATION-CORE
+     5	
+     6	  claim [filter-loop-connection]:
+     7	    <k>
+     8	      #loop(
+     9	        list(INPUT:ValSeq),
+    10	        Name("string"),
+    11	        filterLoopBody)
+    12	      ~> (Return(Name("result")) .Stmts):Stmts
+    13	      ~> #endcall
+    14	      => ref(H:Int)
+    15	    </k>
+    16	    <env> 1 => 0 </env>
+    17	    <scopes>
+    18	      (SC:Map
+    19	       1 |-> scope(
+    20	              "strings" |-> list(ORIGINAL:ValSeq)
+    21	              "prefix" |-> str(P:IntSeq)
+    22	              "result" |-> ref(H)
+    23	              "string" |-> str(OLD:IntSeq),
+    24	              parent(0)))
+    25	      => SC
+    26	    </scopes>
+    27	    <scopeLoc> 2 => 1 </scopeLoc>
+    28	    <heap>
+    29	      HP:Map
+    30	      H |-> list(
+    31	             ACC:ValSeq
+    32	             => filterPrefixAcc(ACC, INPUT, P))
+    33	    </heap>
+    34	    <heapLoc> NEXT:Int </heapLoc>
+    35	    <stack> ListItem(frame(.K, 0, 1)) => .List </stack>
+    36	    <ret> noRet </ret>
+    37	    <exc> NoExc </exc>
+    38	    requires allStrings(INPUT)
+    39	endmodule
+FILE spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [filter-loop]:
+     7	    <k>
+     8	      #loop(
+     9	        list(INPUT:ValSeq),
+    10	        Name("string"),
+    11	        filterLoopBody)
+    12	      ~> (Return(Name("result")) .Stmts):Stmts
+    13	      ~> #endcall
+    14	      => ref(H:Int)
+    15	    </k>
+    16	    <env> 1 => 0 </env>
+    17	    <scopes>
+    18	      (SC:Map
+    19	       1 |-> scope(
+    20	              "strings" |-> list(ORIGINAL:ValSeq)
+    21	              "prefix" |-> str(P:IntSeq)
+    22	              "result" |-> ref(H)
+    23	              "string" |-> str(OLD:IntSeq),
+    24	              parent(0)))
+    25	      => SC
+    26	    </scopes>
+    27	    <scopeLoc> 2 => 1 </scopeLoc>
+    28	    <heap>
+    29	      HP:Map
+    30	      H |-> list(
+    31	             ACC:ValSeq
+    32	             => filterPrefixAcc(ACC, INPUT, P))
+    33	    </heap>
+    34	    <heapLoc> NEXT:Int </heapLoc>
+    35	    <stack> ListItem(frame(.K, 0, 1)) => .List </stack>
+    36	    <ret> noRet </ret>
+    37	    <exc> NoExc </exc>
+    38	    requires allStrings(INPUT)
+    39	
+    40	  claim [filter-program]:
+    41	    <k>
+    42	      #loadAll(filterByPrefixProgram)
+    43	      ~> Call(
+    44	           Name("filter_by_prefix"),
+    45	           list(INPUT:ValSeq),
+    46	           str(PREFIX:IntSeq))
+    47	      => ref(0)
+    48	    </k>
+    49	    <env> 0 </env>
+    50	    <scopes>
+    51	      0 |-> scope(
+    52	             .Map
+    53	             => "filter_by_prefix" |->
+    54	                  closureVal(
+    55	                    ("strings", "prefix"),
+    56	                    filterFunctionBody,
+    57	                    0),
+    58	             parent(-1))
+    59	      -1 |-> builtinsScope
+    60	    </scopes>
+    61	    <scopeLoc> 1 </scopeLoc>
+    62	    <heap>
+    63	      .Map
+    64	      => 0 |-> list(
+    65	           filterPrefixAcc(.ValSeq, INPUT, PREFIX))
+    66	    </heap>
+    67	    <heapLoc> 0 => 1 </heapLoc>
+    68	    <stack> .List </stack>
+    69	    <ret> noRet </ret>
+    70	    <exc> NoExc </exc>
+    71	    requires allStrings(INPUT)
+    72	endmodule
+
+== Indexed candidate-local declaration starts ==
+rg: regex parse error:
+    (?:^[[:space:]]*(syntax|configuration|context|rule|claim|alias|macro|module|imports|requires)\\b|\\[(function|total|functional|simplification|concrete|priority|owise|macro))
+                                                                                                       ^
+error: unclosed character class
+
+== Source AST constructors actually submitted ==
+      2 Assign
+      2 Attribute
+      2 Call
+      1 Expr
+      1 For
+      1 FuncDef
+      1 If
+      1 ImportFrom
+      1 ListExpr
+      1 Module
+      9 Name
+      1 Params
+      1 Return
+      1 Str
+
+== Relevant fixed-semantics rule/declaration excerpts ==
+SPAN reference-semantics/semantics/syntax.k:9-61
+     9	  syntax Expr ::= "Int"      "(" Int ")"
+    10	                | "Float"    "(" Float ")"
+    11	                | "Bool"     "(" Bool ")"
+    12	                | "Name"     "(" String ")"
+    13	                | "Str"      "(" String ")"
+    14	                | "UnaryOp"  "(" String "," Expr ")" [strict(2)]
+    15	                | "BinOp"    "(" String "," Expr "," Expr ")" [seqstrict(2, 3)]
+    16	                | "BoolOp"    "(" String "," Exprs ")"
+    17	                | "ListExpr"  "(" Exprs ")"
+    18	                | "DictExpr"  "(" Entries ")"
+    19	                | "ListComp"  "(" Expr "," CompFors ")" [macro]
+    20	                | "GenExp"    "(" Expr "," CompFors ")" [macro]
+    21	                | "TupleExpr" "(" Exprs ")"
+    22	                | "Subscript" "(" Expr "," Index ")"
+    23	                | "IfExp"     "(" Expr "," Expr "," Expr ")" [strict(1)]
+    24	                | "Lambda"    "(" Params "," Expr ")"
+    25	                | "KwArg"     "(" String "," Expr ")"
+    26	                | "Lambda"    "(" Params "," CellVars "," FreeVars "," Expr ")"
+    27	                | "NoneVal"
+    28	                | "Call"      "(" Expr "," Exprs ")"
+    29	                | "Attribute" "(" Expr "," String ")" [strict(1)]
+    30	                | "Compare"   "(" Expr "," CmpOp ")"
+    31	
+    32	  syntax CmpOp    ::= "CmpOp" "(" String "," Expr ")"
+    33	  syntax Entry    ::= "Entry" "(" Expr "," Expr ")"
+    34	  syntax Entries  ::= List{Entry, ","}
+    35	  syntax CompFor  ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+    36	  syntax CompFors ::= List{CompFor, ""}
+    37	  syntax Exprs    ::= List{Expr, ","}
+    38	  syntax Index    ::= Expr | "Slice" "(" Bound "," Bound "," Bound ")"
+    39	  syntax Bound    ::= Expr | "NoBound"
+    40	
+    41	  syntax Stmt ::= "Assign"    "(" Expr "," Expr ")" [strict(2)]
+    42	                | "Import"    "(" String ")"
+    43	                | "ImportFrom" "(" String "," ParamNames ")"
+    44	                | "AugAssign" "(" Expr "," String "," Expr ")" [strict(3)]
+    45	                | "For"       "(" Expr "," Expr "," Stmts ")" [strict(2)]
+    46	                | "While"     "(" Expr "," Stmts ")"
+    47	                | "Break"
+    48	                | "Continue"
+    49	                | "If"        "(" Expr "," Stmts "," Stmts ")" [strict(1)]
+    50	                | "Return"    "(" Expr ")" [strict]
+    51	                | "Assert"    "(" Expr ")" [strict]
+    52	                | "Expr"      "(" Expr ")" [strict]
+    53	                | "FuncDef"   "(" String "," Params "," Stmts ")"
+    54	                | "FuncDef"   "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"
+    55	
+    56	  syntax Stmts      ::= List{Stmt, ""}
+    57	  syntax Params     ::= "Params" "(" ParamNames ")"
+    58	  syntax CellVars   ::= "CellVars" "(" ParamNames ")"
+    59	  syntax FreeVars   ::= "FreeVars" "(" ParamNames ")"
+    60	  syntax ParamNames ::= List{String, ","}
+    61	  syntax Module     ::= "Module" "(" Stmts ")"
+SPAN reference-semantics/semantics/core.k:12-60
+    12	  // ==== values, the algebraic lists, and the scope heap =====================
+    13	  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+    14	  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+    15	  syntax Str    ::= str(IntSeq)
+    16	
+    17	  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+    18	  syntax Iterable ::= list(ValSeq)
+    19	                    | tuple(ValSeq)
+    20	                    | Str
+    21	                    | rangeObj(Int, Int, Int)
+    22	                    | zipObj(ValSeq, ValSeq)
+    23	                    | zipObjS(IntSeq, IntSeq)
+    24	
+    25	  syntax Val      ::= Int
+    26	                    | Bool
+    27	                    | "noneV"
+    28	                    | Iterable
+    29	                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+    30	                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+    31	                    | closureVal(ParamNames, Stmts, Int)
+    32	                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+    33	                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+    34	                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+    35	
+    36	  syntax Parent   ::= "root" | parent(Int)
+    37	  syntax Scope    ::= scope(Map, Parent)
+    38	  syntax KResult  ::= Val
+    39	  syntax Expr     ::= Val   // cooling puts results back into expression holes
+    40	  syntax Vals     ::= List{Val, ","}
+    41	  syntax Exc      ::= "NoExc" | "AssertionError"
+    42	  syntax RetState ::= "noRet" | retV(Val)
+    43	
+    44	  // ==== configuration =======================================================
+    45	  // The builtins namespace is a real scope at reserved location -1 (the bottom of every
+    46	  // chain; scopeLoc only allocates >=1, so -1 never collides). The module scope (loc 0)
+    47	  // has it as parent, so an unbound name resolves there last — exactly LEGB. `int`/`str`
+    48	  // resolve to their type objects; any local/global binding shadows them via normal lookup.
+    49	  configuration
+    50	    <k>       #loadAll($PGM:Module) </k>
+    51	    <env>     0 </env>
+    52	    <scopes>   0     |-> scope(.Map, parent(-1))
+    53	              -1    |-> builtinsScope </scopes>
+    54	    <scopeLoc> 1 </scopeLoc>
+    55	    <heap>    .Map </heap>
+    56	    <heapLoc> 0 </heapLoc>
+    57	    <stack>   .List </stack>
+    58	    <ret>     noRet </ret>
+    59	    <exc>     NoExc </exc>
+    60	    <exit-code exit=""> 0 </exit-code>
+SPAN reference-semantics/semantics/core.k:117-154
+   117	  syntax KItem ::= #alloc(Val)
+   118	  rule <k> #alloc(V:Val) => ref(N) ... </k>
+   119	       <heap>    H:Map => (N |-> V) H </heap>
+   120	       <heapLoc> N:Int => N +Int 1 </heapLoc>
+   121	       requires notBool N in_keys(H)
+   122	
+   123	  // ==== module load + statement sequencing ==================================
+   124	  syntax KItem ::= #loadAll(Module)
+   125	  rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>
+   126	  rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>
+   127	  rule <k> .Stmts => .K ... </k>
+   128	
+   129	  // ==== Name lookup (walk the scope chain; builtins live in the -1 scope) ====
+   130	  syntax KItem ::= #look(String, Int)
+   131	  rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>
+   132	  rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k>
+   133	       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+   134	       requires X in_keys(M)
+   135	  // a SYNTACTICALLY cell-bound name reads through the heap cell AT THE
+   136	  // LOOKUP (higher priority beats the plain return above on concrete cell
+   137	  // bindings; abstract claim values take the plain rule unchanged) — this
+   138	  // covers cross-frame cell reads (a comprehension closure reading the
+   139	  // enclosing function's cellvar) without a narrowing-prone k-top redex
+   140	  // guarded on the FOUND frame's DECLARED cellvars (pnMember over the
+   141	  // cellsMark): decidable for every concrete frame pin — plain frames and
+   142	  // non-cell names prune outright, so an abstract looked-up value never
+   143	  // drags a narrowing cellV heap match along (probed on 5-intersperse and
+   144	  // Q4's abstract `numbers` in the annotated frame)
+   145	  rule <k> #look(X:String, L:Int) => V ... </k>
+   146	       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+   147	       <heap> ... H |-> cellV(V:Val) ... </heap>
+   148	       requires X in_keys(M) andBool "$cells" in_keys(M)
+   149	        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+   150	        andBool {M[X]}:>Val ==K cellRef(H)
+   151	       [priority(40)]
+   152	  rule <k> #look(X:String, L:Int) => #look(X, P) ... </k>
+   153	       <scopes> ... L |-> scope(M:Map, parent(P:Int)) ... </scopes>
+   154	       requires notBool (X in_keys(M))
+SPAN reference-semantics/semantics/core.k:183-229
+   183	  // ==== argument/element evaluation: ONE left-to-right loop, tagged by destination ==
+   184	  // (list/tuple literals and calls all use it; modules extend ApplyK with their tags)
+   185	  syntax ApplyK ::= toCall(Val)
+   186	  syntax KItem  ::= #evalArgs(Exprs, Vals, ApplyK)
+   187	                  | #evalArgCont(Exprs, Vals, ApplyK)
+   188	                  | #applyK(ApplyK, Vals)
+   189	  rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>
+   190	  rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>
+   191	  rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>
+   192	
+   193	  // ==== Int / Bool / None literals ==========================================
+   194	  rule <k> Int(I:Int)   => I ... </k>
+   195	  rule <k> Bool(B:Bool) => B ... </k>
+   196	  rule <k> NoneVal      => noneV ... </k>
+   197	
+   198	  // ==== truthy (If, Assert, BoolOp, IfExp, not, While) ======================
+   199	  syntax Bool ::= truthy(Val) [function]
+   200	  rule truthy(B:Bool)          => B
+   201	  rule truthy(noneV)           => false
+   202	  rule truthy(I:Int)           => I =/=Int 0
+   203	  rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)
+   204	  rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)
+   205	  rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)
+   206	
+   207	  // ==== extensible operator dispatch (cases added by the construct modules) ==
+   208	  syntax Val  ::= applyUn(String, Val) [function]
+   209	  syntax Val  ::= applyBin(String, Val, Val) [function]
+   210	  syntax Bool ::= applyCmp(String, Val, Val) [function]
+   211	
+   212	  // ==== shared list helpers =================================================
+   213	  syntax Vals ::= appendVal(Vals, Val) [function, total]
+   214	  rule appendVal(.Vals, V:Val)              => V , .Vals
+   215	  rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+   216	
+   217	  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+   218	  rule vals2valSeq(.Vals)            => .ValSeq
+   219	  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+   220	
+   221	  // ==== shared sequence length (len / summaries across many modules) ========
+   222	  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+   223	  syntax Int ::= vsLen(ValSeq) [function, total]
+   224	  rule vsLen(.ValSeq)                => 0
+   225	  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+   226	
+   227	  syntax Int ::= isLen(IntSeq) [function, total]
+   228	  rule isLen(.IntSeq)                => 0
+   229	  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+SPAN reference-semantics/semantics/controls.k:8-75
+     8	  // ==== Assign / AugAssign (write the current scope; RHS evaluated by strictness) ==
+     9	  rule <k> Assign(Name(X:String), V:Val) => .K ... </k>
+    10	       <env> L:Int </env>
+    11	       <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>
+    12	  rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k>
+    13	       <env> L:Int </env>
+    14	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    15	       requires "$cells" in_keys(M)
+    16	        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+    17	        andBool X in_keys(M) andBool isCellRef({M[X]}:>Val)
+    18	       [priority(40)]
+    19	
+    20	  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k>
+    21	       <env> L:Int </env>
+    22	       <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes>
+    23	       requires X in_keys(M)
+    24	  // `lst += [..]` where lst is a heap ref: the generic rule leaves applyBin(OP, ref, V) — but the
+    25	  // ref-deref preemption is BinOp-level (operators.k), so applyBin never derefs and it sticks. Route
+    26	  // the ref case through BinOp so the deref + list-concat + #alloc path fires (result is a fresh ref).
+    27	  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k>
+    28	       <env> L:Int </env>
+    29	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    30	       requires X in_keys(M) andBool isRefV({M[X]}:>Val)
+    31	       [priority(40)]
+    32	
+    33	  // ==== import trivia: `from math import floor, ceil` binds the supported
+    34	  // names as builtins in the current scope; every other import is a no-op
+    35	  rule <k> ImportFrom("math", NS:ParamNames) => #bindImports(NS) ... </k>
+    36	  rule <k> ImportFrom(_:String, _:ParamNames) => .K ... </k> [owise]
+    37	  syntax KItem ::= #bindImports(ParamNames)
+    38	  rule <k> #bindImports(.ParamNames) => .K ... </k>
+    39	  rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>
+    40	       <env> L:Int </env>
+    41	       <scopes> ... L |-> scope(M:Map => M [ N <- builtinV(N) ], _) ... </scopes>
+    42	       requires N ==String "floor" orBool N ==String "ceil"
+    43	  rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>
+    44	       requires notBool (N ==String "floor" orBool N ==String "ceil")
+    45	
+    46	  // ==== Expr statement: evaluate for effect, discard the value ===============
+    47	  // (bare calls — mutator methods, docstrings; the WP0 statement-trivia rung)
+    48	  rule <k> Expr(_:Val) => .K ... </k>
+    49	
+    50	  // ==== If (condition evaluated by strictness) ==============================
+    51	  syntax KItem ::= #branch(Bool, Stmts, Stmts)
+    52	  rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>
+    53	  rule <k> #branch(true,  T:Stmts, _:Stmts) => T ... </k>
+    54	  rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>
+    55	
+    56	  // ==== IfExp: ternary T if C else E ========================================
+    57	  rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k>
+    58	       requires truthy(V)
+    59	  rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k>
+    60	       requires notBool truthy(V)
+    61	
+    62	  // ==== For: one loop, in-cell continuation, over #iterNext =================
+    63	  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+    64	  // circularities anchor on #loop and narrowing substitutes the structure)
+    65	  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+    66	                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+    67	                 | #loopLbl(K) | "#cont" | "#brk"
+    68	
+    69	  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+    70	
+    71	  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+    72	  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+    73	  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+    74	        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+    75	
+SPAN reference-semantics/semantics/functions.k:8-16
+     8	  syntax KItem ::= frame(continuation: K, callerEnv: Int, savedLoc: Int)
+     9	                 | #bindP(ParamNames, Vals)
+    10	                 | "#pop"
+    11	                 | "#endcall"
+    12	
+    13	  // ==== def / anonymous closure =============================================
+    14	  rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k>
+    15	       <env> L:Int </env>
+    16	       <scopes> ... L |-> scope(M:Map => M [ F <- closureVal(PNS, BODY, L) ], _) ... </scopes>
+SPAN reference-semantics/semantics/functions.k:62-90
+    62	  // ==== bind params ========================================================
+    63	  rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>
+    64	  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k>
+    65	       <env> L:Int </env>
+    66	       <scopes> ... L |-> scope(M:Map => M [ P <- V ], _) ... </scopes>
+    67	  // a param that is a cellvar was pre-bound to its cell at frame entry
+    68	  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals))
+    69	        => #cellW({M[P]}:>Val, V) ~> #bindP(PS, VS) ... </k>
+    70	       <env> L:Int </env>
+    71	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    72	       requires "$cells" in_keys(M)
+    73	        andBool pnMember(P, cellsOf({M["$cells"]}:>Val))
+    74	        andBool P in_keys(M) andBool isCellRef({M[P]}:>Val)
+    75	       [priority(40)]
+    76	
+    77	  // ==== return / pop the frame (the returned expr evaluates by strictness) ==
+    78	  rule <k> Return(V:Val) ~> _ => #pop </k>
+    79	       <ret> noRet => retV(V) </ret>
+    80	  rule <k> #endcall => #pop ... </k>
+    81	       <ret> noRet => retV(noneV) </ret>
+    82	  // pop: restore env, DEALLOCATE the callee frame, and wind scopeLoc back (LIFO allocation
+    83	  // makes the saved loc the callee frame's own loc). Sound because no closureVal outlives its
+    84	  // defining frame (frontend subset: no returned/stored closures; module defs live in loc 0).
+    85	  rule <k> #pop => V ~> CONT </k>
+    86	       <ret>   retV(V) => noRet </ret>
+    87	       <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack>
+    88	       <env>   L:Int => CALLERL </env>
+    89	       <scopes> SC:Map => SC [ L <- undef ] </scopes>
+    90	       <scopeLoc> _ => SAVEDL </scopeLoc>
+SPAN reference-semantics/semantics/call.k:15-24
+    15	  // a cooled attribute is a bound method value
+    16	  rule <k> Attribute(V:Val, M:String) => boundMethodV(V, M) ... </k>
+    17	
+    18	  // evaluate callee, then args ([owise]: problem-local Call interceptions beat this)
+    19	  syntax KItem ::= #callee(Exprs)
+    20	  rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]
+    21	  rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>
+    22	
+    23	  // ==== dispatch on the callee value ========================================
+    24	  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>
+SPAN reference-semantics/semantics/call.k:69-75
+    69	  rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT
+    70	        => #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+    71	       <env>     CALLERL:Int => NEWL </env>
+    72	       <scopes>   STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes>
+    73	       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+    74	       <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+    75	
+SPAN reference-semantics/semantics/list.k:8-20
+     8	  // ==== iteration (the iterator protocol's list case) =======================
+     9	  rule <k> #iterNext(list(.ValSeq))                => #iterDone ... </k>
+    10	  rule <k> #iterNext(list(vCons(V:Val, R:ValSeq))) => #iterYield(V, list(R)) ... </k>
+    11	
+    12	  // ==== ListExpr: [...] literal -> a fresh heap object =======================
+    13	  syntax ApplyK ::= "toList"
+    14	  rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>
+    15	  rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>
+    16	
+    17	  // ==== list ops: + / == / != ===============================================
+    18	  syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]
+    19	  rule valSeqConcat(.ValSeq, T:ValSeq)                => T
+    20	  rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))
+SPAN reference-semantics/semantics/list.k:52-55
+    52	  // ==== mutator: xs.append(v) — an in-place heap write ======================
+    53	  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "append")), (V:Val, .Vals)) => noneV ... </k>
+    54	       <heap> ... H |-> list(VS:ValSeq => valSeqConcat(VS, vCons(V, .ValSeq))) ... </heap>
+    55	       [priority(40)]
+SPAN reference-semantics/semantics/tuple.k:30-41
+    30	  // ==== target binding: bind a Name or a TupleExpr target to a value ========
+    31	  syntax KItem ::= #bindTgt(Expr, Val)
+    32	  rule <k> #bindTgt(Name(X:String), V:Val) => .K ... </k>
+    33	       <env> L:Int </env>
+    34	       <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>
+    35	  rule <k> #bindTgt(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k>
+    36	       <env> L:Int </env>
+    37	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    38	       requires "$cells" in_keys(M)
+    39	        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+    40	        andBool X in_keys(M) andBool isCellRef({M[X]}:>Val)
+    41	       [priority(40)]
+SPAN reference-semantics/semantics/str.k:7-22
+     7	  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+     8	  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+     9	  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+    10	        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+    11	
+    12	  // ==== str literal (ASCII-only) ============================================
+    13	  syntax IntSeq ::= strToCodes(String) [function]
+    14	  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+    15	  rule strToCodes("") => .IntSeq
+    16	  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    17	    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+    18	
+    19	  // ==== operators: + / == / != / in =========================================
+    20	  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+    21	  rule seqConcat(.IntSeq, T:IntSeq)                => T
+    22	  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+SPAN reference-semantics/semantics/methods.k:60-62
+    60	  // ==== prefix ===============================================================
+    61	  rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)
+    62	
+SPAN reference-semantics/semantics/methods.k:166-170
+   166	  syntax Bool ::= startsWith(IntSeq, IntSeq) [function, total]
+   167	  rule startsWith(.IntSeq, _:IntSeq)               => true
+   168	  rule startsWith(iCons(_:Int, _:IntSeq), .IntSeq) => false
+   169	  rule startsWith(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool startsWith(As, Bs)
+   170	endmodule
+
+SCRIPT_EXIT: 0

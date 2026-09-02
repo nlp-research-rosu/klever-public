@@ -1,0 +1,186 @@
+                verification.name,
+                "--source-rule-inventory",
+                str(source_inventory_path),
+            ]
+            for function in functions:
+                command.extend(("--spec-func", function.name))
+            code, output = run_command(
+                command,
+                cwd=scratch,
+                timeout=KLEAN_TIMEOUT,
+                env=environment,
+            )
+            package = lean_output / package_name
+            if code != 0 or not package.is_dir():
+                raise KleanExportError(f"klean failed ({code}): {output[-600:]}")
+            obligation_map = _bind_obligation_provenance(
+                package, domain_rules, source_rules
+            )
+            (package / "lean-toolchain").write_text(lock["lean_toolchain"] + "\n")
+            _patch_lake_build_directory(package)
+
+            function_file = package / library_name / "Func.lean"
+            modeled_collection_hooks: tuple[str, ...] = ()
+            modeled_operational_hooks: tuple[str, ...] = ()
+            modeled_recursive_functions: tuple[str, ...] = ()
+            if function_file.is_file():
+                modeled_text, modeled_collection_hooks = (
+                    model_collection_hooks(function_file.read_text())
+                )
+                modeled_text, modeled_operational_hooks = (
+                    model_core_operational_hooks(modeled_text)
+                )
+                modeled_text, modeled_recursive_functions = (
+                    model_recursive_build_is(modeled_text)
+                )
+                function_file.write_text(modeled_text)
+            axiomatized: set[str] = set()
+            noncomputable_repair = False
+            build_code = 1
+            build_output = ""
+            for _attempt in range(8):
+                build_code, build_output = run_command(
+                    ["lake", "build"],
+                    cwd=package,
+                    timeout=BUILD_TIMEOUT,
+                    env=environment,
+                )
+                if build_code == 0:
+                    break
+                if not function_file.is_file():
+                    break
+                newly_flagged = (
+                    termination_failures(build_output)
+                    | elaboration_failures(
+                        function_file.read_text(), build_output
+                    )
+                ) - axiomatized
+                if newly_flagged:
+                    axiomatized.update(newly_flagged)
+                    function_file.write_text(
+                        axiomatize(function_file.read_text(), axiomatized)
+                    )
+                    continue
+                if (
+                    not noncomputable_repair
+                    and needs_noncomputable(build_output)
+                ):
+                    noncomputable_repair = True
+                    function_file.write_text(
+                        mark_all_noncomputable(function_file.read_text())
+                    )
+                    continue
+                break
+            if build_code != 0:
+                raise KleanExportError(
+                    f"lake build failed ({build_code}): {build_output[-600:]}"
+                )
+            if tree_digest(frozen_input) != before_hash:
+                raise KleanExportError("frozen input changed during export")
+            if discovery_manifest.read_bytes() != discovery_bytes:
+                raise KleanExportError(
+                    "validated Stage 3 discovery manifest changed during export"
+                )
+
+            generated = publish_staging / "generated"
+            shutil.copytree(
+                package,
+                generated,
+                ignore=shutil.ignore_patterns(".lake", "build"),
+            )
+            inventory = _trust_inventory(
+                generated,
+                axiomatized=axiomatized,
+                noncomputable_repair=noncomputable_repair,
+                modeled_collection_hooks=modeled_collection_hooks,
+                modeled_operational_hooks=modeled_operational_hooks,
+                modeled_recursive_functions=modeled_recursive_functions,
+            )
+            input_manifest = {
+                "schema_version": 3,
+                "problem": problem,
+                "frozen_input_sha256": before_hash,
+                "stage1_workspace_sha256": before_hash,
+                "stage3_discovery_manifest_sha256": (
+                    discovery_manifest_sha256
+                ),
+                "verification_sha256": hashlib.sha256(
+                    verification.read_bytes()
+                ).hexdigest(),
+                "verification_module": module,
+                "syntax_module": resolution.syntax_module,
+                "required_k_files": [
+                    str(path) for path in resolution.required_files
+                ],
+                "inventory_sha256": validated["inventory_sha256"],
+                "summary_functions": [
+                    {
+                        "name": function.name,
+                        "return_sort": function.ret,
+                        "argument_sorts": function.args,
+                    }
+                    for function in functions
+                ],
+                "promoted_structural_definitions": list(
+                    promoted_structural_definitions
+                ),
+                "lowered_structural_definition_rules": list(
+                    lowered_structural_definition_rules
+                ),
+                "modeled_collection_hooks": list(modeled_collection_hooks),
+                "modeled_operational_hooks": list(
+                    modeled_operational_hooks
+                ),
+                "modeled_recursive_functions": list(
+                    modeled_recursive_functions
+                ),
+                "definitions": validated["definitions"],
+                "operational_rules": validated["operational_rules"],
+                "proved_derived_lemmas": validated[
+                    "proved_derived_lemmas"
+                ],
+                "source_rules": domain_rules,
+            }
+            obligations = obligation_map.get("obligations")
+            if not isinstance(obligations, list):
+                raise KleanExportError("generated obligations are malformed")
+            target = target_statement(generated)
+            generator_manifest = {
+                "schema_version": 3,
+                "toolchain": lock,
+                "klean_py_sha256": hashlib.sha256(KLEAN.read_bytes()).hexdigest(),
+                "exporter_sha256": hashlib.sha256(
+                    Path(__file__).read_bytes()
+                ).hexdigest(),
+                "modeled_collection_hooks": list(modeled_collection_hooks),
+                "modeled_operational_hooks": list(
+                    modeled_operational_hooks
+                ),
+                "modeled_recursive_functions": list(
+                    modeled_recursive_functions
+                ),
+                "generated_tree_sha256": tree_digest(generated),
+                "obligation_count": len(obligations),
+                "obligation_map_sha256": hashlib.sha256(
+                    (generated / "obligation-map.json").read_bytes()
+                ).hexdigest(),
+                "target": target,
+                "provenance": {
+                    "stage1_workspace_sha256": before_hash,
+                    "stage3_discovery_manifest_sha256": (
+                        discovery_manifest_sha256
+                    ),
+                    "inventory_sha256": validated["inventory_sha256"],
+                    "generator_image_id": generator_image_id,
+                },
+            }
+            result = {
+                "schema_version": 3,
+                "status": (
+                    "OK" if obligations else "KLEAN_NO_OBLIGATIONS"
+                ),
+                "problem": problem,
+                "generated_tree_sha256": generator_manifest[
+                    "generated_tree_sha256"
+                ],
+                "frozen_input_sha256": before_hash,

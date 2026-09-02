@@ -1,0 +1,64 @@
+requires "verification.k"
+
+module SPEC-VACUITY-AUDIT
+  imports VERIFICATION
+
+  // Fresh non-vacuity probe: require the opposite of the real result.
+  // The empty IntSeq is a satisfying witness: execution returns true while
+  // this destination is false.
+  claim
+    <k>
+      #loadAll(
+        Module(
+          FuncDef(
+            "is_palindrome",
+            Params("text"),
+            Return(
+              Compare(
+                Name("text"),
+                CmpOp(
+                  "==",
+                  Subscript(
+                    Name("text"),
+                    Slice(
+                      NoBound,
+                      NoBound,
+                      UnaryOp("-", Int(1)))))))
+            .Stmts)))
+      ~> Call(Name("is_palindrome"), str(IS:IntSeq))
+    =>
+      notBool palindrome(IS)
+    </k>
+    <env> 0 </env>
+    <scopes>
+      0 |-> scope(.Map, parent(-1))
+      -1 |-> builtinsScope
+    =>
+      0 |-> scope(
+        "is_palindrome" |->
+          closureVal(
+            "text",
+            Return(
+              Compare(
+                Name("text"),
+                CmpOp(
+                  "==",
+                  Subscript(
+                    Name("text"),
+                    Slice(
+                      NoBound,
+                      NoBound,
+                      UnaryOp("-", Int(1)))))))
+            .Stmts,
+            0),
+        parent(-1))
+      -1 |-> builtinsScope
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+endmodule

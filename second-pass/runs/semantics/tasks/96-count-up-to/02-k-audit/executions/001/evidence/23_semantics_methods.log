@@ -1,0 +1,174 @@
+WORKDIR: /tmp/audit-work/96-count-up-to/source
+COMMAND: nl -ba reference-semantics/semantics/methods.k
+EXIT_STATUS: 0
+--- OUTPUT (first 240 lines) ---
+     1	// reference/src/semantics/methods.k — MPY-METHODS
+     2	
+     3	module MPY-METHODS
+     4	  imports MPY-CORE
+     5	  imports K-EQUAL
+     6	  imports MPY-STR
+     7	  imports MPY-LIST
+     8	
+     9	  // method-call routing + arg-eval live in call.k; this module owns applyMethod.
+    10	  syntax Val ::= applyMethod(Val, String, Vals) [function]
+    11	
+    12	  // ==== string predicates (Python semantics) =================================
+    13	  rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)
+    14	  rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)
+    15	  rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)
+    16	  rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS)
+    17	
+    18	  // ==== case maps ============================================================
+    19	  rule applyMethod(str(CS:IntSeq), "lower",    .Vals) => str(mapLower(CS))
+    20	  rule applyMethod(str(CS:IntSeq), "upper",    .Vals) => str(mapUpper(CS))
+    21	  rule applyMethod(str(CS:IntSeq), "swapcase", .Vals) => str(mapSwap(CS))
+    22	
+    23	  // ==== join / count / strip / encode ========================================
+    24	  // S.join(list-of-str): fold with separator codes (receiver + arg deref'd by
+    25	  // the call layer; the result str is a value)
+    26	  rule applyMethod(str(SEP:IntSeq), "join", list(VS:ValSeq), .Vals) => str(joinCodes(SEP, VS))
+    27	  syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]
+    28	  rule joinCodes(_:IntSeq, .ValSeq) => .IntSeq
+    29	  rule joinCodes(_:IntSeq, vCons(str(CS:IntSeq), .ValSeq)) => CS
+    30	  rule joinCodes(SEP:IntSeq, vCons(str(CS:IntSeq), vCons(V:Val, R:ValSeq)))
+    31	    => seqConcat(CS, seqConcat(SEP, joinCodes(SEP, vCons(V, R))))
+    32	
+    33	  // S.count(sub): non-overlapping window scan (Python str.count)
+    34	  rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)
+    35	  syntax Int ::= cntSub(IntSeq, IntSeq) [function]
+    36	  rule cntSub(.IntSeq, _:IntSeq) => 0
+    37	  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC)
+    38	       requires strPrefix(PC, iCons(C, R)) andBool isLen(PC) >Int 0
+    39	  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => cntSub(R, PC)
+    40	       requires notBool strPrefix(PC, iCons(C, R)) orBool isLen(PC) <=Int 0
+    41	  syntax IntSeq ::= dropIS(IntSeq, Int) [function, total]
+    42	  rule dropIS(S:IntSeq, N:Int) => S requires N <=Int 0
+    43	  rule dropIS(.IntSeq, _:Int) => .IntSeq [owise]
+    44	  rule dropIS(iCons(_:Int, R:IntSeq), N:Int) => dropIS(R, N -Int 1) requires N >Int 0
+    45	
+    46	  // S.strip(): trim whitespace runs from both ends
+    47	  rule applyMethod(str(CS:IntSeq), "strip", .Vals) => str(revIS(trimWS(revIS(trimWS(CS)))))
+    48	  syntax IntSeq ::= trimWS(IntSeq) [function, total]
+    49	  rule trimWS(.IntSeq) => .IntSeq
+    50	  rule trimWS(iCons(C:Int, R:IntSeq)) => trimWS(R) requires isWSC(C)
+    51	  rule trimWS(iCons(C:Int, R:IntSeq)) => iCons(C, R) requires notBool isWSC(C)
+    52	  syntax IntSeq ::= revIS(IntSeq) [function, total] | revISAcc(IntSeq, IntSeq) [function, total]
+    53	  rule revIS(S:IntSeq) => revISAcc(S, .IntSeq)
+    54	  rule revISAcc(.IntSeq, A:IntSeq) => A
+    55	  rule revISAcc(iCons(C:Int, R:IntSeq), A:IntSeq) => revISAcc(R, iCons(C, A))
+    56	
+    57	  // S.encode('ascii'): identity on the code-sequence model (bytes == codes)
+    58	  rule applyMethod(str(CS:IntSeq), "encode", str(_:IntSeq), .Vals) => str(CS)
+    59	
+    60	  // ==== prefix ===============================================================
+    61	  rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)
+    62	
+    63	  // ==== list.count(v) — number of occurrences of v in the list (concrete for krun) ==========
+    64	  rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)
+    65	  syntax Int ::= cntOccVS(ValSeq, Val) [function, total]
+    66	  rule cntOccVS(.ValSeq, _:Val)                => 0
+    67	  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V
+    68	  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => cntOccVS(R, V)        requires notBool (A ==K V)
+    69	
+    70	  // ==== split (no-arg: on whitespace runs, dropping empty tokens) + replace (single char) ==========
+    71	  // Concrete string ops for krun. A proof over a symbolic string intercepts the split problem-locally.
+    72	  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals)
+    73	        => #alloc(list(splitWS(CS, .IntSeq, .ValSeq))) ... </k>
+    74	       [priority(40)]
+    75	  syntax ValSeq ::= splitWS(IntSeq, IntSeq, ValSeq) [function]  // remaining, current token, result
+    76	  rule splitWS(.IntSeq, CUR:IntSeq, ACC:ValSeq) => flushTok(ACC, CUR)
+    77	  rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, .IntSeq, flushTok(ACC, CUR))
+    78	       requires isWSC(C)
+    79	  rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, seqConcat(CUR, iCons(C, .IntSeq)), ACC)
+    80	       requires notBool isWSC(C)
+    81	  // flush the current token to the result list iff non-empty.
+    82	  syntax ValSeq ::= flushTok(ValSeq, IntSeq) [function]
+    83	  rule flushTok(ACC:ValSeq, .IntSeq)            => ACC
+    84	  rule flushTok(ACC:ValSeq, iCons(C:Int, T:IntSeq)) => valSeqConcat(ACC, vCons(str(iCons(C, T)), .ValSeq))
+    85	  syntax Bool ::= isWSC(Int) [function, total]
+    86	  rule isWSC(C:Int) => C ==Int 32 orBool C ==Int 9 orBool C ==Int 10 orBool C ==Int 13
+    87	
+    88	  // split(sep='x') keyword form delegates to the positional k-cell rule
+    89	  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (kwV("sep", str(S:IntSeq)), .Vals))
+    90	        => #applyK(toCall(boundMethodV(str(CS), "split")), (str(S), .Vals)) ... </k>
+    91	       [priority(39)]
+    92	
+    93	  // str.split(sep) — single-char separator, KEEPING empty parts (Python's sep-split; len == #sep + 1).
+    94	  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (str(iCons(SEP:Int, .IntSeq)), .Vals))
+    95	        => #alloc(list(splitSep(CS, SEP, .IntSeq))) ... </k>
+    96	       [priority(40)]
+    97	  syntax ValSeq ::= splitSep(IntSeq, Int, IntSeq) [function]  // remaining, sep code, current token
+    98	  rule splitSep(.IntSeq, _SEP:Int, CUR:IntSeq)              => vCons(str(CUR), .ValSeq)
+    99	  rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => vCons(str(CUR), splitSep(R, SEP, .IntSeq))
+   100	       requires C ==Int SEP
+   101	  rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => splitSep(R, SEP, seqConcat(CUR, iCons(C, .IntSeq)))
+   102	       requires notBool (C ==Int SEP)
+   103	
+   104	  rule applyMethod(str(CS:IntSeq), "replace", str(iCons(A:Int, .IntSeq)), str(iCons(B:Int, .IntSeq)), .Vals)
+   105	    => str(replaceC(CS, A, B))
+   106	  syntax IntSeq ::= replaceC(IntSeq, Int, Int) [function, total]
+   107	  rule replaceC(.IntSeq, _:Int, _:Int)             => .IntSeq
+   108	  rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(B, replaceC(R, A, B)) requires C ==Int A
+   109	  rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(C, replaceC(R, A, B)) requires notBool (C ==Int A)
+   110	
+   111	  // ==== char helpers =========================================================
+   112	  syntax Bool ::= isUpperC(Int) [function, total]
+   113	  rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90
+   114	
+   115	  syntax Bool ::= isLowerC(Int) [function, total]
+   116	  rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122
+   117	
+   118	  syntax Bool ::= isAlphaC(Int) [function, total]
+   119	  rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)
+   120	
+   121	  syntax Bool ::= isDigitC(Int) [function, total]
+   122	  rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57
+   123	
+   124	  syntax Bool ::= hasUpper(IntSeq) [function, total]
+   125	  rule hasUpper(.IntSeq) => false
+   126	  rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)
+   127	
+   128	  syntax Bool ::= hasLower(IntSeq) [function, total]
+   129	  rule hasLower(.IntSeq) => false
+   130	  rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)
+   131	
+   132	  syntax Bool ::= allAlpha(IntSeq) [function, total]
+   133	  rule allAlpha(.IntSeq) => true
+   134	  rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)
+   135	
+   136	  syntax Bool ::= allDigit(IntSeq) [function, total]
+   137	  rule allDigit(.IntSeq) => true
+   138	  rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)
+   139	
+   140	  syntax Int ::= lowerC(Int) [function, total]
+   141	
+   142	  rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)
+   143	  rule lowerC(C:Int) => C         [owise]
+   144	
+   145	  syntax Int ::= upperC(Int) [function, total]
+   146	  rule upperC(C:Int) => C -Int 32 requires isLowerC(C)
+   147	  rule upperC(C:Int) => C         [owise]
+   148	
+   149	  syntax Int ::= swapC(Int) [function, total]
+   150	  rule swapC(C:Int) => C +Int 32 requires isUpperC(C)
+   151	  rule swapC(C:Int) => C -Int 32 requires isLowerC(C)
+   152	  rule swapC(C:Int) => C         [owise]
+   153	
+   154	  syntax IntSeq ::= mapLower(IntSeq) [function, total]
+   155	  rule mapLower(.IntSeq) => .IntSeq
+   156	  rule mapLower(iCons(C:Int, S:IntSeq)) => iCons(lowerC(C), mapLower(S))
+   157	
+   158	  syntax IntSeq ::= mapUpper(IntSeq) [function, total]
+   159	  rule mapUpper(.IntSeq) => .IntSeq
+   160	  rule mapUpper(iCons(C:Int, S:IntSeq)) => iCons(upperC(C), mapUpper(S))
+   161	
+   162	  syntax IntSeq ::= mapSwap(IntSeq) [function, total]
+   163	  rule mapSwap(.IntSeq) => .IntSeq
+   164	  rule mapSwap(iCons(C:Int, S:IntSeq)) => iCons(swapC(C), mapSwap(S))
+   165	
+   166	  syntax Bool ::= startsWith(IntSeq, IntSeq) [function, total]
+   167	  rule startsWith(.IntSeq, _:IntSeq)               => true
+   168	  rule startsWith(iCons(_:Int, _:IntSeq), .IntSeq) => false
+   169	  rule startsWith(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool startsWith(As, Bs)
+   170	endmodule

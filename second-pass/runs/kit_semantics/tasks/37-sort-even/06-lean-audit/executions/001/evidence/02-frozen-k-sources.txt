@@ -1,0 +1,368 @@
+Script started on 2026-07-31 05:07:34-05:00 [<not executed on terminal>]
+COMMAND: nl -ba verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION-SYNTAX
+     4	  imports MPY-SYNTAX
+     5	
+     6	  // Exact source-body macros. They only avoid duplicating the translated AST
+     7	  // in the claims; macro expansion happens before execution.
+     8	  syntax Stmts ::= "sortEvenBody" [macro]
+     9	  syntax Stmts ::= "sortEvenLoopBody" [macro]
+    10	
+    11	  // Number of even positions in a sequence of length N.
+    12	  syntax Int ::= evenCount(Int) [function, total]
+    13	
+    14	  // Apply consecutive writes for counters I through STOP - 1.
+    15	  syntax ValSeq ::= fillEven(ValSeq, ValSeq, Int, Int)
+    16	                    [function, total]
+    17	
+    18	  // The result specified by the source contract: the input sequence with its
+    19	  // even-position projection replaced by the ascending sort of that projection.
+    20	  syntax ValSeq ::= sortEvenResult(ValSeq) [function, total]
+    21	endmodule
+    22	
+    23	module VERIFICATION-BASE
+    24	  imports MPY
+    25	  imports VERIFICATION-SYNTAX
+    26	
+    27	  rule sortEvenLoopBody
+    28	    => Assign(
+    29	         Subscript(Name("result"), BinOp("*", Int(2), Name("i"))),
+    30	         Subscript(Name("evens"), Name("i")))
+    31	
+    32	  rule sortEvenBody
+    33	    => Assign(Name("result"), Call(Name("list"), Name("l")))
+    34	       Assign(
+    35	         Name("evens"),
+    36	         Call(
+    37	           Name("sorted"),
+    38	           Subscript(Name("l"), Slice(NoBound, NoBound, Int(2)))))
+    39	       Assign(Name("i"), Int(0))
+    40	       For(
+    41	         Name("i"),
+    42	         Call(
+    43	           Name("range"),
+    44	           BinOp(
+    45	             "//",
+    46	             BinOp("+", Call(Name("len"), Name("l")), Int(1)),
+    47	             Int(2))),
+    48	         sortEvenLoopBody)
+    49	       Return(Name("result"))
+    50	
+    51	  rule evenCount(N)
+    52	    => (N +Int 1 -Int pyMod(N +Int 1, 2)) /Int 2
+    53	
+    54	  rule fillEven(VS, _SORTED, I, STOP) => VS
+    55	    requires I >=Int STOP
+    56	
+    57	  rule fillEven(VS, SORTED, I, STOP)
+    58	    => fillEven(
+    59	         setVSAt(VS, 2 *Int I, valSeqAt(SORTED, I)),
+    60	         SORTED,
+    61	         I +Int 1,
+    62	         STOP)
+    63	    requires I <Int STOP
+    64	
+    65	  rule sortEvenResult(VS)
+    66	    => fillEven(
+    67	         VS,
+    68	         sortVS(buildVS(VS, 0, vsLen(VS), 2)),
+    69	         0,
+    70	         evenCount(vsLen(VS)))
+    71	endmodule
+    72	
+    73	// Used to prove the loop connection theorem without the operational bridge.
+    74	module VERIFICATION-NO-BRIDGE
+    75	  imports VERIFICATION-BASE
+    76	endmodule
+    77	
+    78	module VERIFICATION
+    79	  imports VERIFICATION-BASE
+    80	
+    81	  // Exact operational bridge justified by SPEC-CONNECTION.loop-connection,
+    82	  // which is proved under VERIFICATION-NO-BRIDGE.  The rule deliberately
+    83	  // accepts no continuation, binding, heap, stack, return, exception, or exit
+    84	  // context beyond the universally quantified context of that theorem.
+    85	  rule
+    86	    <k>
+    87	      #loop(
+    88	        rangeObj(I, C, 1),
+    89	        Name("i"),
+    90	        sortEvenLoopBody)
+    91	      ~> (Return(Name("result")) .Stmts)
+    92	      ~> #endcall
+    93	      => ref(0)
+    94	    </k>
+    95	    <env> 1 => 0 </env>
+    96	    <scopes>
+    97	      ( 0 |-> scope(
+    98	          "sort_even" |-> closureVal("l", sortEvenBody, 0),
+    99	          parent(-1))
+   100	        1 |-> scope(
+   101	          ( "l"      |-> list(VS)
+   102	            "result" |-> ref(0)
+   103	            "evens"  |-> ref(2)
+   104	            "i"      |-> _J ),
+   105	          parent(0))
+   106	        -1 |-> B:Scope )
+   107	      =>
+   108	      ( 0 |-> scope(
+   109	          "sort_even" |-> closureVal("l", sortEvenBody, 0),
+   110	          parent(-1))
+   111	        -1 |-> B )
+   112	    </scopes>
+   113	    <scopeLoc> 2 => 1 </scopeLoc>
+   114	    <heap>
+   115	      ( 0 |-> list(
+   116	          CUR
+   117	          => fillEven(
+   118	               CUR,
+   119	               SORTED,
+   120	               I,
+   121	               C))
+   122	        1 |-> list(SLICE)
+   123	        2 |-> list(SORTED) )
+   124	    </heap>
+   125	    <heapLoc> 3 </heapLoc>
+   126	    <stack>
+   127	      ListItem(frame(.K, 0, 1))
+   128	      => .List
+   129	    </stack>
+   130	    <ret> noRet </ret>
+   131	    <exc> NoExc </exc>
+   132	    <exit-code> 0 </exit-code>
+   133	    requires I >=Int 0
+   134	    [priority(40)]
+   135	endmodule
+COMMAND: nl -ba spec-connection.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC-CONNECTION
+     4	  imports VERIFICATION-NO-BRIDGE
+     5	
+     6	  // Bridge-free universal connection theorem for the exact operational rule
+     7	  // in module VERIFICATION.
+     8	  claim [loop-connection]:
+     9	    <k>
+    10	      #loop(
+    11	        rangeObj(I, C, 1),
+    12	        Name("i"),
+    13	        sortEvenLoopBody)
+    14	      ~> (Return(Name("result")) .Stmts)
+    15	      ~> #endcall
+    16	      => ref(0)
+    17	    </k>
+    18	    <env> 1 => 0 </env>
+    19	    <scopes>
+    20	      ( 0 |-> scope(
+    21	          "sort_even" |-> closureVal("l", sortEvenBody, 0),
+    22	          parent(-1))
+    23	        1 |-> scope(
+    24	          ( "l"      |-> list(VS)
+    25	            "result" |-> ref(0)
+    26	            "evens"  |-> ref(2)
+    27	            "i"      |-> _J ),
+    28	          parent(0))
+    29	        -1 |-> B:Scope )
+    30	      =>
+    31	      ( 0 |-> scope(
+    32	          "sort_even" |-> closureVal("l", sortEvenBody, 0),
+    33	          parent(-1))
+    34	        -1 |-> B )
+    35	    </scopes>
+    36	    <scopeLoc> 2 => 1 </scopeLoc>
+    37	    <heap>
+    38	      ( 0 |-> list(
+    39	          CUR
+    40	          => fillEven(
+    41	               CUR,
+    42	               SORTED,
+    43	               I,
+    44	               C))
+    45	        1 |-> list(SLICE)
+    46	        2 |-> list(SORTED) )
+    47	    </heap>
+    48	    <heapLoc> 3 </heapLoc>
+    49	    <stack>
+    50	      ListItem(frame(.K, 0, 1))
+    51	      => .List
+    52	    </stack>
+    53	    <ret> noRet </ret>
+    54	    <exc> NoExc </exc>
+    55	    <exit-code> 0 </exit-code>
+    56	    requires I >=Int 0
+    57	endmodule
+COMMAND: nl -ba prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py smoke.py > smoke.mpy
+     6	
+     7	kompile --backend llvm reference-semantics/semantics.k \
+     8	  --main-module MPY-KRUN \
+     9	  --syntax-module MPY-SYNTAX \
+    10	  --output-definition runtime-kompiled
+    11	
+    12	krun smoke.mpy --definition runtime-kompiled
+    13	python3 test_solution.py
+    14	
+    15	kompile --backend haskell verification.k \
+    16	  --main-module VERIFICATION-NO-BRIDGE \
+    17	  --syntax-module MPY-SYNTAX \
+    18	  --output-definition verification-no-bridge-kompiled
+    19	
+    20	kprove spec-connection.k \
+    21	  --definition verification-no-bridge-kompiled \
+    22	  --spec-module SPEC-CONNECTION
+    23	
+    24	kompile --backend haskell verification.k \
+    25	  --main-module VERIFICATION \
+    26	  --syntax-module MPY-SYNTAX \
+    27	  --output-definition verification-kompiled
+    28	
+    29	kprove spec.k \
+    30	  --definition verification-kompiled \
+    31	  --spec-module SPEC
+    32	
+    33	if kprove spec-vacuity.k \
+    34	     --definition verification-kompiled \
+    35	     --spec-module SPEC-VACUITY; then
+    36	  echo "UNEXPECTED SUCCESS: false-result mutation proved"
+    37	  exit 1
+    38	else
+    39	  status=$?
+    40	  echo "EXPECTED FAILURE: false-result mutation exited ${status}"
+    41	fi
+    42	
+    43	if kprove spec-body-mutation.k \
+    44	     --definition verification-no-bridge-kompiled \
+    45	     --spec-module SPEC-BODY-MUTATION; then
+    46	  echo "UNEXPECTED SUCCESS: mutated loop body proved"
+    47	  exit 1
+    48	else
+    49	  status=$?
+    50	  echo "EXPECTED FAILURE: mutated loop body exited ${status}"
+    51	fi
+COMMAND: nl -ba spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [loop-inv]:
+     7	    <k>
+     8	      #loop(
+     9	        rangeObj(I, C, 1),
+    10	        Name("i"),
+    11	        sortEvenLoopBody)
+    12	      ~> (Return(Name("result")) .Stmts)
+    13	      ~> #endcall
+    14	      => ref(0)
+    15	    </k>
+    16	    <env> 1 => 0 </env>
+    17	    <scopes>
+    18	      ( 0 |-> scope(
+    19	          "sort_even" |-> closureVal("l", sortEvenBody, 0),
+    20	          parent(-1))
+    21	        1 |-> scope(
+    22	          ( "l"      |-> list(VS)
+    23	            "result" |-> ref(0)
+    24	            "evens"  |-> ref(2)
+    25	            "i"      |-> _J ),
+    26	          parent(0))
+    27	        -1 |-> builtinsScope )
+    28	      =>
+    29	      ( 0 |-> scope(
+    30	          "sort_even" |-> closureVal("l", sortEvenBody, 0),
+    31	          parent(-1))
+    32	        -1 |-> builtinsScope )
+    33	    </scopes>
+    34	    <scopeLoc> 2 => 1 </scopeLoc>
+    35	    <heap>
+    36	      ( 0 |-> list(
+    37	          CUR
+    38	          => fillEven(
+    39	               CUR,
+    40	               sortVS(buildVS(VS, 0, vsLen(VS), 2)),
+    41	               I,
+    42	               C))
+    43	        1 |-> list(buildVS(VS, 0, vsLen(VS), 2))
+    44	        2 |-> list(sortVS(buildVS(VS, 0, vsLen(VS), 2))) )
+    45	    </heap>
+    46	    <heapLoc> 3 </heapLoc>
+    47	    <stack>
+    48	      ListItem(frame(.K, 0, 1))
+    49	      => .List
+    50	    </stack>
+    51	    <ret> noRet </ret>
+    52	    <exc> NoExc </exc>
+    53	    <exit-code> 0 </exit-code>
+    54	    requires I >=Int 0
+    55	
+    56	  claim [sort-even]:
+    57	    <k>
+    58	      #loadAll(Module(FuncDef("sort_even", Params("l"), sortEvenBody)))
+    59	      ~> Call(Name("sort_even"), list(VS))
+    60	      => ref(0)
+    61	    </k>
+    62	    <env> 0 </env>
+    63	    <scopes>
+    64	      ( 0 |-> scope(.Map, parent(-1))
+    65	        -1 |-> builtinsScope )
+    66	      =>
+    67	      ( 0 |-> scope(
+    68	          "sort_even" |-> closureVal("l", sortEvenBody, 0),
+    69	          parent(-1))
+    70	        -1 |-> builtinsScope )
+    71	    </scopes>
+    72	    <scopeLoc> 1 </scopeLoc>
+    73	    <heap>
+    74	      .Map
+    75	      =>
+    76	      ( 0 |-> list(sortEvenResult(VS))
+    77	        1 |-> list(buildVS(VS, 0, vsLen(VS), 2))
+    78	        2 |-> list(sortVS(buildVS(VS, 0, vsLen(VS), 2))) )
+    79	    </heap>
+    80	    <heapLoc> 0 => 3 </heapLoc>
+    81	    <stack> .List </stack>
+    82	    <ret> noRet </ret>
+    83	    <exc> NoExc </exc>
+    84	    <exit-code> 0 </exit-code>
+    85	endmodule
+COMMAND: solution sources
+     1	def sort_even(l: list):
+     2	    result = list(l)
+     3	    evens = sorted(l[::2])
+     4	    i = 0
+     5	    for i in range((len(l) + 1) // 2):
+     6	        result[2 * i] = evens[i]
+     7	    return result
+     1	Module(
+     2	  FuncDef("sort_even", Params("l"),
+     3	    Assign(Name("result"), Call(Name("list"), Name("l")))
+     4	    Assign(
+     5	      Name("evens"),
+     6	      Call(
+     7	        Name("sorted"),
+     8	        Subscript(Name("l"), Slice(NoBound, NoBound, Int(2)))))
+     9	    Assign(Name("i"), Int(0))
+    10	    For(Name("i"), Call(
+    11	      Name("range"),
+    12	      BinOp(
+    13	        "//",
+    14	        BinOp("+", Call(Name("len"), Name("l")), Int(1)),
+    15	        Int(2))),
+    16	      Assign(
+    17	        Subscript(Name("result"), BinOp("*", Int(2), Name("i"))),
+    18	        Subscript(Name("evens"), Name("i"))))
+    19	    Return(Name("result"))))
+COMMAND: hashes
+d2ae562c0947b167ec2b5143491da99d1871ff04b56c2bc059010b7da1ac050f  /reference/k-proof/verification.k
+4384cf0211d0076e1a62f59d844a62c86025e592c63b7b22942b230d8aad0241  /reference/k-proof/spec-connection.k
+7c5fc3c14981fff71d4ecd4ecd4836c2957c0400445d6e94d53fe70281851cf2  /reference/k-proof/prove.sh
+e544e04cb058eaf0527154934aee01b2bf1c259f6650bb6bffe3a1d693ae91ff  /reference/k-proof/solution.py
+c25e5d64b696017be3aa254ddf81cecdb15f4ddf770c164a9c197e2773535280  /reference/k-proof/solution.mpy
+
+Script done on 2026-07-31 05:07:34-05:00 [COMMAND_EXIT_CODE="0"]

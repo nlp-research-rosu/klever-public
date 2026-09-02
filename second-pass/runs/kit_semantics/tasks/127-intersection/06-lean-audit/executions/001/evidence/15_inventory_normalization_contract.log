@@ -1,0 +1,152 @@
++ sed -n 600,750p /reference/tools/k_rule_inventory.py
+                start_offset=start_offset,
+                end_offset=start_offset + len(rule_text),
+                attribute_start=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.start()
+                ),
+                attribute_end=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.end()
+                ),
+            )
+        )
+    return rules
+
+
+def _rule_documents(
+    text: str, modules: tuple[_Module, ...]
+) -> list[dict[str, Any]]:
+    spans = [span for module in modules for span in _rule_spans(text, module)]
+    spans.sort(key=lambda span: span.start_offset)
+    return [dataclasses.asdict(span.rule) for span in spans]
+
+
+def _attribute_token_spans(
+    text: str,
+    masked_text: str,
+) -> list[tuple[int, int, str]]:
+    spans: list[tuple[int, int, str]] = []
+    start = 0
+    depth = 0
+    for index, character in enumerate(masked_text):
+        if character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth = max(depth - 1, 0)
+        elif character == "," and depth == 0:
+            spans.append(
+                (
+                    start,
+                    index,
+                    _without_comments(text[start:index]).strip(),
+                )
+            )
+            start = index + 1
+    spans.append(
+        (
+            start,
+            len(text),
+            _without_comments(text[start:]).strip(),
+        )
+    )
+    return spans
+
+
+def _blank_non_newlines(text: str) -> str:
+    return "".join(
+        character if character in "\r\n" else " "
+        for character in text
+    )
+
+
+def desimplify_rule_ids(
+    text: str,
+    source_rule_ids: list[str],
+) -> str:
+    """Remove simplification from exactly the selected canonical rule IDs."""
+
+    if len(source_rule_ids) != len(set(source_rule_ids)):
+        raise KRuleInventoryError(
+            "exact rule transformation contains a duplicate source rule ID"
+        )
+    selected = set(source_rule_ids)
+    modules = _modules(_mask_non_code(text))
+    spans = [
+        span
+        for local_module in modules
+        for span in _rule_spans(text, local_module)
+    ]
+    by_id = {span.rule.source_rule_id: span for span in spans}
+    unknown = sorted(selected - set(by_id))
+    if unknown:
+        raise KRuleInventoryError(
+            "exact rule transformation names an unknown source rule ID: "
+            + ", ".join(unknown)
+        )
+
+    edits: list[tuple[int, int]] = []
+    for source_rule_id in source_rule_ids:
+        span = by_id[source_rule_id]
+        if span.attribute_start is None or span.attribute_end is None:
+            raise KRuleInventoryError(
+                "selected source rule has no simplification attribute: "
+                f"{source_rule_id}"
+            )
+        attribute_text = text[
+            span.attribute_start + 1 : span.attribute_end - 1
+        ]
+        masked_attributes = _mask_non_code(attribute_text)
+        tokens = _attribute_token_spans(
+            attribute_text,
+            masked_attributes,
+        )
+        matches = [
+            index
+            for index, (_start, _end, token) in enumerate(tokens)
+            if token == "simplification"
+        ]
+        if len(matches) != 1:
+            raise KRuleInventoryError(
+                "selected source rule has ambiguous simplification "
+                f"attributes: {source_rule_id}"
+            )
+        token_index = matches[0]
+        if len(tokens) == 1:
+            edit_start = span.attribute_start
+            edit_end = span.attribute_end
+        elif token_index < len(tokens) - 1:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index][0]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index + 1][0]
+            )
+        else:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index - 1][1]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index][1]
+            )
+        edits.append((edit_start, edit_end))
+
+    transformed = text
+    for start, end in sorted(edits, reverse=True):
+        transformed = (
+            transformed[:start]
+            + _blank_non_newlines(transformed[start:end])
+            + transformed[end:]
+        )
+    return transformed
+
+
+def inventory_verification(workspace: Path) -> dict[str, Any]:
+    workspace = Path(workspace)
+    try:
+        workspace_mode = workspace.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"

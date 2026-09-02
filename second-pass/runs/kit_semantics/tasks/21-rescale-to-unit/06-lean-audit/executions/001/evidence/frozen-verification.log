@@ -1,0 +1,120 @@
+Script started on 2026-07-30 23:43:04-05:00 [<not executed on terminal>]
+requires "reference-semantics/semantics.k"
+
+module VERIFICATION
+  imports MPY
+
+  // The source contract's homogeneous float-list domain.
+  syntax Bool ::= allFloatVS(ValSeq) [function, total]
+  rule allFloatVS(.ValSeq) => true
+  rule allFloatVS(vCons(V:Val, REST:ValSeq))
+    => isFloat(V) andBool allFloatVS(REST)
+
+  // A guarded total projection used only after allFloatVS has established that
+  // a dynamically sorted Val is a Float.
+  syntax Bool ::= definedProjectFloat(Val) [function, total]
+  rule definedProjectFloat(V:Val) => isFloat(V)
+
+  syntax Float ::= projectFloatTotal(Val)
+    [function, total, symbol(projectFloatTotal), no-evaluators]
+
+  rule #Ceil({@V:Val}:>Float)
+    => ({ definedProjectFloat(@V) #Equals true } #And #Ceil(@V))
+    [simplification]
+
+  rule projectFloatTotal(F:Float) => F [simplification]
+  rule projectFloatTotal(V:Val) => {V}:>Float
+    requires definedProjectFloat(V)
+    [concrete, simplification(10), preserves-definedness]
+  rule {V:Val}:>Float => projectFloatTotal(V)
+    requires definedProjectFloat(V)
+    [symbolic(V), simplification, preserves-definedness]
+
+  // This is the fixed MPY-FLOAT subtraction equation restated over the
+  // dynamic Val supersort, under exactly its Float-domain guard.
+  rule applyBin("-", V:Val, F:Float)
+    => subF(projectFloatTotal(V), F)
+    requires isFloat(V)
+    [simplification]
+
+  // The Haskell backend has no FLOAT.min/FLOAT.max hooks.  These wrappers
+  // isolate exactly those supplied primitives while leaving the surrounding
+  // iterator control and state transitions to the fixed semantics.
+  syntax Float ::= minFOpaque(Float, Float)
+    [function, total, symbol(minFOpaque), no-evaluators]
+  syntax Float ::= maxFOpaque(Float, Float)
+    [function, total, symbol(maxFOpaque), no-evaluators]
+  rule minFloat(F1:Float, F2:Float) => minFOpaque(F1, F2)
+    [simplification]
+  rule maxFloat(F1:Float, F2:Float) => maxFOpaque(F1, F2)
+    [simplification]
+
+  // Exact accumulator summaries for the fixed-semantics float min/max folds.
+  syntax Float ::= minTailF(ValSeq, Float) [function, total]
+  rule minTailF(.ValSeq, M:Float) => M
+  rule minTailF(vCons(V:Val, REST:ValSeq), M:Float)
+    => minTailF(REST, minFOpaque(M, projectFloatTotal(V)))
+    requires isFloat(V)
+  rule minTailF(vCons(V:Val, _REST:ValSeq), M:Float) => M
+    requires notBool isFloat(V)
+
+  syntax Float ::= maxTailF(ValSeq, Float) [function, total]
+  rule maxTailF(.ValSeq, M:Float) => M
+  rule maxTailF(vCons(V:Val, REST:ValSeq), M:Float)
+    => maxTailF(REST, maxFOpaque(M, projectFloatTotal(V)))
+    requires isFloat(V)
+  rule maxTailF(vCons(V:Val, _REST:ValSeq), M:Float) => M
+    requires notBool isFloat(V)
+
+  syntax Float ::= minVF(ValSeq) [function, total]
+  rule minVF(.ValSeq) => 0.0
+  rule minVF(vCons(V:Val, REST:ValSeq))
+    => minTailF(REST, projectFloatTotal(V))
+    requires isFloat(V)
+  rule minVF(vCons(V:Val, _REST:ValSeq)) => 0.0
+    requires notBool isFloat(V)
+
+  syntax Float ::= maxVF(ValSeq) [function, total]
+  rule maxVF(.ValSeq) => 0.0
+  rule maxVF(vCons(V:Val, REST:ValSeq))
+    => maxTailF(REST, projectFloatTotal(V))
+    requires isFloat(V)
+  rule maxVF(vCons(V:Val, _REST:ValSeq)) => 0.0
+    requires notBool isFloat(V)
+
+  // The source for-loop appends one transformed element at a time.  Keeping
+  // the current accumulator explicit makes the loop step definitionally
+  // identical to list.append, without needing an associativity axiom.
+  syntax ValSeq ::= scaleAcc(ValSeq, ValSeq, Float, Float)
+    [function, total]
+  rule scaleAcc(ACC:ValSeq, .ValSeq, _LO:Float, _HI:Float) => ACC
+  rule scaleAcc(ACC:ValSeq, vCons(V:Val, REST:ValSeq),
+                LO:Float, HI:Float)
+    => scaleAcc(
+         valSeqConcat(
+           ACC,
+           vCons(
+             divF(
+               subF(projectFloatTotal(V), LO),
+               subF(HI, LO)),
+             .ValSeq)),
+         REST,
+         LO,
+         HI)
+    requires isFloat(V)
+  rule scaleAcc(ACC:ValSeq, vCons(V:Val, REST:ValSeq),
+                LO:Float, HI:Float)
+    => scaleAcc(valSeqConcat(ACC, vCons(V, .ValSeq)),
+                REST, LO, HI)
+    requires notBool isFloat(V)
+
+  // The loop target remains bound after a Python for-loop.  This summary
+  // records that local-state effect even though the callee frame is later
+  // popped and is not observable to the caller.
+  syntax Val ::= lastVal(ValSeq, Val) [function, total]
+  rule lastVal(.ValSeq, CURRENT:Val) => CURRENT
+  rule lastVal(vCons(V:Val, REST:ValSeq), _CURRENT:Val)
+    => lastVal(REST, V)
+endmodule
+
+Script done on 2026-07-30 23:43:04-05:00 [COMMAND_EXIT_CODE="0"]

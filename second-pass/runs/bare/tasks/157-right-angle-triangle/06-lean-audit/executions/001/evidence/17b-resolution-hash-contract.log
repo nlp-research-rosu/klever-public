@@ -1,0 +1,160 @@
++ find / -maxdepth 3 '(' -iname '*lock*.json' -o -iname '*mechanical*' ')' -printf '%y %p\n'
++ sort
+f /reference/klean-toolchain.lock.json
++ sed -n 1,135p /reference/tools/stage6_resolution_contract.py
+#!/usr/bin/env python3
+"""Dependency-light signed-resolution contract for Stage 6 audit inputs."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from typing import Any
+
+
+SCHEMA_VERSION = 4
+RESOLUTION_KEYS = frozenset(
+    {
+        "schema_version",
+        "run_id",
+        "problem_id",
+        "condition",
+        "mode",
+        "semantics_mode",
+        "k_workspace",
+        "k_audit",
+        "discovery_manifest",
+        "klean_generation",
+        "generation_producer_sources",
+        "lean_workspace",
+        "lean_invocation",
+        "target",
+        "stage1_source_hashes",
+        "trust_inventory",
+        "hashes",
+        "selections",
+        "stage4_preflight",
+        "stage5_result",
+    }
+)
+
+
+class Stage6ResolutionContractError(RuntimeError):
+    """Raised when a Stage 6 signed resolution is malformed."""
+
+
+def canonical_json_sha256(document: Any) -> str:
+    encoded = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def validate_sha256(value: object, label: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(
+        r"[0-9a-f]{64}", value
+    ) is None:
+        raise Stage6ResolutionContractError(f"{label} is malformed")
+    return value
+
+
+def build_audit_input(
+    resolution: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "resolution": resolution,
+        "resolved_input_sha256": canonical_json_sha256(resolution),
+    }
+
+
+def verify_audit_input(
+    document: dict[str, Any],
+) -> tuple[dict[str, Any], str]:
+    required = {
+        "schema_version",
+        "resolution",
+        "resolved_input_sha256",
+    }
+    keys = set(document)
+    if (
+        (keys != required and keys != required | {"audit"})
+        or document.get("schema_version") != SCHEMA_VERSION
+    ):
+        raise Stage6ResolutionContractError(
+            "Stage 6 audit input envelope is malformed"
+        )
+    audit = document.get("audit")
+    if "audit" in document and not isinstance(audit, dict):
+        raise Stage6ResolutionContractError(
+            "Stage 6 audit metadata is malformed"
+        )
+    resolution = document.get("resolution")
+    if (
+        not isinstance(resolution, dict)
+        or set(resolution) != RESOLUTION_KEYS
+        or resolution.get("schema_version") != SCHEMA_VERSION
+    ):
+        raise Stage6ResolutionContractError(
+            "Stage 6 signed resolution is malformed"
+        )
+    digest = validate_sha256(
+        document.get("resolved_input_sha256"),
+        "Stage 6 resolved-input digest",
+    )
+    if canonical_json_sha256(resolution) != digest:
+        raise Stage6ResolutionContractError(
+            "Stage 6 audit input digest does not match signed resolution"
+        )
+    return resolution, digest
++ sed -n 510,555p /reference/tools/klean_audit_contract.py
+                )
+            children.append(path)
+        return sorted(children)
+    except OSError as error:
+        raise KleanAuditContractError(
+            f"cannot scan Stage 6 executions: {error}"
+        ) from error
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def prepare_stage6_execution(
+    repo: Path,
+    run_id: str,
+    problem: str,
+    *,
+    expected_resolved_input_sha256: str,
+    replace_selected: bool = False,
+) -> Path:
+    expected_digest = _validate_sha256(
+        expected_resolved_input_sha256,
+        "expected Stage 6 resolved-input digest",
+    )
+    try:
+        resolution = resolve_stage6_audit(repo, run_id, problem)
+    except KleanAuditContractError as error:
+        raise KleanAuditContractError(
+            "resolved inputs changed before Stage 6 allocation"
+        ) from error
+    if resolution["resolved_input_sha256"] != expected_digest:
+        raise KleanAuditContractError(
+            "resolved inputs changed before Stage 6 allocation"
+        )
+    try:
+        task, _state, _run = pipeline_contract._resolve_task_state(
+            repo, run_id, problem
+        )
+        stage = pipeline_contract.require_real_directory(
+            task / "06-lean-audit", "Stage 6"
+        )
+        executions = pipeline_contract.require_real_directory(
+            stage / "executions", "Stage 6 executions"
+        )
+        existing = _execution_directories(executions)
+        selected_path = stage / "selected.json"
+        if selected_path.exists() or selected_path.is_symlink():

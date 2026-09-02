@@ -1,0 +1,125 @@
+COMMAND: sed -n 130\,250p /reference/tools/pipeline_contract.py
+
+def parse_codex_config(config: str) -> CodexConfig:
+    validate_safe_component(config, "config")
+    match = _CODEX_CONFIG.fullmatch(config)
+    if match is None:
+        raise PipelineContractError(f"invalid Codex config grammar: {config}")
+    condition_name = match.group("condition")
+    condition = next(
+        (
+            Condition(name, kit, semantics, prompt)
+            for name, kit, semantics, prompt in _CONDITIONS
+            if name == condition_name
+        ),
+        None,
+    )
+    if condition is None:
+        raise PipelineContractError(f"unsupported benchmark condition: {condition_name}")
+    return CodexConfig(
+        name=config,
+        model=match.group("model"),
+        effort="xhigh",
+        condition=condition,
+    )
+
+
+def _lstat(path: Path, label: str) -> os.stat_result:
+    try:
+        return path.lstat()
+    except OSError as error:
+        raise PipelineContractError(f"{label} is missing: {path}") from error
+
+
+def require_real_directory(path: Path, label: str) -> Path:
+    if not stat.S_ISDIR(_lstat(path, label).st_mode):
+        raise PipelineContractError(f"{label} must be a real directory: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise PipelineContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def require_regular_file(path: Path, label: str) -> Path:
+    if not stat.S_ISREG(_lstat(path, label).st_mode):
+        raise PipelineContractError(f"{label} must be a real regular file: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise PipelineContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise PipelineContractError(f"cannot hash file {path}: {error}") from error
+    return digest.hexdigest()
+
+
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, "tree root")
+    digest = hashlib.sha256()
+    pending = [root]
+    entries: list[tuple[str, str, Path]] = []
+    while pending:
+        directory = pending.pop()
+        try:
+            children = list(os.scandir(directory))
+        except OSError as error:
+            raise PipelineContractError(f"cannot scan tree {directory}: {error}") from error
+        for child in children:
+            path = Path(child.path)
+            try:
+                mode = child.stat(follow_symlinks=False).st_mode
+            except OSError as error:
+                raise PipelineContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise PipelineContractError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    for relative, kind, path in sorted(entries):
+        encoded = relative.encode()
+        digest.update(len(encoded).to_bytes(4, "big"))
+        digest.update(encoded)
+        digest.update(kind.encode() + b"\0")
+        if kind == "file":
+            try:
+                size = path.stat(follow_symlinks=False).st_size
+                digest.update(size.to_bytes(8, "big"))
+                with path.open("rb") as stream:
+                    for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                        digest.update(chunk)
+            except OSError as error:
+                raise PipelineContractError(
+                    f"cannot hash tree file {path}: {error}"
+                ) from error
+    return digest.hexdigest()
+
+
+def write_json_atomic(path: Path, document: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    file_descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", dir=path.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as stream:
+            json.dump(document, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+
+EXIT_CODE: 0

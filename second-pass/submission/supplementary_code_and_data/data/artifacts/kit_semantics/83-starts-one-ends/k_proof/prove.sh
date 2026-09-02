@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+python3 -m py_compile solution.py validate.py
+python3 py2mpy.py solution.py > solution.mpy
+python3 py2mpy.py concrete-tests.py > concrete-tests.mpy
+
+kompile reference-semantics/semantics.k \
+  --backend llvm \
+  --main-module MPY-KRUN \
+  --syntax-module MPY-SYNTAX \
+  --output-definition runtime-kompiled
+
+krun concrete-tests.mpy \
+  --definition runtime-kompiled \
+  --output none
+echo "LLVM concrete assertions: PASS"
+
+python3 validate.py
+
+kompile --backend haskell verification.k \
+  --main-module VERIFICATION \
+  --syntax-module MPY-SYNTAX \
+  --output-definition verification-kompiled
+
+kprove spec.k \
+  --definition verification-kompiled \
+  --spec-module SPEC \
+  --claims SPEC.starts-one-ends-one-digit
+
+kprove spec.k \
+  --definition verification-kompiled \
+  --spec-module SPEC \
+  --claims SPEC.starts-one-ends-multi-digit
+
+kprove spec.k \
+  --definition verification-kompiled \
+  --spec-module SPEC
+
+if kprove spec-body-mutation.k \
+  --definition verification-kompiled \
+  --spec-module SPEC-BODY-MUTATION
+then
+  echo "Body mutation unexpectedly proved" >&2
+  exit 1
+else
+  mutation_status=$?
+  if [ "$mutation_status" -ne 1 ]; then
+    echo "Body mutation returned unexpected status $mutation_status" >&2
+    exit "$mutation_status"
+  fi
+  echo "Body mutation: EXPECTED FAILURE (exit 1)"
+fi
+
+if kprove spec-vacuity.k \
+  --definition verification-kompiled \
+  --spec-module SPEC-VACUITY
+then
+  echo "False-result mutation unexpectedly proved" >&2
+  exit 1
+else
+  vacuity_status=$?
+  if [ "$vacuity_status" -ne 1 ]; then
+    echo "False-result mutation returned unexpected status $vacuity_status" >&2
+    exit "$vacuity_status"
+  fi
+  echo "False-result mutation: EXPECTED FAILURE (exit 1)"
+fi

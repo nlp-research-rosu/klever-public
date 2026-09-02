@@ -1,0 +1,105 @@
+Script started on 2026-07-31 07:46:03-05:00 [<not executed on terminal>]
+/reference/k-proof/reference-semantics/semantics/sort.k
+14-  // sortVS(VS): the ascending sort of the Val list VS. Opaque for symbolic VS (no-evaluators);
+15-  // concrete insertion sort for krun.
+16-  // Concrete sort matches Int-sorted elements directly (an int Val IS an Int); projectIntTotal
+17-  // (lemmas-only) is not available in the semantics. Int and str lists.
+18:  syntax ValSeq ::= sortVS(ValSeq) [function, total, symbol(sortVS), no-evaluators]
+19-  syntax ValSeq ::= insVS(Int, ValSeq) [function]
+20:  rule sortVS(.ValSeq)                => .ValSeq          [concrete]
+21:  rule sortVS(vCons(X:Int, R:ValSeq)) => insVS(X, sortVS(R)) [concrete]
+22-  rule insVS(X:Int, .ValSeq)                => vCons(X, .ValSeq) [concrete]
+23-  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]
+24-  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X  >Int Y [concrete]
+25-  // str elements insert by the shared lexicographic strLt (methods.k)
+26-  syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]
+27:  rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]
+28-  rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]
+29-  rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(A), vCons(str(B), R))
+30-       requires strLt(A, B) orBool A ==K B [concrete]
+31-  rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(B), insVSs(A, R))
+--
+41-       <heap> ... H |-> list(VS:ValSeq => sortVS(VS)) ... </heap>
+42-       [priority(40)]
+43-
+44-  // ==== keyed / reversed sorted() (WP2) =====================================
+45:  // sortKeyVS(VS, KV): the stable ascending sort of VS by the key value KV
+46-  // (a closure/builtin/type — anything callable). OPAQUE here; the concrete
+47-  // leg (MPY-CONCRETE, llvm only) computes keys by REAL calls and stable-
+48-  // inserts, at priority(40) over these.
+49:  syntax ValSeq ::= sortKeyVS(ValSeq, Val) [function, total, symbol(sortKeyVS), no-evaluators]
+50-
+51-  syntax ValSeq ::= revVS(ValSeq) [function, total]
+52-                  | revVSAcc(ValSeq, ValSeq) [function, total]
+53-  rule revVS(S:ValSeq) => revVSAcc(S, .ValSeq)
+--
+58-  rule condRev(S:ValSeq, false) => S
+59-  rule condRev(S:ValSeq, true)  => revVS(S)
+60-
+61-  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals))
+62:        => #alloc(list(sortKeyVS(VS, KV))) ... </k>
+63-  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals))
+64:        => #alloc(list(condRev(sortKeyVS(VS, KV), RB))) ... </k>
+65-  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("reverse", RB:Bool), .Vals))
+66-        => #alloc(list(condRev(sortVS(VS), RB))) ... </k>
+67-
+68-  // Indexing the opaque sorted list: `valSeqAt(sortVS(VS), I)` is DEFINED because valSeqAt is
+
+/reference/k-proof/reference-semantics/semantics/concrete.k
+20-  // ==== keyed sort, concrete leg ============================================
+21-  // Computes each key by a REAL call through the uniform #callee machinery
+22-  // (closures, len, type objects all work), stable-inserts on the key, and
+23-  // allocates the result. priority(40) beats sort.k's opaque rules, so krun
+24:  // runs this and proofs (which never see MPY-CONCRETE) keep sortKeyVS.
+25-  syntax Val ::= kvP(Val, Val)
+26-  syntax KItem ::= #ksort(ValSeq, Val, ValSeq, Bool)
+27-                 | #ksIns(Val, ValSeq, Val, ValSeq, Bool)
+28-  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals))
+
+/reference/k-proof/reference-semantics/semantics/methods.k
+31-    => seqConcat(CS, seqConcat(SEP, joinCodes(SEP, vCons(V, R))))
+32-
+33-  // S.count(sub): non-overlapping window scan (Python str.count)
+34-  rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)
+35:  syntax Int ::= cntSub(IntSeq, IntSeq) [function]
+36:  rule cntSub(.IntSeq, _:IntSeq) => 0
+37:  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC)
+38-       requires strPrefix(PC, iCons(C, R)) andBool isLen(PC) >Int 0
+39:  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => cntSub(R, PC)
+40-       requires notBool strPrefix(PC, iCons(C, R)) orBool isLen(PC) <=Int 0
+41-  syntax IntSeq ::= dropIS(IntSeq, Int) [function, total]
+42-  rule dropIS(S:IntSeq, N:Int) => S requires N <=Int 0
+43-  rule dropIS(.IntSeq, _:Int) => .IntSeq [owise]
+
+/reference/k-proof/reference-semantics/semantics/builtins.k
+103-  rule applyBuiltin("min", I:Int, REST:Vals) => minVals(I, REST)
+104-  rule minVals(M:Int, .Vals)           => M
+105-  rule minVals(M:Int, (I:Int, R:Vals)) => minVals(minInt(M, I), R)
+106-
+107:  // ==== bin(n) — "0b" + binary digit codes (promoted from 103's defined fold) ==
+108-  rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(48, iCons(98, binCodes(N))))
+109-       requires N >=Int 0
+110-  // negative operand: the '-' sign prefixes the magnitude's digits
+111-  rule applyBuiltin("bin", N:Int, .Vals)
+112-    => str(iCons(45, iCons(48, iCons(98, binCodes(0 -Int N)))))
+113-       requires N <Int 0
+114:  syntax IntSeq ::= binCodes(Int) [function, total]
+115:  rule binCodes(0) => iCons(48, .IntSeq)
+116:  rule binCodes(N:Int) => binAcc(N, .IntSeq) requires N >Int 0
+117-  syntax IntSeq ::= binAcc(Int, IntSeq) [function, total]
+118-  rule binAcc(0, ACC:IntSeq) => ACC
+119-  rule binAcc(N:Int, ACC:IntSeq)
+120-    => binAcc((N -Int pyMod(N, 2)) /Int 2, iCons(48 +Int pyMod(N, 2), ACC))
+--
+289-  // typeV (see core.k's config); no Call-level special case. isIntV/isStrV mirror the old
+290-  // owise-on-Val test (concrete-sort args decide; a symbolic Val stays owise, as before).
+291-  rule applyBuiltin("isinstance", V:Val, typeV("int"), .Vals) => isIntV(V)
+292-  rule applyBuiltin("isinstance", V:Val, typeV("str"), .Vals) => isStrV(V)
+293:  syntax Bool ::= isIntV(Val) [function] | isStrV(Val) [function]
+294:  rule isIntV(_:Int)         => true
+295:  rule isIntV(_:Val)         => false [owise]
+296-  rule isStrV(str(_:IntSeq)) => true
+297-  rule isStrV(_:Val)         => false [owise]
+298-endmodule
+
+Script done on 2026-07-31 07:46:03-05:00 [COMMAND_EXIT_CODE="0"]

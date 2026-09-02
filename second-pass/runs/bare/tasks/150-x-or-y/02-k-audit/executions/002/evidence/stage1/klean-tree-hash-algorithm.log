@@ -1,0 +1,78 @@
+COMMAND: sed -n 460\,535p /opt/humaneval/tools/klean_export.py
+    setting = 'buildDir = "/tmp/klean-generated-build"\n'
+    if setting in text:
+        return
+    marker = "[[lean_lib]]"
+    if marker in text:
+        text = text.replace(marker, setting + "\n" + marker, 1)
+    else:
+        text = text.rstrip() + "\n" + setting
+    lakefile.write_text(text)
+
+
+def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+    if not root.is_dir() or root.is_symlink():
+        raise KleanExportError(f"tree root must be a real directory: {root}")
+    entries: list[tuple[str, str, Path]] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        for child in os.scandir(directory):
+            path = Path(child.path)
+            mode = child.stat(follow_symlinks=False).st_mode
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise KleanExportError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    return sorted(entries)
+
+
+def tree_digest(root: Path) -> str:
+    digest = hashlib.sha256()
+    for relative, kind, path in _tree_entries(Path(root)):
+        digest.update(relative.encode() + b"\0" + kind.encode() + b"\0")
+        if kind == "file":
+            digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def _regular_json(path: Path) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise KleanExportError(f"required JSON is not a regular file: {path}")
+    try:
+        document = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise KleanExportError(f"malformed JSON: {path}") from error
+    if not isinstance(document, dict):
+        raise KleanExportError(f"JSON must be an object: {path}")
+    return document
+
+
+def _run_command(
+    command: list[str] | str,
+    *,
+    cwd: Path | None,
+    timeout: int,
+    env: dict[str, str],
+    shell: bool = False,
+) -> tuple[int, str]:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            timeout=timeout,
+            shell=shell,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        return result.returncode, result.stdout
+    except subprocess.TimeoutExpired:
+EXIT_STATUS: 0

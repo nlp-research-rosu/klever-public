@@ -1,0 +1,120 @@
+WORKDIR: /audit-output
+COMMAND: bash -lc nl\ -ba\ /reference/k-proof/verification.k\;\ nl\ -ba\ /reference/k-proof/spec.k\;\ nl\ -ba\ /reference/k-proof/prove.sh
+     1	requires "semantic.k"
+     2	
+     3	module ROMAN-VERIFICATION
+     4	  imports MINI-PYTHON
+     5	
+     6	  syntax Pgm ::= "romanProgram" [macro]
+     7	  rule romanProgram =>
+     8	    Module(
+     9	      FuncDef("int_to_mini_roman", Params("number"),
+    10	        Assign(Name("thousands"), TupleExpr(Str(""), Str("m")))
+    11	        Assign(Name("hundreds"),
+    12	          TupleExpr(
+    13	            Str(""), Str("c"), Str("cc"), Str("ccc"), Str("cd"),
+    14	            Str("d"), Str("dc"), Str("dcc"), Str("dccc"), Str("cm")))
+    15	        Assign(Name("tens"),
+    16	          TupleExpr(
+    17	            Str(""), Str("x"), Str("xx"), Str("xxx"), Str("xl"),
+    18	            Str("l"), Str("lx"), Str("lxx"), Str("lxxx"), Str("xc")))
+    19	        Assign(Name("ones"),
+    20	          TupleExpr(
+    21	            Str(""), Str("i"), Str("ii"), Str("iii"), Str("iv"),
+    22	            Str("v"), Str("vi"), Str("vii"), Str("viii"), Str("ix")))
+    23	        Return(
+    24	          BinOp("+",
+    25	            BinOp("+",
+    26	              BinOp("+",
+    27	                Subscript(
+    28	                  Name("thousands"),
+    29	                  BinOp("//", Name("number"), Int(1000))),
+    30	                Subscript(
+    31	                  Name("hundreds"),
+    32	                  BinOp("//",
+    33	                    BinOp("%", Name("number"), Int(1000)),
+    34	                    Int(100)))),
+    35	              Subscript(
+    36	                Name("tens"),
+    37	                BinOp("//",
+    38	                  BinOp("%", Name("number"), Int(100)),
+    39	                  Int(10)))),
+    40	            Subscript(
+    41	              Name("ones"),
+    42	              BinOp("%", Name("number"), Int(10)))))))
+    43	
+    44	  syntax String ::= miniRoman(Int) [function]
+    45	  rule miniRoman(N) =>
+    46	    (((tupleAt("" , "m" , .Strings, N /Int 1000)
+    47	       +String
+    48	       tupleAt(
+    49	         "" , "c" , "cc" , "ccc" , "cd" ,
+    50	         "d" , "dc" , "dcc" , "dccc" , "cm" , .Strings,
+    51	         (N modInt 1000) /Int 100))
+    52	      +String
+    53	      tupleAt(
+    54	        "" , "x" , "xx" , "xxx" , "xl" ,
+    55	        "l" , "lx" , "lxx" , "lxxx" , "xc" , .Strings,
+    56	        (N modInt 100) /Int 10))
+    57	     +String
+    58	     tupleAt(
+    59	       "" , "i" , "ii" , "iii" , "iv" ,
+    60	       "v" , "vi" , "vii" , "viii" , "ix" , .Strings,
+    61	       N modInt 10))
+    62	endmodule
+     1	module ROMAN-SPEC
+     2	  imports ROMAN-VERIFICATION
+     3	
+     4	  claim [int-to-mini-roman-correct]:
+     5	    <k> romanProgram => .K </k>
+     6	    <input> N:Int </input>
+     7	    <env> .Map => ?_FINAL_ENV:Map </env>
+     8	    <result> noResult => result(vStr(miniRoman(N))) </result>
+     9	    requires (1 <=Int N) andBool (N <=Int 1000)
+    10	endmodule
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Regenerate the submitted constructor term with the required fixed translator.
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	
+     7	# Compile the semantics together with the verification-only oracle and program
+     8	# macro.  The Haskell backend is used by both krun and kprove below.
+     9	kompile verification.k \
+    10	  --backend haskell \
+    11	  --main-module ROMAN-VERIFICATION \
+    12	  --syntax-module MINI-PYTHON-SYNTAX
+    13	
+    14	# Prove that the ground program macro in verification.k is exactly the AST
+    15	# generated from solution.py (after macro expansion).
+    16	diff -u \
+    17	  <(kast solution.mpy \
+    18	      --definition verification-kompiled \
+    19	      --module ROMAN-VERIFICATION \
+    20	      --sort Pgm \
+    21	      --output kast) \
+    22	  <(kast \
+    23	      --expression romanProgram \
+    24	      --definition verification-kompiled \
+    25	      --module ROMAN-VERIFICATION \
+    26	      --sort Pgm \
+    27	      --expand-macros \
+    28	      --output kast)
+    29	
+    30	# Exercise both contract boundaries and all three examples from prompt.py.
+    31	krun solution.mpy --definition verification-kompiled -cINPUT=1 \
+    32	  | grep -F 'result ( vStr ( "i" ) )'
+    33	krun solution.mpy --definition verification-kompiled -cINPUT=19 \
+    34	  | grep -F 'result ( vStr ( "xix" ) )'
+    35	krun solution.mpy --definition verification-kompiled -cINPUT=152 \
+    36	  | grep -F 'result ( vStr ( "clii" ) )'
+    37	krun solution.mpy --definition verification-kompiled -cINPUT=426 \
+    38	  | grep -F 'result ( vStr ( "cdxxvi" ) )'
+    39	krun solution.mpy --definition verification-kompiled -cINPUT=1000 \
+    40	  | grep -F 'result ( vStr ( "m" ) )'
+    41	
+    42	# Prove every claim in spec.k.  The sole claim is symbolic over 1 <= N <= 1000.
+    43	kprove spec.k \
+    44	  --definition verification-kompiled \
+    45	  --spec-module ROMAN-SPEC
+EXIT_CODE: 0

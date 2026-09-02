@@ -1,0 +1,200 @@
++ rg -n 'generation_producer_sources|producer_sources|source-manifest' /reference/tools/audit_contract.py /reference/tools/check_audit_campaign.py /reference/tools/check_kit_bundle.py /reference/tools/create_run.py /reference/tools/import_humaneval_prompts.py /reference/tools/k_rule_inventory.py /reference/tools/klean.py /reference/tools/klean_audit_contract.py /reference/tools/klean_export.py /reference/tools/klean_final_gate.py /reference/tools/klean_preflight.py /reference/tools/legacy_migration.py /reference/tools/lemma_discovery_contract.py /reference/tools/migrate_legacy_runs.py /reference/tools/migrate_six_stage_layout.py /reference/tools/pipeline_contract.py /reference/tools/populate_runs.py /reference/tools/py2mpy.py /reference/tools/run_pipeline.py /reference/tools/stage1_runner.py /reference/tools/stage3_runner.py /reference/tools/stage4_runner.py /reference/tools/stage5_runner.py /reference/tools/stage6_resolution_contract.py /reference/tools/usage_accounting.py
+/reference/tools/stage6_resolution_contract.py:25:        "generation_producer_sources",
+/reference/tools/klean_audit_contract.py:221:def _generation_producer_sources(
+/reference/tools/klean_audit_contract.py:245:            bundle / "source-manifest.json",
+/reference/tools/klean_audit_contract.py:273:            "source-manifest.json",
+/reference/tools/klean_audit_contract.py:370:        generation_producer_sources, producer_sources_hash = (
+/reference/tools/klean_audit_contract.py:371:            _generation_producer_sources(repo, generator_manifest)
+/reference/tools/klean_audit_contract.py:438:            "generation_producer_sources": str(
+/reference/tools/klean_audit_contract.py:439:                generation_producer_sources
+/reference/tools/klean_audit_contract.py:467:                "generation_producer_sources_sha256": (
+/reference/tools/klean_audit_contract.py:468:                    producer_sources_hash
++ sed -n 260,390p /reference/tools/audit_contract.py
+        if not stat.S_ISREG(metadata.st_mode):
+            raise AuditContractError(
+                f"legacy seed tree contains a linked or unsupported entry: {path}"
+            )
+        relative = path.relative_to(root).as_posix().encode()
+        digest.update(len(relative).to_bytes(4, "big"))
+        digest.update(relative)
+        try:
+            content = path.read_bytes()
+        except OSError as error:
+            raise AuditContractError(
+                f"cannot read legacy seed tree entry: {path}"
+            ) from error
+        digest.update(len(content).to_bytes(8, "big"))
+        digest.update(content)
+    return digest.hexdigest()
+
+
+def require_generation_evidence(candidate: Path) -> dict[str, Path]:
+    evidence = {
+        "metrics": require_regular_file(candidate / "metrics.json"),
+        "codex_output": require_regular_file(candidate / "codex-output.log"),
+        "codex_last": require_regular_file(candidate / "codex-last.txt"),
+        "codex_trace": require_real_directory(
+            candidate / "codex-trace", "codex-trace generation evidence"
+        ),
+    }
+    return evidence
+
+
+def _manifest_condition(manifest: dict[str, Any]) -> str:
+    condition_block = manifest.get("condition")
+    if not isinstance(condition_block, dict):
+        raise AuditContractError("manifest condition must be an object")
+    condition = condition_block.get("name")
+    if not isinstance(condition, str):
+        raise AuditContractError("manifest condition name must be a string")
+    if condition not in CONDITIONS:
+        raise AuditContractError(f"unsupported manifest condition: {condition!r}")
+    return condition
+
+
+def _manifest_input_hash(manifest: dict[str, Any], name: str) -> object:
+    inputs = manifest.get("inputs")
+    if not isinstance(inputs, dict):
+        return None
+    return inputs.get(name)
+
+
+def build_resolution_and_hashes(
+    repo: Path,
+    config: str,
+    problem: str,
+    condition: str,
+    candidate: Path,
+    canonical: Path,
+    prompt: Path,
+    translator: Path,
+    semantics: Path | None,
+    manifest: dict[str, Any],
+    manifest_path: Path,
+    generation_evidence: dict[str, Path],
+) -> dict[str, object]:
+    candidate_prompt_hash = _optional_regular_file_hash(candidate / "prompt.py")
+    candidate_translator_hash = _optional_regular_file_hash(candidate / "py2mpy.py")
+    candidate_semantics_hash = _optional_tree_hash(candidate / "reference-semantics")
+    trusted_prompt_hash = sha256_file(prompt)
+    trusted_translator_hash = sha256_file(translator)
+    trusted_semantics_hash = sha256_tree(semantics) if semantics is not None else None
+
+    hashes = {
+        "candidate_tree_sha256": sha256_tree(candidate),
+        "manifest_sha256": sha256_file(manifest_path),
+        "canonical_sha256": sha256_file(canonical),
+        "trusted_prompt_sha256": trusted_prompt_hash,
+        "candidate_prompt_sha256": candidate_prompt_hash,
+        "trusted_translator_sha256": trusted_translator_hash,
+        "candidate_translator_sha256": candidate_translator_hash,
+        "trusted_reference_semantics_sha256": trusted_semantics_hash,
+        "candidate_reference_semantics_sha256": candidate_semantics_hash,
+        "generation_metrics_sha256": sha256_file(generation_evidence["metrics"]),
+        "generation_codex_output_sha256": sha256_file(
+            generation_evidence["codex_output"]
+        ),
+        "generation_codex_last_sha256": sha256_file(
+            generation_evidence["codex_last"]
+        ),
+        "generation_codex_trace_sha256": sha256_tree(
+            generation_evidence["codex_trace"]
+        ),
+    }
+    integrity = {
+        "candidate_prompt_matches_trusted": candidate_prompt_hash == trusted_prompt_hash,
+        "candidate_translator_matches_trusted": (
+            candidate_translator_hash == trusted_translator_hash
+        ),
+        "candidate_reference_semantics_matches_trusted": (
+            candidate_semantics_hash == trusted_semantics_hash
+            if semantics is not None
+            else None
+        ),
+        "manifest_prompt_hash_matches_trusted": (
+            _manifest_input_hash(manifest, "problem_prompt_sha256")
+            == trusted_prompt_hash
+        ),
+        "manifest_translator_hash_matches_trusted": (
+            _manifest_input_hash(manifest, "translator_sha256")
+            == trusted_translator_hash
+        ),
+        "manifest_reference_semantics_hash_matches_trusted": (
+            _manifest_input_hash(manifest, "reference_semantics_sha256")
+            == trusted_semantics_hash
+            if semantics is not None
+            else None
+        ),
+    }
+    return {
+        "repo": str(repo),
+        "config": config,
+        "generation_config": config,
+        "manifest_config": manifest.get("config"),
+        "problem_id": problem,
+        "condition": condition,
+        "semantics_mode": (
+            "SUPPLIED_SEMANTICS" if semantics is not None else "GENERATED_SEMANTICS"
+        ),
+        "mount_reference_semantics": semantics is not None,
+        "candidate": str(candidate),
+        "canonical": str(canonical),
+        "trusted_prompt": str(prompt),
+        "translator": str(translator),
++ sed -n 170,225p /reference/tools/pipeline_contract.py
+def require_regular_file(path: Path, label: str) -> Path:
+    if not stat.S_ISREG(_lstat(path, label).st_mode):
+        raise PipelineContractError(f"{label} must be a real regular file: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise PipelineContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise PipelineContractError(f"cannot hash file {path}: {error}") from error
+    return digest.hexdigest()
+
+
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, "tree root")
+    digest = hashlib.sha256()
+    pending = [root]
+    entries: list[tuple[str, str, Path]] = []
+    while pending:
+        directory = pending.pop()
+        try:
+            children = list(os.scandir(directory))
+        except OSError as error:
+            raise PipelineContractError(f"cannot scan tree {directory}: {error}") from error
+        for child in children:
+            path = Path(child.path)
+            try:
+                mode = child.stat(follow_symlinks=False).st_mode
+            except OSError as error:
+                raise PipelineContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise PipelineContractError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    for relative, kind, path in sorted(entries):
+        encoded = relative.encode()
+        digest.update(len(encoded).to_bytes(4, "big"))
+        digest.update(encoded)
+        digest.update(kind.encode() + b"\0")
+        if kind == "file":
+            try:

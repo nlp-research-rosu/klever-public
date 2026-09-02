@@ -1,0 +1,327 @@
+Script started on 2026-07-28 01:11:58-05:00 [<not executed on terminal>]
+     1	requires "semantic.k"
+     2	
+     3	module MPY-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // A direct contract model. It consumes input characters into a mathematical
+     7	  // scanner state: depth, unfinished group, completed groups, and last loop
+     8	  // character. Spaces change only the last-character component.
+     9	  syntax ScanState ::= "scanState" "(" PInt "," Chars "," Outputs "," Chars ")"
+    10	  syntax ScanState ::= "runSpec" "(" Chars "," PInt "," Chars "," Outputs "," Chars ")" [function]
+    11	  syntax PInt ::= "stateDepth" "(" ScanState ")" [function]
+    12	  syntax Chars ::= "stateCurrent" "(" ScanState ")" [function]
+    13	                 | "stateLast" "(" ScanState ")" [function]
+    14	  syntax Outputs ::= "stateOutput" "(" ScanState ")" [function]
+    15	                   | "separateSpec" "(" Chars ")" [function]
+    16	
+    17	  rule runSpec(.Chars, D, CURRENT, OUT, LAST) => scanState(D, CURRENT, OUT, LAST)
+    18	  rule runSpec(SP CS, D, CURRENT, OUT, _LAST) => runSpec(CS, D, CURRENT, OUT, SP)
+    19	  rule runSpec(LP CS, D, CURRENT, OUT, _LAST) => runSpec(CS, succ(D), #concat(CURRENT, LP), OUT, LP)
+    20	  rule runSpec(RP CS, zero, CURRENT, OUT, _LAST) => runSpec(CS, zero, .Chars, #snocOut(OUT, #concat(CURRENT, RP)), RP)
+    21	  rule runSpec(RP CS, succ(zero), CURRENT, OUT, _LAST) => runSpec(CS, zero, .Chars, #snocOut(OUT, #concat(CURRENT, RP)), RP)
+    22	  rule runSpec(RP CS, succ(succ(D)), CURRENT, OUT, _LAST) => runSpec(CS, succ(D), #concat(CURRENT, RP), OUT, RP)
+    23	
+    24	  rule stateDepth(scanState(D, _, _, _)) => D
+    25	  rule stateCurrent(scanState(_, CURRENT, _, _)) => CURRENT
+    26	  rule stateOutput(scanState(_, _, OUT, _)) => OUT
+    27	  rule stateLast(scanState(_, _, _, LAST)) => LAST
+    28	  rule separateSpec(CS) => stateOutput(runSpec(CS, zero, .Chars, .Outputs, .Chars))
+    29	
+    30	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports MPY-VERIFICATION
+     5	
+     6	  // Inductive loop invariant.  This claim is intentionally phrased over an
+     7	  // arbitrary remaining character sequence CS, arbitrary scanner state, and
+     8	  // the exact AST loop body emitted in solution.mpy.
+     9	  claim [loop-invariant]:
+    10	    <mpy>
+    11	      <k>
+    12	        #loop("ch", CS,
+    13	          If(Compare(Name("ch"), CmpOp("!=", Str(" "))),
+    14	            AugAssign(Name("current"), "+", Name("ch"))
+    15	            If(Compare(Name("ch"), CmpOp("==", Str("("))),
+    16	              AugAssign(Name("depth"), "+", Int(1)),
+    17	              AugAssign(Name("depth"), "-", Int(1))
+    18	              If(Compare(Name("depth"), CmpOp("==", Int(0))),
+    19	                Expr(Call(Attribute(Name("result"), "append"), Name("current")))
+    20	                Assign(Name("current"), Str("")),
+    21	                .Stmts)),
+    22	            .Stmts))
+    23	        ~> #exec(Return(Name("result")) .Stmts)
+    24	        => .K
+    25	      </k>
+    26	      <input> IN </input>
+    27	      <env>
+    28	        "ch" |-> SVal(LAST)
+    29	        "current" |-> SVal(CURRENT)
+    30	        "depth" |-> D
+    31	        "paren_string" |-> SVal(ALL)
+    32	        "result" |-> OutList(OUT)
+    33	        => ?FINALENV:Map
+    34	      </env>
+    35	      <functions> FS </functions>
+    36	      <result> _ => OutList(stateOutput(runSpec(CS, D, CURRENT, OUT, LAST))) </result>
+    37	    </mpy>
+    38	
+    39	  // End-to-end correctness from the exact constructor tree in solution.mpy.
+    40	  // Encoded(CS) ranges over every string made of parentheses and spaces, a
+    41	  // strict superset of the prompt's balanced-input domain.
+    42	  claim [program-correct]:
+    43	    <mpy>
+    44	      <k>
+    45	        #boot(
+    46	          Module(
+    47	            ImportFrom("typing", "List")
+    48	            FuncDef("separate_paren_groups", Params("paren_string"),
+    49	              Assign(Name("result"), ListExpr())
+    50	              Assign(Name("current"), Str(""))
+    51	              Assign(Name("depth"), Int(0))
+    52	              Assign(Name("ch"), Str(""))
+    53	              For(Name("ch"), Name("paren_string"),
+    54	                If(Compare(Name("ch"), CmpOp("!=", Str(" "))),
+    55	                  AugAssign(Name("current"), "+", Name("ch"))
+    56	                  If(Compare(Name("ch"), CmpOp("==", Str("("))),
+    57	                    AugAssign(Name("depth"), "+", Int(1)),
+    58	                    AugAssign(Name("depth"), "-", Int(1))
+    59	                    If(Compare(Name("depth"), CmpOp("==", Int(0))),
+    60	                      Expr(Call(Attribute(Name("result"), "append"), Name("current")))
+    61	                      Assign(Name("current"), Str("")),
+    62	                      .Stmts)),
+    63	                  .Stmts))
+    64	              Return(Name("result"))))
+    65	        )
+    66	        => .K
+    67	      </k>
+    68	      <input> Encoded(CS) </input>
+    69	      <env> .Map => ?TOPENV:Map </env>
+    70	      <functions> .Map => ?TOPFUNS:Map </functions>
+    71	      <result> none => OutList(separateSpec(CS)) </result>
+    72	    </mpy>
+    73	
+    74	endmodule
+     1	from typing import List
+     2	
+     3	
+     4	def separate_paren_groups(paren_string: str) -> List[str]:
+     5	    result = []
+     6	    current = ""
+     7	    depth = 0
+     8	    ch = ""
+     9	    for ch in paren_string:
+    10	        if ch != " ":
+    11	            current += ch
+    12	            if ch == "(":
+    13	                depth += 1
+    14	            else:
+    15	                depth -= 1
+    16	                if depth == 0:
+    17	                    result.append(current)
+    18	                    current = ""
+    19	    return result
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports STRING-SYNTAX
+     6	  imports BOOL-SYNTAX
+     7	
+     8	  syntax Ids ::= List{String, ","}
+     9	  syntax Params ::= "Params" "(" Ids ")"
+    10	
+    11	  syntax Program ::= "Module" "(" Stmts ")"
+    12	  syntax Stmts ::= List{Stmt, ""}
+    13	
+    14	  syntax Stmt ::= "ImportFrom" "(" String "," Ids ")"
+    15	                | "FuncDef" "(" String "," Params "," Stmts ")"
+    16	                | "Assign" "(" Expr "," Expr ")"
+    17	                | "AugAssign" "(" Expr "," String "," Expr ")"
+    18	                | "For" "(" Expr "," Expr "," Stmts ")"
+    19	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    20	                | "Return" "(" Expr ")"
+    21	                | "Expr" "(" Expr ")"
+    22	
+    23	  syntax Expr ::= "Name" "(" String ")"
+    24	                | "Str" "(" String ")"
+    25	                | "Int" "(" Int ")"
+    26	                | "ListExpr" "(" ")"
+    27	                | "Compare" "(" Expr "," CmpOp ")"
+    28	                | "Attribute" "(" Expr "," String ")"
+    29	                | "Call" "(" Expr "," Expr ")"
+    30	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    31	
+    32	  // The task's source alphabet, represented independently of K's strings.
+    33	  // This makes the executable string decoder a small boundary component and
+    34	  // lets the proof quantify structurally over arbitrary inputs.
+    35	  syntax Char ::= "LP" | "RP" | "SP"
+    36	  syntax Chars ::= List{Char, ""}
+    37	
+    38	  syntax Output ::= "out" "(" Chars ")"
+    39	  syntax Outputs ::= List{Output, ""}
+    40	
+    41	  syntax PInt ::= "zero" | "succ" "(" PInt ")"
+    42	
+    43	  syntax Value ::= PInt | Bool
+    44	                 | "SVal" "(" Chars ")"
+    45	                 | "OutList" "(" Outputs ")"
+    46	                 | "none"
+    47	
+    48	  syntax Input ::= "Raw" "(" String ")"
+    49	                 | "Encoded" "(" Chars ")"
+    50	
+    51	  syntax Function ::= "fun" "(" String "," Stmts ")"
+    52	
+    53	  syntax Chars ::= "#chars" "(" String ")" [function]
+    54	  syntax Chars ::= "#concat" "(" Chars "," Chars ")" [function]
+    55	  syntax Char ::= "#char" "(" String ")" [function]
+    56	  syntax Outputs ::= "#snocOut" "(" Outputs "," Chars ")" [function]
+    57	  syntax Value ::= "#inputValue" "(" Input ")" [function]
+    58	  syntax Bool ::= "#eqChars" "(" Chars "," Chars ")" [function]
+    59	  syntax Bool ::= "#eqChar" "(" Char "," Char ")" [function]
+    60	
+    61	  syntax KItem ::= "#boot" "(" Program ")"
+    62	                 | "#load" "(" Stmts ")"
+    63	                 | "#invoke" "(" String ")"
+    64	                 | "#exec" "(" Stmts ")"
+    65	                 | "#assign" "(" String ")"
+    66	                 | "#augAssign" "(" String "," String ")"
+    67	                 | "#cmpLeft" "(" String "," Expr ")"
+    68	                 | "#cmpRight" "(" String "," Value ")"
+    69	                 | "#if" "(" Stmts "," Stmts ")"
+    70	                 | "#for" "(" String "," Stmts ")"
+    71	                 | "#loop" "(" String "," Chars "," Stmts ")"
+    72	                 | "#set" "(" String "," Value ")"
+    73	                 | "#append" "(" String ")"
+    74	                 | "#discard"
+    75	                 | "#return"
+    76	
+    77	endmodule
+    78	
+    79	module MPY
+    80	  imports MPY-SYNTAX
+    81	  imports INT
+    82	  imports STRING
+    83	  imports BOOL
+    84	  imports MAP
+    85	
+    86	  configuration
+    87	    <mpy>
+    88	      <k> #boot($PGM:Program) </k>
+    89	      <input> $INPUT:Input </input>
+    90	      <env> .Map </env>
+    91	      <functions> .Map </functions>
+    92	      <result> none </result>
+    93	    </mpy>
+    94	
+    95	  rule #chars(S) => .Chars
+    96	    requires lengthString(S) ==Int 0
+    97	  rule #chars(S) => #char(substrString(S, 0, 1)) #chars(substrString(S, 1, lengthString(S)))
+    98	    requires lengthString(S) >Int 0
+    99	
+   100	  rule #char("(") => LP
+   101	  rule #char(")") => RP
+   102	  rule #char(" ") => SP
+   103	
+   104	  rule #concat(.Chars, CS) => CS
+   105	  rule #concat(C CS1, CS2) => C #concat(CS1, CS2)
+   106	
+   107	  rule #snocOut(.Outputs, CS) => out(CS)
+   108	  rule #snocOut(out(OLD) OS, CS) => out(OLD) #snocOut(OS, CS)
+   109	
+   110	  rule #inputValue(Raw(S)) => SVal(#chars(S))
+   111	  rule #inputValue(Encoded(CS)) => SVal(CS)
+   112	
+   113	  rule #eqChars(.Chars, .Chars) => true
+   114	  rule #eqChars(.Chars, _C _CS) => false
+   115	  rule #eqChars(_C _CS, .Chars) => false
+   116	  rule #eqChars(C1 CS1, C2 CS2) => #eqChar(C1, C2) andBool #eqChars(CS1, CS2)
+   117	
+   118	  rule #eqChar(LP, LP) => true
+   119	  rule #eqChar(RP, RP) => true
+   120	  rule #eqChar(SP, SP) => true
+   121	  rule #eqChar(LP, RP) => false
+   122	  rule #eqChar(LP, SP) => false
+   123	  rule #eqChar(RP, LP) => false
+   124	  rule #eqChar(RP, SP) => false
+   125	  rule #eqChar(SP, LP) => false
+   126	  rule #eqChar(SP, RP) => false
+   127	
+   128	  rule <k> #boot(Module(SS)) => #load(SS) ... </k>
+   129	
+   130	  rule <k> #load(.Stmts) => #invoke("separate_paren_groups") ... </k>
+   131	  rule <k> #load(ImportFrom(_, _) SS) => #load(SS) ... </k>
+   132	  rule <k> #load(FuncDef(F, Params(P), BODY) SS) => #load(SS) ... </k>
+   133	       <functions> FS => FS [ F <- fun(P, BODY) ] </functions>
+   134	
+   135	  rule <k> #invoke(F) => #exec(BODY) ... </k>
+   136	       <input> IN </input>
+   137	       <functions> ... F |-> fun(P, BODY) ... </functions>
+   138	       <env> _ => P |-> #inputValue(IN) </env>
+   139	
+   140	  rule <k> #exec(.Stmts) => .K ... </k>
+   141	  rule <k> #exec(S SS) => S ~> #exec(SS) ... </k>
+   142	
+   143	  rule <k> Assign(Name(X), E) => E ~> #assign(X) ... </k>
+   144	  rule <k> V:Value ~> #assign(X) => .K ... </k>
+   145	       <env> RHO => RHO [ X <- V ] </env>
+   146	
+   147	  rule <k> AugAssign(Name(X), OP, E) => E ~> #augAssign(X, OP) ... </k>
+   148	  rule <k> SVal(CS2) ~> #augAssign(X, "+") => .K ... </k>
+   149	       <env> ... X |-> (SVal(CS1) => SVal(#concat(CS1, CS2))) ... </env>
+   150	  rule <k> succ(zero) ~> #augAssign(X, "+") => .K ... </k>
+   151	       <env> ... X |-> (N:PInt => succ(N)) ... </env>
+   152	  rule <k> succ(zero) ~> #augAssign(X, "-") => .K ... </k>
+   153	       <env> ... X |-> (zero => zero) ... </env>
+   154	  rule <k> succ(zero) ~> #augAssign(X, "-") => .K ... </k>
+   155	       <env> ... X |-> (succ(N) => N) ... </env>
+   156	
+   157	  rule <k> If(E, THEN, ELSE) => E ~> #if(THEN, ELSE) ... </k>
+   158	  rule <k> true ~> #if(THEN, _) => #exec(THEN) ... </k>
+   159	  rule <k> false ~> #if(_, ELSE) => #exec(ELSE) ... </k>
+   160	
+   161	  rule <k> For(Name(X), E, BODY) => E ~> #for(X, BODY) ... </k>
+   162	  rule <k> SVal(CS) ~> #for(X, BODY) => #loop(X, CS, BODY) ... </k>
+   163	  rule <k> #loop(_, .Chars, _) => .K ... </k>
+   164	  rule <k> #loop(X, C CS, BODY) => #set(X, SVal(C)) ~> #exec(BODY) ~> #loop(X, CS, BODY) ... </k>
+   165	
+   166	  rule <k> #set(X, V) => .K ... </k>
+   167	       <env> RHO => RHO [ X <- V ] </env>
+   168	
+   169	  rule <k> Return(E) => E ~> #return ... </k>
+   170	  rule <k> V:Value ~> #return ~> _ => .K </k>
+   171	       <result> _ => V </result>
+   172	
+   173	  rule <k> Expr(E) => E ~> #discard ... </k>
+   174	  rule <k> _V:Value ~> #discard => .K ... </k>
+   175	
+   176	  rule <k> Call(Attribute(Name(X), "append"), E) => E ~> #append(X) ... </k>
+   177	  rule <k> SVal(CS) ~> #append(X) => none ... </k>
+   178	       <env> ... X |-> (OutList(OS) => OutList(#snocOut(OS, CS))) ... </env>
+   179	
+   180	  rule <k> Compare(E1, CmpOp(OP, E2)) => E1 ~> #cmpLeft(OP, E2) ... </k>
+   181	  rule <k> V:Value ~> #cmpLeft(OP, E2) => E2 ~> #cmpRight(OP, V) ... </k>
+   182	  rule <k> zero ~> #cmpRight("==", zero) => true ... </k>
+   183	  rule <k> zero ~> #cmpRight("==", succ(_)) => false ... </k>
+   184	  // Character/literal comparisons used by this translated program.  Keeping
+   185	  // these constructor-disjoint also lets symbolic execution split cleanly on
+   186	  // the finite Char datatype.
+   187	  rule <k> SVal(SP) ~> #cmpRight("!=", SVal(SP)) => false ... </k>
+   188	  rule <k> SVal(SP) ~> #cmpRight("!=", SVal(LP)) => true ... </k>
+   189	  rule <k> SVal(SP) ~> #cmpRight("!=", SVal(RP)) => true ... </k>
+   190	  rule <k> SVal(LP) ~> #cmpRight("==", SVal(LP)) => true ... </k>
+   191	  rule <k> SVal(LP) ~> #cmpRight("==", SVal(RP)) => false ... </k>
+   192	  rule <k> SVal(LP) ~> #cmpRight("==", SVal(SP)) => false ... </k>
+   193	
+   194	  rule <k> Name(X) => V ... </k>
+   195	       <env> ... X |-> V ... </env>
+   196	  rule <k> Str(S) => SVal(#chars(S)) ... </k>
+   197	  rule <k> Int(0) => zero ... </k>
+   198	  rule <k> Int(1) => succ(zero) ... </k>
+   199	  rule <k> ListExpr() => OutList(.Outputs) ... </k>
+   200	
+   201	endmodule
+
+Script done on 2026-07-28 01:11:58-05:00 [COMMAND_EXIT_CODE="0"]

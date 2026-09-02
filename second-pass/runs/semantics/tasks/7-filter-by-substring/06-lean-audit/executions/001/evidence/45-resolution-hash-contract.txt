@@ -1,0 +1,126 @@
+        )
+        children: list[Path] = []
+        for entry in os.scandir(executions):
+            mode = entry.stat(follow_symlinks=False).st_mode
+            path = Path(entry.path)
+            if not stat.S_ISDIR(mode) or not re.fullmatch(
+                r"[0-9]{3}", path.name
+            ):
+                raise KleanAuditContractError(
+                    f"invalid Stage 6 execution entry: {path}"
+                )
+            children.append(path)
+        return sorted(children)
+    except OSError as error:
+        raise KleanAuditContractError(
+            f"cannot scan Stage 6 executions: {error}"
+        ) from error
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def prepare_stage6_execution(
+    repo: Path,
+    run_id: str,
+    problem: str,
+    *,
+    expected_resolved_input_sha256: str,
+    replace_selected: bool = False,
+) -> Path:
+    expected_digest = _validate_sha256(
+        expected_resolved_input_sha256,
+        "expected Stage 6 resolved-input digest",
+    )
+    try:
+        resolution = resolve_stage6_audit(repo, run_id, problem)
+    except KleanAuditContractError as error:
+        raise KleanAuditContractError(
+            "resolved inputs changed before Stage 6 allocation"
+        ) from error
+    if resolution["resolved_input_sha256"] != expected_digest:
+        raise KleanAuditContractError(
+            "resolved inputs changed before Stage 6 allocation"
+        )
+    try:
+        task, _state, _run = pipeline_contract._resolve_task_state(
+            repo, run_id, problem
+        )
+        stage = pipeline_contract.require_real_directory(
+            task / "06-lean-audit", "Stage 6"
+        )
+        executions = pipeline_contract.require_real_directory(
+            stage / "executions", "Stage 6 executions"
+        )
+        existing = _execution_directories(executions)
+        selected_path = stage / "selected.json"
+        if selected_path.exists() or selected_path.is_symlink():
+            selected = pipeline_contract._read_regular_json(
+                selected_path, "Stage 6 selection"
+            )
+            if (
+                selected.get("status") != "AUDIT_ERROR"
+                and not replace_selected
+            ):
+                raise KleanAuditContractError(
+                    "Stage 6 has a terminal selected audit"
+                )
+        elif existing:
+            raise KleanAuditContractError(
+                "unselected Stage 6 execution exists; recover it before retry"
+            )
+        destination = executions / f"{len(existing) + 1:03d}"
+        destination.mkdir()
+        (destination / "evidence").mkdir()
+        return destination.resolve(strict=True)
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+    except OSError as error:
+        raise KleanAuditContractError(
+            "cannot allocate Stage 6 execution"
+        ) from error
+
+
+def _mechanical_binding_error(
+    mechanical: dict[str, Any],
+    audit_input: dict[str, Any],
+) -> str | None:
+    resolution, expected_digest = verify_stage6_audit_input(
+        audit_input
+    )
+    expected_mode = resolution.get("mode")
+    expected_hashes = resolution.get("hashes")
+    if (
+        not isinstance(expected_digest, str)
+        or re.fullmatch(r"[0-9a-f]{64}", expected_digest) is None
+        or expected_mode not in {
+            "CLASSIFICATION_ONLY",
+            "CLASSIFICATION_AND_PROOF",
+        }
+        or not isinstance(expected_hashes, dict)
+    ):
+        raise KleanAuditContractError(
+            "Stage 6 audit input binding is malformed"
+        )
+    if mechanical.get("resolved_input_sha256") != expected_digest:
+        return "mechanical resolved-input digest differs from audit input"
+    if mechanical.get("mode") != expected_mode:
+        return "mechanical audit mode differs from audit input"
+    if mechanical.get("input_hashes") != expected_hashes:
+        return "mechanical input hashes differ from audit input"
+    return None
+
+
+def reconcile_mechanical_verdict(
+    verdict_path: Path,
+    mechanical_path: Path,
+    audit_input_path: Path,
+) -> dict[str, Any]:
+    verdict = _read_json(Path(verdict_path), "Stage 6 verdict")
+    mechanical = _read_json(
+        Path(mechanical_path), "Stage 6 mechanical check"
+    )
+    audit_input = _read_json(
+        Path(audit_input_path), "Stage 6 audit input"
+    )
+    binding_error = _mechanical_binding_error(
+        mechanical, audit_input

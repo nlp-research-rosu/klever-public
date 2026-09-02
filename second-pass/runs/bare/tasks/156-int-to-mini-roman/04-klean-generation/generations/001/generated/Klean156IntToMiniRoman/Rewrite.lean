@@ -1,0 +1,5 @@
+import Klean156IntToMiniRoman.Func
+
+inductive Rewrites : SortGeneratedTopCell → SortGeneratedTopCell → Prop where
+  | tran {s1 s2 s3 : SortGeneratedTopCell} (t1 : Rewrites s1 s2) (t2 : Rewrites s2 s3) : Rewrites s1 s3
+  | ROMAN_KLEAN_EXPORT_kxExport0 {V0 : SortInt} {_DotVar0 : SortGeneratedCounterCell} {_DotVar2 : SortK} {_Gen0 : SortInputCell} {_Gen1 : SortEnvCell} {_Gen2 : SortResultCell} {_Val0 : SortString} (defn_Val0 : «miniRoman(_)_ROMAN-VERIFICATION_String_Int» V0 = some _Val0) : Rewrites { miniPython := { k := { val := SortK.kseq (SortKItem.«#kxExport0(_)_ROMAN-KLEAN-EXPORT_KItem_Int» V0) _DotVar2 }, input := _Gen0, env := _Gen1, result := _Gen2 }, generatedCounter := _DotVar0 } { miniPython := { k := { val := SortK.kseq ((@inj SortString SortKItem) _Val0) _DotVar2 }, input := _Gen0, env := _Gen1, result := _Gen2 }, generatedCounter := _DotVar0 }

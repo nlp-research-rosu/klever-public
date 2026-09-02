@@ -1,0 +1,5 @@
+import Klean75IsMultiplyPrime.Func
+
+inductive Rewrites : SortGeneratedTopCell → SortGeneratedTopCell → Prop where
+  | tran {s1 s2 s3 : SortGeneratedTopCell} (t1 : Rewrites s1 s2) (t2 : Rewrites s2 s3) : Rewrites s1 s3
+  | VERIFICATION_KLEAN_EXPORT_kxExport0 {V0 : SortInt} {_DotVar1 : SortK} {_Gen0 : SortArgCell} {_Gen1 : SortEnvCell} {_Gen2 : SortResultCell} {_Gen3 : SortGeneratedCounterCell} {_Val0 : SortBool} (defn_Val0 : «isThreePrimeProductBelow100(_)_VERIFICATION_Bool_Int» V0 = some _Val0) : Rewrites { k := { val := SortK.kseq (SortKItem.«#kxExport0(_)_VERIFICATION-KLEAN-EXPORT_KItem_Int» V0) _DotVar1 }, arg := _Gen0, env := _Gen1, result := _Gen2, generatedCounter := _Gen3 } { k := { val := SortK.kseq ((@inj SortBool SortKItem) _Val0) _DotVar1 }, arg := _Gen0, env := _Gen1, result := _Gen2, generatedCounter := _Gen3 }

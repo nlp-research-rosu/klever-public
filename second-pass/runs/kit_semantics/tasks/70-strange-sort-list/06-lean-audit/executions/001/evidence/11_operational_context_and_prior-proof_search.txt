@@ -1,0 +1,353 @@
++ nl -ba /reference/k-proof/reference-semantics/semantics/functions.k
++ sed -n 1,115p
+     1	// reference/src/semantics/functions.k — MPY-FUNCTIONS
+     2	
+     3	module MPY-FUNCTIONS
+     4	  imports MPY-CORE
+     5	
+     6	  // call routing + callee/arg evaluation (#callee/#args/#argCont) live in call.k;
+     7	  // this module owns the frame lifecycle (bind params, return, pop).
+     8	  syntax KItem ::= frame(continuation: K, callerEnv: Int, savedLoc: Int)
+     9	                 | #bindP(ParamNames, Vals)
+    10	                 | "#pop"
+    11	                 | "#endcall"
+    12	
+    13	  // ==== def / anonymous closure =============================================
+    14	  rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k>
+    15	       <env> L:Int </env>
+    16	       <scopes> ... L |-> scope(M:Map => M [ F <- closureVal(PNS, BODY, L) ], _) ... </scopes>
+    17	
+    18	  syntax Expr ::= closureExpr(ParamNames, Stmts)
+    19	  rule <k> closureExpr(PNS:ParamNames, BODY:Stmts) => closureVal(PNS, BODY, L) ... </k>
+    20	       <env> L:Int </env>
+    21	
+    22	  // ==== annotated def/lambda (closure cells; spec 2.3) ======================
+    23	  // closureValC(params, cellvars, body, captured-cells). No frame anchor: all
+    24	  // enclosing-local reads are freevars (symtable-complete) and go through the
+    25	  // captured cells; everything else is global/builtin, so the callee frame's
+    26	  // parent is the module scope (0) — sound after the defining frame dies.
+    27	  syntax Val ::= closureValC(ParamNames, ParamNames, Stmts, Map)
+    28	
+    29	  // capture: resolve each freevar to the enclosing frame's cellRef, then bind
+    30	  // (FuncDef) or yield (Lambda) the closure value.
+    31	  syntax KItem ::= #mkClosure(String, ParamNames, ParamNames, ParamNames, Stmts, Map)
+    32	                 | #mkLambda(ParamNames, ParamNames, ParamNames, Stmts, Map)
+    33	  rule <k> FuncDef(F:String, Params(PNS:ParamNames), CellVars(CVS:ParamNames),
+    34	                   FreeVars(FVS:ParamNames), BODY:Stmts)
+    35	        => #mkClosure(F, PNS, CVS, FVS, BODY, .Map) ... </k>
+    36	  rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames,
+    37	                      (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map)
+    38	        => #mkClosure(F, PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k>
+    39	       <env> L:Int </env>
+    40	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    41	       requires FV in_keys(M)
+    42	  rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames,
+    43	                      .ParamNames, BODY:Stmts, CM:Map) => .K ... </k>
+    44	       <env> L:Int </env>
+    45	       <scopes> ... L |-> scope(M:Map => M [ F <- closureValC(PNS, CVS, BODY, CM) ], _) ... </scopes>
+    46	
+    47	  rule <k> Lambda(Params(PNS:ParamNames), E:Expr)
+    48	        => closureVal(PNS, Return(E) .Stmts, L) ... </k>
+    49	       <env> L:Int </env>
+    50	  rule <k> Lambda(Params(PNS:ParamNames), CellVars(CVS:ParamNames),
+    51	                  FreeVars(FVS:ParamNames), E:Expr)
+    52	        => #mkLambda(PNS, CVS, FVS, Return(E) .Stmts, .Map) ... </k>
+    53	  rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames,
+    54	                     (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map)
+    55	        => #mkLambda(PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k>
+    56	       <env> L:Int </env>
+    57	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    58	       requires FV in_keys(M)
+    59	  rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map)
+    60	        => closureValC(PNS, CVS, BODY, CM) ... </k>
+    61	
+    62	  // ==== bind params ========================================================
+    63	  rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>
+    64	  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k>
+    65	       <env> L:Int </env>
+    66	       <scopes> ... L |-> scope(M:Map => M [ P <- V ], _) ... </scopes>
+    67	  // a param that is a cellvar was pre-bound to its cell at frame entry
+    68	  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals))
+    69	        => #cellW({M[P]}:>Val, V) ~> #bindP(PS, VS) ... </k>
+    70	       <env> L:Int </env>
+    71	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    72	       requires "$cells" in_keys(M)
+    73	        andBool pnMember(P, cellsOf({M["$cells"]}:>Val))
+    74	        andBool P in_keys(M) andBool isCellRef({M[P]}:>Val)
+    75	       [priority(40)]
+    76	
+    77	  // ==== return / pop the frame (the returned expr evaluates by strictness) ==
+    78	  rule <k> Return(V:Val) ~> _ => #pop </k>
+    79	       <ret> noRet => retV(V) </ret>
+    80	  rule <k> #endcall => #pop ... </k>
+    81	       <ret> noRet => retV(noneV) </ret>
+    82	  // pop: restore env, DEALLOCATE the callee frame, and wind scopeLoc back (LIFO allocation
+    83	  // makes the saved loc the callee frame's own loc). Sound because no closureVal outlives its
+    84	  // defining frame (frontend subset: no returned/stored closures; module defs live in loc 0).
+    85	  rule <k> #pop => V ~> CONT </k>
+    86	       <ret>   retV(V) => noRet </ret>
+    87	       <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack>
+    88	       <env>   L:Int => CALLERL </env>
+    89	       <scopes> SC:Map => SC [ L <- undef ] </scopes>
+    90	       <scopeLoc> _ => SAVEDL </scopeLoc>
+    91	endmodule
++ nl -ba /reference/k-proof/reference-semantics/semantics/core.k
++ sed -n 1,180p
+     1	// reference/src/semantics/core.k — MPY-CORE
+     2	
+     3	module MPY-CORE
+     4	  imports MPY-SYNTAX
+     5	  imports INT
+     6	  imports BOOL
+     7	  imports STRING
+     8	  imports MAP
+     9	  imports LIST
+    10	  imports K-EQUAL
+    11	
+    12	  // ==== values, the algebraic lists, and the scope heap =====================
+    13	  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+    14	  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+    15	  syntax Str    ::= str(IntSeq)
+    16	
+    17	  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+    18	  syntax Iterable ::= list(ValSeq)
+    19	                    | tuple(ValSeq)
+    20	                    | Str
+    21	                    | rangeObj(Int, Int, Int)
+    22	                    | zipObj(ValSeq, ValSeq)
+    23	                    | zipObjS(IntSeq, IntSeq)
+    24	
+    25	  syntax Val      ::= Int
+    26	                    | Bool
+    27	                    | "noneV"
+    28	                    | Iterable
+    29	                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+    30	                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+    31	                    | closureVal(ParamNames, Stmts, Int)
+    32	                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+    33	                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+    34	                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+    35	
+    36	  syntax Parent   ::= "root" | parent(Int)
+    37	  syntax Scope    ::= scope(Map, Parent)
+    38	  syntax KResult  ::= Val
+    39	  syntax Expr     ::= Val   // cooling puts results back into expression holes
+    40	  syntax Vals     ::= List{Val, ","}
+    41	  syntax Exc      ::= "NoExc" | "AssertionError"
+    42	  syntax RetState ::= "noRet" | retV(Val)
+    43	
+    44	  // ==== configuration =======================================================
+    45	  // The builtins namespace is a real scope at reserved location -1 (the bottom of every
+    46	  // chain; scopeLoc only allocates >=1, so -1 never collides). The module scope (loc 0)
+    47	  // has it as parent, so an unbound name resolves there last — exactly LEGB. `int`/`str`
+    48	  // resolve to their type objects; any local/global binding shadows them via normal lookup.
+    49	  configuration
+    50	    <k>       #loadAll($PGM:Module) </k>
+    51	    <env>     0 </env>
+    52	    <scopes>   0     |-> scope(.Map, parent(-1))
+    53	              -1    |-> builtinsScope </scopes>
+    54	    <scopeLoc> 1 </scopeLoc>
+    55	    <heap>    .Map </heap>
+    56	    <heapLoc> 0 </heapLoc>
+    57	    <stack>   .List </stack>
+    58	    <ret>     noRet </ret>
+    59	    <exc>     NoExc </exc>
+    60	    <exit-code exit=""> 0 </exit-code>
+    61	
+    62	  // ==== heap allocation (constructed lists become objects) ==================
+    63	  // Cons-form emission with a freshness guard (the heap-list-probe discipline:
+    64	  // an update-form H[N <- _] never re-normalizes symbolically). heapLoc is
+    65	  // monotonic — it does NOT wind back at #pop: returned lists escape by ref.
+    66	  // A bare list(VS) Val stays legal (read-only inputs in claims flow unboxed);
+    67	  // only CONSTRUCTORS in program syntax allocate.
+    68	  syntax Bool ::= isRefV(Val) [function, total]
+    69	  rule isRefV(ref(_:Int)) => true
+    70	  rule isRefV(_:Val)      => false [owise]
+    71	
+    72	  // closure cells (Python-faithful capture): the heap holds cellV(V); a
+    73	  // cellRef surfacing as the k-redex reads through (lookup is the only use —
+    74	  // cellRefs never escape to user-visible values)
+    75	  syntax HeapVal ::= cellV(Val)
+    76	  syntax Bool ::= isCellRef(Val) [function, total]
+    77	  rule isCellRef(cellRef(_:Int)) => true
+    78	  rule isCellRef(_:Val)          => false [owise]
+    79	  // k-top deref for cell-bound reads surfacing INSIDE the annotated frame
+    80	  // (AugAssign's in-place read and friends). The "$cells" guard keeps this
+    81	  // DECIDABLY inapplicable in plain frames — an unguarded rule lets the
+    82	  // prover narrow abstract k-top values into cellRef junk (probed on
+    83	  // 26-remove-duplicates). Cross-frame reads (a comprehension closure
+    84	  // reading the enclosing function's cellvar) deref inside #look instead.
+    85	  rule <k> cellRef(H:Int) => V ... </k>
+    86	       <env> L:Int </env>
+    87	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    88	       <heap> ... H |-> cellV(V:Val) ... </heap>
+    89	       requires "$cells" in_keys(M)
+    90	       [priority(40)]
+    91	
+    92	  // write through a cell (Assign / #bindP / #bindTgt dispatch here on
+    93	  // cell-bound names)
+    94	  // a keyword argument cools to a TAGGED value (consumed by kw-aware builtins)
+    95	  syntax Val ::= kwV(String, Val)
+    96	  syntax KItem ::= #kwTag(String)
+    97	  rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>
+    98	  rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k>
+    99	       requires notBool isKwV(V)
+   100	  syntax Bool ::= isKwV(Val) [function, total]
+   101	  rule isKwV(kwV(_:String, _:Val)) => true
+   102	  rule isKwV(_:Val)                => false [owise]
+   103	
+   104	  // the frame marker carries the CONCRETE cellvar list, so cell-write dispatch
+   105	  // decides by pnMember even over an abstract frame rest (no prover branching)
+   106	  syntax Val ::= cellsMark(ParamNames)
+   107	  syntax ParamNames ::= cellsOf(Val) [function]
+   108	  rule cellsOf(cellsMark(CVS:ParamNames)) => CVS
+   109	  syntax Bool ::= pnMember(String, ParamNames) [function, total]
+   110	  rule pnMember(_:String, .ParamNames) => false
+   111	  rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)
+   112	
+   113	  syntax KItem ::= #cellW(Val, Val)
+   114	  rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k>
+   115	       <heap> ... H |-> cellV(_:Val => V) ... </heap>
+   116	
+   117	  syntax KItem ::= #alloc(Val)
+   118	  rule <k> #alloc(V:Val) => ref(N) ... </k>
+   119	       <heap>    H:Map => (N |-> V) H </heap>
+   120	       <heapLoc> N:Int => N +Int 1 </heapLoc>
+   121	       requires notBool N in_keys(H)
+   122	
+   123	  // ==== module load + statement sequencing ==================================
+   124	  syntax KItem ::= #loadAll(Module)
+   125	  rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>
+   126	  rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>
+   127	  rule <k> .Stmts => .K ... </k>
+   128	
+   129	  // ==== Name lookup (walk the scope chain; builtins live in the -1 scope) ====
+   130	  syntax KItem ::= #look(String, Int)
+   131	  rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>
+   132	  rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k>
+   133	       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+   134	       requires X in_keys(M)
+   135	  // a SYNTACTICALLY cell-bound name reads through the heap cell AT THE
+   136	  // LOOKUP (higher priority beats the plain return above on concrete cell
+   137	  // bindings; abstract claim values take the plain rule unchanged) — this
+   138	  // covers cross-frame cell reads (a comprehension closure reading the
+   139	  // enclosing function's cellvar) without a narrowing-prone k-top redex
+   140	  // guarded on the FOUND frame's DECLARED cellvars (pnMember over the
+   141	  // cellsMark): decidable for every concrete frame pin — plain frames and
+   142	  // non-cell names prune outright, so an abstract looked-up value never
+   143	  // drags a narrowing cellV heap match along (probed on 5-intersperse and
+   144	  // Q4's abstract `numbers` in the annotated frame)
+   145	  rule <k> #look(X:String, L:Int) => V ... </k>
+   146	       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+   147	       <heap> ... H |-> cellV(V:Val) ... </heap>
+   148	       requires X in_keys(M) andBool "$cells" in_keys(M)
+   149	        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+   150	        andBool {M[X]}:>Val ==K cellRef(H)
+   151	       [priority(40)]
+   152	  rule <k> #look(X:String, L:Int) => #look(X, P) ... </k>
+   153	       <scopes> ... L |-> scope(M:Map, parent(P:Int)) ... </scopes>
+   154	       requires notBool (X in_keys(M))
+   155	
+   156	  // the ONE predefined builtins scope (the -1 frame; claims write `-1 |-> builtinsScope`)
+   157	  syntax Scope ::= "builtinsScope" [function, total]
+   158	  rule builtinsScope
+   159	    => scope(.Map [ "len"    <- builtinV("len")    ]
+   160	                  [ "set"    <- builtinV("set")    ]
+   161	                  [ "sum"    <- builtinV("sum")    ]
+   162	                  [ "abs"    <- builtinV("abs")    ]
+   163	                  [ "min"    <- builtinV("min")    ]
+   164	                  [ "max"    <- builtinV("max")    ]
+   165	                  [ "ord"    <- builtinV("ord")    ]
+   166	                  [ "chr"    <- builtinV("chr")    ]
+   167	                  [ "range"  <- builtinV("range")  ]
+   168	                  [ "all"    <- builtinV("all")    ]
+   169	                  [ "any"    <- builtinV("any")    ]
+   170	                  [ "zip"    <- builtinV("zip")    ]
+   171	                  [ "isinstance" <- builtinV("isinstance") ]
+   172	                  [ "sorted" <- builtinV("sorted") ]
+   173	                  [ "list"   <- builtinV("list")   ]
+   174	                  [ "round"  <- builtinV("round")  ]
+   175	                  [ "bin"    <- builtinV("bin")    ]
+   176	                  [ "enumerate" <- builtinV("enumerate") ]
+   177	                  [ "map"    <- builtinV("map")    ]
+   178	                  [ "eval"   <- builtinV("eval")   ]
+   179	                  [ "int"    <- typeV("int")       ]
+   180	                  [ "str"    <- typeV("str")       ]
++ nl -ba /reference/k-proof/reference-semantics/semantics/sort.k
++ sed -n 1,90p
+     1	// reference/src/semantics/sort.k — MPY-SORT
+     2	// Trusted sorted(): sorted(list) as an opaque ascending permutation `sortVS` — opaque symbolic
+     3	// for kprove (a trusted primitive, correctness/ordering proved in Lean / notes/sort-probe),
+     4	// and a concrete insertion sort for krun. Wrappers verify the logic AROUND the sort (index /
+     5	// slice / filter / dedup); indexing an opaque sortVS(VS) carries through as an opaque term, so
+     6	// no ordering lemma is needed in K — the trust (sortVS = real sorted) is discharged by each
+     7	// problem's differential test. Only int lists (compared by projectIntTotal); keyed / string
+     8	// sorts are separate. Fires only via the "sorted" builtin, so inert for non-sorting programs.
+     9	
+    10	module MPY-SORT
+    11	  imports MPY-BUILTINS
+    12	  imports MPY-SUBSCRIPT
+    13	
+    14	  // sortVS(VS): the ascending sort of the Val list VS. Opaque for symbolic VS (no-evaluators);
+    15	  // concrete insertion sort for krun.
+    16	  // Concrete sort matches Int-sorted elements directly (an int Val IS an Int); projectIntTotal
+    17	  // (lemmas-only) is not available in the semantics. Int and str lists.
+    18	  syntax ValSeq ::= sortVS(ValSeq) [function, total, symbol(sortVS), no-evaluators]
+    19	  syntax ValSeq ::= insVS(Int, ValSeq) [function]
+    20	  rule sortVS(.ValSeq)                => .ValSeq          [concrete]
+    21	  rule sortVS(vCons(X:Int, R:ValSeq)) => insVS(X, sortVS(R)) [concrete]
+    22	  rule insVS(X:Int, .ValSeq)                => vCons(X, .ValSeq) [concrete]
+    23	  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]
+    24	  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X  >Int Y [concrete]
+    25	  // str elements insert by the shared lexicographic strLt (methods.k)
+    26	  syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]
+    27	  rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]
+    28	  rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]
+    29	  rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(A), vCons(str(B), R))
+    30	       requires strLt(A, B) orBool A ==K B [concrete]
+    31	  rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(B), insVSs(A, R))
+    32	       requires notBool (strLt(A, B) orBool A ==K B) [concrete]
+    33	
+    34	  // sorted(list) constructs a NEW object: k-cell pre-dispatch (beats the [owise]
+    35	  // applyBuiltin routing in call.k) so the result allocates.
+    36	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), .Vals))
+    37	        => #alloc(list(sortVS(VS))) ... </k>
+    38	
+    39	  // mutator: xs.sort() — the in-place heap write over the same trusted sortVS
+    40	  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "sort")), .Vals) => noneV ... </k>
+    41	       <heap> ... H |-> list(VS:ValSeq => sortVS(VS)) ... </heap>
+    42	       [priority(40)]
+    43	
+    44	  // ==== keyed / reversed sorted() (WP2) =====================================
+    45	  // sortKeyVS(VS, KV): the stable ascending sort of VS by the key value KV
+    46	  // (a closure/builtin/type — anything callable). OPAQUE here; the concrete
+    47	  // leg (MPY-CONCRETE, llvm only) computes keys by REAL calls and stable-
+    48	  // inserts, at priority(40) over these.
+    49	  syntax ValSeq ::= sortKeyVS(ValSeq, Val) [function, total, symbol(sortKeyVS), no-evaluators]
+    50	
+    51	  syntax ValSeq ::= revVS(ValSeq) [function, total]
+    52	                  | revVSAcc(ValSeq, ValSeq) [function, total]
+    53	  rule revVS(S:ValSeq) => revVSAcc(S, .ValSeq)
+    54	  rule revVSAcc(.ValSeq, A:ValSeq) => A
+    55	  rule revVSAcc(vCons(V:Val, R:ValSeq), A:ValSeq) => revVSAcc(R, vCons(V, A))
+    56	
+    57	  syntax ValSeq ::= condRev(ValSeq, Bool) [function, total]
+    58	  rule condRev(S:ValSeq, false) => S
+    59	  rule condRev(S:ValSeq, true)  => revVS(S)
+    60	
+    61	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals))
+    62	        => #alloc(list(sortKeyVS(VS, KV))) ... </k>
+    63	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals))
+    64	        => #alloc(list(condRev(sortKeyVS(VS, KV), RB))) ... </k>
+    65	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("reverse", RB:Bool), .Vals))
+    66	        => #alloc(list(condRev(sortVS(VS), RB))) ... </k>
+    67	
+    68	  // Indexing the opaque sorted list: `valSeqAt(sortVS(VS), I)` is DEFINED because valSeqAt is
+    69	  // [total] (subscript.k) — it stays an abstract total value for a symbolic sort and reduces
+    70	  // over the concrete sort for krun. No separate sortedAt indirection is needed; wrappers write
+    71	  // their postcondition directly as valSeqAt(sortVS(VS), …).
+    72	endmodule
++ rg -n -F 'rule (M:Map K:Int |-> _V:Scope) [K <- undef] => M' /reference/k-proof --glob '*.k'
+/reference/k-proof/verification.k:31:  rule (M:Map K:Int |-> _V:Scope) [K <- undef] => M
++ rg -n 'claim.*\[K <- undef\]|\[K <- undef\].*=> M|565182bf' /reference/k-proof --glob '*.k' --glob '*.sh' --glob '*.log'
+/reference/k-proof/verification.k:31:  rule (M:Map K:Int |-> _V:Scope) [K <- undef] => M

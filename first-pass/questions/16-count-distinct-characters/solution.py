@@ -1,0 +1,2 @@
+def count_distinct_characters(string):
+    return len(set(string.lower()))

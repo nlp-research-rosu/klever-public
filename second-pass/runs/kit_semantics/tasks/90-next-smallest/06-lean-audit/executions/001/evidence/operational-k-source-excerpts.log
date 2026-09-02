@@ -1,0 +1,119 @@
+Script started on 2026-07-31 12:15:42-05:00 [<not executed on terminal>]
+     1	// reference/src/semantics/int.k — MPY-INT
+     2	// Int cases of the operator dispatch; Python // and % are floored (pyMod).
+     3	
+     4	module MPY-INT
+     5	  imports MPY-CORE
+     6	
+     7	  rule applyUn("-", I:Int) => 0 -Int I
+     8	
+     9	  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    10	  // Bool participates in int arithmetic (x += (a == b))
+    11	  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+    12	  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+    13	  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+    14	  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+    15	  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+    16	  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+    17	  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+    18	
+    19	  syntax Int ::= pyMod(Int, Int) [function]
+    20	  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+    21	
+    22	  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+    23	  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+    24	  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+    25	  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+    26	  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+    27	  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+    28	endmodule
+  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+  syntax Iterable ::= list(ValSeq)
+                    | tuple(ValSeq)
+                    | Str
+                    | rangeObj(Int, Int, Int)
+                    | zipObj(ValSeq, ValSeq)
+                    | zipObjS(IntSeq, IntSeq)
+
+  syntax Val      ::= Int
+                    | Bool
+                    | "noneV"
+                    | Iterable
+                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+                    | closureVal(ParamNames, Stmts, Int)
+                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+
+  syntax Parent   ::= "root" | parent(Int)
+  syntax Scope    ::= scope(Map, Parent)
+  syntax KResult  ::= Val
+  syntax Expr     ::= Val   // cooling puts results back into expression holes
+  syntax Vals     ::= List{Val, ","}
+  syntax Exc      ::= "NoExc" | "AssertionError"
+  syntax RetState ::= "noRet" | retV(Val)
+  rule truthy(I:Int)           => I =/=Int 0
+  rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)
+  rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)
+  rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)
+
+  // ==== extensible operator dispatch (cases added by the construct modules) ==
+  syntax Val  ::= applyUn(String, Val) [function]
+  syntax Val  ::= applyBin(String, Val, Val) [function]
+  syntax Bool ::= applyCmp(String, Val, Val) [function]
+
+  // ==== shared list helpers =================================================
+  syntax Vals ::= appendVal(Vals, Val) [function, total]
+  rule appendVal(.Vals, V:Val)              => V , .Vals
+  rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+
+  // Domain predicate for the prompt's list-of-integers contract.
+  syntax Bool ::= allInts(ValSeq) [function, total]
+  rule allInts(.ValSeq) => true
+  rule allInts(vCons(V:Val, REST:ValSeq)) => isInt(V) andBool allInts(REST)
+
+  // Guarded total projection from the dynamic Val sort to Int.  It is opaque
+  // outside isInt; on the guarded domain it is merely the semantics' built-in
+  // partial injection, exposed in a solver-friendly form.
+  syntax Bool ::= definedProjectInt(Val) [function, total]
+  rule definedProjectInt(V:Val) => isInt(V)
+
+  syntax Int ::= projectIntTotal(Val)
+    [function, total, symbol(projectIntTotal), no-evaluators]
+
+  rule #Ceil({@V:Val}:>Int)
+    => ({ definedProjectInt(@V) #Equals true } #And #Ceil(@V))
+    [simplification]
+
+  rule projectIntTotal(V:Val) => {V}:>Int
+    requires definedProjectInt(V)
+    [concrete, simplification(10), preserves-definedness]
+
+  rule {V:Val}:>Int => projectIntTotal(V)
+    requires definedProjectInt(V)
+    [symbolic(V), simplification, preserves-definedness]
+
+  rule projectIntTotal(I:Int) => I [simplification]
+  rule projectIntTotal(projectIntTotal(V:Val)) => projectIntTotal(V)
+    [simplification]
+
+  // Guarded dispatch twins of the frozen integer rules.  They do not replace
+  // program execution; they restate the same equations after sort refinement.
+  rule applyBin("+", V:Val, W:Val)
+    => projectIntTotal(V) +Int projectIntTotal(W)
+    requires isInt(V) andBool isInt(W)
+    [simplification]
+
+  rule applyCmp("<", V:Val, W:Val)
+    => projectIntTotal(V) <Int projectIntTotal(W)
+    requires isInt(V) andBool isInt(W)
+    [simplification]
+
+  rule applyCmp("!=", V:Val, W:Val)
+    => projectIntTotal(V) =/=Int projectIntTotal(W)
+    requires isInt(V) andBool isInt(W)
+    [simplification]
+
+
+Script done on 2026-07-31 12:15:42-05:00 [COMMAND_EXIT_CODE="0"]

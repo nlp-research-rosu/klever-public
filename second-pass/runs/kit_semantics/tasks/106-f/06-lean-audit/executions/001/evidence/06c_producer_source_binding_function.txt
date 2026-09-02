@@ -1,0 +1,180 @@
+Script started on 2026-07-31 02:08:40-05:00 [<not executed on terminal>]
+201-            )
+202-        return workspace, invocation, result
+203-    except pipeline_contract.PipelineContractError as error:
+204-        raise _translate(error) from error
+205-
+206-
+207-def _stage1_source_hashes(workspace: Path) -> dict[str, str]:
+208-    try:
+209-        return {
+210-            path.relative_to(workspace).as_posix(): (
+211-                pipeline_contract.sha256_file(path)
+212-            )
+213-            for path in pipeline_contract._walk_regular_files(
+214-                workspace, "Stage 1 source workspace"
+215-            )
+216-        }
+217-    except pipeline_contract.PipelineContractError as error:
+218-        raise _translate(error) from error
+219-
+220-
+221:def _generation_producer_sources(
+222-    repo: Path, generator_manifest: dict[str, Any]
+223-) -> tuple[Path, str]:
+224-    provenance = generator_manifest.get("provenance")
+225-    image_id = (
+226-        provenance.get("generator_image_id")
+227-        if isinstance(provenance, dict)
+228-        else None
+229-    )
+230-    if not isinstance(image_id, str) or not image_id.startswith("sha256:"):
+231-        raise KleanAuditContractError(
+232-            "generator image ID is missing from Stage 4 provenance"
+233-        )
+234-    image_key = image_id.removeprefix("sha256:")
+235-    try:
+236-        image_key = pipeline_contract.validate_safe_component(
+237-            image_key, "generator image ID"
+238-        )
+239-        bundle = pipeline_contract._require_direct_directory(
+240-            repo / "data/stage4-producer-sources",
+241-            image_key,
+242-            "Stage 4 producer source bundle",
+243-        )
+244-        source_manifest = pipeline_contract._read_regular_json(
+245-            bundle / "source-manifest.json",
+246-            "Stage 4 producer source manifest",
+247-        )
+248-        expected_files = {
+249-            "klean_export.py": generator_manifest.get("exporter_sha256"),
+250-            "klean.py": generator_manifest.get("klean_py_sha256"),
+251-        }
+252-        if (
+253-            set(source_manifest) != {
+254-                "schema_version",
+255-                "generator_image_id",
+256-                "files",
+257-            }
+258-            or source_manifest.get("schema_version") != 1
+259-            or source_manifest.get("generator_image_id") != image_id
+260-            or source_manifest.get("files") != expected_files
+261-        ):
+262-            raise KleanAuditContractError(
+263-                "Stage 4 producer source manifest differs from generator "
+264-                "provenance"
+265-            )
+266-        observed_names = {
+267-            path.relative_to(bundle).as_posix()
+268-            for path in pipeline_contract._walk_regular_files(
+269-                bundle, "Stage 4 producer source bundle"
+270-            )
+271-        }
+272-        if observed_names != {
+273-            "source-manifest.json",
+274-            "klean_export.py",
+275-            "klean.py",
+276-        }:
+277-            raise KleanAuditContractError(
+278-                "Stage 4 producer source bundle has unexpected files"
+279-            )
+280-        for name, expected in expected_files.items():
+281-            digest = _validate_sha256(
+282-                expected, f"Stage 4 producer source {name} SHA-256"
+283-            )
+284-            source = pipeline_contract.require_regular_file(
+285-                bundle / name, f"Stage 4 producer source {name}"
+286-            )
+287-            if pipeline_contract.sha256_file(source) != digest:
+288-                raise KleanAuditContractError(
+289-                    f"Stage 4 producer source {name} SHA-256 differs "
+290-                    "from generator provenance"
+291-                )
+292-        return bundle, pipeline_contract.sha256_tree(bundle)
+293-    except pipeline_contract.PipelineContractError as error:
+294-        raise _translate(error) from error
+295-
+296-
+297-def resolve_stage6_audit(
+298-    repo: Path, run_id: str, problem: str
+299-) -> dict[str, Any]:
+300-    """Resolve and re-hash every frozen input to the Stage 6 audit."""
+301-
+302-    try:
+303-        task, _state, run = pipeline_contract._resolve_task_state(
+304-            repo, run_id, problem
+305-        )
+306-        pipeline_contract.require_task_unblocked(task, "Stage 6")
+307-        k_stage = pipeline_contract.require_real_directory(
+308-            task / "01-k-proof", "Stage 1"
+309-        )
+310-        k_workspace = pipeline_contract.require_real_directory(
+311-            k_stage / "workspace", "Stage 1 K workspace"
+312-        )
+313-        k_result = pipeline_contract._read_regular_json(
+314-            k_stage / "result.json", "Stage 1 result"
+315-        )
+316-        if k_result.get("status") != "SUCCEEDED":
+317-            raise KleanAuditContractError("Stage 1 is not successful")
+318-        k_hash = pipeline_contract.sha256_tree(k_workspace)
+319-        if (
+320-            not isinstance(k_result.get("outputs"), dict)
+321-            or k_result["outputs"].get("workspace_sha256") != k_hash
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, "tree root")
+    digest = hashlib.sha256()
+    pending = [root]
+    entries: list[tuple[str, str, Path]] = []
+    while pending:
+        directory = pending.pop()
+        try:
+            children = list(os.scandir(directory))
+        except OSError as error:
+            raise PipelineContractError(f"cannot scan tree {directory}: {error}") from error
+        for child in children:
+            path = Path(child.path)
+            try:
+                mode = child.stat(follow_symlinks=False).st_mode
+            except OSError as error:
+                raise PipelineContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise PipelineContractError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    for relative, kind, path in sorted(entries):
+        encoded = relative.encode()
+        digest.update(len(encoded).to_bytes(4, "big"))
+        digest.update(encoded)
+        digest.update(kind.encode() + b"\0")
+        if kind == "file":
+            try:
+                size = path.stat(follow_symlinks=False).st_size
+                digest.update(size.to_bytes(8, "big"))
+                with path.open("rb") as stream:
+                    for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                        digest.update(chunk)
+            except OSError as error:
+                raise PipelineContractError(
+                    f"cannot hash tree file {path}: {error}"
+                ) from error
+    return digest.hexdigest()
+
+
+def write_json_atomic(path: Path, document: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    file_descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", dir=path.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as stream:
+
+Script done on 2026-07-31 02:08:40-05:00 [COMMAND_EXIT_CODE="0"]

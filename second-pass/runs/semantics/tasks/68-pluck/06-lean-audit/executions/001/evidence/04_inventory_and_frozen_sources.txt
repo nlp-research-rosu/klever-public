@@ -1,0 +1,895 @@
+Script started on 2026-07-28 17:44:29-05:00 [<not executed on terminal>]
+COMMAND: nl -ba /reference/k-proof/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module PLUCK-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  syntax Int ::= asInt(Val) [function, total]
+     7	  rule asInt(I:Int) => I
+     8	
+     9	  // Derived specialization of MPY-LIST's iterator rule.  Its higher priority
+    10	  // exposes the contract's integer element sort to symbolic execution; for
+    11	  // concrete integer lists it has exactly the same right-hand side as MPY.
+    12	  rule <k> #iterNext(list(vCons(V:Val, REST:ValSeq)))
+    13	        => #iterYield(asInt(V), list(REST)) ... </k>
+    14	       requires isInt(V)
+    15	       [priority(40)]
+    16	
+    17	  // The predicate exactly captures when the implementation replaces its
+    18	  // current candidate.  B == -1 represents "no even value seen yet".
+    19	  syntax Bool ::= pluckTake(Int, Int) [function, total]
+    20	  rule pluckTake(V:Int, B:Int)
+    21	    => pyMod(V, 2) ==Int 0
+    22	       andBool (B ==Int -1 orBool V <Int B)
+    23	
+    24	  syntax Int ::= nextBest(Int, Int) [function, total]
+    25	               | nextBestIndex(Int, Int, Int, Int) [function, total]
+    26	  rule nextBest(V:Int, B:Int) => V
+    27	    requires pyMod(V, 2) ==Int 0 andBool B ==Int -1
+    28	  rule nextBest(V:Int, B:Int) => V
+    29	    requires pyMod(V, 2) ==Int 0
+    30	     andBool B =/=Int -1 andBool V <Int B
+    31	  rule nextBest(V:Int, B:Int) => B
+    32	    requires pyMod(V, 2) =/=Int 0
+    33	  rule nextBest(V:Int, B:Int) => B
+    34	    requires pyMod(V, 2) ==Int 0
+    35	     andBool B =/=Int -1 andBool V >=Int B
+    36	  rule nextBestIndex(V:Int, B:Int, _:Int, I:Int) => I
+    37	    requires pyMod(V, 2) ==Int 0 andBool B ==Int -1
+    38	  rule nextBestIndex(V:Int, B:Int, _:Int, I:Int) => I
+    39	    requires pyMod(V, 2) ==Int 0
+    40	     andBool B =/=Int -1 andBool V <Int B
+    41	  rule nextBestIndex(V:Int, _B:Int, BI:Int, _:Int) => BI
+    42	    requires pyMod(V, 2) =/=Int 0
+    43	  rule nextBestIndex(V:Int, B:Int, BI:Int, _:Int) => BI
+    44	    requires pyMod(V, 2) ==Int 0
+    45	     andBool B =/=Int -1 andBool V >=Int B
+    46	
+    47	  // Functional reference fold used by the invariant and final contract.
+    48	  syntax PluckState ::= pstate(Int, Int, Int, Int)
+    49	  syntax PluckState ::= scanPluck(ValSeq, Int, Int, Int, Int)
+    50	                        [function, total]
+    51	  rule scanPluck(.ValSeq, B:Int, BI:Int, I:Int, LAST:Int)
+    52	    => pstate(B, BI, I, LAST)
+    53	  rule scanPluck(vCons(V:Val, REST:ValSeq),
+    54	                 B:Int, BI:Int, I:Int, _:Int)
+    55	    => scanPluck(
+    56	         REST,
+    57	         nextBest(asInt(V), B),
+    58	         nextBestIndex(asInt(V), B, BI, I),
+    59	         I +Int 1,
+    60	         asInt(V))
+    61	
+    62	  syntax Int ::= stateBest(PluckState) [function, total]
+    63	               | stateBestIndex(PluckState) [function, total]
+    64	               | stateIndex(PluckState) [function, total]
+    65	               | stateLast(PluckState) [function, total]
+    66	  rule stateBest(pstate(B:Int, _:Int, _:Int, _:Int)) => B
+    67	  rule stateBestIndex(pstate(_:Int, BI:Int, _:Int, _:Int)) => BI
+    68	  rule stateIndex(pstate(_:Int, _:Int, I:Int, _:Int)) => I
+    69	  rule stateLast(pstate(_:Int, _:Int, _:Int, LAST:Int)) => LAST
+    70	
+    71	  syntax ValSeq ::= pluckResult(ValSeq) [function, total]
+    72	  rule pluckResult(VS:ValSeq)
+    73	    => .ValSeq
+    74	    requires stateBest(scanPluck(VS, -1, -1, 0, 0)) ==Int -1
+    75	  rule pluckResult(VS:ValSeq)
+    76	    => vCons(
+    77	         stateBest(scanPluck(VS, -1, -1, 0, 0)),
+    78	         vCons(
+    79	           stateBestIndex(scanPluck(VS, -1, -1, 0, 0)),
+    80	           .ValSeq))
+    81	    requires stateBest(scanPluck(VS, -1, -1, 0, 0)) =/=Int -1
+    82	
+    83	  // The HumanEval precondition: every node is non-negative.
+    84	  syntax Bool ::= allNonNegative(ValSeq) [function, total]
+    85	  rule allNonNegative(.ValSeq) => true
+    86	  rule allNonNegative(vCons(V:Val, REST:ValSeq))
+    87	    => isInt(V)
+    88	       andBool asInt(V) >=Int 0
+    89	       andBool allNonNegative(REST)
+    90	endmodule
+COMMAND: nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module PLUCK-SPEC
+     4	  imports PLUCK-VERIFICATION
+     5	
+     6	  claim [pluck-loop]:
+     7	    <k>
+     8	      #loop(
+     9	        list(VS:ValSeq),
+    10	        Name("value"),
+    11	        If(
+    12	          Compare(
+    13	            BinOp("%", Name("value"), Int(2)),
+    14	            CmpOp("==", Int(0))),
+    15	          If(
+    16	            Compare(
+    17	              Name("smallest"),
+    18	              CmpOp("==", UnaryOp("-", Int(1)))),
+    19	            Assign(Name("smallest"), Name("value"))
+    20	            Assign(Name("smallest_index"), Name("index")),
+    21	            If(
+    22	              Compare(Name("value"), CmpOp("<", Name("smallest"))),
+    23	              Assign(Name("smallest"), Name("value"))
+    24	              Assign(Name("smallest_index"), Name("index")),
+    25	              .Stmts)),
+    26	          .Stmts)
+    27	        AugAssign(Name("index"), "+", Int(1)))
+    28	      ~> K:K
+    29	      => K
+    30	    </k>
+    31	    <env> L:Int </env>
+    32	    <scopes>
+    33	      ... L |-> scope(
+    34	        "arr" |-> ARR:Val
+    35	        "smallest" |-> B:Int
+    36	        "smallest_index" |-> BI:Int
+    37	        "index" |-> I:Int
+    38	        "value" |-> LAST:Int,
+    39	        P:Parent)
+    40	      => L |-> scope(
+    41	        "arr" |-> ARR
+    42	        "smallest" |-> stateBest(scanPluck(VS, B, BI, I, LAST))
+    43	        "smallest_index" |-> stateBestIndex(scanPluck(VS, B, BI, I, LAST))
+    44	        "index" |-> stateIndex(scanPluck(VS, B, BI, I, LAST))
+    45	        "value" |-> stateLast(scanPluck(VS, B, BI, I, LAST)),
+    46	        P) ...
+    47	    </scopes>
+    48	    requires allNonNegative(VS)
+    49	
+    50	  claim [pluck-correct]:
+    51	    <k>
+    52	      #loadAll(
+    53	        Module(
+    54	          FuncDef("pluck", Params("arr"),
+    55	            Assign(Name("smallest"), UnaryOp("-", Int(1)))
+    56	            Assign(Name("smallest_index"), UnaryOp("-", Int(1)))
+    57	            Assign(Name("index"), Int(0))
+    58	            Assign(Name("value"), Int(0))
+    59	            For(Name("value"), Name("arr"),
+    60	              If(
+    61	                Compare(
+    62	                  BinOp("%", Name("value"), Int(2)),
+    63	                  CmpOp("==", Int(0))),
+    64	                If(
+    65	                  Compare(
+    66	                    Name("smallest"),
+    67	                    CmpOp("==", UnaryOp("-", Int(1)))),
+    68	                  Assign(Name("smallest"), Name("value"))
+    69	                  Assign(Name("smallest_index"), Name("index")),
+    70	                  If(
+    71	                    Compare(
+    72	                      Name("value"),
+    73	                      CmpOp("<", Name("smallest"))),
+    74	                    Assign(Name("smallest"), Name("value"))
+    75	                    Assign(Name("smallest_index"), Name("index")),
+    76	                    .Stmts)),
+    77	                .Stmts)
+    78	              AugAssign(Name("index"), "+", Int(1)))
+    79	            If(
+    80	              Compare(
+    81	                Name("smallest"),
+    82	                CmpOp("==", UnaryOp("-", Int(1)))),
+    83	              Return(ListExpr(.Exprs)),
+    84	              .Stmts)
+    85	            Return(
+    86	              ListExpr(
+    87	                Name("smallest"),
+    88	                Name("smallest_index")))))
+    89	        )
+    90	      ~> Call(Name("pluck"), list(VS:ValSeq))
+    91	      => ref(0)
+    92	    </k>
+    93	    <env> 0 </env>
+    94	    <scopes>
+    95	      0 |-> scope(.Map, parent(-1))
+    96	      -1 |-> builtinsScope
+    97	      =>
+    98	      0 |-> scope(
+    99	        "pluck" |-> closureVal(
+   100	          "arr",
+   101	          Assign(Name("smallest"), UnaryOp("-", Int(1)))
+   102	          Assign(Name("smallest_index"), UnaryOp("-", Int(1)))
+   103	          Assign(Name("index"), Int(0))
+   104	          Assign(Name("value"), Int(0))
+   105	          For(Name("value"), Name("arr"),
+   106	            If(
+   107	              Compare(
+   108	                BinOp("%", Name("value"), Int(2)),
+   109	                CmpOp("==", Int(0))),
+   110	              If(
+   111	                Compare(
+   112	                  Name("smallest"),
+   113	                  CmpOp("==", UnaryOp("-", Int(1)))),
+   114	                Assign(Name("smallest"), Name("value"))
+   115	                Assign(Name("smallest_index"), Name("index")),
+   116	                If(
+   117	                  Compare(
+   118	                    Name("value"),
+   119	                    CmpOp("<", Name("smallest"))),
+   120	                  Assign(Name("smallest"), Name("value"))
+   121	                  Assign(Name("smallest_index"), Name("index")),
+   122	                  .Stmts)),
+   123	              .Stmts)
+   124	            AugAssign(Name("index"), "+", Int(1)))
+   125	          If(
+   126	            Compare(
+   127	              Name("smallest"),
+   128	              CmpOp("==", UnaryOp("-", Int(1)))),
+   129	            Return(ListExpr(.Exprs)),
+   130	            .Stmts)
+   131	          Return(
+   132	            ListExpr(
+   133	              Name("smallest"),
+   134	              Name("smallest_index"))),
+   135	          0),
+   136	        parent(-1))
+   137	      -1 |-> builtinsScope
+   138	    </scopes>
+   139	    <scopeLoc> 1 </scopeLoc>
+   140	    <heap> .Map => 0 |-> list(pluckResult(VS)) </heap>
+   141	    <heapLoc> 0 => 1 </heapLoc>
+   142	    <stack> .List </stack>
+   143	    <ret> noRet </ret>
+   144	    <exc> NoExc </exc>
+   145	    <exit-code> 0 </exit-code>
+   146	    requires allNonNegative(VS)
+   147	endmodule
+COMMAND: nl -ba /reference/k-proof/solution.py
+     1	def pluck(arr):
+     2	    smallest = -1
+     3	    smallest_index = -1
+     4	    index = 0
+     5	    value = 0
+     6	    for value in arr:
+     7	        if value % 2 == 0:
+     8	            if smallest == -1:
+     9	                smallest = value
+    10	                smallest_index = index
+    11	            else:
+    12	                if value < smallest:
+    13	                    smallest = value
+    14	                    smallest_index = index
+    15	        index += 1
+    16	    if smallest == -1:
+    17	        return []
+    18	    return [smallest, smallest_index]
+COMMAND: nl -ba /reference/k-proof/prompt.py
+     1	
+     2	def pluck(arr):
+     3	    """
+     4	    "Given an array representing a branch of a tree that has non-negative integer nodes
+     5	    your task is to pluck one of the nodes and return it.
+     6	    The plucked node should be the node with the smallest even value.
+     7	    If multiple nodes with the same smallest even value are found return the node that has smallest index.
+     8	
+     9	    The plucked node should be returned in a list, [ smalest_value, its index ],
+    10	    If there are no even values or the given array is empty, return [].
+    11	
+    12	    Example 1:
+    13	        Input: [4,2,3]
+    14	        Output: [2, 1]
+    15	        Explanation: 2 has the smallest even value, and 2 has the smallest index.
+    16	
+    17	    Example 2:
+    18	        Input: [1,2,3]
+    19	        Output: [2, 1]
+    20	        Explanation: 2 has the smallest even value, and 2 has the smallest index. 
+    21	
+    22	    Example 3:
+    23	        Input: []
+    24	        Output: []
+    25	    
+    26	    Example 4:
+    27	        Input: [5, 0, 3, 0, 4, 2]
+    28	        Output: [0, 1]
+    29	        Explanation: 0 is the smallest value, but  there are two zeros,
+    30	                     so we will choose the first zero, which has the smallest index.
+    31	
+    32	    Constraints:
+    33	        * 1 <= nodes.length <= 10000
+    34	        * 0 <= node.value
+    35	    """
+COMMAND: nl -ba /reference/k-proof/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	cd "$(dirname "$0")"
+     5	
+     6	python3 py2mpy.py solution.py > solution.mpy
+     7	python3 py2mpy.py concrete_tests.py > concrete_tests.mpy
+     8	
+     9	kompile reference-semantics/semantics.k \
+    10	  --backend llvm \
+    11	  --main-module MPY-KRUN \
+    12	  --syntax-module MPY-SYNTAX \
+    13	  --output-definition runtime-kompiled
+    14	
+    15	krun solution.mpy --definition runtime-kompiled
+    16	krun concrete_tests.mpy --definition runtime-kompiled
+    17	
+    18	kompile verification.k \
+    19	  --backend haskell \
+    20	  --main-module PLUCK-VERIFICATION \
+    21	  --syntax-module MPY-SYNTAX \
+    22	  --output-definition proof-kompiled
+    23	
+    24	# First prove the induction lemma over the arbitrary input tail.
+    25	kprove spec.k \
+    26	  --definition proof-kompiled \
+    27	  --spec-module PLUCK-SPEC \
+    28	  --claims PLUCK-SPEC.pluck-loop \
+    29	  --output pretty
+    30	
+    31	# Then prove module loading, call/return, and the result contract, using only
+    32	# the induction lemma proved by the preceding command as a trusted dependency.
+    33	kprove spec.k \
+    34	  --definition proof-kompiled \
+    35	  --spec-module PLUCK-SPEC \
+    36	  --claims PLUCK-SPEC.pluck-correct,PLUCK-SPEC.pluck-loop \
+    37	  --trusted PLUCK-SPEC.pluck-loop \
+    38	  --output pretty
+COMMAND: python canonical inventory and protected-manifest validation
+{
+  "inventory": {
+    "inventory_sha256": "74d32acdd1441ede107a81e6f1273f09ea4c7a684042c14c316e44330ae67f32",
+    "rules": [
+      {
+        "attributes": [],
+        "end_line": 7,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "a4e3be4281302f405391ec6aaa6964b5a5d4638615c68aff54858ab1ee2d092a",
+        "source_rule_id": "rule-a4e3be4281302f405391ec6aaa6964b5a5d4638615c68aff54858ab1ee2d092a",
+        "start_line": 7,
+        "text": "  rule asInt(I:Int) => I"
+      },
+      {
+        "attributes": [
+          "priority(40)"
+        ],
+        "end_line": 15,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "3f5db89b9787a3fdf999e8c890b73a2db174f5c7f8ef866a09ac4e01f6c1c04a",
+        "source_rule_id": "rule-3f5db89b9787a3fdf999e8c890b73a2db174f5c7f8ef866a09ac4e01f6c1c04a",
+        "start_line": 12,
+        "text": "  rule <k> #iterNext(list(vCons(V:Val, REST:ValSeq)))\n        => #iterYield(asInt(V), list(REST)) ... </k>\n       requires isInt(V)\n       [priority(40)]"
+      },
+      {
+        "attributes": [],
+        "end_line": 22,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "4868480142e60a5fc5e0cbd212276c582adf05c328b8192a1fb848ebd4d62069",
+        "source_rule_id": "rule-4868480142e60a5fc5e0cbd212276c582adf05c328b8192a1fb848ebd4d62069",
+        "start_line": 20,
+        "text": "  rule pluckTake(V:Int, B:Int)\n    => pyMod(V, 2) ==Int 0\n       andBool (B ==Int -1 orBool V <Int B)"
+      },
+      {
+        "attributes": [],
+        "end_line": 27,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "8bfc0a45f1090ce2caec3f9d6158f1484560ab13f4e7c56613c588df123c47ff",
+        "source_rule_id": "rule-8bfc0a45f1090ce2caec3f9d6158f1484560ab13f4e7c56613c588df123c47ff",
+        "start_line": 26,
+        "text": "  rule nextBest(V:Int, B:Int) => V\n    requires pyMod(V, 2) ==Int 0 andBool B ==Int -1"
+      },
+      {
+        "attributes": [],
+        "end_line": 30,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "8a8a39850618e2f8701a028be1f01e9cc9d984e1c72ee09ed7a6bef81e64d086",
+        "source_rule_id": "rule-8a8a39850618e2f8701a028be1f01e9cc9d984e1c72ee09ed7a6bef81e64d086",
+        "start_line": 28,
+        "text": "  rule nextBest(V:Int, B:Int) => V\n    requires pyMod(V, 2) ==Int 0\n     andBool B =/=Int -1 andBool V <Int B"
+      },
+      {
+        "attributes": [],
+        "end_line": 32,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "54ae24d922ee0e9160b4375c071b4b470592a6b1449bde228838f18d591702f6",
+        "source_rule_id": "rule-54ae24d922ee0e9160b4375c071b4b470592a6b1449bde228838f18d591702f6",
+        "start_line": 31,
+        "text": "  rule nextBest(V:Int, B:Int) => B\n    requires pyMod(V, 2) =/=Int 0"
+      },
+      {
+        "attributes": [],
+        "end_line": 35,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "b8012784284cd9618fce60a4c28514e398e05582e617812317f27702bae335ec",
+        "source_rule_id": "rule-b8012784284cd9618fce60a4c28514e398e05582e617812317f27702bae335ec",
+        "start_line": 33,
+        "text": "  rule nextBest(V:Int, B:Int) => B\n    requires pyMod(V, 2) ==Int 0\n     andBool B =/=Int -1 andBool V >=Int B"
+      },
+      {
+        "attributes": [],
+        "end_line": 37,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "79363d6615f777e7776f478ff574834a9d5fac38d409a9b237ddafefa087851d",
+        "source_rule_id": "rule-79363d6615f777e7776f478ff574834a9d5fac38d409a9b237ddafefa087851d",
+        "start_line": 36,
+        "text": "  rule nextBestIndex(V:Int, B:Int, _:Int, I:Int) => I\n    requires pyMod(V, 2) ==Int 0 andBool B ==Int -1"
+      },
+      {
+        "attributes": [],
+        "end_line": 40,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "a266f900b4bccf12fbd72100223273bd9fc9f180481b492d47e32d5057882452",
+        "source_rule_id": "rule-a266f900b4bccf12fbd72100223273bd9fc9f180481b492d47e32d5057882452",
+        "start_line": 38,
+        "text": "  rule nextBestIndex(V:Int, B:Int, _:Int, I:Int) => I\n    requires pyMod(V, 2) ==Int 0\n     andBool B =/=Int -1 andBool V <Int B"
+      },
+      {
+        "attributes": [],
+        "end_line": 42,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "ad241e6ab53177283b700157e914dbb05e46eff1d0ac22588b068ad4802a4624",
+        "source_rule_id": "rule-ad241e6ab53177283b700157e914dbb05e46eff1d0ac22588b068ad4802a4624",
+        "start_line": 41,
+        "text": "  rule nextBestIndex(V:Int, _B:Int, BI:Int, _:Int) => BI\n    requires pyMod(V, 2) =/=Int 0"
+      },
+      {
+        "attributes": [],
+        "end_line": 45,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "298b968657698a5d9d83db8728cf50f7a8c0aec30b1303a724c1d34ceab3ef95",
+        "source_rule_id": "rule-298b968657698a5d9d83db8728cf50f7a8c0aec30b1303a724c1d34ceab3ef95",
+        "start_line": 43,
+        "text": "  rule nextBestIndex(V:Int, B:Int, BI:Int, _:Int) => BI\n    requires pyMod(V, 2) ==Int 0\n     andBool B =/=Int -1 andBool V >=Int B"
+      },
+      {
+        "attributes": [],
+        "end_line": 52,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "5cbe8ae4d73799f30efd6c131725659c94c7c49dcaf2f29ca8124013fc189ea7",
+        "source_rule_id": "rule-5cbe8ae4d73799f30efd6c131725659c94c7c49dcaf2f29ca8124013fc189ea7",
+        "start_line": 51,
+        "text": "  rule scanPluck(.ValSeq, B:Int, BI:Int, I:Int, LAST:Int)\n    => pstate(B, BI, I, LAST)"
+      },
+      {
+        "attributes": [],
+        "end_line": 60,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "9e3b823a7219882d5746da6399ae65cf20d6ec1d38d7685c1a212dc414c5962c",
+        "source_rule_id": "rule-9e3b823a7219882d5746da6399ae65cf20d6ec1d38d7685c1a212dc414c5962c",
+        "start_line": 53,
+        "text": "  rule scanPluck(vCons(V:Val, REST:ValSeq),\n                 B:Int, BI:Int, I:Int, _:Int)\n    => scanPluck(\n         REST,\n         nextBest(asInt(V), B),\n         nextBestIndex(asInt(V), B, BI, I),\n         I +Int 1,\n         asInt(V))"
+      },
+      {
+        "attributes": [],
+        "end_line": 66,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "8d1fcfc6a7b0654cf07cdb4fa02c51ef9600c0509c4c865423b839e6aa314c64",
+        "source_rule_id": "rule-8d1fcfc6a7b0654cf07cdb4fa02c51ef9600c0509c4c865423b839e6aa314c64",
+        "start_line": 66,
+        "text": "  rule stateBest(pstate(B:Int, _:Int, _:Int, _:Int)) => B"
+      },
+      {
+        "attributes": [],
+        "end_line": 67,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "0debf238e3a5bbe1d1ae63bae80f10c176fc00c1525cd03f0d4a24494b661b38",
+        "source_rule_id": "rule-0debf238e3a5bbe1d1ae63bae80f10c176fc00c1525cd03f0d4a24494b661b38",
+        "start_line": 67,
+        "text": "  rule stateBestIndex(pstate(_:Int, BI:Int, _:Int, _:Int)) => BI"
+      },
+      {
+        "attributes": [],
+        "end_line": 68,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "0c360e385016f22aefbfcf260e354775e353cef0e4770d60ac37ad00f6aa9dae",
+        "source_rule_id": "rule-0c360e385016f22aefbfcf260e354775e353cef0e4770d60ac37ad00f6aa9dae",
+        "start_line": 68,
+        "text": "  rule stateIndex(pstate(_:Int, _:Int, I:Int, _:Int)) => I"
+      },
+      {
+        "attributes": [],
+        "end_line": 69,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "e1dffb155234d657cfb859a1fd0d3da26e513e9b5d6006389fbeffb2d532b406",
+        "source_rule_id": "rule-e1dffb155234d657cfb859a1fd0d3da26e513e9b5d6006389fbeffb2d532b406",
+        "start_line": 69,
+        "text": "  rule stateLast(pstate(_:Int, _:Int, _:Int, LAST:Int)) => LAST"
+      },
+      {
+        "attributes": [],
+        "end_line": 74,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "59c179a724bc43a6cf59b58d4da4b102c3ee32d9383e21691c0d37a0fdc1489b",
+        "source_rule_id": "rule-59c179a724bc43a6cf59b58d4da4b102c3ee32d9383e21691c0d37a0fdc1489b",
+        "start_line": 72,
+        "text": "  rule pluckResult(VS:ValSeq)\n    => .ValSeq\n    requires stateBest(scanPluck(VS, -1, -1, 0, 0)) ==Int -1"
+      },
+      {
+        "attributes": [],
+        "end_line": 81,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "a27c9e136616de6cdd0f0b2637c4c6bc6f6d73962ac22fb4de44dfb481ca29c5",
+        "source_rule_id": "rule-a27c9e136616de6cdd0f0b2637c4c6bc6f6d73962ac22fb4de44dfb481ca29c5",
+        "start_line": 75,
+        "text": "  rule pluckResult(VS:ValSeq)\n    => vCons(\n         stateBest(scanPluck(VS, -1, -1, 0, 0)),\n         vCons(\n           stateBestIndex(scanPluck(VS, -1, -1, 0, 0)),\n           .ValSeq))\n    requires stateBest(scanPluck(VS, -1, -1, 0, 0)) =/=Int -1"
+      },
+      {
+        "attributes": [],
+        "end_line": 85,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "cf4138b8c8c76302d40452525511bd8b4e31a4b3346bb98e6e73d97d1e6c2974",
+        "source_rule_id": "rule-cf4138b8c8c76302d40452525511bd8b4e31a4b3346bb98e6e73d97d1e6c2974",
+        "start_line": 85,
+        "text": "  rule allNonNegative(.ValSeq) => true"
+      },
+      {
+        "attributes": [],
+        "end_line": 89,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "08658c75ae76a768ec3561a87b812e6a6f0774f66dece1de6c04027e579c685e",
+        "source_rule_id": "rule-08658c75ae76a768ec3561a87b812e6a6f0774f66dece1de6c04027e579c685e",
+        "start_line": 86,
+        "text": "  rule allNonNegative(vCons(V:Val, REST:ValSeq))\n    => isInt(V)\n       andBool asInt(V) >=Int 0\n       andBool allNonNegative(REST)"
+      }
+    ],
+    "schema_version": 2,
+    "verification_file": "verification.k",
+    "verification_module": "PLUCK-VERIFICATION",
+    "verification_modules": [
+      "PLUCK-VERIFICATION"
+    ],
+    "verification_sha256": "213ef96a2d854d96eba68683a4614d3534632a416cae012bd4b9c79a025bfd53"
+  },
+  "validated_classifications": {
+    "definitions": [
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 7,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "a4e3be4281302f405391ec6aaa6964b5a5d4638615c68aff54858ab1ee2d092a",
+        "rationale": "Defining equation for the proof-only total integer projection; it reduces an already-integer value to that integer.",
+        "source_rule_id": "rule-a4e3be4281302f405391ec6aaa6964b5a5d4638615c68aff54858ab1ee2d092a",
+        "start_line": 7,
+        "text": "  rule asInt(I:Int) => I"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 22,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "4868480142e60a5fc5e0cbd212276c582adf05c328b8192a1fb848ebd4d62069",
+        "rationale": "Defining equation for the named predicate that says the current value replaces the accumulated candidate.",
+        "source_rule_id": "rule-4868480142e60a5fc5e0cbd212276c582adf05c328b8192a1fb848ebd4d62069",
+        "start_line": 20,
+        "text": "  rule pluckTake(V:Int, B:Int)\n    => pyMod(V, 2) ==Int 0\n       andBool (B ==Int -1 orBool V <Int B)"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 27,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "8bfc0a45f1090ce2caec3f9d6158f1484560ab13f4e7c56613c588df123c47ff",
+        "rationale": "First defining case of nextBest: an even value initializes the sentinel candidate.",
+        "source_rule_id": "rule-8bfc0a45f1090ce2caec3f9d6158f1484560ab13f4e7c56613c588df123c47ff",
+        "start_line": 26,
+        "text": "  rule nextBest(V:Int, B:Int) => V\n    requires pyMod(V, 2) ==Int 0 andBool B ==Int -1"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 30,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "8a8a39850618e2f8701a028be1f01e9cc9d984e1c72ee09ed7a6bef81e64d086",
+        "rationale": "Defining case of nextBest for replacing an existing candidate with a smaller even value.",
+        "source_rule_id": "rule-8a8a39850618e2f8701a028be1f01e9cc9d984e1c72ee09ed7a6bef81e64d086",
+        "start_line": 28,
+        "text": "  rule nextBest(V:Int, B:Int) => V\n    requires pyMod(V, 2) ==Int 0\n     andBool B =/=Int -1 andBool V <Int B"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 32,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "54ae24d922ee0e9160b4375c071b4b470592a6b1449bde228838f18d591702f6",
+        "rationale": "Defining case of nextBest that preserves the candidate when the current value is odd.",
+        "source_rule_id": "rule-54ae24d922ee0e9160b4375c071b4b470592a6b1449bde228838f18d591702f6",
+        "start_line": 31,
+        "text": "  rule nextBest(V:Int, B:Int) => B\n    requires pyMod(V, 2) =/=Int 0"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 35,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "b8012784284cd9618fce60a4c28514e398e05582e617812317f27702bae335ec",
+        "rationale": "Defining case of nextBest that preserves a no-larger existing candidate for an even value.",
+        "source_rule_id": "rule-b8012784284cd9618fce60a4c28514e398e05582e617812317f27702bae335ec",
+        "start_line": 33,
+        "text": "  rule nextBest(V:Int, B:Int) => B\n    requires pyMod(V, 2) ==Int 0\n     andBool B =/=Int -1 andBool V >=Int B"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 37,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "79363d6615f777e7776f478ff574834a9d5fac38d409a9b237ddafefa087851d",
+        "rationale": "First defining case of nextBestIndex: the current index accompanies initialization by an even value.",
+        "source_rule_id": "rule-79363d6615f777e7776f478ff574834a9d5fac38d409a9b237ddafefa087851d",
+        "start_line": 36,
+        "text": "  rule nextBestIndex(V:Int, B:Int, _:Int, I:Int) => I\n    requires pyMod(V, 2) ==Int 0 andBool B ==Int -1"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 40,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "a266f900b4bccf12fbd72100223273bd9fc9f180481b492d47e32d5057882452",
+        "rationale": "Defining case of nextBestIndex that selects the current index when a smaller even value replaces the candidate.",
+        "source_rule_id": "rule-a266f900b4bccf12fbd72100223273bd9fc9f180481b492d47e32d5057882452",
+        "start_line": 38,
+        "text": "  rule nextBestIndex(V:Int, B:Int, _:Int, I:Int) => I\n    requires pyMod(V, 2) ==Int 0\n     andBool B =/=Int -1 andBool V <Int B"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 42,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "ad241e6ab53177283b700157e914dbb05e46eff1d0ac22588b068ad4802a4624",
+        "rationale": "Defining case of nextBestIndex that preserves the prior index for an odd value.",
+        "source_rule_id": "rule-ad241e6ab53177283b700157e914dbb05e46eff1d0ac22588b068ad4802a4624",
+        "start_line": 41,
+        "text": "  rule nextBestIndex(V:Int, _B:Int, BI:Int, _:Int) => BI\n    requires pyMod(V, 2) =/=Int 0"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 45,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "298b968657698a5d9d83db8728cf50f7a8c0aec30b1303a724c1d34ceab3ef95",
+        "rationale": "Defining case of nextBestIndex that preserves the prior index when an even value does not improve the candidate.",
+        "source_rule_id": "rule-298b968657698a5d9d83db8728cf50f7a8c0aec30b1303a724c1d34ceab3ef95",
+        "start_line": 43,
+        "text": "  rule nextBestIndex(V:Int, B:Int, BI:Int, _:Int) => BI\n    requires pyMod(V, 2) ==Int 0\n     andBool B =/=Int -1 andBool V >=Int B"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 52,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "5cbe8ae4d73799f30efd6c131725659c94c7c49dcaf2f29ca8124013fc189ea7",
+        "rationale": "Base equation of the functional scan, returning the accumulated proof state for an empty suffix.",
+        "source_rule_id": "rule-5cbe8ae4d73799f30efd6c131725659c94c7c49dcaf2f29ca8124013fc189ea7",
+        "start_line": 51,
+        "text": "  rule scanPluck(.ValSeq, B:Int, BI:Int, I:Int, LAST:Int)\n    => pstate(B, BI, I, LAST)"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 60,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "9e3b823a7219882d5746da6399ae65cf20d6ec1d38d7685c1a212dc414c5962c",
+        "rationale": "Recursive equation of the functional scan over a nonempty value sequence.",
+        "source_rule_id": "rule-9e3b823a7219882d5746da6399ae65cf20d6ec1d38d7685c1a212dc414c5962c",
+        "start_line": 53,
+        "text": "  rule scanPluck(vCons(V:Val, REST:ValSeq),\n                 B:Int, BI:Int, I:Int, _:Int)\n    => scanPluck(\n         REST,\n         nextBest(asInt(V), B),\n         nextBestIndex(asInt(V), B, BI, I),\n         I +Int 1,\n         asInt(V))"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 66,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "8d1fcfc6a7b0654cf07cdb4fa02c51ef9600c0509c4c865423b839e6aa314c64",
+        "rationale": "Structural projection equation selecting the best-value component of a pstate proof term.",
+        "source_rule_id": "rule-8d1fcfc6a7b0654cf07cdb4fa02c51ef9600c0509c4c865423b839e6aa314c64",
+        "start_line": 66,
+        "text": "  rule stateBest(pstate(B:Int, _:Int, _:Int, _:Int)) => B"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 67,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "0debf238e3a5bbe1d1ae63bae80f10c176fc00c1525cd03f0d4a24494b661b38",
+        "rationale": "Structural projection equation selecting the best-index component of a pstate proof term.",
+        "source_rule_id": "rule-0debf238e3a5bbe1d1ae63bae80f10c176fc00c1525cd03f0d4a24494b661b38",
+        "start_line": 67,
+        "text": "  rule stateBestIndex(pstate(_:Int, BI:Int, _:Int, _:Int)) => BI"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 68,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "0c360e385016f22aefbfcf260e354775e353cef0e4770d60ac37ad00f6aa9dae",
+        "rationale": "Structural projection equation selecting the running-index component of a pstate proof term.",
+        "source_rule_id": "rule-0c360e385016f22aefbfcf260e354775e353cef0e4770d60ac37ad00f6aa9dae",
+        "start_line": 68,
+        "text": "  rule stateIndex(pstate(_:Int, _:Int, I:Int, _:Int)) => I"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 69,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "e1dffb155234d657cfb859a1fd0d3da26e513e9b5d6006389fbeffb2d532b406",
+        "rationale": "Structural projection equation selecting the last-value component of a pstate proof term.",
+        "source_rule_id": "rule-e1dffb155234d657cfb859a1fd0d3da26e513e9b5d6006389fbeffb2d532b406",
+        "start_line": 69,
+        "text": "  rule stateLast(pstate(_:Int, _:Int, _:Int, LAST:Int)) => LAST"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 74,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "59c179a724bc43a6cf59b58d4da4b102c3ee32d9383e21691c0d37a0fdc1489b",
+        "rationale": "Defining result-construction case for a scan that retains the no-candidate sentinel.",
+        "source_rule_id": "rule-59c179a724bc43a6cf59b58d4da4b102c3ee32d9383e21691c0d37a0fdc1489b",
+        "start_line": 72,
+        "text": "  rule pluckResult(VS:ValSeq)\n    => .ValSeq\n    requires stateBest(scanPluck(VS, -1, -1, 0, 0)) ==Int -1"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 81,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "a27c9e136616de6cdd0f0b2637c4c6bc6f6d73962ac22fb4de44dfb481ca29c5",
+        "rationale": "Defining result-construction case that returns the scan's best value and its stored index.",
+        "source_rule_id": "rule-a27c9e136616de6cdd0f0b2637c4c6bc6f6d73962ac22fb4de44dfb481ca29c5",
+        "start_line": 75,
+        "text": "  rule pluckResult(VS:ValSeq)\n    => vCons(\n         stateBest(scanPluck(VS, -1, -1, 0, 0)),\n         vCons(\n           stateBestIndex(scanPluck(VS, -1, -1, 0, 0)),\n           .ValSeq))\n    requires stateBest(scanPluck(VS, -1, -1, 0, 0)) =/=Int -1"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 85,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "cf4138b8c8c76302d40452525511bd8b4e31a4b3346bb98e6e73d97d1e6c2974",
+        "rationale": "Base equation defining the nonnegative-integer input predicate on the empty sequence.",
+        "source_rule_id": "rule-cf4138b8c8c76302d40452525511bd8b4e31a4b3346bb98e6e73d97d1e6c2974",
+        "start_line": 85,
+        "text": "  rule allNonNegative(.ValSeq) => true"
+      },
+      {
+        "attributes": [],
+        "classification": "DEFINITION",
+        "end_line": 89,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "08658c75ae76a768ec3561a87b812e6a6f0774f66dece1de6c04027e579c685e",
+        "rationale": "Recursive equation defining the nonnegative-integer input predicate on a nonempty sequence.",
+        "source_rule_id": "rule-08658c75ae76a768ec3561a87b812e6a6f0774f66dece1de6c04027e579c685e",
+        "start_line": 86,
+        "text": "  rule allNonNegative(vCons(V:Val, REST:ValSeq))\n    => isInt(V)\n       andBool asInt(V) >=Int 0\n       andBool allNonNegative(REST)"
+      }
+    ],
+    "domain_lemmas": [],
+    "operational_rules": [
+      {
+        "attributes": [
+          "priority(40)"
+        ],
+        "classification": "OPERATIONAL_RULE",
+        "end_line": 15,
+        "module": "PLUCK-VERIFICATION",
+        "normalized_sha256": "3f5db89b9787a3fdf999e8c890b73a2db174f5c7f8ef866a09ac4e01f6c1c04a",
+        "rationale": "Operational specialization of list iteration for values satisfying isInt, yielding the proof model's integer projection while advancing the iterator.",
+        "source_rule_id": "rule-3f5db89b9787a3fdf999e8c890b73a2db174f5c7f8ef866a09ac4e01f6c1c04a",
+        "start_line": 12,
+        "text": "  rule <k> #iterNext(list(vCons(V:Val, REST:ValSeq)))\n        => #iterYield(asInt(V), list(REST)) ... </k>\n       requires isInt(V)\n       [priority(40)]"
+      }
+    ],
+    "proved_derived_lemmas": []
+  }
+}
+COMMAND: sed -n 1,360p /reference/lemma-discovery.json
+{
+  "schema_version": 2,
+  "inventory_sha256": "74d32acdd1441ede107a81e6f1273f09ea4c7a684042c14c316e44330ae67f32",
+  "rules": [
+    {
+      "source_rule_id": "rule-a4e3be4281302f405391ec6aaa6964b5a5d4638615c68aff54858ab1ee2d092a",
+      "classification": "DEFINITION",
+      "rationale": "Defining equation for the proof-only total integer projection; it reduces an already-integer value to that integer."
+    },
+    {
+      "source_rule_id": "rule-3f5db89b9787a3fdf999e8c890b73a2db174f5c7f8ef866a09ac4e01f6c1c04a",
+      "classification": "OPERATIONAL_RULE",
+      "rationale": "Operational specialization of list iteration for values satisfying isInt, yielding the proof model's integer projection while advancing the iterator."
+    },
+    {
+      "source_rule_id": "rule-4868480142e60a5fc5e0cbd212276c582adf05c328b8192a1fb848ebd4d62069",
+      "classification": "DEFINITION",
+      "rationale": "Defining equation for the named predicate that says the current value replaces the accumulated candidate."
+    },
+    {
+      "source_rule_id": "rule-8bfc0a45f1090ce2caec3f9d6158f1484560ab13f4e7c56613c588df123c47ff",
+      "classification": "DEFINITION",
+      "rationale": "First defining case of nextBest: an even value initializes the sentinel candidate."
+    },
+    {
+      "source_rule_id": "rule-8a8a39850618e2f8701a028be1f01e9cc9d984e1c72ee09ed7a6bef81e64d086",
+      "classification": "DEFINITION",
+      "rationale": "Defining case of nextBest for replacing an existing candidate with a smaller even value."
+    },
+    {
+      "source_rule_id": "rule-54ae24d922ee0e9160b4375c071b4b470592a6b1449bde228838f18d591702f6",
+      "classification": "DEFINITION",
+      "rationale": "Defining case of nextBest that preserves the candidate when the current value is odd."
+    },
+    {
+      "source_rule_id": "rule-b8012784284cd9618fce60a4c28514e398e05582e617812317f27702bae335ec",
+      "classification": "DEFINITION",
+      "rationale": "Defining case of nextBest that preserves a no-larger existing candidate for an even value."
+    },
+    {
+      "source_rule_id": "rule-79363d6615f777e7776f478ff574834a9d5fac38d409a9b237ddafefa087851d",
+      "classification": "DEFINITION",
+      "rationale": "First defining case of nextBestIndex: the current index accompanies initialization by an even value."
+    },
+    {
+      "source_rule_id": "rule-a266f900b4bccf12fbd72100223273bd9fc9f180481b492d47e32d5057882452",
+      "classification": "DEFINITION",
+      "rationale": "Defining case of nextBestIndex that selects the current index when a smaller even value replaces the candidate."
+    },
+    {
+      "source_rule_id": "rule-ad241e6ab53177283b700157e914dbb05e46eff1d0ac22588b068ad4802a4624",
+      "classification": "DEFINITION",
+      "rationale": "Defining case of nextBestIndex that preserves the prior index for an odd value."
+    },
+    {
+      "source_rule_id": "rule-298b968657698a5d9d83db8728cf50f7a8c0aec30b1303a724c1d34ceab3ef95",
+      "classification": "DEFINITION",
+      "rationale": "Defining case of nextBestIndex that preserves the prior index when an even value does not improve the candidate."
+    },
+    {
+      "source_rule_id": "rule-5cbe8ae4d73799f30efd6c131725659c94c7c49dcaf2f29ca8124013fc189ea7",
+      "classification": "DEFINITION",
+      "rationale": "Base equation of the functional scan, returning the accumulated proof state for an empty suffix."
+    },
+    {
+      "source_rule_id": "rule-9e3b823a7219882d5746da6399ae65cf20d6ec1d38d7685c1a212dc414c5962c",
+      "classification": "DEFINITION",
+      "rationale": "Recursive equation of the functional scan over a nonempty value sequence."
+    },
+    {
+      "source_rule_id": "rule-8d1fcfc6a7b0654cf07cdb4fa02c51ef9600c0509c4c865423b839e6aa314c64",
+      "classification": "DEFINITION",
+      "rationale": "Structural projection equation selecting the best-value component of a pstate proof term."
+    },
+    {
+      "source_rule_id": "rule-0debf238e3a5bbe1d1ae63bae80f10c176fc00c1525cd03f0d4a24494b661b38",
+      "classification": "DEFINITION",
+      "rationale": "Structural projection equation selecting the best-index component of a pstate proof term."
+    },
+    {
+      "source_rule_id": "rule-0c360e385016f22aefbfcf260e354775e353cef0e4770d60ac37ad00f6aa9dae",
+      "classification": "DEFINITION",
+      "rationale": "Structural projection equation selecting the running-index component of a pstate proof term."
+    },
+    {
+      "source_rule_id": "rule-e1dffb155234d657cfb859a1fd0d3da26e513e9b5d6006389fbeffb2d532b406",
+      "classification": "DEFINITION",
+      "rationale": "Structural projection equation selecting the last-value component of a pstate proof term."
+    },
+    {
+      "source_rule_id": "rule-59c179a724bc43a6cf59b58d4da4b102c3ee32d9383e21691c0d37a0fdc1489b",
+      "classification": "DEFINITION",
+      "rationale": "Defining result-construction case for a scan that retains the no-candidate sentinel."
+    },
+    {
+      "source_rule_id": "rule-a27c9e136616de6cdd0f0b2637c4c6bc6f6d73962ac22fb4de44dfb481ca29c5",
+      "classification": "DEFINITION",
+      "rationale": "Defining result-construction case that returns the scan's best value and its stored index."
+    },
+    {
+      "source_rule_id": "rule-cf4138b8c8c76302d40452525511bd8b4e31a4b3346bb98e6e73d97d1e6c2974",
+      "classification": "DEFINITION",
+      "rationale": "Base equation defining the nonnegative-integer input predicate on the empty sequence."
+    },
+    {
+      "source_rule_id": "rule-08658c75ae76a768ec3561a87b812e6a6f0774f66dece1de6c04027e579c685e",
+      "classification": "DEFINITION",
+      "rationale": "Recursive equation defining the nonnegative-integer input predicate on a nonempty sequence."
+    }
+  ]
+}
+
+Script done on 2026-07-28 17:44:29-05:00 [COMMAND_EXIT_CODE="0"]

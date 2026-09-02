@@ -1,0 +1,553 @@
+Script started on 2026-07-31 02:42:12-05:00 [<not executed on terminal>]
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Definitional summary of the prompt's predicate over the semantics' string
+     7	  // representation.  It does not rewrite or bypass any program computation.
+     8	  syntax Bool ::= standaloneLastLetter(IntSeq) [function, total]
+     9	
+    10	  rule standaloneLastLetter(IS:IntSeq) => false
+    11	    requires isLen(IS) ==Int 0
+    12	
+    13	  rule standaloneLastLetter(IS:IntSeq) => false
+    14	    requires isLen(IS) >Int 0
+    15	      andBool notBool isAlphaC(intSeqAt(IS, isLen(IS) -Int 1))
+    16	
+    17	  rule standaloneLastLetter(IS:IntSeq) => true
+    18	    requires isLen(IS) ==Int 1
+    19	      andBool isAlphaC(intSeqAt(IS, 0))
+    20	
+    21	  rule standaloneLastLetter(IS:IntSeq)
+    22	    => intSeqAt(IS, isLen(IS) -Int 2) ==Int 32
+    23	    requires isLen(IS) >Int 1
+    24	      andBool isAlphaC(intSeqAt(IS, isLen(IS) -Int 1))
+    25	
+    26	  // Derived constructor-disjointness lemma needed by the backend to simplify
+    27	  // the non-emptiness conjunct in str.isalpha() on a one-character string.
+    28	  rule iCons(_C:Int, _REST:IntSeq) ==K .IntSeq
+    29	    => false
+    30	    [simplification]
+    31	
+    32	  // Equality of singleton code sequences is equality of their sole codes.
+    33	  rule iCons(C:Int, .IntSeq) ==K iCons(D:Int, .IntSeq)
+    34	    => C ==Int D
+    35	    [simplification]
+    36	endmodule
+     1	#!/usr/bin/env bash
+     2	set -eu
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py smoke.py > smoke.mpy
+     6	
+     7	kompile reference-semantics/semantics.k \
+     8	  --backend llvm \
+     9	  --main-module MPY-KRUN \
+    10	  --syntax-module MPY-SYNTAX \
+    11	  --output-definition runtime-kompiled
+    12	
+    13	krun smoke.mpy --definition runtime-kompiled
+    14	python3 test_solution.py
+    15	
+    16	kompile --backend haskell verification.k \
+    17	  --main-module VERIFICATION \
+    18	  --syntax-module MPY-SYNTAX \
+    19	  --output-definition verification-kompiled
+    20	
+    21	kprove spec.k \
+    22	  --definition verification-kompiled \
+    23	  --spec-module SPEC
+    24	
+    25	kprove spec-model-boundary.k \
+    26	  --definition verification-kompiled \
+    27	  --spec-module SPEC-MODEL-BOUNDARY
+    28	
+    29	if kprove spec-vacuity.k \
+    30	  --definition verification-kompiled \
+    31	  --spec-module SPEC-VACUITY
+    32	then
+    33	  echo "ERROR: false-result mutation unexpectedly proved"
+    34	  exit 1
+    35	else
+    36	  echo "EXPECTED FAILURE: false-result mutation was rejected"
+    37	fi
+    38	
+    39	if kprove spec-body-mutation.k \
+    40	  --definition verification-kompiled \
+    41	  --spec-module SPEC-BODY-MUTATION
+    42	then
+    43	  echo "ERROR: body mutation unexpectedly proved"
+    44	  exit 1
+    45	else
+    46	  echo "EXPECTED FAILURE: body mutation was rejected"
+    47	fi
+     1	def check_if_last_char_is_a_letter(txt):
+     2	    if len(txt) == 0:
+     3	        return False
+     4	    return txt[-1].isalpha() and (len(txt) == 1 or txt[-2] == " ")
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [target-empty]:
+     7	    <k>
+     8	      Call(
+     9	        Name("check_if_last_char_is_a_letter"),
+    10	        str(IS:IntSeq), .Exprs)
+    11	      => standaloneLastLetter(IS)
+    12	    </k>
+    13	    <env> 0 </env>
+    14	    <scopes>
+    15	      0 |-> scope(
+    16	             "check_if_last_char_is_a_letter" |->
+    17	               closureVal(
+    18	                 "txt", .ParamNames,
+    19	                 If(
+    20	                   Compare(Call(Name("len"), Name("txt")),
+    21	                           CmpOp("==", Int(0))),
+    22	                   Return(Bool(false)),
+    23	                   .Stmts)
+    24	                 Return(
+    25	                   BoolOp(
+    26	                     "and",
+    27	                     Call(
+    28	                       Attribute(
+    29	                         Subscript(Name("txt"), UnaryOp("-", Int(1))),
+    30	                         "isalpha"),
+    31	                       .Exprs),
+    32	                     BoolOp(
+    33	                       "or",
+    34	                       Compare(Call(Name("len"), Name("txt")),
+    35	                               CmpOp("==", Int(1))),
+    36	                       Compare(
+    37	                         Subscript(Name("txt"), UnaryOp("-", Int(2))),
+    38	                         CmpOp("==", Str(" "))),
+    39	                       .Exprs),
+    40	                     .Exprs)),
+    41	                 0),
+    42	             parent(-1))
+    43	      -1 |-> builtinsScope
+    44	    </scopes>
+    45	    <scopeLoc> 1 </scopeLoc>
+    46	    <heap> .Map </heap>
+    47	    <heapLoc> 0 </heapLoc>
+    48	    <stack> .List </stack>
+    49	    <ret> noRet </ret>
+    50	    <exc> NoExc </exc>
+    51	    <exit-code> 0 </exit-code>
+    52	    requires isLen(IS) ==Int 0
+    53	
+    54	  claim [target-nonalpha]:
+    55	    <k>
+    56	      Call(
+    57	        Name("check_if_last_char_is_a_letter"),
+    58	        str(IS:IntSeq), .Exprs)
+    59	      => standaloneLastLetter(IS)
+    60	    </k>
+    61	    <env> 0 </env>
+    62	    <scopes>
+    63	      0 |-> scope(
+    64	             "check_if_last_char_is_a_letter" |->
+    65	               closureVal(
+    66	                 "txt", .ParamNames,
+    67	                 If(
+    68	                   Compare(Call(Name("len"), Name("txt")),
+    69	                           CmpOp("==", Int(0))),
+    70	                   Return(Bool(false)),
+    71	                   .Stmts)
+    72	                 Return(
+    73	                   BoolOp(
+    74	                     "and",
+    75	                     Call(
+    76	                       Attribute(
+    77	                         Subscript(Name("txt"), UnaryOp("-", Int(1))),
+    78	                         "isalpha"),
+    79	                       .Exprs),
+    80	                     BoolOp(
+    81	                       "or",
+    82	                       Compare(Call(Name("len"), Name("txt")),
+    83	                               CmpOp("==", Int(1))),
+    84	                       Compare(
+    85	                         Subscript(Name("txt"), UnaryOp("-", Int(2))),
+    86	                         CmpOp("==", Str(" "))),
+    87	                       .Exprs),
+    88	                     .Exprs)),
+    89	                 0),
+    90	             parent(-1))
+    91	      -1 |-> builtinsScope
+    92	    </scopes>
+    93	    <scopeLoc> 1 </scopeLoc>
+    94	    <heap> .Map </heap>
+    95	    <heapLoc> 0 </heapLoc>
+    96	    <stack> .List </stack>
+    97	    <ret> noRet </ret>
+    98	    <exc> NoExc </exc>
+    99	    <exit-code> 0 </exit-code>
+   100	    requires isLen(IS) >Int 0
+   101	      andBool notBool isAlphaC(intSeqAt(IS, isLen(IS) -Int 1))
+   102	
+   103	  claim [target-alpha]:
+   104	    <k>
+   105	      Call(
+   106	        Name("check_if_last_char_is_a_letter"),
+   107	        str(IS:IntSeq), .Exprs)
+   108	      => standaloneLastLetter(IS)
+   109	    </k>
+   110	    <env> 0 </env>
+   111	    <scopes>
+   112	      0 |-> scope(
+   113	             "check_if_last_char_is_a_letter" |->
+   114	               closureVal(
+   115	                 "txt", .ParamNames,
+   116	                 If(
+   117	                   Compare(Call(Name("len"), Name("txt")),
+   118	                           CmpOp("==", Int(0))),
+   119	                   Return(Bool(false)),
+   120	                   .Stmts)
+   121	                 Return(
+   122	                   BoolOp(
+   123	                     "and",
+   124	                     Call(
+   125	                       Attribute(
+   126	                         Subscript(Name("txt"), UnaryOp("-", Int(1))),
+   127	                         "isalpha"),
+   128	                       .Exprs),
+   129	                     BoolOp(
+   130	                       "or",
+   131	                       Compare(Call(Name("len"), Name("txt")),
+   132	                               CmpOp("==", Int(1))),
+   133	                       Compare(
+   134	                         Subscript(Name("txt"), UnaryOp("-", Int(2))),
+   135	                         CmpOp("==", Str(" "))),
+   136	                       .Exprs),
+   137	                     .Exprs)),
+   138	                 0),
+   139	             parent(-1))
+   140	      -1 |-> builtinsScope
+   141	    </scopes>
+   142	    <scopeLoc> 1 </scopeLoc>
+   143	    <heap> .Map </heap>
+   144	    <heapLoc> 0 </heapLoc>
+   145	    <stack> .List </stack>
+   146	    <ret> noRet </ret>
+   147	    <exc> NoExc </exc>
+   148	    <exit-code> 0 </exit-code>
+   149	    requires isLen(IS) >Int 0
+   150	      andBool isAlphaC(intSeqAt(IS, isLen(IS) -Int 1))
+   151	endmodule
+     1	// reference/src/semantics/core.k — MPY-CORE
+     2	
+     3	module MPY-CORE
+     4	  imports MPY-SYNTAX
+     5	  imports INT
+     6	  imports BOOL
+     7	  imports STRING
+     8	  imports MAP
+     9	  imports LIST
+    10	  imports K-EQUAL
+    11	
+    12	  // ==== values, the algebraic lists, and the scope heap =====================
+    13	  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+    14	  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+    15	  syntax Str    ::= str(IntSeq)
+    16	
+    17	  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+    18	  syntax Iterable ::= list(ValSeq)
+    19	                    | tuple(ValSeq)
+    20	                    | Str
+    21	                    | rangeObj(Int, Int, Int)
+    22	                    | zipObj(ValSeq, ValSeq)
+    23	                    | zipObjS(IntSeq, IntSeq)
+    24	
+    25	  syntax Val      ::= Int
+    26	                    | Bool
+    27	                    | "noneV"
+    28	                    | Iterable
+    29	                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+    30	                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+    31	                    | closureVal(ParamNames, Stmts, Int)
+    32	                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+    33	                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+    34	                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+    35	
+    36	  syntax Parent   ::= "root" | parent(Int)
+    37	  syntax Scope    ::= scope(Map, Parent)
+    38	  syntax KResult  ::= Val
+    39	  syntax Expr     ::= Val   // cooling puts results back into expression holes
+    40	  syntax Vals     ::= List{Val, ","}
+    41	  syntax Exc      ::= "NoExc" | "AssertionError"
+    42	  syntax RetState ::= "noRet" | retV(Val)
+    43	
+    44	  // ==== configuration =======================================================
+    45	  // The builtins namespace is a real scope at reserved location -1 (the bottom of every
+   195	  rule <k> Bool(B:Bool) => B ... </k>
+   196	  rule <k> NoneVal      => noneV ... </k>
+   197	
+   198	  // ==== truthy (If, Assert, BoolOp, IfExp, not, While) ======================
+   199	  syntax Bool ::= truthy(Val) [function]
+   200	  rule truthy(B:Bool)          => B
+   201	  rule truthy(noneV)           => false
+   202	  rule truthy(I:Int)           => I =/=Int 0
+   203	  rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)
+   204	  rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)
+   205	  rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)
+   206	
+   207	  // ==== extensible operator dispatch (cases added by the construct modules) ==
+   208	  syntax Val  ::= applyUn(String, Val) [function]
+   209	  syntax Val  ::= applyBin(String, Val, Val) [function]
+   210	  syntax Bool ::= applyCmp(String, Val, Val) [function]
+   211	
+   212	  // ==== bool-is-a-subtype-of-int: numeric promotion helpers =================
+   213	  // Python: `bool` derives from `int`; True/False act as 1/0 in arithmetic and
+   214	  // comparison. boolAsInt is the total 0/1 coercion; the op-class predicates gate
+   215	  // the generic Bool-operand promotion rules in int.k / bool.k / float.k (they
+   216	  // re-dispatch to the existing Int / Float cases after coercion, so no numeric
+   217	  // logic is duplicated). == and != over Bool x Bool stay in bool.k unchanged.
+   218	  syntax Int ::= boolAsInt(Bool) [function, total]
+   219	  rule boolAsInt(true)  => 1
+   220	  rule boolAsInt(false) => 0
+   221	
+   222	  syntax Bool ::= isArithOp(String) [function, total]
+   223	  rule isArithOp(OP:String)
+   224	    => OP ==String "+"  orBool OP ==String "-"  orBool OP ==String "*"
+   225	       orBool OP ==String "/" orBool OP ==String "//" orBool OP ==String "%"
+   226	       orBool OP ==String "**"
+   227	  // the six comparison operators (== != < <= > >=)
+   228	  syntax Bool ::= isEqOrdOp(String) [function, total]
+   229	  rule isEqOrdOp(OP:String)
+   230	    => OP ==String "==" orBool OP ==String "!=" orBool OP ==String "<"
+   231	       orBool OP ==String "<=" orBool OP ==String ">" orBool OP ==String ">="
+   232	  // the four ordering operators only (< <= > >=)
+   233	  syntax Bool ::= isOrdOp(String) [function, total]
+   234	  rule isOrdOp(OP:String)
+   235	    => OP ==String "<" orBool OP ==String "<=" orBool OP ==String ">" orBool OP ==String ">="
+   236	
+   237	  // ==== shared list helpers =================================================
+   238	  syntax Vals ::= appendVal(Vals, Val) [function, total]
+   239	  rule appendVal(.Vals, V:Val)              => V , .Vals
+   240	  rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+   241	
+   242	  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+   243	  rule vals2valSeq(.Vals)            => .ValSeq
+   244	  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+   245	
+   246	  // ==== shared sequence length (len / summaries across many modules) ========
+   247	  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+   248	  syntax Int ::= vsLen(ValSeq) [function, total]
+   249	  rule vsLen(.ValSeq)                => 0
+   250	  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+   251	
+   252	  syntax Int ::= isLen(IntSeq) [function, total]
+   253	  rule isLen(.IntSeq)                => 0
+   254	  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+   255	
+   256	  // in-bounds positional write (list subscript-assign); OOB leaves the seq unchanged
+   257	  // (valid programs write in-bounds — mirrors valSeqAt's total-but-underspecified stance)
+   258	  syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]
+   259	  rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq
+   260	  rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val)    => vCons(V, S)
+     1	// reference/src/semantics/methods.k — MPY-METHODS
+     2	
+     3	module MPY-METHODS
+     4	  imports MPY-CORE
+     5	  imports K-EQUAL
+     6	  imports MPY-STR
+     7	  imports MPY-LIST
+     8	
+     9	  // method-call routing + arg-eval live in call.k; this module owns applyMethod.
+    10	  syntax Val ::= applyMethod(Val, String, Vals) [function]
+    11	
+    12	  // ==== string predicates (Python semantics) =================================
+    13	  rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)
+    14	  rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)
+    15	  rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)
+    16	  rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS)
+    17	
+    18	  // ==== case maps ============================================================
+    19	  rule applyMethod(str(CS:IntSeq), "lower",    .Vals) => str(mapLower(CS))
+    20	  rule applyMethod(str(CS:IntSeq), "upper",    .Vals) => str(mapUpper(CS))
+    21	  rule applyMethod(str(CS:IntSeq), "swapcase", .Vals) => str(mapSwap(CS))
+    22	
+    23	  // ==== join / count / strip / encode ========================================
+    24	  // S.join(list-of-str): fold with separator codes (receiver + arg deref'd by
+    25	  // the call layer; the result str is a value)
+    26	  rule applyMethod(str(SEP:IntSeq), "join", list(VS:ValSeq), .Vals) => str(joinCodes(SEP, VS))
+    27	  syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]
+    28	  rule joinCodes(_:IntSeq, .ValSeq) => .IntSeq
+    29	  rule joinCodes(_:IntSeq, vCons(str(CS:IntSeq), .ValSeq)) => CS
+    30	  rule joinCodes(SEP:IntSeq, vCons(str(CS:IntSeq), vCons(V:Val, R:ValSeq)))
+    31	    => seqConcat(CS, seqConcat(SEP, joinCodes(SEP, vCons(V, R))))
+    32	
+    33	  // S.count(sub): non-overlapping window scan (Python str.count)
+    34	  rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)
+    35	  syntax Int ::= cntSub(IntSeq, IntSeq) [function]
+    36	  rule cntSub(.IntSeq, _:IntSeq) => 0
+    37	  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC)
+    38	       requires strPrefix(PC, iCons(C, R)) andBool isLen(PC) >Int 0
+    39	  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => cntSub(R, PC)
+    40	       requires notBool strPrefix(PC, iCons(C, R)) orBool isLen(PC) <=Int 0
+    41	  syntax IntSeq ::= dropIS(IntSeq, Int) [function, total]
+    42	  rule dropIS(S:IntSeq, N:Int) => S requires N <=Int 0
+    43	  rule dropIS(.IntSeq, _:Int) => .IntSeq [owise]
+    44	  rule dropIS(iCons(_:Int, R:IntSeq), N:Int) => dropIS(R, N -Int 1) requires N >Int 0
+    45	
+   112	  syntax Bool ::= isUpperC(Int) [function, total]
+   113	  rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90
+   114	
+   115	  syntax Bool ::= isLowerC(Int) [function, total]
+   116	  rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122
+   117	
+   118	  syntax Bool ::= isAlphaC(Int) [function, total]
+   119	  rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)
+   120	
+   121	  syntax Bool ::= isDigitC(Int) [function, total]
+   122	  rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57
+   123	
+   124	  syntax Bool ::= hasUpper(IntSeq) [function, total]
+   125	  rule hasUpper(.IntSeq) => false
+   126	  rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)
+   127	
+   128	  syntax Bool ::= hasLower(IntSeq) [function, total]
+   129	  rule hasLower(.IntSeq) => false
+   130	  rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)
+   131	
+   132	  syntax Bool ::= allAlpha(IntSeq) [function, total]
+   133	  rule allAlpha(.IntSeq) => true
+   134	  rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)
+   135	
+   136	  syntax Bool ::= allDigit(IntSeq) [function, total]
+   137	  rule allDigit(.IntSeq) => true
+   138	  rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)
+   139	
+   140	  syntax Int ::= lowerC(Int) [function, total]
+   141	
+   142	  rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)
+   143	  rule lowerC(C:Int) => C         [owise]
+   144	
+   145	  syntax Int ::= upperC(Int) [function, total]
+     1	// reference/src/semantics/subscript.k — MPY-SUBSCRIPT
+     2	
+     3	module MPY-SUBSCRIPT
+     4	  imports MPY-CORE
+     5	
+     6	  // ==== positional access + negative-index normalization (used only here) ===
+     7	  // valSeqAt is [total]: in-bounds vCons access reduces as usual; on an OPAQUE sequence (e.g.
+     8	  // a trusted sort's sortVS(VS)) or OOB it stays an abstract total value — so indexing the
+     9	  // opaque sorted list is DEFINED (no undischarged #Ceil), matching the old semantics' total
+    10	  // atK. K trusts the [total] annotation; valid programs index in-bounds.
+    11	  syntax Val ::= valSeqAt(ValSeq, Int) [function, total]
+    12	  rule valSeqAt(vCons(V:Val, _:ValSeq), 0)     => V
+    13	  rule valSeqAt(vCons(_:Val, S:ValSeq), I:Int) => valSeqAt(S, I -Int 1)
+    14	       requires I >Int 0
+    15	
+    16	  syntax Int ::= intSeqAt(IntSeq, Int) [function]
+    17	  rule intSeqAt(iCons(C:Int, _:IntSeq), 0)     => C
+    18	  rule intSeqAt(iCons(_:Int, S:IntSeq), I:Int) => intSeqAt(S, I -Int 1)
+    19	       requires I >Int 0
+    20	
+    21	  syntax Int ::= normIdx(Int, Int) [function, total]
+    22	  rule normIdx(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0
+    23	  rule normIdx(I:Int, _:Int)   => I          requires I >=Int 0
+    24	
+    25	  // ==== Subscript: indexing obj[i] (list / tuple / str) =====================
+    26	  // contexts (not strict attrs): the Index slot's Slice alternative must never heat
+    27	  context Subscript(HOLE, _)
+    28	  context Subscript(_:Val, HOLE:Expr)
+    29	
+    30	  // heap-object deref (covers both the index and slice forms via the Index slot)
+    31	  rule <k> Subscript(ref(H:Int), IX:Index) => Subscript(V, IX) ... </k>
+    32	       <heap> ... H |-> V:Val ... </heap>
+    33	       [priority(40)]
+    34	
+    35	  rule <k> Subscript(OBJ:Val, I:Int) => applyIndex(OBJ, I) ... </k>
+    36	
+    37	  syntax Val ::= applyIndex(Val, Int) [function]
+    38	  rule applyIndex(list(VS:ValSeq),  I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+    39	  rule applyIndex(tuple(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+    40	  rule applyIndex(str(IS:IntSeq),   I:Int)
+    41	    => str(iCons(intSeqAt(IS, normIdx(I, isLen(IS))), .IntSeq))
+    42	
+    43	  // ==== Slice: obj[lo:hi:step] (list / str) — CPython slice.indices ==========
+    44	  syntax KItem ::= #evalB(Bound) | "#toSome"
+    45	                 | #slLo(Val, Bound, Bound)
+    46	                 | #slHi(Val, OptInt, Bound)
+    47	                 | #slStep(Val, OptInt, OptInt)
+    48	
+    49	  syntax OptInt ::= "noB" | someB(Int)
+    50	  rule <k> #evalB(NoBound)  => noB ... </k>
+     1	// reference/src/semantics/int.k — MPY-INT
+     2	// Int cases of the operator dispatch; Python // and % are floored (pyMod).
+     3	
+     4	module MPY-INT
+     5	  imports MPY-CORE
+     6	
+     7	  rule applyUn("-", I:Int) => 0 -Int I
+     8	
+     9	  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    10	  // Bool participates in int arithmetic (x += (a == b))
+    11	  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+    12	  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+    13	  // bool is a subtype of int: any Bool operand promotes to 0/1 and re-dispatches
+    14	  // to the Int cases (the "+" mixed cases above are kept, so "+" is excluded here
+    15	  // to avoid a duplicate rule — Bool + Bool still promotes via the Bool x Bool rule).
+    16	  rule applyBin(OP:String, B1:Bool, B2:Bool) => applyBin(OP, boolAsInt(B1), boolAsInt(B2))
+    17	       requires isArithOp(OP)
+    18	  rule applyBin(OP:String, B:Bool, I:Int)    => applyBin(OP, boolAsInt(B), I)
+    19	       requires isArithOp(OP) andBool OP =/=String "+"
+    20	  rule applyBin(OP:String, I:Int, B:Bool)    => applyBin(OP, I, boolAsInt(B))
+    21	       requires isArithOp(OP) andBool OP =/=String "+"
+    22	  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+    23	  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+    24	  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+    25	  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+    26	  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+    27	
+    28	  syntax Int ::= pyMod(Int, Int) [function]
+    29	  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+    30	
+    31	  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+    32	  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+    33	  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+    34	  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+    35	  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+    36	  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+    37	endmodule
+     1	// reference/src/semantics/str.k — MPY-STR
+     2	
+     3	module MPY-STR
+     4	  imports MPY-CORE
+     5	  imports MPY-ITER
+     6	
+     7	  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+     8	  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+     9	  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+    10	        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+    11	
+    12	  // ==== str literal (ASCII-only) ============================================
+    13	  syntax IntSeq ::= strToCodes(String) [function]
+    14	  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+    15	  rule strToCodes("") => .IntSeq
+    16	  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    17	    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+    18	
+    19	  // ==== operators: + / == / != / in =========================================
+    20	  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+    21	  rule seqConcat(.IntSeq, T:IntSeq)                => T
+    22	  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+    23	
+    24	  rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+    25	  rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+    26	  rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)
+    27	
+    28	  // substring membership: `P in X` iff the code-seq P occurs contiguously in X
+    29	  rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)
+    30	  rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)
+    31	
+    32	  syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]
+    33	  rule strPrefix(.IntSeq, _:IntSeq)               => true
+    34	  rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false
+    35	  rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)
+
+Script done on 2026-07-31 02:42:12-05:00 [COMMAND_EXIT_CODE="0"]

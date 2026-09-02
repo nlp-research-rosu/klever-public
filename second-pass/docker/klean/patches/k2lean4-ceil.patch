@@ -1,0 +1,156 @@
+--- a/pyk/klean/k2lean4.py
++++ b/pyk/klean/k2lean4.py
+@@ -15,7 +15,7 @@
+ from ..kore.internal import CollectionKind
+ from ..kore.kompiled import KoreSymbolTable
+ from ..kore.manip import collect_symbols, elim_aliases, free_occs
+-from ..kore.syntax import DV, And, App, EVar, SortApp, String, Top
++from ..kore.syntax import DV, And, App, Ceil, EVar, Equals, Exists, SortApp, String, SVar, Top
+ from ..utils import FrozenDict, POSet
+ from .model import (
+     Alt,
+@@ -1013,13 +1013,115 @@
+         match pattern:
+             case EVar(name):
+                 return self._transform_evar(name)
++            case SVar(name):
++                # Set variables (``@V``) occur in matching-logic simplification
++                # rules; they are rendered like element variables.
++                return self._transform_evar(name)
+             case DV(SortApp(sort), String(value)):
+                 return self._transform_dv(sort, value)
+             case App(symbol, sorts, args):
+                 return self._transform_app(symbol, sorts, args, concrete=concrete)
++            case Ceil(_op_sort, _sort, op):
++                return self._transform_ceil(op, concrete=concrete)
++            case Equals(op_sort, _sort, left, right):
++                return self._transform_ml_equals(op_sort, left, right, concrete=concrete)
++            case And(_sort, ops):
++                return self._transform_ml_and(ops, concrete=concrete)
++            case Exists(_sort, var, body):
++                return self._transform_ml_exists(var, body, concrete=concrete)
++            case Top(_sort):
++                return Term('True')
+             case _:
+                 raise ValueError(f'Unsupported pattern: {pattern.text}')
+ 
++    def _transform_ceil(self, op: Pattern, *, concrete: bool) -> Term:
++        r"""Translate a ``\ceil`` (definedness) predicate, preserving partiality.
++
++        ``\ceil(t)`` asserts that ``t`` is defined (non-bottom).  Variables and
++        domain values are always defined; constructors, injections and total
++        functions are defined exactly when their arguments are; a *partial*
++        function application ``f(args)`` is defined exactly when the
++        Option-valued rendering of ``f`` succeeds, i.e. ``(f? args).isSome``.
++        The ``f?`` identifier names an Option-valued counterpart of ``f``
++        which the obligation emitter binds as a trust parameter.
++        """
++        props = [
++            str(prop)
++            for prop in self._ceil_props(op, concrete=concrete)
++            if str(prop) != 'True'
++        ]
++        if not props:
++            return Term('True')
++        if len(props) == 1:
++            return Term(props[0])
++        return Term(' ∧ '.join(f'({prop})' for prop in props))
++
++    def _ceil_props(self, pattern: Pattern, *, concrete: bool) -> list[Term]:
++        r"""Return the conjuncts of the definedness proposition of a term."""
++        match pattern:
++            case EVar() | SVar() | DV():
++                return []
++            case App('inj', _, (arg,)):
++                return self._ceil_props(arg, concrete=concrete)
++            case App(symbol, _, args):
++                if symbol in self.defn.functions and not self._is_total_function(symbol):
++                    for arg in args:
++                        self._require_ceil_pure(arg)
++                    chunks = [_opt_symbol_ident(symbol)]
++                    chunks.extend(
++                        str(self._transform_arg(arg, concrete=concrete)) for arg in args
++                    )
++                    return [Term(f"({' '.join(chunks)}).isSome = true")]
++                # Constructors and total functions are defined exactly when
++                # their arguments are.
++                return [
++                    prop for arg in args for prop in self._ceil_props(arg, concrete=concrete)
++                ]
++            case _:
++                raise ValueError(f'Unsupported pattern under \\ceil: {pattern.text}')
++
++    def _is_total_function(self, symbol: str) -> bool:
++        attrs = self.defn.symbols[symbol].attrs_by_key
++        return 'total' in attrs or 'functional' in attrs
++
++    def _require_ceil_pure(self, pattern: Pattern) -> None:
++        r"""Reject partial applications nested inside a partial ``\ceil`` head.
++
++        The arguments of an Option-rendered partial application are rendered as
++        plain (total) terms; a nested partial application there would need
++        monadic sequencing, which is not implemented.
++        """
++        for symbol in collect_symbols(pattern):
++            if symbol in self.defn.functions and not self._is_total_function(symbol):
++                raise ValueError(
++                    f'Unsupported pattern under \\ceil (nested partial function '
++                    f'{symbol}): {pattern.text}'
++                )
++
++    def _transform_ml_equals(
++        self, op_sort: Sort, left: Pattern, right: Pattern, *, concrete: bool
++    ) -> Term:
++        r"""Translate a matching-logic ``\equals`` predicate as Lean equality."""
++        left_term = self._transform_pattern(left, concrete=concrete)
++        right_term = self._transform_pattern(right, concrete=concrete)
++        if isinstance(op_sort, SortApp):
++            sort = op_sort.name
++            return Term(f'({left_term} : {sort}) = ({right_term} : {sort})')
++        return Term(f'({left_term}) = ({right_term})')
++
++    def _transform_ml_and(self, ops: tuple[Pattern, ...], *, concrete: bool) -> Term:
++        r"""Translate a matching-logic ``\and`` of predicates as Lean ``∧``."""
++        if not ops:
++            return Term('True')
++        terms = [str(self._transform_pattern(op, concrete=concrete)) for op in ops]
++        return Term(' ∧ '.join(f'({term})' for term in terms))
++
++    def _transform_ml_exists(self, var: EVar, body: Pattern, *, concrete: bool) -> Term:
++        r"""Translate a matching-logic ``\exists`` as a Lean existential."""
++        name = self._transform_pattern(var, concrete=concrete)
++        body_term = self._transform_pattern(body, concrete=concrete)
++        return Term(f'∃ ({name} : {var.sort.name}), {body_term}')
++
+     def _transform_arg(self, pattern: Pattern, *, concrete: bool = False) -> Term:
+         term = self._transform_pattern(pattern, concrete=concrete)
+ 
+@@ -1154,7 +1256,28 @@
+     return _escape_ident(symbol, kore=True)
+ 
+ 
++def _opt_symbol_ident(symbol: str) -> str:
++    r"""Name the Option-valued counterpart of a partial function symbol.
++
++    Used by the ``\ceil`` translation: ``f?`` (guillemet-quoted when the base
++    identifier requires quoting) denotes ``f`` rendered with return type
++    ``Option S`` instead of ``S``.
++    """
++    if symbol in _SYMBOL_OVERRIDES:
++        ident = _SYMBOL_OVERRIDES[symbol] + '?'
++    else:
++        if symbol.startswith('Lbl'):
++            symbol = symbol[3:]
++        ident = unmunge(symbol) + '?'
++    if not _VALID_LEAN_IDENT.fullmatch(ident):
++        ident = f'«{ident}»'
++    return ident
++
++
+ def _var_ident(var: str) -> str:
++    if var.startswith('@'):
++        # Set variables (``@V``) are named ``@Var...`` in KORE.
++        var = var[1:]
+     assert var.startswith('Var')
+     return _escape_ident(var[3:], kore=True)
+ 

@@ -1,0 +1,90 @@
+     1	// reference/src/semantics/call.k — MPY-CALL
+     2	// ONE call route for every callable: evaluate the callee to a VALUE (name lookup reaches
+     3	// builtins at the root; a cooled Attribute is a bound method), evaluate the args (the shared
+     4	// #evalArgs loop in core.k), then dispatch on the callee value:
+     5	//   closureVal    -> bind params, push a frame (user function)
+     6	//   boundMethodV  -> applyMethod
+     7	//   builtinV      -> the #iterNext folds (sum/all/any/max/min) or applyBuiltin
+     8	//   typeV         -> callable type objects: int(...) / str(...)
+     9	
+    10	module MPY-CALL
+    11	  imports MPY-METHODS
+    12	  imports MPY-BUILTINS
+    13	  imports MPY-FUNCTIONS
+    14	
+    15	  // a cooled attribute is a bound method value
+    16	  rule <k> Attribute(V:Val, M:String) => boundMethodV(V, M) ... </k>
+    17	
+    18	  // evaluate callee, then args ([owise]: problem-local Call interceptions beat this)
+    19	  syntax KItem ::= #callee(Exprs)
+    20	  rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]
+    21	  rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>
+    22	
+    23	  // ==== dispatch on the callee value ========================================
+    24	  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>
+    25	
+    26	  rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>
+    27	  rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ)    ... </k>
+    28	  rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ)    ... </k>
+    29	  rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ)   ... </k>
+    30	  rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ)   ... </k>
+    31	  rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]
+    32	  rule <k> #applyK(toCall(typeV(T:String)),     ACC:Vals) => applyBuiltin(T, ACC)  ... </k>
+    33	
+    34	  // ==== heap-object arguments/receivers =====================================
+    35	  // Builtins and type calls READ structure — deref the first two arg positions
+    36	  // (covers len/sum/all/any/max/min/sorted/list/set + zip's pair). Mutating list
+    37	  // methods take the ref itself; every other method receiver is deref'd.
+    38	  rule <k> #applyK(toCall(builtinV(BN:String)), (ref(H:Int), REST:Vals))
+    39	        => #applyK(toCall(builtinV(BN)), (V, REST)) ... </k>
+    40	       <heap> ... H |-> V:Val ... </heap>
+    41	       [priority(40)]
+    42	  rule <k> #applyK(toCall(builtinV(BN:String)), (A:Val, ref(H:Int), REST:Vals))
+    43	        => #applyK(toCall(builtinV(BN)), (A, V, REST)) ... </k>
+    44	       <heap> ... H |-> V:Val ... </heap>
+    45	       requires notBool isRefV(A)
+    46	       [priority(40)]
+    47	  rule <k> #applyK(toCall(typeV(T:String)), (ref(H:Int), REST:Vals))
+    48	        => #applyK(toCall(typeV(T)), (V, REST)) ... </k>
+    49	       <heap> ... H |-> V:Val ... </heap>
+    50	       [priority(40)]
+    51	
+    52	  syntax Bool ::= isMutMethod(String) [function, total]
+    53	  rule isMutMethod(M:String)
+    54	    => M ==String "append" orBool M ==String "sort" orBool M ==String "extend"
+    55	       orBool M ==String "insert" orBool M ==String "pop" orBool M ==String "remove"
+    56	  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), M:String)), ACC:Vals)
+    57	        => #applyK(toCall(boundMethodV(V, M)), ACC) ... </k>
+    58	       <heap> ... H |-> V:Val ... </heap>
+    59	       requires notBool isMutMethod(M)
+    60	       [priority(40)]
+    61	  // non-mutating methods READ their heap-object arguments too (join's list);
+    62	  // mutators keep refs (append of a list into a list-of-lists stays aliased)
+    63	  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), (ref(H:Int), REST:Vals))
+    64	        => #applyK(toCall(boundMethodV(OBJ, M)), (V, REST)) ... </k>
+    65	       <heap> ... H |-> V:Val ... </heap>
+    66	       requires notBool isMutMethod(M) andBool notBool isRefV(OBJ)
+    67	       [priority(40)]
+    68	
+    69	  rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT
+    70	        => #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+    71	       <env>     CALLERL:Int => NEWL </env>
+    72	       <scopes>   STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes>
+    73	       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+    74	       <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+    75	
+    76	  // annotated closure: the frame starts with the captured freevar cells, its
+    77	  // parent is the module scope (all enclosing-local reads go through cells),
+    78	  // and the cellvars' fresh cells allocate before params bind (a cellvar param
+    79	  // then writes through its cell in #bindP).
+    80	  rule <k> #applyK(toCall(closureValC(PNS:ParamNames, CVS:ParamNames, BODY:Stmts, CM:Map)), ACC:Vals) ~> CONT
+    81	        => #allocCells(CVS) ~> #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+    82	       <env>     CALLERL:Int => NEWL </env>
+    83	       <scopes>   STORE:Map => STORE [ NEWL <- scope(CM [ "$cells" <- cellsMark(CVS) ], parent(0)) ] </scopes>
+    84	       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+    85	       <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+    86	
+    87	  syntax KItem ::= #allocCells(ParamNames)
+    88	  rule <k> #allocCells(.ParamNames) => .K ... </k>
+    89	  rule <k> #allocCells((CV:String, R:ParamNames)) => #allocCells(R) ... </k>
+    90	       <env> L:Int </env>

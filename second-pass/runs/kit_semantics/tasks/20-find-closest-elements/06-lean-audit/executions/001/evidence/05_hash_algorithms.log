@@ -1,0 +1,451 @@
+Script started on 2026-07-30 23:25:57-05:00 [<not executed on terminal>]
+                else None
+            )
+            or current_outputs.get("evidence")
+            != (
+                invocation_outputs.get("evidence")
+                if isinstance(invocation_outputs, dict)
+                else None
+            )
+        ):
+            raise KleanAuditContractError(
+                "Stage 5 invocation evidence changed after success"
+            )
+        return workspace, invocation, result
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _stage1_source_hashes(workspace: Path) -> dict[str, str]:
+    try:
+        return {
+            path.relative_to(workspace).as_posix(): (
+                pipeline_contract.sha256_file(path)
+            )
+            for path in pipeline_contract._walk_regular_files(
+                workspace, "Stage 1 source workspace"
+            )
+        }
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _generation_producer_sources(
+    repo: Path, generator_manifest: dict[str, Any]
+) -> tuple[Path, str]:
+    provenance = generator_manifest.get("provenance")
+    image_id = (
+        provenance.get("generator_image_id")
+        if isinstance(provenance, dict)
+        else None
+    )
+    if not isinstance(image_id, str) or not image_id.startswith("sha256:"):
+        raise KleanAuditContractError(
+            "generator image ID is missing from Stage 4 provenance"
+        )
+    image_key = image_id.removeprefix("sha256:")
+    try:
+        image_key = pipeline_contract.validate_safe_component(
+            image_key, "generator image ID"
+        )
+        bundle = pipeline_contract._require_direct_directory(
+            repo / "data/stage4-producer-sources",
+            image_key,
+            "Stage 4 producer source bundle",
+        )
+        source_manifest = pipeline_contract._read_regular_json(
+            bundle / "source-manifest.json",
+            "Stage 4 producer source manifest",
+        )
+        expected_files = {
+            "klean_export.py": generator_manifest.get("exporter_sha256"),
+            "klean.py": generator_manifest.get("klean_py_sha256"),
+        }
+        if (
+            set(source_manifest) != {
+                "schema_version",
+                "generator_image_id",
+                "files",
+            }
+            or source_manifest.get("schema_version") != 1
+            or source_manifest.get("generator_image_id") != image_id
+            or source_manifest.get("files") != expected_files
+        ):
+            raise KleanAuditContractError(
+                "Stage 4 producer source manifest differs from generator "
+                "provenance"
+            )
+        observed_names = {
+            path.relative_to(bundle).as_posix()
+            for path in pipeline_contract._walk_regular_files(
+                bundle, "Stage 4 producer source bundle"
+            )
+        }
+        if observed_names != {
+            "source-manifest.json",
+            "klean_export.py",
+            "klean.py",
+        }:
+            raise KleanAuditContractError(
+                "Stage 4 producer source bundle has unexpected files"
+            )
+        for name, expected in expected_files.items():
+            digest = _validate_sha256(
+                expected, f"Stage 4 producer source {name} SHA-256"
+            )
+            source = pipeline_contract.require_regular_file(
+                bundle / name, f"Stage 4 producer source {name}"
+
+pipeline tree hash definitions
+/reference/tools/klean_export.py
+169:        for _relative, kind, path in _tree_entries(workspace)
+1476:def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+1499:def tree_digest(root: Path) -> str:
+1501:    for relative, kind, path in _tree_entries(Path(root)):
+1558:    for _relative, kind, path in _tree_entries(package):
+1613:    for relative, kind, path in _tree_entries(generated):
+
+/reference/tools/pipeline_contract.py
+190:def sha256_tree(root: Path) -> str:
+#!/usr/bin/env python3
+"""Deterministically export one frozen K proof workspace to a Lean project."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import shlex
+import stat
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
+
+
+REPO = Path(__file__).resolve().parent.parent
+KLEAN = REPO / "tools/klean.py"
+KOMPILE_TIMEOUT = 480
+KLEAN_TIMEOUT = 300
+BUILD_TIMEOUT = 600
+
+K_IDENTIFIER = r"[A-Za-z][A-Za-z0-9_'-]*"
+SYNTAX_BLOCK_RE = re.compile(
+    rf"(?ms)^[ \t]*syntax\s+(?P<ret>{K_IDENTIFIER})\s*::=\s*"
+    r"(?P<body>.*?)"
+    r"(?=^[ \t]*(?:syntax|rule|module|endmodule|imports)\b|\Z)"
+)
+FUNC_PRODUCTION_RE = re.compile(
+    r"(?:\A|^[ \t]*\|)\s*"
+    rf"(?P<name>{K_IDENTIFIER})\s*\((?P<args>[^)]*)\)\s*"
+    r"\[(?P<attrs>[^\]]*)\]",
+    re.M,
+)
+K_IDENTIFIER_END = r"(?![A-Za-z0-9_'-])"
+MODULE_RE = re.compile(
+    rf"(?m)^[ \t]*module\s+({K_IDENTIFIER}){K_IDENTIFIER_END}"
+)
+MODULE_BLOCK_RE = re.compile(
+    rf"(?ms)^[ \t]*module\s+(?P<name>{K_IDENTIFIER}){K_IDENTIFIER_END}"
+    r"(?P<body>.*?)\bendmodule\b"
+)
+IMPORT_RE = re.compile(
+    rf"(?m)^[ \t]*imports\s+({K_IDENTIFIER}){K_IDENTIFIER_END}"
+)
+REQUIRES_RE = re.compile(r'requires\s+"([^"]+)"')
+_TERM_HEAD_RE = re.compile(r"fail to show termination for\s*\n\s*(«[^»]+»|\S+)")
+_TERM_CALL_RE = re.compile(r"Call from («[^»]+»|\S+) to («[^»]+»|\S+)")
+_ELAB_LINE_RE = re.compile(
+    r"error:\s+\S*Func\.lean:(\d+):\d+:\s+"
+    r"(?:unknown identifier|Application type mismatch)"
+)
+_DEF_RE = re.compile(r"^(\s*)(?:noncomputable\s+)?def\s+(\S+)\b")
+_NONCOMPUTABLE_RE = re.compile(r"(?m)^\s*noncomputable\s+def\s+(\S+)")
+_LEAN_NAMESPACE_RE = re.compile(r"^\s*namespace\s+(\S+)\s*$")
+_LEAN_END_RE = re.compile(r"^\s*end(?:\s+(\S+))?\s*$")
+_LEAN_TRUST_DECL_RE = re.compile(
+    r"^\s*(axiom|opaque)\s+(\S+)\s+(.+?)\s*$"
+)
+_RULE_HEAD_RE = re.compile(
+    rf"(?m)^\s*rule(?:\s+\[[^\]]+\]:)?\s+"
+    rf"(?P<name>{K_IDENTIFIER}){K_IDENTIFIER_END}"
+)
+_SYNTAX_PRODUCTION_LINE_RE = re.compile(
+    rf"^(?P<prefix>[ \t]*(?:syntax\s+{K_IDENTIFIER}\s*::=\s*|\|\s*))"
+    rf"(?P<name>{K_IDENTIFIER})\s*\((?P<args>[^)]*)\)"
+    r"(?P<spacing>[ \t]*)(?P<attrs>\[[^\]]*\])?"
+    r"(?P<suffix>[ \t]*(?://.*)?)$"
+)
+
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from tools import k_rule_inventory, lemma_discovery_contract
+
+
+class KleanExportError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class Func:
+    name: str
+    ret: str
+    args: list[str]
+
+
+@dataclass(frozen=True)
+class DefinitionResolution:
+    verification_file: Path
+    verification_module: str
+    syntax_module: str
+    required_files: tuple[Path, ...]
+    entry_files: tuple[Path, ...]
+
+
+@dataclass(frozen=True)
+class KompileCommand:
+    source: Path
+    main_module: str | None
+    syntax_module: str | None
+    backend: str | None
+
+
+def _proof_kompile_commands(workspace: Path) -> tuple[KompileCommand, ...]:
+    prove = workspace / "prove.sh"
+    if not prove.is_file() or prove.is_symlink():
+        return ()
+    logical_lines = prove.read_text().replace("\\\n", " ").splitlines()
+    commands: list[KompileCommand] = []
+    for line in logical_lines:
+        try:
+            words = shlex.split(line, comments=True)
+        except ValueError:
+            continue
+        try:
+            index = words.index("kompile")
+        except ValueError:
+            continue
+        arguments = words[index + 1 :]
+        source_word = next(
+            (
+                word
+                for word in arguments
+                if not word.startswith("-") and word.endswith(".k")
+            ),
+            None,
+        )
+        if source_word is None:
+            continue
+        source = (workspace / source_word).resolve()
+        try:
+            source.relative_to(workspace)
+        except ValueError:
+            continue
+        if not source.is_file() or source.is_symlink():
+            continue
+
+        def option(name: str) -> str | None:
+            if name not in arguments:
+                return None
+            option_index = arguments.index(name)
+            if option_index + 1 >= len(arguments):
+                return None
+            return arguments[option_index + 1]
+#!/usr/bin/env python3
+"""Contracts and filesystem layout for resumable benchmark pipeline runs."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+import fcntl
+import hashlib
+import json
+import os
+import re
+import shutil
+import stat
+import tempfile
+import uuid
+from pathlib import Path
+from typing import Any, Callable, Iterable
+
+
+SCHEMA_VERSION = 3
+CODEX_CLI_VERSION = "0.144.6"
+K_VERSION = "7.1.293"
+K_BASE_IMAGE = (
+    "runtimeverificationinc/kframework-k:ubuntu-jammy-7.1.293@"
+    "sha256:f3f64ab72bd7b560082d50e4c6c23e107025cf217ca62ab73700104fc45de09a"
+)
+K_COMMIT = "ff15baac9e66426612ec45ff912af7f14965b64a"
+PYK_VERSION = "7.1.293"
+PYK_PROJECT = "pyk@runtimeverification/k"
+LEAN_TOOLCHAIN = "leanprover/lean4:v4.22.0"
+LEAN_COMMIT = "ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05"
+FROZEN_TOOLCHAIN_LOCK = {
+    "codex_cli_version": CODEX_CLI_VERSION,
+    "k_base_image": K_BASE_IMAGE,
+    "k_version": K_VERSION,
+    "lean_commit": LEAN_COMMIT,
+    "lean_toolchain": LEAN_TOOLCHAIN,
+    "pyk_version": PYK_VERSION,
+    "pyk_project": PYK_PROJECT,
+    "runtimeverification_k_commit": K_COMMIT,
+}
+STAGE_NAMES = (
+    "01-k-proof",
+    "02-k-audit",
+    "03-lemma-discovery",
+    "04-klean-generation",
+    "05-lean-proof",
+    "06-lean-audit",
+)
+_INVOCATION_STAGES = {
+    "01-k-proof": ("k_initial_s", "k_total_s"),
+    "03-lemma-discovery": ("lemma_initial_s", "lemma_total_s"),
+    "05-lean-proof": ("lean_initial_s", "lean_total_s"),
+}
+
+_CONDITIONS = (
+    ("kit-semantics", True, True, "kit-semantics.md"),
+    ("semantics", False, True, "with-semantics.md"),
+    ("kit", True, False, "kit-bare.md"),
+    ("bare", False, False, "bare.md"),
+)
+_CODEX_CONFIG = re.compile(r"^codex-(?P<model>.+)-xhigh-(?P<condition>.+)$")
+_HASH_CHUNK_SIZE = 1024 * 1024
+_BWRAP_NAMESPACE_DENIAL = (
+    b"bwrap: No permissions to create a new namespace"
+)
+
+
+class PipelineContractError(RuntimeError):
+    """Raised when a pipeline path, manifest, or state violates the contract."""
+
+
+def _usage_accounting_module():
+    try:
+        from tools import usage_accounting
+    except ImportError as error:
+        raise PipelineContractError(
+            "usage accounting support is unavailable"
+        ) from error
+    return usage_accounting
+
+
+@dataclass(frozen=True)
+class Condition:
+    name: str
+    kit: bool
+    semantics: bool
+    prompt_file: str
+
+
+@dataclass(frozen=True)
+class CodexConfig:
+    name: str
+    model: str
+    effort: str
+    condition: Condition
+
+
+@dataclass(frozen=True)
+class Invocation:
+    stage: str
+    name: str
+    kind: str
+    path: Path
+    allocation_s: int
+    session_id: str | None
+
+
+def validate_safe_component(value: object, label: str) -> str:
+    if not isinstance(value, str):
+        raise PipelineContractError(f"{label} must be a string path component")
+    path = Path(value)
+    if (
+        not value
+        or value in {".", ".."}
+        or value.startswith(".")
+        or path.is_absolute()
+        or len(path.parts) != 1
+        or "/" in value
+        or "\\" in value
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+    ):
+        raise PipelineContractError(
+            f"{label} must be one safe nonhidden path component: {value!r}"
+        )
+    return value
+
+
+def parse_codex_config(config: str) -> CodexConfig:
+    validate_safe_component(config, "config")
+    match = _CODEX_CONFIG.fullmatch(config)
+    if match is None:
+        raise PipelineContractError(f"invalid Codex config grammar: {config}")
+    condition_name = match.group("condition")
+    condition = next(
+        (
+            Condition(name, kit, semantics, prompt)
+            for name, kit, semantics, prompt in _CONDITIONS
+            if name == condition_name
+        ),
+        None,
+    )
+    if condition is None:
+        raise PipelineContractError(f"unsupported benchmark condition: {condition_name}")
+    return CodexConfig(
+        name=config,
+        model=match.group("model"),
+        effort="xhigh",
+        condition=condition,
+    )
+
+
+def _lstat(path: Path, label: str) -> os.stat_result:
+    try:
+        return path.lstat()
+    except OSError as error:
+        raise PipelineContractError(f"{label} is missing: {path}") from error
+
+
+def require_real_directory(path: Path, label: str) -> Path:
+    if not stat.S_ISDIR(_lstat(path, label).st_mode):
+        raise PipelineContractError(f"{label} must be a real directory: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise PipelineContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def require_regular_file(path: Path, label: str) -> Path:
+    if not stat.S_ISREG(_lstat(path, label).st_mode):
+        raise PipelineContractError(f"{label} must be a real regular file: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise PipelineContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise PipelineContractError(f"cannot hash file {path}: {error}") from error
+    return digest.hexdigest()
+
+
+def sha256_tree(root: Path) -> str:
+
+Script done on 2026-07-30 23:25:57-05:00 [COMMAND_EXIT_CODE="0"]

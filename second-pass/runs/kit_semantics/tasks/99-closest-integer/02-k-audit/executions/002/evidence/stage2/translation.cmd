@@ -1,0 +1,1 @@
+bash -c python3\ /reference/py2mpy.py\ /candidate/solution.py\ \>\ /tmp/audit-work/regenerated-solution.mpy\ \&\&\ cmp\ -s\ /tmp/audit-work/regenerated-solution.mpy\ /candidate/solution.mpy\ \&\&\ sha256sum\ /tmp/audit-work/regenerated-solution.mpy\ /candidate/solution.mpy 

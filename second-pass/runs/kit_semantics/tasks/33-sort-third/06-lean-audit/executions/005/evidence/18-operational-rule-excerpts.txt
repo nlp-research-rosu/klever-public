@@ -1,0 +1,265 @@
+COMMAND: bash -lc nl\ -ba\ /reference/k-proof/reference-semantics/semantics/sort.k\ \|\ sed\ -n\ \"14\,42p\"\;\ nl\ -ba\ /reference/k-proof/reference-semantics/semantics/subscript.k\ \|\ sed\ -n\ \"63\,115p\"\;\ nl\ -ba\ /reference/k-proof/reference-semantics/semantics/core.k\ \|\ sed\ -n\ \"212\,226p\"\;\ nl\ -ba\ /reference/k-proof/reference-semantics/semantics/list.k\ \|\ sed\ -n\ \"17\,25p\"\;\ nl\ -ba\ /reference/klean-generation/generated/Klean33SortThird/Sorts.lean\ \|\ sed\ -n\ \"22\,40p\;323\,350p\"\;\ nl\ -ba\ /candidate/Proof.lean\ \|\ sed\ -n\ \"69\,146p\;148\,178p\"
+    14	  // sortVS(VS): the ascending sort of the Val list VS. Opaque for symbolic VS (no-evaluators);
+    15	  // concrete insertion sort for krun.
+    16	  // Concrete sort matches Int-sorted elements directly (an int Val IS an Int); projectIntTotal
+    17	  // (lemmas-only) is not available in the semantics. Int and str lists.
+    18	  syntax ValSeq ::= sortVS(ValSeq) [function, total, symbol(sortVS), no-evaluators]
+    19	  syntax ValSeq ::= insVS(Int, ValSeq) [function]
+    20	  rule sortVS(.ValSeq)                => .ValSeq          [concrete]
+    21	  rule sortVS(vCons(X:Int, R:ValSeq)) => insVS(X, sortVS(R)) [concrete]
+    22	  rule insVS(X:Int, .ValSeq)                => vCons(X, .ValSeq) [concrete]
+    23	  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]
+    24	  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X  >Int Y [concrete]
+    25	  // str elements insert by the shared lexicographic strLt (methods.k)
+    26	  syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]
+    27	  rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]
+    28	  rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]
+    29	  rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(A), vCons(str(B), R))
+    30	       requires strLt(A, B) orBool A ==K B [concrete]
+    31	  rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(B), insVSs(A, R))
+    32	       requires notBool (strLt(A, B) orBool A ==K B) [concrete]
+    33	
+    34	  // sorted(list) constructs a NEW object: k-cell pre-dispatch (beats the [owise]
+    35	  // applyBuiltin routing in call.k) so the result allocates.
+    36	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), .Vals))
+    37	        => #alloc(list(sortVS(VS))) ... </k>
+    38	
+    39	  // mutator: xs.sort() — the in-place heap write over the same trusted sortVS
+    40	  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "sort")), .Vals) => noneV ... </k>
+    41	       <heap> ... H |-> list(VS:ValSeq => sortVS(VS)) ... </heap>
+    42	       [priority(40)]
+    63	  syntax Val ::= doSlice(Val, OptInt, OptInt, OptInt) [function]
+    64	  rule doSlice(list(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    65	    => list(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))
+    66	  rule doSlice(tuple(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    67	    => tuple(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))
+    68	  rule doSlice(str(IS:IntSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    69	    => str(buildIS(IS, slStart(LO, ST, isLen(IS)), slStop(HI, ST, isLen(IS)), slStep(ST)))
+    70	
+    71	  // ==== slice.indices: step / start / stop / clamp ==========================
+    72	  syntax Int ::= slStep(OptInt) [function, total]
+    73	  rule slStep(noB)          => 1
+    74	  rule slStep(someB(S:Int)) => S
+    75	
+    76	  syntax Int ::= slStart(OptInt, OptInt, Int) [function]
+    77	  rule slStart(noB,          ST:OptInt, _LEN:Int) => 0
+    78	       requires slStep(ST) >Int 0
+    79	  rule slStart(noB,          ST:OptInt, LEN:Int)  => LEN -Int 1
+    80	       requires slStep(ST) <Int 0
+    81	  rule slStart(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))
+    82	
+    83	  syntax Int ::= slStop(OptInt, OptInt, Int) [function]
+    84	  rule slStop(noB,          ST:OptInt, LEN:Int)  => LEN
+    85	       requires slStep(ST) >Int 0
+    86	  rule slStop(noB,          ST:OptInt, _LEN:Int) => -1
+    87	       requires slStep(ST) <Int 0
+    88	  rule slStop(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))
+    89	
+    90	  syntax Int ::= slAdjust(Int, Int, Int) [function, total]
+    91	  rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampLo(I +Int LEN, STEP)
+    92	       requires I  <Int 0
+    93	  rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampHi(I, LEN, STEP)
+    94	       requires I >=Int 0
+    95	
+    96	  syntax Int ::= clampLo(Int, Int) [function, total]
+    97	  rule clampLo(J:Int, _STEP:Int) => J
+    98	       requires J >=Int 0
+    99	  rule clampLo(J:Int, STEP:Int)  => #if STEP <Int 0 #then -1 #else 0 #fi
+   100	       requires J <Int 0
+   101	
+   102	  syntax Int ::= clampHi(Int, Int, Int) [function, total]
+   103	  rule clampHi(I:Int, LEN:Int, _STEP:Int) => I
+   104	       requires I  <Int LEN
+   105	  rule clampHi(I:Int, LEN:Int, STEP:Int)  => #if STEP <Int 0 #then LEN -Int 1 #else LEN #fi
+   106	       requires I >=Int LEN
+   107	
+   108	  // ==== build the strided sub-sequence (indices in range by construction) ====
+   109	  syntax ValSeq ::= buildVS(ValSeq, Int, Int, Int) [function]
+   110	  rule buildVS(VS:ValSeq, I:Int, STOP:Int, STEP:Int)
+   111	    => vCons(valSeqAt(VS, I), buildVS(VS, I +Int STEP, STOP, STEP))
+   112	       requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)
+   113	  rule buildVS(_:ValSeq, I:Int, STOP:Int, STEP:Int) => .ValSeq
+   114	       requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))
+   115	
+   212	  // ==== shared list helpers =================================================
+   213	  syntax Vals ::= appendVal(Vals, Val) [function, total]
+   214	  rule appendVal(.Vals, V:Val)              => V , .Vals
+   215	  rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+   216	
+   217	  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+   218	  rule vals2valSeq(.Vals)            => .ValSeq
+   219	  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+   220	
+   221	  // ==== shared sequence length (len / summaries across many modules) ========
+   222	  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+   223	  syntax Int ::= vsLen(ValSeq) [function, total]
+   224	  rule vsLen(.ValSeq)                => 0
+   225	  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+   226	
+    17	  // ==== list ops: + / == / != ===============================================
+    18	  syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]
+    19	  rule valSeqConcat(.ValSeq, T:ValSeq)                => T
+    20	  rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))
+    21	
+    22	  // list + list constructs a NEW object (k-cell — it allocates; operands land here
+    23	  // already deref'd). priority(45) beats the generic BinOp dispatch.
+    24	  rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k>
+    25	       [priority(45)]
+    22	inductive SortIntSeq : Type where
+    23	  | «.IntSeq_MPY-CORE_IntSeq» : SortIntSeq
+    24	  | «iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» (x0 : SortInt) (x1 : SortIntSeq) : SortIntSeq
+    25	
+    26	inductive SortOptInt : Type where
+    27	  | «noB_MPY-SUBSCRIPT_OptInt» : SortOptInt
+    28	  | «someB(_)_MPY-SUBSCRIPT_OptInt_Int» (x0 : SortInt) : SortOptInt
+    29	
+    30	structure SortScopeLocCell : Type where
+    31	  val : SortInt
+    32	
+    33	inductive SortParamNames : Type where
+    34	  | «.List{"_,__MPY-SYNTAX_ParamNames_String_ParamNames"}_ParamNames» : SortParamNames
+    35	  | «_,__MPY-SYNTAX_ParamNames_String_ParamNames» (x0 : SortString) (x1 : SortParamNames) : SortParamNames
+    36	
+    37	inductive SortStr : Type where
+    38	  | «str(_)_MPY-CORE_Str_IntSeq» (x0 : SortIntSeq) : SortStr
+    39	
+    40	inductive SortCellVars : Type where
+   323	  inductive SortVal : Type where
+   324	    | inj_SortBool (x : SortBool) : SortVal
+   325	    | inj_SortFloat (x : SortFloat) : SortVal
+   326	    | inj_SortInt (x : SortInt) : SortVal
+   327	    | inj_SortIterable (x : SortIterable) : SortVal
+   328	    | inj_SortStr (x : SortStr) : SortVal
+   329	    | «boundMethodV(_,_)_MPY-CORE_Val_Val_String» (x0 : SortVal) (x1 : SortString) : SortVal
+   330	    | «builtinV(_)_MPY-CORE_Val_String» (x0 : SortString) : SortVal
+   331	    | «cellRef(_)_MPY-CORE_Val_Int» (x0 : SortInt) : SortVal
+   332	    | «cellsMark(_)_MPY-CORE_Val_ParamNames» (x0 : SortParamNames) : SortVal
+   333	    | «closureVal(_,_,_)_MPY-CORE_Val_ParamNames_Stmts_Int» (x0 : SortParamNames) (x1 : SortStmts) (x2 : SortInt) : SortVal
+   334	    | «closureValC(_,_,_,_)_MPY-FUNCTIONS_Val_ParamNames_ParamNames_Stmts_Map» (x0 : SortParamNames) (x1 : SortParamNames) (x2 : SortStmts) (x3 : SortMap) : SortVal
+   335	    | «dictV(_,_)_MPY-DICT_Val_ValSeq_ValSeq» (x0 : SortValSeq) (x1 : SortValSeq) : SortVal
+   336	    | «kwV(_,_)_MPY-CORE_Val_String_Val» (x0 : SortString) (x1 : SortVal) : SortVal
+   337	    | «md5Obj(_)_MPY-BUILTINS_Val_IntSeq» (x0 : SortIntSeq) : SortVal
+   338	    | «noneV_MPY-CORE_Val» : SortVal
+   339	    | «ref(_)_MPY-CORE_Val_Int» (x0 : SortInt) : SortVal
+   340	    | «setV(_)_MPY-SET_Val_IntSeq» (x0 : SortIntSeq) : SortVal
+   341	    | «typeV(_)_MPY-CORE_Val_String» (x0 : SortString) : SortVal
+   342	
+   343	  inductive SortValSeq : Type where
+   344	    | «.ValSeq_MPY-CORE_ValSeq» : SortValSeq
+   345	    | «vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» (x0 : SortVal) (x1 : SortValSeq) : SortValSeq
+   346	
+   347	  inductive SortVals : Type where
+   348	    | «.List{"_,__MPY-CORE_Vals_Val_Vals"}_Vals» : SortVals
+   349	    | «_,__MPY-CORE_Vals_Val_Vals» (x0 : SortVal) (x1 : SortVals) : SortVals
+   350	end
+    69	/- This is source `<` lifted to the value universe retained by Base. Boolean,
+    70	   integer, and float values share Python's numeric order; lists and tuples
+    71	   compare lexicographically within their own kinds. Base has no injection for
+    72	   the frozen `str(IntSeq)` Python value. All other pairs use the same fixed
+    73	   incomparable result because the frozen comparison is partial there. -/
+    74	mutual
+    75	  private def proofCompareBaseValuesFuel :
+    76	      Nat → SortVal → SortVal → Option Ordering
+    77	    | 0, _, _ => none
+    78	    | Nat.succ _, SortVal.inj_SortBool left, SortVal.inj_SortBool right =>
+    79	        some (proofCompareInts (proofBoolAsInt left) (proofBoolAsInt right))
+    80	    | Nat.succ _, SortVal.inj_SortBool left, SortVal.inj_SortInt right =>
+    81	        some (proofCompareInts (proofBoolAsInt left) right)
+    82	    | Nat.succ _, SortVal.inj_SortInt left, SortVal.inj_SortBool right =>
+    83	        some (proofCompareInts left (proofBoolAsInt right))
+    84	    | Nat.succ _, SortVal.inj_SortInt left, SortVal.inj_SortInt right =>
+    85	        some (proofCompareInts left right)
+    86	    | Nat.succ _, SortVal.inj_SortFloat left, SortVal.inj_SortFloat right =>
+    87	        proofCompareFloats left right
+    88	    | Nat.succ _, SortVal.inj_SortInt left, SortVal.inj_SortFloat right =>
+    89	        proofCompareFloats (Float.ofInt left) right
+    90	    | Nat.succ _, SortVal.inj_SortFloat left, SortVal.inj_SortInt right =>
+    91	        proofCompareFloats left (Float.ofInt right)
+    92	    | Nat.succ _, SortVal.inj_SortBool left, SortVal.inj_SortFloat right =>
+    93	        proofCompareFloats (Float.ofInt (proofBoolAsInt left)) right
+    94	    | Nat.succ _, SortVal.inj_SortFloat left, SortVal.inj_SortBool right =>
+    95	        proofCompareFloats left (Float.ofInt (proofBoolAsInt right))
+    96	    | Nat.succ fuel,
+    97	        SortVal.inj_SortIterable
+    98	          (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq» left),
+    99	        SortVal.inj_SortIterable
+   100	          (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq» right) =>
+   101	        proofCompareBaseSequencesFuel fuel left right
+   102	    | Nat.succ fuel,
+   103	        SortVal.inj_SortIterable
+   104	          (SortIterable.«tuple(_)_MPY-CORE_Iterable_ValSeq» left),
+   105	        SortVal.inj_SortIterable
+   106	          (SortIterable.«tuple(_)_MPY-CORE_Iterable_ValSeq» right) =>
+   107	        proofCompareBaseSequencesFuel fuel left right
+   108	    | Nat.succ _, _, _ => none
+   109	
+   110	  private def proofCompareBaseSequencesFuel :
+   111	      Nat → SortValSeq → SortValSeq → Option Ordering
+   112	    | 0, _, _ => none
+   113	    | Nat.succ _, SortValSeq.«.ValSeq_MPY-CORE_ValSeq»,
+   114	        SortValSeq.«.ValSeq_MPY-CORE_ValSeq» => some .eq
+   115	    | Nat.succ _, SortValSeq.«.ValSeq_MPY-CORE_ValSeq»,
+   116	        SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» _ _ => some .lt
+   117	    | Nat.succ _, SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» _ _,
+   118	        SortValSeq.«.ValSeq_MPY-CORE_ValSeq» => some .gt
+   119	    | Nat.succ fuel,
+   120	        SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» left leftRest,
+   121	        SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» right rightRest =>
+   122	        match proofCompareBaseValuesFuel fuel left right with
+   123	        | some .eq => proofCompareBaseSequencesFuel fuel leftRest rightRest
+   124	        | result => result
+   125	end
+   126	
+   127	private def proofCompareBaseValues
+   128	    (left right : SortVal) : Option Ordering :=
+   129	  proofCompareBaseValuesFuel
+   130	    (proofComparableValueSize left + proofComparableValueSize right + 1)
+   131	    left right
+   132	
+   133	/- Stable insertion using source `<`. Equal and incomparable pairs follow one
+   134	   fixed totalization: retain their input order. -/
+   135	private def proofInsertBySourceOrder
+   136	    (value : SortVal) : List SortVal → List SortVal
+   137	  | [] => [value]
+   138	  | head :: tail =>
+   139	      match proofCompareBaseValues head value with
+   140	      | some .lt => head :: proofInsertBySourceOrder value tail
+   141	      | _ => value :: head :: tail
+   142	
+   143	private def proofSortBySourceOrder : List SortVal → List SortVal
+   144	  | [] => []
+   145	  | value :: rest =>
+   146	      proofInsertBySourceOrder value (proofSortBySourceOrder rest)
+   148	/- `mergeThirdFrom` at I = 0 replaces each three-element chunk's first
+   149	   position from `sortVS(buildVS(...))` and preserves every other position. -/
+   150	private def proofMergeThirdResult : List SortVal → List SortVal → List SortVal
+   151	  | [], _ => []
+   152	  | _ :: second :: third :: rest, selected :: selectedRest =>
+   153	      selected :: second :: third :: proofMergeThirdResult rest selectedRest
+   154	  | _ :: second :: [], selected :: _ => [selected, second]
+   155	  | _ :: [], selected :: _ => [selected]
+   156	  | original, [] => original
+   157	
+   158	private def proofSortThirdOperational (values : SortValSeq) : SortValSeq :=
+   159	  let original := proofValSeqToList values
+   160	  let selected := proofSortBySourceOrder (proofEveryThirdValue original)
+   161	  proofValSeqOfList (proofMergeThirdResult original selected)
+   162	
+   163	/- KORE symbol: LblsortThirdResult'LParUndsRParUnds'VERIFICATION'Unds'ValSeq'Unds'ValSeq; frozen source obligations: rule-684bef72ba46103ebf75024cdc1fa13051bb1bec81e5c3ebfd659638388ad8f2. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   164	def «sortThirdResult(_)_VERIFICATION_ValSeq_ValSeq»
+   165	    (values : SortValSeq) : SortValSeq :=
+   166	  proofSortThirdOperational values
+   167	
+   168	/- KORE symbol: LblvalSeqConcat'LParUndsCommUndsRParUnds'MPY-LIST'Unds'ValSeq'Unds'ValSeq'Unds'ValSeq; frozen source obligations: rule-a1197a694d8ff7aa6e41e81faf447c740a45b12fc2bad596cbef040446551918, rule-d101e72bc8dee6c43ac06d55f47939cef9e5ae630efb965cc680c40d10bb36f9. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   169	def «valSeqConcat(_,_)_MPY-LIST_ValSeq_ValSeq_ValSeq» :
+   170	    SortValSeq → SortValSeq → SortValSeq
+   171	  | SortValSeq.«.ValSeq_MPY-CORE_ValSeq», suffix => suffix
+   172	  | SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» value rest, suffix =>
+   173	      SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» value
+   174	        («valSeqConcat(_,_)_MPY-LIST_ValSeq_ValSeq_ValSeq» rest suffix)
+   175	
+   176	/- KORE symbol: LblvsLen'LParUndsRParUnds'MPY-CORE'Unds'Int'Unds'ValSeq; frozen source obligations: rule-684bef72ba46103ebf75024cdc1fa13051bb1bec81e5c3ebfd659638388ad8f2. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   177	def «vsLen(_)_MPY-CORE_Int_ValSeq» (values : SortValSeq) : SortInt :=
+   178	  Int.ofNat (proofValSeqLength values)
+
+EXIT_CODE: 0

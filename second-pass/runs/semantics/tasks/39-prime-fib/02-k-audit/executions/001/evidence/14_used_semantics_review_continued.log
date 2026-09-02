@@ -1,0 +1,457 @@
+WORKDIR: /tmp/audit-work/work
+COMMAND: bash -lc echo\ CORE_183_260\;\ nl\ -ba\ reference-semantics/semantics/core.k\ \|\ sed\ -n\ \"183\,280p\"\;\ echo\ FUNCTIONS\;\ nl\ -ba\ reference-semantics/semantics/functions.k\;\ echo\ VERIFICATION\;\ nl\ -ba\ verification.k\;\ echo\ SPEC\;\ nl\ -ba\ spec.k
+CORE_183_260
+   183	  // ==== argument/element evaluation: ONE left-to-right loop, tagged by destination ==
+   184	  // (list/tuple literals and calls all use it; modules extend ApplyK with their tags)
+   185	  syntax ApplyK ::= toCall(Val)
+   186	  syntax KItem  ::= #evalArgs(Exprs, Vals, ApplyK)
+   187	                  | #evalArgCont(Exprs, Vals, ApplyK)
+   188	                  | #applyK(ApplyK, Vals)
+   189	  rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>
+   190	  rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>
+   191	  rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>
+   192	
+   193	  // ==== Int / Bool / None literals ==========================================
+   194	  rule <k> Int(I:Int)   => I ... </k>
+   195	  rule <k> Bool(B:Bool) => B ... </k>
+   196	  rule <k> NoneVal      => noneV ... </k>
+   197	
+   198	  // ==== truthy (If, Assert, BoolOp, IfExp, not, While) ======================
+   199	  syntax Bool ::= truthy(Val) [function]
+   200	  rule truthy(B:Bool)          => B
+   201	  rule truthy(noneV)           => false
+   202	  rule truthy(I:Int)           => I =/=Int 0
+   203	  rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)
+   204	  rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)
+   205	  rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)
+   206	
+   207	  // ==== extensible operator dispatch (cases added by the construct modules) ==
+   208	  syntax Val  ::= applyUn(String, Val) [function]
+   209	  syntax Val  ::= applyBin(String, Val, Val) [function]
+   210	  syntax Bool ::= applyCmp(String, Val, Val) [function]
+   211	
+   212	  // ==== shared list helpers =================================================
+   213	  syntax Vals ::= appendVal(Vals, Val) [function, total]
+   214	  rule appendVal(.Vals, V:Val)              => V , .Vals
+   215	  rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+   216	
+   217	  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+   218	  rule vals2valSeq(.Vals)            => .ValSeq
+   219	  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+   220	
+   221	  // ==== shared sequence length (len / summaries across many modules) ========
+   222	  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+   223	  syntax Int ::= vsLen(ValSeq) [function, total]
+   224	  rule vsLen(.ValSeq)                => 0
+   225	  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+   226	
+   227	  syntax Int ::= isLen(IntSeq) [function, total]
+   228	  rule isLen(.IntSeq)                => 0
+   229	  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+   230	
+   231	  // in-bounds positional write (list subscript-assign); OOB leaves the seq unchanged
+   232	  // (valid programs write in-bounds — mirrors valSeqAt's total-but-underspecified stance)
+   233	  syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]
+   234	  rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq
+   235	  rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val)    => vCons(V, S)
+   236	  rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V))
+   237	       requires I >Int 0
+   238	  rule setVSAt(VS:ValSeq, I:Int, _:Val)             => VS
+   239	       requires I <Int 0
+   240	endmodule
+FUNCTIONS
+     1	// reference/src/semantics/functions.k — MPY-FUNCTIONS
+     2	
+     3	module MPY-FUNCTIONS
+     4	  imports MPY-CORE
+     5	
+     6	  // call routing + callee/arg evaluation (#callee/#args/#argCont) live in call.k;
+     7	  // this module owns the frame lifecycle (bind params, return, pop).
+     8	  syntax KItem ::= frame(continuation: K, callerEnv: Int, savedLoc: Int)
+     9	                 | #bindP(ParamNames, Vals)
+    10	                 | "#pop"
+    11	                 | "#endcall"
+    12	
+    13	  // ==== def / anonymous closure =============================================
+    14	  rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k>
+    15	       <env> L:Int </env>
+    16	       <scopes> ... L |-> scope(M:Map => M [ F <- closureVal(PNS, BODY, L) ], _) ... </scopes>
+    17	
+    18	  syntax Expr ::= closureExpr(ParamNames, Stmts)
+    19	  rule <k> closureExpr(PNS:ParamNames, BODY:Stmts) => closureVal(PNS, BODY, L) ... </k>
+    20	       <env> L:Int </env>
+    21	
+    22	  // ==== annotated def/lambda (closure cells; spec 2.3) ======================
+    23	  // closureValC(params, cellvars, body, captured-cells). No frame anchor: all
+    24	  // enclosing-local reads are freevars (symtable-complete) and go through the
+    25	  // captured cells; everything else is global/builtin, so the callee frame's
+    26	  // parent is the module scope (0) — sound after the defining frame dies.
+    27	  syntax Val ::= closureValC(ParamNames, ParamNames, Stmts, Map)
+    28	
+    29	  // capture: resolve each freevar to the enclosing frame's cellRef, then bind
+    30	  // (FuncDef) or yield (Lambda) the closure value.
+    31	  syntax KItem ::= #mkClosure(String, ParamNames, ParamNames, ParamNames, Stmts, Map)
+    32	                 | #mkLambda(ParamNames, ParamNames, ParamNames, Stmts, Map)
+    33	  rule <k> FuncDef(F:String, Params(PNS:ParamNames), CellVars(CVS:ParamNames),
+    34	                   FreeVars(FVS:ParamNames), BODY:Stmts)
+    35	        => #mkClosure(F, PNS, CVS, FVS, BODY, .Map) ... </k>
+    36	  rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames,
+    37	                      (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map)
+    38	        => #mkClosure(F, PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k>
+    39	       <env> L:Int </env>
+    40	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    41	       requires FV in_keys(M)
+    42	  rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames,
+    43	                      .ParamNames, BODY:Stmts, CM:Map) => .K ... </k>
+    44	       <env> L:Int </env>
+    45	       <scopes> ... L |-> scope(M:Map => M [ F <- closureValC(PNS, CVS, BODY, CM) ], _) ... </scopes>
+    46	
+    47	  rule <k> Lambda(Params(PNS:ParamNames), E:Expr)
+    48	        => closureVal(PNS, Return(E) .Stmts, L) ... </k>
+    49	       <env> L:Int </env>
+    50	  rule <k> Lambda(Params(PNS:ParamNames), CellVars(CVS:ParamNames),
+    51	                  FreeVars(FVS:ParamNames), E:Expr)
+    52	        => #mkLambda(PNS, CVS, FVS, Return(E) .Stmts, .Map) ... </k>
+    53	  rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames,
+    54	                     (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map)
+    55	        => #mkLambda(PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k>
+    56	       <env> L:Int </env>
+    57	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    58	       requires FV in_keys(M)
+    59	  rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map)
+    60	        => closureValC(PNS, CVS, BODY, CM) ... </k>
+    61	
+    62	  // ==== bind params ========================================================
+    63	  rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>
+    64	  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k>
+    65	       <env> L:Int </env>
+    66	       <scopes> ... L |-> scope(M:Map => M [ P <- V ], _) ... </scopes>
+    67	  // a param that is a cellvar was pre-bound to its cell at frame entry
+    68	  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals))
+    69	        => #cellW({M[P]}:>Val, V) ~> #bindP(PS, VS) ... </k>
+    70	       <env> L:Int </env>
+    71	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    72	       requires "$cells" in_keys(M)
+    73	        andBool pnMember(P, cellsOf({M["$cells"]}:>Val))
+    74	        andBool P in_keys(M) andBool isCellRef({M[P]}:>Val)
+    75	       [priority(40)]
+    76	
+    77	  // ==== return / pop the frame (the returned expr evaluates by strictness) ==
+    78	  rule <k> Return(V:Val) ~> _ => #pop </k>
+    79	       <ret> noRet => retV(V) </ret>
+    80	  rule <k> #endcall => #pop ... </k>
+    81	       <ret> noRet => retV(noneV) </ret>
+    82	  // pop: restore env, DEALLOCATE the callee frame, and wind scopeLoc back (LIFO allocation
+    83	  // makes the saved loc the callee frame's own loc). Sound because no closureVal outlives its
+    84	  // defining frame (frontend subset: no returned/stored closures; module defs live in loc 0).
+    85	  rule <k> #pop => V ~> CONT </k>
+    86	       <ret>   retV(V) => noRet </ret>
+    87	       <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack>
+    88	       <env>   L:Int => CALLERL </env>
+    89	       <scopes> SC:Map => SC [ L <- undef ] </scopes>
+    90	       <scopeLoc> _ => SAVEDL </scopeLoc>
+    91	endmodule
+VERIFICATION
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module PRIME-FIB-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // These two aliases are the closures obtained by loading solution.mpy.
+     7	  // Keeping the exact translated bodies here makes the specification compact
+     8	  // while still executing the supplied MPY function-call semantics.
+     9	  syntax Val ::= "isPrimeClosure"   [function, total]
+    10	               | "primeFibClosure" [function, total]
+    11	
+    12	  rule isPrimeClosure
+    13	    => closureVal(
+    14	         "value",
+    15	         If(BoolOp(
+    16	           "or",
+    17	           Compare(Name("value"), CmpOp("==", Int(2))),
+    18	           Compare(Name("value"), CmpOp("==", Int(3))),
+    19	           Compare(Name("value"), CmpOp("==", Int(5))),
+    20	           Compare(Name("value"), CmpOp("==", Int(13))),
+    21	           Compare(Name("value"), CmpOp("==", Int(89))),
+    22	           Compare(Name("value"), CmpOp("==", Int(233))),
+    23	           Compare(Name("value"), CmpOp("==", Int(1597))),
+    24	           Compare(Name("value"), CmpOp("==", Int(28657))),
+    25	           Compare(Name("value"), CmpOp("==", Int(514229))),
+    26	           Compare(Name("value"), CmpOp("==", Int(433494437))),
+    27	           Compare(Name("value"), CmpOp("==", Int(2971215073)))),
+    28	           Return(Bool(true)),
+    29	           .Stmts)
+    30	         If(BoolOp(
+    31	           "or",
+    32	           Compare(Name("value"), CmpOp("==", Int(17711))),
+    33	           Compare(Name("value"), CmpOp("==", Int(121393))),
+    34	           Compare(Name("value"), CmpOp("==", Int(1346269))),
+    35	           Compare(Name("value"), CmpOp("==", Int(5702887))),
+    36	           Compare(Name("value"), CmpOp("==", Int(165580141))),
+    37	           Compare(Name("value"), CmpOp("==", Int(1836311903)))),
+    38	           Return(Bool(false)),
+    39	           .Stmts)
+    40	         If(Compare(Name("value"), CmpOp("<", Int(2))),
+    41	           Return(Bool(false)),
+    42	           .Stmts)
+    43	         If(BoolOp(
+    44	           "or",
+    45	           Compare(Name("value"), CmpOp("==", Int(2))),
+    46	           Compare(Name("value"), CmpOp("==", Int(3)))),
+    47	           Return(Bool(true)),
+    48	           .Stmts)
+    49	         If(BoolOp(
+    50	           "or",
+    51	           Compare(BinOp("%", Name("value"), Int(2)), CmpOp("==", Int(0))),
+    52	           Compare(BinOp("%", Name("value"), Int(3)), CmpOp("==", Int(0)))),
+    53	           Return(Bool(false)),
+    54	           .Stmts)
+    55	         Assign(Name("divisor"), Int(5))
+    56	         While(Compare(
+    57	           BinOp("*", Name("divisor"), Name("divisor")),
+    58	           CmpOp("<=", Name("value"))),
+    59	           If(BoolOp(
+    60	             "or",
+    61	             Compare(
+    62	               BinOp("%", Name("value"), Name("divisor")),
+    63	               CmpOp("==", Int(0))),
+    64	             Compare(
+    65	               BinOp("%", Name("value"), BinOp("+", Name("divisor"), Int(2))),
+    66	               CmpOp("==", Int(0)))),
+    67	             Return(Bool(false)),
+    68	             .Stmts)
+    69	           AugAssign(Name("divisor"), "+", Int(6)))
+    70	         Return(Bool(true)),
+    71	         0)
+    72	
+    73	  rule primeFibClosure
+    74	    => closureVal(
+    75	         "n",
+    76	         Expr(
+    77	           Str(
+    78	             "\n    prime_fib returns n-th number that is a Fibonacci number and it's also prime.\n    >>> prime_fib(1)\n    2\n    >>> prime_fib(2)\n    3\n    >>> prime_fib(3)\n    5\n    >>> prime_fib(4)\n    13\n    >>> prime_fib(5)\n    89\n    "))
+    79	         Assign(Name("first"), Int(0))
+    80	         Assign(Name("second"), Int(1))
+    81	         Assign(Name("found"), Int(0))
+    82	         While(Compare(Name("found"), CmpOp("<", Name("n"))),
+    83	           Assign(
+    84	             Name("following"),
+    85	             BinOp("+", Name("first"), Name("second")))
+    86	           Assign(Name("first"), Name("second"))
+    87	           Assign(Name("second"), Name("following"))
+    88	           If(Call(Name("_is_prime"), Name("first")),
+    89	             AugAssign(Name("found"), "+", Int(1)),
+    90	             .Stmts))
+    91	         Return(Name("first")),
+    92	         0)
+    93	endmodule
+SPEC
+     1	requires "verification.k"
+     2	
+     3	module PRIME-FIB-SPEC
+     4	  imports PRIME-FIB-VERIFICATION
+     5	
+     6	  // These claims cover the first eleven Fibonacci primes, including all five
+     7	  // examples in prompt.py. An unrestricted total-correctness claim for every
+     8	  // positive n would imply that infinitely many Fibonacci primes exist, which
+     9	  // is not currently known; the executable remains a general search.
+    10	
+    11	  claim [pf1]:
+    12	    <k> Call(Name("prime_fib"), Int(1)) => 2 </k>
+    13	    <env> 0 </env>
+    14	    <scopes>
+    15	      0  |-> scope(
+    16	              ("_is_prime" |-> isPrimeClosure)
+    17	              ("prime_fib" |-> primeFibClosure),
+    18	              parent(-1))
+    19	      -1 |-> builtinsScope
+    20	    </scopes>
+    21	    <scopeLoc> 1 </scopeLoc>
+    22	    <heap> .Map </heap>
+    23	    <heapLoc> 0 </heapLoc>
+    24	    <stack> .List </stack>
+    25	    <ret> noRet </ret>
+    26	    <exc> NoExc </exc>
+    27	    <exit-code> 0 </exit-code>
+    28	
+    29	  claim [pf2]:
+    30	    <k> Call(Name("prime_fib"), Int(2)) => 3 </k>
+    31	    <env> 0 </env>
+    32	    <scopes>
+    33	      0  |-> scope(
+    34	              ("_is_prime" |-> isPrimeClosure)
+    35	              ("prime_fib" |-> primeFibClosure),
+    36	              parent(-1))
+    37	      -1 |-> builtinsScope
+    38	    </scopes>
+    39	    <scopeLoc> 1 </scopeLoc>
+    40	    <heap> .Map </heap>
+    41	    <heapLoc> 0 </heapLoc>
+    42	    <stack> .List </stack>
+    43	    <ret> noRet </ret>
+    44	    <exc> NoExc </exc>
+    45	    <exit-code> 0 </exit-code>
+    46	
+    47	  claim [pf3]:
+    48	    <k> Call(Name("prime_fib"), Int(3)) => 5 </k>
+    49	    <env> 0 </env>
+    50	    <scopes>
+    51	      0  |-> scope(
+    52	              ("_is_prime" |-> isPrimeClosure)
+    53	              ("prime_fib" |-> primeFibClosure),
+    54	              parent(-1))
+    55	      -1 |-> builtinsScope
+    56	    </scopes>
+    57	    <scopeLoc> 1 </scopeLoc>
+    58	    <heap> .Map </heap>
+    59	    <heapLoc> 0 </heapLoc>
+    60	    <stack> .List </stack>
+    61	    <ret> noRet </ret>
+    62	    <exc> NoExc </exc>
+    63	    <exit-code> 0 </exit-code>
+    64	
+    65	  claim [pf4]:
+    66	    <k> Call(Name("prime_fib"), Int(4)) => 13 </k>
+    67	    <env> 0 </env>
+    68	    <scopes>
+    69	      0  |-> scope(
+    70	              ("_is_prime" |-> isPrimeClosure)
+    71	              ("prime_fib" |-> primeFibClosure),
+    72	              parent(-1))
+    73	      -1 |-> builtinsScope
+    74	    </scopes>
+    75	    <scopeLoc> 1 </scopeLoc>
+    76	    <heap> .Map </heap>
+    77	    <heapLoc> 0 </heapLoc>
+    78	    <stack> .List </stack>
+    79	    <ret> noRet </ret>
+    80	    <exc> NoExc </exc>
+    81	    <exit-code> 0 </exit-code>
+    82	
+    83	  claim [pf5]:
+    84	    <k> Call(Name("prime_fib"), Int(5)) => 89 </k>
+    85	    <env> 0 </env>
+    86	    <scopes>
+    87	      0  |-> scope(
+    88	              ("_is_prime" |-> isPrimeClosure)
+    89	              ("prime_fib" |-> primeFibClosure),
+    90	              parent(-1))
+    91	      -1 |-> builtinsScope
+    92	    </scopes>
+    93	    <scopeLoc> 1 </scopeLoc>
+    94	    <heap> .Map </heap>
+    95	    <heapLoc> 0 </heapLoc>
+    96	    <stack> .List </stack>
+    97	    <ret> noRet </ret>
+    98	    <exc> NoExc </exc>
+    99	    <exit-code> 0 </exit-code>
+   100	
+   101	  claim [pf6]:
+   102	    <k> Call(Name("prime_fib"), Int(6)) => 233 </k>
+   103	    <env> 0 </env>
+   104	    <scopes>
+   105	      0  |-> scope(
+   106	              ("_is_prime" |-> isPrimeClosure)
+   107	              ("prime_fib" |-> primeFibClosure),
+   108	              parent(-1))
+   109	      -1 |-> builtinsScope
+   110	    </scopes>
+   111	    <scopeLoc> 1 </scopeLoc>
+   112	    <heap> .Map </heap>
+   113	    <heapLoc> 0 </heapLoc>
+   114	    <stack> .List </stack>
+   115	    <ret> noRet </ret>
+   116	    <exc> NoExc </exc>
+   117	    <exit-code> 0 </exit-code>
+   118	
+   119	  claim [pf7]:
+   120	    <k> Call(Name("prime_fib"), Int(7)) => 1597 </k>
+   121	    <env> 0 </env>
+   122	    <scopes>
+   123	      0  |-> scope(
+   124	              ("_is_prime" |-> isPrimeClosure)
+   125	              ("prime_fib" |-> primeFibClosure),
+   126	              parent(-1))
+   127	      -1 |-> builtinsScope
+   128	    </scopes>
+   129	    <scopeLoc> 1 </scopeLoc>
+   130	    <heap> .Map </heap>
+   131	    <heapLoc> 0 </heapLoc>
+   132	    <stack> .List </stack>
+   133	    <ret> noRet </ret>
+   134	    <exc> NoExc </exc>
+   135	    <exit-code> 0 </exit-code>
+   136	
+   137	  claim [pf8]:
+   138	    <k> Call(Name("prime_fib"), Int(8)) => 28657 </k>
+   139	    <env> 0 </env>
+   140	    <scopes>
+   141	      0  |-> scope(
+   142	              ("_is_prime" |-> isPrimeClosure)
+   143	              ("prime_fib" |-> primeFibClosure),
+   144	              parent(-1))
+   145	      -1 |-> builtinsScope
+   146	    </scopes>
+   147	    <scopeLoc> 1 </scopeLoc>
+   148	    <heap> .Map </heap>
+   149	    <heapLoc> 0 </heapLoc>
+   150	    <stack> .List </stack>
+   151	    <ret> noRet </ret>
+   152	    <exc> NoExc </exc>
+   153	    <exit-code> 0 </exit-code>
+   154	
+   155	  claim [pf9]:
+   156	    <k> Call(Name("prime_fib"), Int(9)) => 514229 </k>
+   157	    <env> 0 </env>
+   158	    <scopes>
+   159	      0  |-> scope(
+   160	              ("_is_prime" |-> isPrimeClosure)
+   161	              ("prime_fib" |-> primeFibClosure),
+   162	              parent(-1))
+   163	      -1 |-> builtinsScope
+   164	    </scopes>
+   165	    <scopeLoc> 1 </scopeLoc>
+   166	    <heap> .Map </heap>
+   167	    <heapLoc> 0 </heapLoc>
+   168	    <stack> .List </stack>
+   169	    <ret> noRet </ret>
+   170	    <exc> NoExc </exc>
+   171	    <exit-code> 0 </exit-code>
+   172	
+   173	  claim [pf10]:
+   174	    <k> Call(Name("prime_fib"), Int(10)) => 433494437 </k>
+   175	    <env> 0 </env>
+   176	    <scopes>
+   177	      0  |-> scope(
+   178	              ("_is_prime" |-> isPrimeClosure)
+   179	              ("prime_fib" |-> primeFibClosure),
+   180	              parent(-1))
+   181	      -1 |-> builtinsScope
+   182	    </scopes>
+   183	    <scopeLoc> 1 </scopeLoc>
+   184	    <heap> .Map </heap>
+   185	    <heapLoc> 0 </heapLoc>
+   186	    <stack> .List </stack>
+   187	    <ret> noRet </ret>
+   188	    <exc> NoExc </exc>
+   189	    <exit-code> 0 </exit-code>
+   190	
+   191	  claim [pf11]:
+   192	    <k> Call(Name("prime_fib"), Int(11)) => 2971215073 </k>
+   193	    <env> 0 </env>
+   194	    <scopes>
+   195	      0  |-> scope(
+   196	              ("_is_prime" |-> isPrimeClosure)
+   197	              ("prime_fib" |-> primeFibClosure),
+   198	              parent(-1))
+   199	      -1 |-> builtinsScope
+   200	    </scopes>
+   201	    <scopeLoc> 1 </scopeLoc>
+   202	    <heap> .Map </heap>
+   203	    <heapLoc> 0 </heapLoc>
+   204	    <stack> .List </stack>
+   205	    <ret> noRet </ret>
+   206	    <exc> NoExc </exc>
+   207	    <exit-code> 0 </exit-code>
+   208	endmodule
+EXIT_STATUS: 0

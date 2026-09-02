@@ -1,0 +1,334 @@
+Script started on 2026-07-23 09:43:01-05:00 [<not executed on terminal>]
+$ nl -ba /candidate/semantic.k
+     1	requires "verification.k"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports STRING-SYNTAX
+     6	
+     7	  syntax Program ::= "Module" "(" Stmts ")" [symbol(Module)]
+     8	
+     9	  // The translator prints statement sequences by juxtaposition.
+    10	  syntax Stmts ::= List{Stmt, ""}
+    11	
+    12	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")" [symbol(FuncDef)]
+    13	                | "Assign" "(" Expr "," Expr ")"                 [symbol(Assign)]
+    14	                | "For" "(" Expr "," Expr "," Stmts ")"       [symbol(For)]
+    15	                | "If" "(" Expr "," Stmts "," Stmts ")"       [symbol(If)]
+    16	                | "Return" "(" Expr ")"                          [symbol(Return)]
+    17	
+    18	  syntax Params ::= "Params" "(" String ")" [symbol(Params)]
+    19	
+    20	  syntax Expr ::= "Name" "(" String ")"                      [symbol(Name)]
+    21	                | "Int" "(" Int ")"                          [symbol(IntExpr)]
+    22	                | "Str" "(" String ")"                       [symbol(Str)]
+    23	                | "BinOp" "(" String "," Expr "," Expr ")" [symbol(BinOp)]
+    24	                | "Call" "(" Expr "," Expr ")"              [symbol(Call)]
+    25	                | "Compare" "(" Expr "," CmpOps ")"         [symbol(Compare)]
+    26	
+    27	  syntax CmpOps ::= List{CmpOp, ","}
+    28	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")" [symbol(CmpOp)]
+    29	endmodule
+    30	
+    31	module DIGIT-SUM-SEMANTICS
+    32	  imports MPY-SYNTAX
+    33	  imports INT
+    34	  imports BOOL
+    35	  imports STRING
+    36	  imports MAP
+    37	  imports K-EQUAL
+    38	
+    39	  syntax Value ::= "intVal" "(" Int ")"
+    40	                 | "strVal" "(" String ")"
+    41	                 | "boolVal" "(" Bool ")"
+    42	  syntax Result ::= "noResult" | Value
+    43	
+    44	  syntax KItem ::= "execute" "(" Stmts ")"
+    45	                 | "execStmt" "(" Stmt ")"
+    46	                 | "loopString" "(" String "," String "," Stmts ")"
+    47	                 | "addUpper" "(" String ")"
+    48	
+    49	  syntax Value ::= "eval" "(" Expr "," Map ")" [function]
+    50	  syntax Value ::= "addValues" "(" Value "," Value ")" [function]
+    51	                 | "ordValue" "(" Value ")" [function]
+    52	                 | "compareLE3" "(" Value "," Value "," Value ")" [function]
+    53	  syntax String ::= "stringOf" "(" Value ")" [function]
+    54	  syntax Bool ::= "truthOf" "(" Value ")" [function]
+    55	  syntax Int ::= "pythonUpperOrd" "(" String ")" [function]
+    56	
+    57	  rule eval(Int(I), _) => intVal(I)
+    58	  rule eval(Str(S), _) => strVal(S)
+    59	  // A just-assigned local is immediately visible even when the surrounding
+    60	  // symbolic map is otherwise unknown.
+    61	  rule eval(Name(X), _ENV [ X <- V ]) => {V}:>Value [simplification]
+    62	  rule eval(Name(X), ENV [ Y <- _V ]) => eval(Name(X), ENV)
+    63	    requires X =/=String Y [simplification]
+    64	  rule eval(Name(X), (X |-> V) REST) => {V}:>Value
+    65	    requires notBool (X in_keys(REST))
+    66	  rule eval(BinOp("+", LEFT, RIGHT), ENV)
+    67	    => addValues(eval(LEFT, ENV), eval(RIGHT, ENV))
+    68	  rule eval(Call(Name("ord"), ARG), ENV)
+    69	    => ordValue(eval(ARG, ENV))
+    70	  rule eval(Compare(LEFT,
+    71	          CmpOp("<=", MIDDLE), CmpOp("<=", RIGHT)), ENV)
+    72	    => compareLE3(eval(LEFT, ENV), eval(MIDDLE, ENV), eval(RIGHT, ENV))
+    73	
+    74	  rule addValues(intVal(I), intVal(J)) => intVal(I +Int J)
+    75	  rule ordValue(strVal(S)) => intVal(ordChar(S))
+    76	  rule compareLE3(strVal(A), strVal(B), strVal(C))
+    77	    => boolVal((ordChar(A) <=Int ordChar(B))
+    78	               andBool (ordChar(B) <=Int ordChar(C)))
+    79	  rule stringOf(strVal(S)) => S
+    80	  rule truthOf(boolVal(B)) => B
+    81	  rule pythonUpperOrd(C)
+    82	    => #if ordChar(C) >=Int 65 andBool ordChar(C) <=Int 90
+    83	       #then ordChar(C)
+    84	       #else 0
+    85	       #fi
+    86	
+    87	  configuration
+    88	    <digit-sum>
+    89	      <k> $PGM:Program </k>
+    90	      <input> $INPUT:String </input>
+    91	      <env> .Map </env>
+    92	      <result> noResult </result>
+    93	    </digit-sum>
+    94	
+    95	  // Loading the one-argument definition binds the supplied input as Python
+    96	  // would, then executes the function body.
+    97	  rule <k> Module(FuncDef("digitSum", Params("s"), BODY))
+    98	            => execute(BODY) ... </k>
+    99	       <input> S </input>
+   100	       <env> .Map => "s" |-> strVal(S) </env>
+   101	
+   102	  rule <k> execute(.Stmts) => .K ... </k>
+   103	  rule <k> execute(S SS) => execStmt(S) ~> execute(SS) ... </k>
+   104	
+   105	  rule <k> execStmt(Assign(Name(X), E)) => .K ... </k>
+   106	       <env> ENV => ENV[X <- eval(E, ENV)] </env>
+   107	
+   108	  // This exact translated if-statement is evaluated atomically.  The #if is
+   109	  // the ordinary conditional denotation: it adds ord(char) in the uppercase
+   110	  // case and zero otherwise, without forcing a symbolic branch.
+   111	  rule <k> execStmt(If(Compare(Str("A"),
+   112	                    CmpOp("<=", Name(X)), CmpOp("<=", Str("Z"))),
+   113	                  Assign(Name("total"),
+   114	                    BinOp("+", Name("total"),
+   115	                      Call(Name("ord"), Name(X)))),
+   116	                  .Stmts))
+   117	            => .K ... </k>
+   118	       <env> ENV
+   119	              => ENV["total" <-
+   120	                   addValues(eval(Name("total"), ENV),
+   121	                     intVal(pythonUpperOrd(
+   122	                       stringOf(eval(Name(X), ENV)))))]
+   123	       </env>
+   124	
+   125	  rule <k> execStmt(For(Name(X), ITER, BODY))
+   126	            => loopString(X, stringOf(eval(ITER, ENV)), BODY) ... </k>
+   127	       <env> ENV </env>
+   128	
+   129	  rule <k> loopString(_X, "", _BODY) => .K ... </k>
+   130	  rule <k> loopString("char", S,
+   131	              If(Compare(Str("A"),
+   132	                   CmpOp("<=", Name("char")), CmpOp("<=", Str("Z"))),
+   133	                 Assign(Name("total"),
+   134	                   BinOp("+", Name("total"),
+   135	                     Call(Name("ord"), Name("char")))),
+   136	                 .Stmts)
+   137	              .Stmts)
+   138	            => addUpper(substrString(S, 0, 1))
+   139	            ~> loopString("char",
+   140	                 substrString(S, 1, lengthString(S)),
+   141	                 If(Compare(Str("A"),
+   142	                      CmpOp("<=", Name("char")), CmpOp("<=", Str("Z"))),
+   143	                    Assign(Name("total"),
+   144	                      BinOp("+", Name("total"),
+   145	                        Call(Name("ord"), Name("char")))),
+   146	                    .Stmts)
+   147	                 .Stmts) ... </k>
+   148	    requires S =/=String ""
+   149	
+   150	  rule <k> addUpper(C) => .K ... </k>
+   151	       <env> ("total" |-> intVal(A)) FRAME
+   152	              => ("total" |-> intVal(A +Int pythonUpperOrd(C))) FRAME
+   153	       </env>
+   154	    requires notBool ("total" in_keys(FRAME))
+   155	
+   156	  rule <k> execStmt(Return(E)) ~> _REST => .K </k>
+   157	       <env> ENV => .Map </env>
+   158	       <result> noResult => eval(E, ENV) </result>
+   159	endmodule
+   160	
+   161	module SEMANTIC
+   162	  imports DIGIT-SUM-SEMANTICS
+   163	  imports DIGIT-SUM-VERIFICATION
+   164	endmodule
+[exit 0]
+$ nl -ba /candidate/verification.k
+     1	module DIGIT-SUM-VERIFICATION
+     2	  imports INT
+     3	  imports BOOL
+     4	  imports STRING
+     5	  imports K-EQUAL
+     6	
+     7	  // Independent mathematical contract: recursively sum exactly the code
+     8	  // points in the inclusive ASCII uppercase interval [65, 90].
+     9	  syntax Int ::= "upperAsciiSum" "(" String ")" [function]
+    10	               | "upperAsciiContribution" "(" String ")" [function]
+    11	
+    12	  rule upperAsciiSum("") => 0 [simplification]
+    13	  rule upperAsciiSum(S)
+    14	    => upperAsciiContribution(substrString(S, 0, 1))
+    15	       +Int upperAsciiSum(substrString(S, 1, lengthString(S)))
+    16	    requires S =/=String "" [simplification]
+    17	
+    18	  rule upperAsciiContribution(C)
+    19	    => #if ordChar(C) >=Int 65 andBool ordChar(C) <=Int 90
+    20	       #then ordChar(C)
+    21	       #else 0
+    22	       #fi [simplification]
+    23	
+    24	  // Canonical right-associated form used by the loop invariant.
+    25	  rule (I +Int J) +Int K => I +Int (J +Int K) [simplification]
+    26	endmodule
+[exit 0]
+$ nl -ba /candidate/spec.k
+     1	requires "semantic.k"
+     2	
+     3	module SPEC
+     4	  imports SEMANTIC
+     5	  imports DIGIT-SUM-VERIFICATION
+     6	
+     7	  // End-to-end functional correctness for every K String S.  The left side
+     8	  // is the exact constructor tree emitted in solution.mpy; the right side is
+     9	  // the independent recursive contract from verification.k.
+    10	  claim <k>
+    11	      Module(
+    12	        FuncDef("digitSum", Params("s"),
+    13	          Assign(Name("total"), Int(0))
+    14	          For(Name("char"), Name("s"),
+    15	            If(Compare(Str("A"),
+    16	                 CmpOp("<=", Name("char")), CmpOp("<=", Str("Z"))),
+    17	               Assign(Name("total"),
+    18	                 BinOp("+", Name("total"),
+    19	                   Call(Name("ord"), Name("char")))),
+    20	               .Stmts))
+    21	          Return(Name("total"))))
+    22	        => .K
+    23	        </k>
+    24	        <input> S:String => S:String </input>
+    25	        <env> .Map => .Map </env>
+    26	        <result> noResult => intVal(upperAsciiSum(S)) </result>
+    27	
+    28	  // Loop invariant: with accumulator A and unprocessed suffix S, execution
+    29	  // returns A plus the contract value of S. FRAME holds unrelated locals.
+    30	  claim <k>
+    31	          loopString("char", S:String,
+    32	            If(Compare(Str("A"),
+    33	                 CmpOp("<=", Name("char")), CmpOp("<=", Str("Z"))),
+    34	               Assign(Name("total"),
+    35	                 BinOp("+", Name("total"),
+    36	                   Call(Name("ord"), Name("char")))),
+    37	               .Stmts)
+    38	            .Stmts)
+    39	          ~> execute(Return(Name("total")) .Stmts)
+    40	          ~> .K
+    41	          => .K
+    42	        </k>
+    43	        <input> INPUT:String => INPUT:String </input>
+    44	        <env>
+    45	          ("total" |-> intVal(A:Int)) FRAME:Map
+    46	          => .Map
+    47	        </env>
+    48	        <result>
+    49	          noResult => intVal(A +Int upperAsciiSum(S))
+    50	        </result>
+    51	    requires notBool ("total" in_keys(FRAME))
+    52	endmodule
+[exit 0]
+$ nl -ba /candidate/solution.mpy
+     1	Module(
+     2	  FuncDef("digitSum", Params("s"),
+     3	    Assign(Name("total"), Int(0))
+     4	    For(Name("char"), Name("s"),
+     5	      If(Compare(
+     6	        Str("A"),
+     7	        CmpOp("<=", Name("char")),
+     8	        CmpOp("<=", Str("Z"))),
+     9	        Assign(
+    10	          Name("total"),
+    11	          BinOp("+", Name("total"), Call(Name("ord"), Name("char")))),
+    12	        ))
+    13	    Return(Name("total"))))
+[exit 0]
+$ nl -ba /candidate/solution.py
+     1	def digitSum(s):
+     2	    total = 0
+     3	    for char in s:
+     4	        if "A" <= char <= "Z":
+     5	            total = total + ord(char)
+     6	    return total
+[exit 0]
+$ rg -n syntax\|rule\|claim\|configuration\|\\\[\(function\|total\|functional\|simplification\|priority\|anywhere\|macro\|opaque\|concrete\) /candidate/semantic.k /candidate/verification.k /candidate/spec.k
+/candidate/spec.k
+10:  claim <k>
+30:  claim <k>
+
+/candidate/verification.k
+9:  syntax Int ::= "upperAsciiSum" "(" String ")" [function]
+10:               | "upperAsciiContribution" "(" String ")" [function]
+12:  rule upperAsciiSum("") => 0 [simplification]
+13:  rule upperAsciiSum(S)
+16:    requires S =/=String "" [simplification]
+18:  rule upperAsciiContribution(C)
+22:       #fi [simplification]
+25:  rule (I +Int J) +Int K => I +Int (J +Int K) [simplification]
+
+/candidate/semantic.k
+7:  syntax Program ::= "Module" "(" Stmts ")" [symbol(Module)]
+10:  syntax Stmts ::= List{Stmt, ""}
+12:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")" [symbol(FuncDef)]
+18:  syntax Params ::= "Params" "(" String ")" [symbol(Params)]
+20:  syntax Expr ::= "Name" "(" String ")"                      [symbol(Name)]
+27:  syntax CmpOps ::= List{CmpOp, ","}
+28:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")" [symbol(CmpOp)]
+39:  syntax Value ::= "intVal" "(" Int ")"
+42:  syntax Result ::= "noResult" | Value
+44:  syntax KItem ::= "execute" "(" Stmts ")"
+49:  syntax Value ::= "eval" "(" Expr "," Map ")" [function]
+50:  syntax Value ::= "addValues" "(" Value "," Value ")" [function]
+51:                 | "ordValue" "(" Value ")" [function]
+52:                 | "compareLE3" "(" Value "," Value "," Value ")" [function]
+53:  syntax String ::= "stringOf" "(" Value ")" [function]
+54:  syntax Bool ::= "truthOf" "(" Value ")" [function]
+55:  syntax Int ::= "pythonUpperOrd" "(" String ")" [function]
+57:  rule eval(Int(I), _) => intVal(I)
+58:  rule eval(Str(S), _) => strVal(S)
+61:  rule eval(Name(X), _ENV [ X <- V ]) => {V}:>Value [simplification]
+62:  rule eval(Name(X), ENV [ Y <- _V ]) => eval(Name(X), ENV)
+63:    requires X =/=String Y [simplification]
+64:  rule eval(Name(X), (X |-> V) REST) => {V}:>Value
+66:  rule eval(BinOp("+", LEFT, RIGHT), ENV)
+68:  rule eval(Call(Name("ord"), ARG), ENV)
+70:  rule eval(Compare(LEFT,
+74:  rule addValues(intVal(I), intVal(J)) => intVal(I +Int J)
+75:  rule ordValue(strVal(S)) => intVal(ordChar(S))
+76:  rule compareLE3(strVal(A), strVal(B), strVal(C))
+79:  rule stringOf(strVal(S)) => S
+80:  rule truthOf(boolVal(B)) => B
+81:  rule pythonUpperOrd(C)
+87:  configuration
+97:  rule <k> Module(FuncDef("digitSum", Params("s"), BODY))
+102:  rule <k> execute(.Stmts) => .K ... </k>
+103:  rule <k> execute(S SS) => execStmt(S) ~> execute(SS) ... </k>
+105:  rule <k> execStmt(Assign(Name(X), E)) => .K ... </k>
+111:  rule <k> execStmt(If(Compare(Str("A"),
+125:  rule <k> execStmt(For(Name(X), ITER, BODY))
+129:  rule <k> loopString(_X, "", _BODY) => .K ... </k>
+130:  rule <k> loopString("char", S,
+150:  rule <k> addUpper(C) => .K ... </k>
+156:  rule <k> execStmt(Return(E)) ~> _REST => .K </k>
+[exit 0]
+
+Script done on 2026-07-23 09:43:01-05:00 [COMMAND_EXIT_CODE="0"]

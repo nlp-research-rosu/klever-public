@@ -1,0 +1,184 @@
+$ wc -l /reference/k-proof/verification.k /reference/k-proof/spec.k /reference/k-proof/semantic.k /reference/k-proof/solution.py /reference/k-proof/solution.mpy /reference/k-proof/prove.sh /reference/k-proof/prompt.py
+  60 /reference/k-proof/verification.k
+  49 /reference/k-proof/spec.k
+  97 /reference/k-proof/semantic.k
+  12 /reference/k-proof/solution.py
+  18 /reference/k-proof/solution.mpy
+  19 /reference/k-proof/prove.sh
+  11 /reference/k-proof/prompt.py
+ 266 total
+$ nl -ba /reference/k-proof/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // Mathematical functions used only in specifications.  Their equations are
+     7	  // deliberately aligned with the two loops' decreasing/advancing measures.
+     8	  syntax Int ::= digitSevens(Int) [function, total]
+     9	               | fizzContribution(Int) [function, total]
+    10	               | fizzFrom(Int, Int) [function, total]
+    11	               | fizzEnd(Int) [function, total]
+    12	
+    13	  rule fizzEnd(N) => 0
+    14	    requires N <Int 0
+    15	  rule fizzEnd(N) => N
+    16	    requires N >=Int 0
+    17	
+    18	  rule digitSevens(X) => 0
+    19	    requires X <=Int 0
+    20	  rule digitSevens(X) => 1 +Int digitSevens(X /Int 10)
+    21	    requires X >Int 0 andBool X %Int 10 ==Int 7
+    22	  rule digitSevens(X) => digitSevens(X /Int 10)
+    23	    requires X >Int 0 andBool X %Int 10 =/=Int 7
+    24	
+    25	  rule fizzContribution(I) => digitSevens(I)
+    26	    requires I %Int 11 ==Int 0
+    27	  rule fizzContribution(I) => digitSevens(I)
+    28	    requires I %Int 11 =/=Int 0 andBool I %Int 13 ==Int 0
+    29	  rule fizzContribution(I) => 0
+    30	    requires I %Int 11 =/=Int 0 andBool I %Int 13 =/=Int 0
+    31	
+    32	  rule fizzFrom(I, N) => 0
+    33	    requires I >=Int N
+    34	  rule fizzFrom(I, N) => fizzContribution(I) +Int fizzFrom(I +Int 1, N)
+    35	    requires I <Int N
+    36	
+    37	  // Keep symbolic sums in the right-associated shape used by the invariants.
+    38	  rule (A +Int B) +Int C => A +Int (B +Int C) [simplification]
+    39	
+    40	  // Readable aliases for the exact translated loops.  These are macros only:
+    41	  // claims still execute the constructors emitted into solution.mpy.
+    42	  syntax Stmt ::= "INNER-LOOP" [macro]
+    43	  rule INNER-LOOP =>
+    44	    While(Compare(Name("x"), CmpOp(">", Int(0))),
+    45	      If(Compare(BinOp("%", Name("x"), Int(10)), CmpOp("==", Int(7))),
+    46	        Assign(Name("count"), BinOp("+", Name("count"), Int(1))),
+    47	        .Stmts)
+    48	      Assign(Name("x"), BinOp("//", Name("x"), Int(10))))
+    49	
+    50	  syntax Stmt ::= "OUTER-LOOP" [macro]
+    51	  rule OUTER-LOOP =>
+    52	    While(Compare(Name("i"), CmpOp("<", Name("n"))),
+    53	      If(BoolOp("or",
+    54	          Compare(BinOp("%", Name("i"), Int(11)), CmpOp("==", Int(0))),
+    55	          Compare(BinOp("%", Name("i"), Int(13)), CmpOp("==", Int(0)))),
+    56	        Assign(Name("x"), Name("i"))
+    57	        INNER-LOOP,
+    58	        .Stmts)
+    59	      Assign(Name("i"), BinOp("+", Name("i"), Int(1))))
+    60	endmodule
+$ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Inner-loop invariant: starting with x = X adds exactly the number of
+     7	  // decimal sevens in X and terminates with x = 0.
+     8	  claim <k> INNER-LOOP ~> REST => REST </k>
+     9	        <env>
+    10	          "count" |-> (C => C +Int digitSevens(X))
+    11	          "i" |-> _I
+    12	          "n" |-> _N
+    13	          "x" |-> (X => 0)
+    14	        </env>
+    15	    requires X >=Int 0
+    16	
+    17	  // Outer-loop invariant: [I,N) contributes fizzFrom(I,N); x is zero at each
+    18	  // outer-loop boundary because the inner loop exhausts it.
+    19	  claim <k> OUTER-LOOP ~> REST => REST </k>
+    20	        <env>
+    21	          "count" |-> (C => C +Int fizzFrom(I, N))
+    22	          "i" |-> (I => N)
+    23	          "n" |-> N
+    24	          "x" |-> 0
+    25	        </env>
+    26	    requires I >=Int 0 andBool I <=Int N
+    27	
+    28	  // End-to-end theorem for every integer input.  For N <= 0, fizzFrom(0,N)
+    29	  // and the program's empty iteration both yield zero.
+    30	  claim <fizz>
+    31	          <k>
+    32	            Module(
+    33	              FuncDef("fizz_buzz", Params("n"),
+    34	                Assign(Name("count"), Int(0))
+    35	                Assign(Name("i"), Int(0))
+    36	                OUTER-LOOP
+    37	                Return(Name("count"))))
+    38	            => .K
+    39	          </k>
+    40	          <input> N </input>
+    41	          <env> .Map =>
+    42	            "count" |-> fizzFrom(0, N)
+    43	            "i" |-> fizzEnd(N)
+    44	            "n" |-> N
+    45	            "x" |-> 0
+    46	          </env>
+    47	          <result> 0 => fizzFrom(0, N) </result>
+    48	        </fizz>
+    49	endmodule
+$ nl -ba /reference/k-proof/solution.py
+     1	def fizz_buzz(n: int):
+     2	    count = 0
+     3	    i = 0
+     4	    while i < n:
+     5	        if i % 11 == 0 or i % 13 == 0:
+     6	            x = i
+     7	            while x > 0:
+     8	                if x % 10 == 7:
+     9	                    count = count + 1
+    10	                x = x // 10
+    11	        i = i + 1
+    12	    return count
+$ nl -ba /reference/k-proof/solution.mpy
+     1	Module(
+     2	  FuncDef("fizz_buzz", Params("n"),
+     3	    Assign(Name("count"), Int(0))
+     4	    Assign(Name("i"), Int(0))
+     5	    While(Compare(Name("i"), CmpOp("<", Name("n"))),
+     6	      If(BoolOp(
+     7	        "or",
+     8	        Compare(BinOp("%", Name("i"), Int(11)), CmpOp("==", Int(0))),
+     9	        Compare(BinOp("%", Name("i"), Int(13)), CmpOp("==", Int(0)))),
+    10	        Assign(Name("x"), Name("i"))
+    11	        While(Compare(Name("x"), CmpOp(">", Int(0))),
+    12	          If(Compare(BinOp("%", Name("x"), Int(10)), CmpOp("==", Int(7))),
+    13	            Assign(Name("count"), BinOp("+", Name("count"), Int(1))),
+    14	            )
+    15	          Assign(Name("x"), BinOp("//", Name("x"), Int(10)))),
+    16	        )
+    17	      Assign(Name("i"), BinOp("+", Name("i"), Int(1))))
+    18	    Return(Name("count"))))
+$ nl -ba /reference/k-proof/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	cd "$(dirname "$0")"
+     5	
+     6	python3 py2mpy.py solution.py > solution.mpy
+     7	
+     8	kompile verification.k \
+     9	  --main-module VERIFICATION \
+    10	  --syntax-module MPY-SYNTAX \
+    11	  --backend haskell
+    12	
+    13	# The three examples from prompt.py.
+    14	krun solution.mpy -cN=50 --definition verification-kompiled
+    15	krun solution.mpy -cN=78 --definition verification-kompiled
+    16	krun solution.mpy -cN=79 --definition verification-kompiled
+    17	
+    18	# This proves every claim in spec.k.  Success prints #Top and exits zero.
+    19	kprove spec.k --definition verification-kompiled
+$ nl -ba /reference/k-proof/prompt.py
+     1	
+     2	
+     3	def fizz_buzz(n: int):
+     4	    """Return the number of times the digit 7 appears in integers less than n which are divisible by 11 or 13.
+     5	    >>> fizz_buzz(50)
+     6	    0
+     7	    >>> fizz_buzz(78)
+     8	    2
+     9	    >>> fizz_buzz(79)
+    10	    3
+    11	    """

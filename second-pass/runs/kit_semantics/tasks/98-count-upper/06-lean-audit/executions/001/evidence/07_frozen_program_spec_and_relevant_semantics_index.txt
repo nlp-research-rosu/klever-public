@@ -1,0 +1,297 @@
++ nl -ba /reference/k-proof/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Number of uppercase vowels at offsets 0, 2, 4, ... in a code sequence.
+     7	  syntax Int ::= countUpperEven(IntSeq) [function, total]
+     8	  rule countUpperEven(.IntSeq) => 0
+     9	  rule countUpperEven(CODES:IntSeq)
+    10	    => (#if strContains(
+    11	                  iCons(intSeqAt(CODES, 0), .IntSeq),
+    12	                  strToCodes("AEIOU"))
+    13	        #then 1 #else 0 #fi)
+    14	       +Int countUpperEven(
+    15	         buildIS(
+    16	           CODES,
+    17	           clampHi(2, isLen(CODES), 1),
+    18	           isLen(CODES),
+    19	           1))
+    20	    requires notBool (CODES ==K .IntSeq)
+    21	    [simplification]
+    22	
+    23	  // Normalize the accumulator shape used by the loop invariant.
+    24	  rule (A:Int +Int B:Int) +Int C:Int
+    25	    => A +Int (B +Int C)
+    26	    [simplification]
+    27	endmodule
++ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [loop-invariant]:
+     7	    <k>
+     8	      #while(
+     9	        Name("remaining"),
+    10	        AugAssign(
+    11	          Name("count"),
+    12	          "+",
+    13	          Compare(
+    14	            Subscript(Name("remaining"), Int(0)),
+    15	            CmpOp("in", Str("AEIOU"))))
+    16	        Assign(
+    17	          Name("remaining"),
+    18	          Subscript(
+    19	            Name("remaining"),
+    20	            Slice(Int(2), NoBound, NoBound))))
+    21	      => .K
+    22	      ...
+    23	    </k>
+    24	    <env> 1 </env>
+    25	    <scopes>
+    26	      ...
+    27	      1 |-> scope(
+    28	        "s" |-> str(ORIGINAL:IntSeq)
+    29	        "count" |-> (ACC:Int => ACC +Int countUpperEven(CODES))
+    30	        "remaining" |-> (str(CODES) => str(.IntSeq)),
+    31	        parent(0))
+    32	      ...
+    33	    </scopes>
+    34	
+    35	  claim [count-upper]:
+    36	    <k>
+    37	      Call(Name("count_upper"), str(CODES:IntSeq))
+    38	      => countUpperEven(CODES)
+    39	    </k>
+    40	    <env> 0 </env>
+    41	    <scopes>
+    42	      0 |-> scope(
+    43	        "count_upper" |->
+    44	          closureVal(
+    45	            ("s", .ParamNames),
+    46	            Assign(Name("count"), Int(0))
+    47	            Assign(Name("remaining"), Name("s"))
+    48	            While(
+    49	              Name("remaining"),
+    50	              AugAssign(
+    51	                Name("count"),
+    52	                "+",
+    53	                Compare(
+    54	                  Subscript(Name("remaining"), Int(0)),
+    55	                  CmpOp("in", Str("AEIOU"))))
+    56	              Assign(
+    57	                Name("remaining"),
+    58	                Subscript(
+    59	                  Name("remaining"),
+    60	                  Slice(Int(2), NoBound, NoBound))))
+    61	            Return(Name("count"))
+    62	            .Stmts,
+    63	            0),
+    64	        parent(-1))
+    65	      -1 |-> builtinsScope
+    66	    </scopes>
+    67	    <scopeLoc> 1 </scopeLoc>
+    68	    <heap> .Map </heap>
+    69	    <heapLoc> 0 </heapLoc>
+    70	    <stack> .List </stack>
+    71	    <ret> noRet </ret>
+    72	    <exc> NoExc </exc>
+    73	    <exit-code> 0 </exit-code>
+    74	endmodule
++ nl -ba /reference/k-proof/solution.py
+     1	def count_upper(s):
+     2	    count = 0
+     3	    remaining = s
+     4	    while remaining:
+     5	        count += remaining[0] in "AEIOU"
+     6	        remaining = remaining[2:]
+     7	    return count
++ nl -ba /reference/k-proof/prompt.py
+     1	
+     2	def count_upper(s):
+     3	    """
+     4	    Given a string s, count the number of uppercase vowels in even indices.
+     5	    
+     6	    For example:
+     7	    count_upper('aBCdEf') returns 1
+     8	    count_upper('abcdefg') returns 0
+     9	    count_upper('dBBE') returns 0
+    10	    """
++ nl -ba /reference/k-proof/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	cd "$(dirname "$0")"
+     5	
+     6	# Translation and test-harness identity checks.
+     7	cmp solution.mpy <(python3 py2mpy.py solution.py)
+     8	echo "SOLUTION_TRANSLATION_MATCH=PASS"
+     9	cmp solution.py <(head -n 7 concrete_tests.py)
+    10	echo "CONCRETE_HARNESS_BODY_MATCH=PASS"
+    11	python3 py2mpy.py solution.py > solution.mpy
+    12	python3 py2mpy.py concrete_tests.py > concrete_tests.mpy
+    13	python3 identity_test.py
+    14	
+    15	# Independent CPython evidence.
+    16	python3 concrete_tests.py
+    17	echo "CPYTHON_CONCRETE_ASSERTS=5 PASS"
+    18	python3 differential_test.py
+    19	
+    20	# Concrete execution under the supplied semantics.
+    21	kompile --backend llvm reference-semantics/semantics.k \
+    22	  --main-module MPY-KRUN \
+    23	  --syntax-module MPY-SYNTAX \
+    24	  --output-definition runtime-kompiled
+    25	krun solution.mpy --definition runtime-kompiled
+    26	echo "KRUN_SOLUTION_LOAD=PASS"
+    27	krun concrete_tests.mpy --definition runtime-kompiled
+    28	echo "KRUN_CONCRETE_ASSERTS=5 PASS"
+    29	
+    30	# Symbolic proof under the supplied semantics plus verification.k.
+    31	kompile --backend haskell verification.k \
+    32	  --main-module VERIFICATION \
+    33	  --syntax-module MPY-SYNTAX \
+    34	  --output-definition verification-kompiled
+    35	kprove spec.k \
+    36	  --definition verification-kompiled \
+    37	  --spec-module SPEC \
+    38	  --claims SPEC.loop-invariant
+    39	echo "KPROVE_LOOP_INVARIANT=PASS"
+    40	kprove spec.k \
+    41	  --definition verification-kompiled \
+    42	  --spec-module SPEC
+    43	echo "KPROVE_ALL_CLAIMS=PASS"
+    44	
+    45	# Gate A negative probes: both must be rejected.
+    46	if kprove spec-vacuity.k \
+    47	  --definition verification-kompiled \
+    48	  --spec-module SPEC-VACUITY
+    49	then
+    50	  echo "UNEXPECTED SUCCESS: false-result mutation proved" >&2
+    51	  exit 1
+    52	else
+    53	  echo "EXPECTED FAILURE: false-result mutation rejected"
+    54	fi
+    55	
+    56	if kprove spec-body-mutation.k \
+    57	  --definition verification-kompiled \
+    58	  --spec-module SPEC-BODY-MUTATION
+    59	then
+    60	  echo "UNEXPECTED SUCCESS: mutated body proved" >&2
+    61	  exit 1
+    62	else
+    63	  echo "EXPECTED FAILURE: mutated body rejected"
+    64	fi
++ rg -n 'countUpperEven|intSeqAt|strContains|strToCodes|buildIS|clampHi|isLen|\+Int|range|comprehension|List' /reference/k-proof/reference-semantics/semantics.k /reference/k-proof/reference-semantics/semantics/assert.k /reference/k-proof/reference-semantics/semantics/bool.k /reference/k-proof/reference-semantics/semantics/builtins.k /reference/k-proof/reference-semantics/semantics/call.k /reference/k-proof/reference-semantics/semantics/comprehension.k /reference/k-proof/reference-semantics/semantics/concrete.k /reference/k-proof/reference-semantics/semantics/controls.k /reference/k-proof/reference-semantics/semantics/core.k /reference/k-proof/reference-semantics/semantics/dict.k /reference/k-proof/reference-semantics/semantics/float.k /reference/k-proof/reference-semantics/semantics/functions.k /reference/k-proof/reference-semantics/semantics/int.k /reference/k-proof/reference-semantics/semantics/iter.k /reference/k-proof/reference-semantics/semantics/list.k /reference/k-proof/reference-semantics/semantics/methods.k /reference/k-proof/reference-semantics/semantics/operators.k /reference/k-proof/reference-semantics/semantics/range.k /reference/k-proof/reference-semantics/semantics/set.k /reference/k-proof/reference-semantics/semantics/sort.k /reference/k-proof/reference-semantics/semantics/str.k /reference/k-proof/reference-semantics/semantics/subscript.k /reference/k-proof/reference-semantics/semantics/syntax.k /reference/k-proof/reference-semantics/semantics/tuple.k
+/reference/k-proof/reference-semantics/semantics/functions.k:87:       <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack>
+/reference/k-proof/reference-semantics/semantics/tuple.k:26:  rule idxOfVS(vCons(A:Val, R:ValSeq), V:Val, I:Int) => idxOfVS(R, V, I +Int 1)
+/reference/k-proof/reference-semantics/semantics/syntax.k:17:                | "ListExpr"  "(" Exprs ")"
+/reference/k-proof/reference-semantics/semantics/syntax.k:19:                | "ListComp"  "(" Expr "," CompFors ")" [macro]
+/reference/k-proof/reference-semantics/semantics/syntax.k:34:  syntax Entries  ::= List{Entry, ","}
+/reference/k-proof/reference-semantics/semantics/syntax.k:36:  syntax CompFors ::= List{CompFor, ""}
+/reference/k-proof/reference-semantics/semantics/syntax.k:37:  syntax Exprs    ::= List{Expr, ","}
+/reference/k-proof/reference-semantics/semantics/syntax.k:56:  syntax Stmts      ::= List{Stmt, ""}
+/reference/k-proof/reference-semantics/semantics/syntax.k:60:  syntax ParamNames ::= List{String, ","}
+/reference/k-proof/reference-semantics/semantics/float.k:164:       requires isLen(CS) >Int 0 andBool headIS(CS) =/=Int 45 [concrete]
+/reference/k-proof/reference-semantics/semantics/float.k:171:  rule intPartAcc(iCons(C:Int, R:IntSeq), A:Int) => intPartAcc(R, A *Int 10 +Int (C -Int 48))
+/reference/k-proof/reference-semantics/semantics/float.k:178:  rule fracAcc(iCons(C:Int, R:IntSeq), A:Int) => fracAcc(R, A *Int 10 +Int (C -Int 48))
+/reference/k-proof/reference-semantics/semantics/subscript.k:16:  syntax Int ::= intSeqAt(IntSeq, Int) [function]
+/reference/k-proof/reference-semantics/semantics/subscript.k:17:  rule intSeqAt(iCons(C:Int, _:IntSeq), 0)     => C
+/reference/k-proof/reference-semantics/semantics/subscript.k:18:  rule intSeqAt(iCons(_:Int, S:IntSeq), I:Int) => intSeqAt(S, I -Int 1)
+/reference/k-proof/reference-semantics/semantics/subscript.k:22:  rule normIdx(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0
+/reference/k-proof/reference-semantics/semantics/subscript.k:41:    => str(iCons(intSeqAt(IS, normIdx(I, isLen(IS))), .IntSeq))
+/reference/k-proof/reference-semantics/semantics/subscript.k:69:    => str(buildIS(IS, slStart(LO, ST, isLen(IS)), slStop(HI, ST, isLen(IS)), slStep(ST)))
+/reference/k-proof/reference-semantics/semantics/subscript.k:91:  rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampLo(I +Int LEN, STEP)
+/reference/k-proof/reference-semantics/semantics/subscript.k:93:  rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampHi(I, LEN, STEP)
+/reference/k-proof/reference-semantics/semantics/subscript.k:102:  syntax Int ::= clampHi(Int, Int, Int) [function, total]
+/reference/k-proof/reference-semantics/semantics/subscript.k:103:  rule clampHi(I:Int, LEN:Int, _STEP:Int) => I
+/reference/k-proof/reference-semantics/semantics/subscript.k:105:  rule clampHi(I:Int, LEN:Int, STEP:Int)  => #if STEP <Int 0 #then LEN -Int 1 #else LEN #fi
+/reference/k-proof/reference-semantics/semantics/subscript.k:108:  // ==== build the strided sub-sequence (indices in range by construction) ====
+/reference/k-proof/reference-semantics/semantics/subscript.k:111:    => vCons(valSeqAt(VS, I), buildVS(VS, I +Int STEP, STOP, STEP))
+/reference/k-proof/reference-semantics/semantics/subscript.k:116:  syntax IntSeq ::= buildIS(IntSeq, Int, Int, Int) [function]
+/reference/k-proof/reference-semantics/semantics/subscript.k:117:  rule buildIS(IS:IntSeq, I:Int, STOP:Int, STEP:Int)
+/reference/k-proof/reference-semantics/semantics/subscript.k:118:    => iCons(intSeqAt(IS, I), buildIS(IS, I +Int STEP, STOP, STEP))
+/reference/k-proof/reference-semantics/semantics/subscript.k:120:  rule buildIS(_:IntSeq, I:Int, STOP:Int, STEP:Int) => .IntSeq
+/reference/k-proof/reference-semantics/semantics/dict.k:91:  rule normIdxD(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0
+/reference/k-proof/reference-semantics/semantics/str.k:13:  syntax IntSeq ::= strToCodes(String) [function]
+/reference/k-proof/reference-semantics/semantics/str.k:14:  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+/reference/k-proof/reference-semantics/semantics/str.k:15:  rule strToCodes("") => .IntSeq
+/reference/k-proof/reference-semantics/semantics/str.k:16:  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+/reference/k-proof/reference-semantics/semantics/str.k:29:  rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)
+/reference/k-proof/reference-semantics/semantics/str.k:30:  rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)
+/reference/k-proof/reference-semantics/semantics/str.k:37:  syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]
+/reference/k-proof/reference-semantics/semantics/str.k:38:  rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)
+/reference/k-proof/reference-semantics/semantics/str.k:39:  rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)
+/reference/k-proof/reference-semantics/semantics/str.k:40:  rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs)
+/reference/k-proof/reference-semantics/semantics/core.k:21:                    | rangeObj(Int, Int, Int)
+/reference/k-proof/reference-semantics/semantics/core.k:40:  syntax Vals     ::= List{Val, ","}
+/reference/k-proof/reference-semantics/semantics/core.k:57:    <stack>   .List </stack>
+/reference/k-proof/reference-semantics/semantics/core.k:83:  // 26-remove-duplicates). Cross-frame reads (a comprehension closure
+/reference/k-proof/reference-semantics/semantics/core.k:120:       <heapLoc> N:Int => N +Int 1 </heapLoc>
+/reference/k-proof/reference-semantics/semantics/core.k:138:  // covers cross-frame cell reads (a comprehension closure reading the
+/reference/k-proof/reference-semantics/semantics/core.k:167:                  [ "range"  <- builtinV("range")  ]
+/reference/k-proof/reference-semantics/semantics/core.k:222:  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+/reference/k-proof/reference-semantics/semantics/core.k:225:  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+/reference/k-proof/reference-semantics/semantics/core.k:227:  syntax Int ::= isLen(IntSeq) [function, total]
+/reference/k-proof/reference-semantics/semantics/core.k:228:  rule isLen(.IntSeq)                => 0
+/reference/k-proof/reference-semantics/semantics/core.k:229:  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+/reference/k-proof/reference-semantics/semantics/range.k:1:// reference/src/semantics/range.k — MPY-RANGE
+/reference/k-proof/reference-semantics/semantics/range.k:2:// rangeObj: the range helpers (inRange / rangeLen) + its #iterNext case. rangeObj itself is
+/reference/k-proof/reference-semantics/semantics/range.k:12:  syntax Int ::= rangeLen(Int, Int, Int) [function]
+/reference/k-proof/reference-semantics/semantics/range.k:13:  rule rangeLen(LO:Int, HI:Int, ST:Int) => (HI -Int LO +Int ST -Int 1) /Int ST
+/reference/k-proof/reference-semantics/semantics/range.k:15:  rule rangeLen(LO:Int, HI:Int, ST:Int) => (LO -Int HI -Int ST -Int 1) /Int (0 -Int ST)
+/reference/k-proof/reference-semantics/semantics/range.k:17:  rule rangeLen(LO:Int, HI:Int, ST:Int) => 0
+/reference/k-proof/reference-semantics/semantics/range.k:20:  rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int))
+/reference/k-proof/reference-semantics/semantics/range.k:21:        => #iterYield(I, rangeObj(I +Int ST, HI, ST)) ... </k>
+/reference/k-proof/reference-semantics/semantics/range.k:23:  rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterDone ... </k>
+/reference/k-proof/reference-semantics/semantics/comprehension.k:1:// reference/src/semantics/comprehension.k — MPY-COMPREHENSION
+/reference/k-proof/reference-semantics/semantics/comprehension.k:10:  // A comprehension is pure syntactic sugar
+/reference/k-proof/reference-semantics/semantics/comprehension.k:11:  rule ListComp(ELT:Expr, Gs:CompFors) => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)
+/reference/k-proof/reference-semantics/semantics/comprehension.k:16:    => Assign(Name("$acc"), ListExpr(.Exprs)) compNest(Gs, ELT) Return(Name("$acc"))
+/reference/k-proof/reference-semantics/semantics/comprehension.k:20:    => Assign(Name("$acc"), BinOp("+", Name("$acc"), ListExpr(ELT)))
+/reference/k-proof/reference-semantics/semantics/call.k:73:       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+/reference/k-proof/reference-semantics/semantics/call.k:74:       <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+/reference/k-proof/reference-semantics/semantics/call.k:84:       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+/reference/k-proof/reference-semantics/semantics/call.k:85:       <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+/reference/k-proof/reference-semantics/semantics/call.k:93:       <heapLoc> N:Int => N +Int 1 </heapLoc>
+/reference/k-proof/reference-semantics/semantics/methods.k:37:  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC)
+/reference/k-proof/reference-semantics/semantics/methods.k:38:       requires strPrefix(PC, iCons(C, R)) andBool isLen(PC) >Int 0
+/reference/k-proof/reference-semantics/semantics/methods.k:40:       requires notBool strPrefix(PC, iCons(C, R)) orBool isLen(PC) <=Int 0
+/reference/k-proof/reference-semantics/semantics/methods.k:67:  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V
+/reference/k-proof/reference-semantics/semantics/methods.k:142:  rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)
+/reference/k-proof/reference-semantics/semantics/methods.k:150:  rule swapC(C:Int) => C +Int 32 requires isUpperC(C)
+/reference/k-proof/reference-semantics/semantics/builtins.k:24:  rule seqLen(str(IS:IntSeq))                   => isLen(IS)
+/reference/k-proof/reference-semantics/semantics/builtins.k:25:  rule seqLen(setV(DS:IntSeq))                  => isLen(DS)
+/reference/k-proof/reference-semantics/semantics/builtins.k:26:  rule seqLen(rangeObj(LO:Int, HI:Int, ST:Int)) => rangeLen(LO, HI, ST)
+/reference/k-proof/reference-semantics/semantics/builtins.k:30:  // list() of other iterables (str/range/set/zip) is added via the iterator fold when needed.
+/reference/k-proof/reference-semantics/semantics/builtins.k:51:        => #sumAcc(R, ACC +Int intOf(V)) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:120:    => binAcc((N -Int pyMod(N, 2)) /Int 2, iCons(48 +Int pyMod(N, 2), ACC))
+/reference/k-proof/reference-semantics/semantics/builtins.k:129:    => vCons(tuple(vCons(I, vCons(V, .ValSeq))), enumVS(R, I +Int 1))
+/reference/k-proof/reference-semantics/semantics/builtins.k:136:  rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))
+/reference/k-proof/reference-semantics/semantics/builtins.k:148:  rule applyBuiltin("str", I:Int, .Vals)       => str(strToCodes(Int2String(I)))
+/reference/k-proof/reference-semantics/semantics/builtins.k:157:       requires isLen(CS) >=Int 2
+/reference/k-proof/reference-semantics/semantics/builtins.k:160:  rule intDigAcc(iCons(C:Int, R:IntSeq), ACC:Int) => intDigAcc(R, (ACC *Int 10) +Int (C -Int 48))
+/reference/k-proof/reference-semantics/semantics/builtins.k:176:  // ==== range(stop) / range(start, stop) / range(start, stop, step) =========
+/reference/k-proof/reference-semantics/semantics/builtins.k:177:  rule applyBuiltin("range", I:Int, .Vals)               => rangeObj(0, I, 1)
+/reference/k-proof/reference-semantics/semantics/builtins.k:178:  rule applyBuiltin("range", A:Int, B:Int, .Vals)        => rangeObj(A, B, 1)
+/reference/k-proof/reference-semantics/semantics/builtins.k:179:  rule applyBuiltin("range", A:Int, B:Int, S:Int, .Vals) => rangeObj(A, B, S)
+/reference/k-proof/reference-semantics/semantics/builtins.k:221:  rule tokNdAcc(A:Int, iCons(C:Int, R:IntSeq)) => tokNdAcc(A *Int 10 +Int (C -Int 48), R)
+/reference/k-proof/reference-semantics/semantics/builtins.k:231:  rule applyOpE("+",  A:Int, B:Int) => A +Int B
+/reference/k-proof/reference-semantics/semantics/list.k:12:  // ==== ListExpr: [...] literal -> a fresh heap object =======================
+/reference/k-proof/reference-semantics/semantics/list.k:13:  syntax ApplyK ::= "toList"
+/reference/k-proof/reference-semantics/semantics/list.k:14:  rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>
+/reference/k-proof/reference-semantics/semantics/list.k:15:  rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>
+/reference/k-proof/reference-semantics/semantics/iter.k:3:// iterable's own module (list/tuple/str in their modules, rangeObj in range.k, zip in
+/reference/k-proof/reference-semantics/semantics/int.k:9:  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+/reference/k-proof/reference-semantics/semantics/int.k:11:  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+/reference/k-proof/reference-semantics/semantics/int.k:12:  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+/reference/k-proof/reference-semantics/semantics/int.k:20:  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+/reference/k-proof/reference-semantics/semantics.k:14://   semantics/range.k          MPY-RANGE        rangeObj: inRange / rangeLen / its #iterNext
+/reference/k-proof/reference-semantics/semantics.k:21://   semantics/list.k           MPY-LIST         ListExpr, list(ValSeq): +, ==, in
+/reference/k-proof/reference-semantics/semantics.k:24://   semantics/comprehension.k  MPY-COMPREHENSION  list comprehensions [ELT for T in ITER if COND]
+/reference/k-proof/reference-semantics/semantics.k:37:requires "semantics/range.k"
+/reference/k-proof/reference-semantics/semantics.k:47:requires "semantics/comprehension.k"
+/reference/k-proof/reference-semantics/semantics.k:86:// while: sorted-key stuck and comprehension asserted wrong under krun).

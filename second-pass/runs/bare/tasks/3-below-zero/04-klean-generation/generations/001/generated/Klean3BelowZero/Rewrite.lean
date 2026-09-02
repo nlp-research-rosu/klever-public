@@ -1,0 +1,5 @@
+import Klean3BelowZero.Func
+
+inductive Rewrites : SortGeneratedTopCell → SortGeneratedTopCell → Prop where
+  | tran {s1 s2 s3 : SortGeneratedTopCell} (t1 : Rewrites s1 s2) (t2 : Rewrites s2 s3) : Rewrites s1 s3
+  | VERIFICATION_KLEAN_EXPORT_kxExport0 {V0 : SortInt} {V1 : SortIntList} {_DotVar0 : SortGeneratedCounterCell} {_DotVar2 : SortK} {_Gen0 : SortInputCell} {_Gen1 : SortBalanceCell} {_Gen2 : SortCurrentCell} {_Gen3 : SortResultCell} {_Val0 : SortBool} (defn_Val0 : «belowZeroFrom(_,_)_VERIFICATION_Bool_Int_IntList» V0 V1 = some _Val0) : Rewrites { mpy := { k := { val := SortK.kseq (SortKItem.«#kxExport0(_,_)_VERIFICATION-KLEAN-EXPORT_KItem_Int_IntList» V0 V1) _DotVar2 }, input := _Gen0, balance := _Gen1, current := _Gen2, result := _Gen3 }, generatedCounter := _DotVar0 } { mpy := { k := { val := SortK.kseq ((@inj SortBool SortKItem) _Val0) _DotVar2 }, input := _Gen0, balance := _Gen1, current := _Gen2, result := _Gen3 }, generatedCounter := _DotVar0 }

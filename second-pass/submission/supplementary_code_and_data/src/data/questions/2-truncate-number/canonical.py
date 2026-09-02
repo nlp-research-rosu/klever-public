@@ -1,0 +1,16 @@
+# canonical.py — the UNMODIFIED HumanEval/2 reference solution (from the dataset).
+# Co-located with solution.py (the proof rewrite) to make the original<->rewrite link
+# explicit & auditable.  entry point: truncate_number
+
+
+
+def truncate_number(number: float) -> float:
+    """ Given a positive floating point number, it can be decomposed into
+    and integer part (largest integer smaller than given number) and decimals
+    (leftover part always smaller than 1).
+
+    Return the decimal part of the number.
+    >>> truncate_number(3.5)
+    0.5
+    """
+    return number % 1.0

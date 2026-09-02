@@ -1,0 +1,56 @@
+Command:
+PYTHONPATH=/reference python3 - <<'PY'
+import json
+from pathlib import Path
+from tools.klean_preflight import check_generation
+result = check_generation(
+    Path('/reference/k-proof'),
+    Path('/reference/lemma-discovery.json'),
+    Path('/reference/klean-generation'),
+    toolchain_lock=Path('/reference/klean-toolchain.lock.json'),
+)
+print(json.dumps(result, indent=2, sort_keys=True))
+PY
+
+Exit code: 1
+Exact result:
+Traceback (most recent call last):
+  File "<stdin>", line 4, in <module>
+  File "/reference/tools/klean_preflight.py", line 582, in check_generation
+    raise KleanPreflightError(
+tools.klean_preflight.KleanPreflightError: lake clean failed (1): error: could not detect the configuration of the Lake installation
+
+Environment diagnosis:
+The audit sandbox reports a namespace-local PID from getpid(), while /proc is
+mounted using different visible PIDs. Lean 4.22's lean_io_app_path implementation
+constructs /proc/<getpid()>/exe rather than using /proc/self/exe. For example,
+inside a shell:
+
+  bash -c 'p=$$; echo $p; readlink /proc/$p/exe; ls -l /proc/$p/exe'
+
+returned:
+
+  2
+  ls: cannot access '/proc/2/exe': No such file or directory
+
+The local shim source is /tmp/audit-work/getpid_host.c. It overrides only
+getpid(), returning the numeric target of /proc/self, so the unmodified Lean and
+Lake binaries can resolve their own executable. It was compiled as:
+
+  cc -shared -fPIC -O2 -Wall -Wextra \
+    -o /tmp/audit-work/getpid_host.so /tmp/audit-work/getpid_host.c
+
+SHA-256:
+  getpid_host.c  f36e82c447f699c20ad11ec1e60699db0f1e08e64c7dadef33d3dd9f000cb6cc
+  getpid_host.so b18d67d731c99e5f44ad8364cf7213d41372c28438355a7606bca04c26191f1a
+
+Toolchain confirmation with the shim:
+
+  LD_PRELOAD=/tmp/audit-work/getpid_host.so \
+    /opt/elan/toolchains/leanprover--lean4---v4.22.0/bin/lean --version
+
+Result:
+Lean (version 4.22.0, x86_64-unknown-linux-gnu, commit ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05, Release)
+
+This workaround changes no mounted input and no generated source. It is inherited
+only by the preflight's subprocesses.

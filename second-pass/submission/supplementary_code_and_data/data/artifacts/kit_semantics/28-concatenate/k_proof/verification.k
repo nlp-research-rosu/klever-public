@@ -1,0 +1,43 @@
+requires "reference-semantics/semantics.k"
+
+module VERIFICATION
+  imports MPY
+
+  // A total projection used only to express the string-sort recognizer as an
+  // equality that the symbolic backend can invert. The fallback is arbitrary
+  // but harmless: a non-string Val can never equal str(...).
+  syntax IntSeq ::= stringCodes(Val) [function, total]
+  rule stringCodes(str(S:IntSeq)) => S
+  rule stringCodes(_:Val) => .IntSeq [owise]
+
+  // True exactly for the ValSeq values that represent lists of strings.
+  syntax Bool ::= isStringSeq(ValSeq) [function, total]
+  rule isStringSeq(.ValSeq) => true
+  rule isStringSeq(vCons(V:Val, REST:ValSeq))
+    => (V ==K str(stringCodes(V))) andBool isStringSeq(REST)
+
+  // Mathematical left fold performed by concatenate's accumulator.
+  // It is intentionally partial outside isStringSeq(VS), which is the
+  // source-level List[str] domain used by every claim.
+  syntax IntSeq ::= concatFrom(IntSeq, ValSeq) [function]
+  rule concatFrom(ACC:IntSeq, .ValSeq) => ACC
+  rule concatFrom(ACC:IntSeq, vCons(V:Val, REST:ValSeq))
+    => concatFrom(seqConcat(ACC, stringCodes(V)), REST)
+    requires V ==K str(stringCodes(V))
+
+  // Exact final value of Python's loop target (the prior value for an empty
+  // remainder, otherwise the last element visited).
+  syntax Val ::= lastFrom(Val, ValSeq) [function]
+  rule lastFrom(CURRENT:Val, .ValSeq) => CURRENT
+  rule lastFrom(_:Val, vCons(V:Val, REST:ValSeq))
+    => lastFrom(V, REST)
+    requires V ==K str(stringCodes(V))
+
+  // Derived symbolic normalization of MPY-STR's concrete-string "+" case.
+  // Its guard is the exact equality needed to instantiate V as a string, so
+  // the RHS is identical to applyBin("+", str(A), str(B)).
+  rule applyBin("+", str(A:IntSeq), V:Val)
+    => str(seqConcat(A, stringCodes(V)))
+    requires V ==K str(stringCodes(V))
+    [simplification]
+endmodule

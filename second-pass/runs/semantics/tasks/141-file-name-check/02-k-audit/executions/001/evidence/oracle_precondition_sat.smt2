@@ -1,0 +1,28 @@
+; Satisfiability projection of ORACLE-FALSE-WITNESS's ground precondition.
+; Each declaration is one unconstrained ground observation admitted by
+; verification.k's total opaque functions on the fixed IntSeq for "a.pdf".
+(set-logic QF_UFLIA)
+(declare-const dotCount Int)
+(declare-const headCode Int)
+(declare-const suffixTxt Bool)
+(declare-const suffixExe Bool)
+(declare-const suffixDll Bool)
+(declare-const digit0 Int)
+(declare-const digit1 Int)
+(declare-const digit2 Int)
+(declare-const digit3 Int)
+(declare-const digit4 Int)
+(declare-const digit5 Int)
+(declare-const digit6 Int)
+(declare-const digit7 Int)
+(declare-const digit8 Int)
+(declare-const digit9 Int)
+(assert (= dotCount 1))
+(assert (or (and (>= headCode 65) (<= headCode 90))
+            (and (>= headCode 97) (<= headCode 122))))
+(assert (or suffixTxt suffixExe suffixDll))
+(assert (<= (+ digit0 digit1 digit2 digit3 digit4
+               digit5 digit6 digit7 digit8 digit9)
+            3))
+(check-sat)
+(get-model)

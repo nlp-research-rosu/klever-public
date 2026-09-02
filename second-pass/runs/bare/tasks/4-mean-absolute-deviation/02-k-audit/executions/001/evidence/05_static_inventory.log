@@ -1,0 +1,333 @@
+INVOCATION: bash /audit-output/evidence/05_static_inventory.sh
+AUDIT STAGE 5: raw exhaustive declaration/rule inventory
+
+COMMAND (numbered semantic.k): nl -ba /tmp/audit-work/reconstruction/semantic.k
+     1	module MPY-SYNTAX
+     2	  imports INT
+     3	  imports BOOL
+     4	  imports STRING
+     5	
+     6	  // The source language is the constructor language emitted by py2mpy.py.
+     7	  syntax ModuleAst ::= "Module" "(" Stmts ")"
+     8	  syntax Stmts    ::= List{Stmt, ""}
+     9	  syntax Strings  ::= List{String, ","}
+    10	  syntax Exprs    ::= List{Expr, ","}
+    11	  syntax CompFors ::= List{CompFor, ""}
+    12	
+    13	  syntax Params   ::= "Params"   "(" Strings ")"
+    14	  syntax CellVars ::= "CellVars" "(" Strings ")"
+    15	  syntax FreeVars ::= "FreeVars" "(" Strings ")"
+    16	
+    17	  syntax Stmt ::= "ImportFrom" "(" String "," Strings ")"
+    18	                | "FuncDef" "(" String "," Params "," Stmts ")"
+    19	                | "FuncDef" "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"
+    20	                | "Assign" "(" Expr "," Expr ")"
+    21	                | "Return" "(" Expr ")"
+    22	
+    23	  syntax Expr ::= "Name"     "(" String ")"
+    24	                | "Int"      "(" Int ")"
+    25	                | "Float"    "(" Float ")"
+    26	                | "Bool"     "(" Bool ")"
+    27	                | "BinOp"    "(" String "," Expr "," Expr ")"
+    28	                | "Call"     "(" Expr "," Exprs ")"
+    29	                | "ListComp" "(" Expr "," CompFors ")"
+    30	
+    31	  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+    32	endmodule
+    33	
+    34	module SEMANTIC
+    35	  imports MPY-SYNTAX
+    36	
+    37	  // Exact rational numbers keep both execution and proof independent of
+    38	  // host floating-point rounding.  Runtime inputs use nums(rat(...), ...).
+    39	  syntax Num  ::= "rat" "(" Int "," Int ")"
+    40	                | "addNum"   "(" Num "," Num ")" [function]
+    41	                | "subNum"   "(" Num "," Num ")" [function]
+    42	                | "divNum"   "(" Num "," Num ")" [function]
+    43	                | "absNum"   "(" Num ")" [function]
+    44	                | "sumNums"  "(" Nums ")" [function]
+    45	                | "countNums" "(" Nums ")" [function]
+    46	                | "sumAbs"   "(" Nums "," Num ")" [function]
+    47	                | "asNum"    "(" Value ")" [function]
+    48	  syntax Nums ::= List{Num, ","}
+    49	
+    50	  syntax Value ::= Num
+    51	                 | "nums" "(" Nums ")"
+    52	                 | "comprehension" "(" Expr "," String "," Nums "," Env ")"
+    53	
+    54	  syntax Env ::= "emptyEnv"
+    55	               | "bind" "(" String "," Value "," Env ")"
+    56	  syntax Value ::= "lookup" "(" String "," Env ")" [function]
+    57	
+    58	  syntax Value ::= "eval" "(" Expr "," Env ")" [function]
+    59	                 | "sumValue" "(" Value ")" [function]
+    60	                 | "lenValue" "(" Value ")" [function]
+    61	                 | "absValue" "(" Value ")" [function]
+    62	                 | "subValue" "(" Value "," Value ")" [function]
+    63	                 | "divValue" "(" Value "," Value ")" [function]
+    64	                 | "makeComp" "(" Expr "," String "," Value "," Env ")" [function]
+    65	
+    66	  syntax Result ::= "noResult" | "result" "(" Value ")"
+    67	
+    68	  configuration
+    69	    <mad>
+    70	      <k> init($PGM:ModuleAst, $ARGS:Value) </k>
+    71	      <env> emptyEnv </env>
+    72	      <result> noResult </result>
+    73	    </mad>
+    74	
+    75	  syntax KItem ::= "init" "(" ModuleAst "," Value ")"
+    76	                 | "seekTarget" "(" Stmts "," Value ")"
+    77	                 | "exec" "(" Stmts ")"
+    78	                 | "setVar" "(" String "," Value ")"
+    79	                 | "finish" "(" Value ")"
+    80	
+    81	  // Module loading ignores imports and locates the requested unary function.
+    82	  rule <k> init(Module(SS), ARGS) => seekTarget(SS, ARGS) ... </k>
+    83	  rule <k> seekTarget(ImportFrom(_, _) REST, ARGS)
+    84	        => seekTarget(REST, ARGS) ... </k>
+    85	  rule <k> seekTarget(FuncDef("mean_absolute_deviation", Params("numbers"),
+    86	                              _, _, BODY) _REST, ARGS)
+    87	        => exec(BODY) ... </k>
+    88	       <env> _ => bind("numbers", ARGS, emptyEnv) </env>
+    89	  rule <k> seekTarget(FuncDef(_, _, _) REST, ARGS)
+    90	        => seekTarget(REST, ARGS) ... </k>
+    91	  rule <k> seekTarget(FuncDef(F, _, _, _, _) REST, ARGS)
+    92	        => seekTarget(REST, ARGS) ... </k>
+    93	    requires F =/=String "mean_absolute_deviation"
+    94	
+    95	  // The statement fragment needed by the submitted implementation.
+    96	  rule <k> exec(.Stmts) => .K ... </k>
+    97	  rule <k> exec(Assign(Name(X), E) REST)
+    98	        => setVar(X, eval(E, ENV)) ~> exec(REST) ... </k>
+    99	       <env> ENV </env>
+   100	  rule <k> setVar(X, V) => .K ... </k>
+   101	       <env> ENV => bind(X, V, ENV) </env>
+   102	  rule <k> exec(Return(E) _REST) => finish(eval(E, ENV)) ... </k>
+   103	       <env> ENV </env>
+   104	  rule <k> finish(V) => .K ... </k>
+   105	       <result> noResult => result(V) </result>
+   106	
+   107	  // Lexical environments; the newest binding shadows older bindings.
+   108	  rule lookup(X, bind(X, V, _)) => V
+   109	  rule lookup(X, bind(Y, _, ENV)) => lookup(X, ENV)
+   110	    requires X =/=String Y
+   111	
+   112	  // Denotational expression rules.  Comprehensions retain their lexical
+   113	  // environment until consumed by sum.
+   114	  rule eval(Name(X), ENV) => lookup(X, ENV)
+   115	  rule eval(Int(I), _) => rat(I, 1)
+   116	  rule eval(BinOp("-", A, B), ENV)
+   117	    => subValue(eval(A, ENV), eval(B, ENV))
+   118	  rule eval(BinOp("/", A, B), ENV)
+   119	    => divValue(eval(A, ENV), eval(B, ENV))
+   120	  rule eval(Call(Name("sum"), E), ENV) => sumValue(eval(E, ENV))
+   121	  rule eval(Call(Name("len"), E), ENV) => lenValue(eval(E, ENV))
+   122	  rule eval(Call(Name("abs"), E), ENV) => absValue(eval(E, ENV))
+   123	  rule eval(ListComp(E, CompFor(Name(X), ITER, Bool(true))), ENV)
+   124	    => makeComp(E, X, eval(ITER, ENV), ENV)
+   125	
+   126	  rule makeComp(E, X, nums(NS), ENV) => comprehension(E, X, NS, ENV)
+   127	  rule sumValue(nums(NS)) => sumNums(NS)
+   128	  rule lenValue(nums(NS)) => countNums(NS)
+   129	  rule absValue(N:Num) => absNum(N)
+   130	  rule subValue(A:Num, B:Num) => subNum(A, B)
+   131	  rule divValue(A:Num, B:Num) => divNum(A, B)
+   132	
+   133	  // Fusion for sum(abs(x - center) for x in numbers).  This is the usual
+   134	  // fold semantics of the list comprehension, retained symbolically for
+   135	  // arbitrary lists and unfolded for concrete lists below.
+   136	  rule sumValue(comprehension(
+   137	          Call(Name("abs"), BinOp("-", Name(X), Name(M))), X, NS, ENV))
+   138	    => sumAbs(NS, asNum(lookup(M, ENV)))
+   139	
+   140	  rule asNum(N:Num) => N
+   141	
+   142	  // Exact rational arithmetic.
+   143	  rule addNum(rat(A, B), rat(C, D))
+   144	    => rat(A *Int D +Int C *Int B, B *Int D)
+   145	  rule subNum(rat(A, B), rat(C, D))
+   146	    => rat(A *Int D -Int C *Int B, B *Int D)
+   147	  rule divNum(rat(A, B), rat(C, D))
+   148	    => rat(A *Int D, B *Int C)
+   149	  rule absNum(rat(A, B)) => rat(0 -Int A, B)
+   150	    requires A <Int 0
+   151	  rule absNum(rat(A, B)) => rat(A, B)
+   152	    requires A >=Int 0
+   153	
+   154	  rule sumNums(.Nums) => rat(0, 1)
+   155	  rule sumNums(N, NS) => addNum(N, sumNums(NS))
+   156	  rule countNums(.Nums) => rat(0, 1)
+   157	  rule countNums(_N, NS) => addNum(rat(1, 1), countNums(NS))
+   158	  rule sumAbs(.Nums, _MEAN) => rat(0, 1)
+   159	  rule sumAbs(N, NS, MEAN) => addNum(absNum(subNum(N, MEAN)), sumAbs(NS, MEAN))
+   160	
+   161	endmodule
+EXIT STATUS: 0
+
+COMMAND (numbered verification.k): nl -ba /tmp/audit-work/reconstruction/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // Readable name for the exact constructor tree emitted in solution.mpy.
+     7	  syntax ModuleAst ::= "solutionProgram" [function]
+     8	  rule solutionProgram =>
+     9	    Module(
+    10	      ImportFrom("typing", "List")
+    11	      FuncDef("mean_absolute_deviation", Params("numbers"),
+    12	              CellVars("mean"), FreeVars(.Strings),
+    13	        Assign(
+    14	          Name("mean"),
+    15	          BinOp("/",
+    16	            Call(Name("sum"), Name("numbers")),
+    17	            Call(Name("len"), Name("numbers"))))
+    18	        Return(
+    19	          BinOp("/",
+    20	            Call(Name("sum"),
+    21	              ListComp(
+    22	                Call(Name("abs"), BinOp("-", Name("x"), Name("mean"))),
+    23	                CompFor(Name("x"), Name("numbers"), Bool(true)))),
+    24	            Call(Name("len"), Name("numbers"))))))
+    25	
+    26	  // Mathematical contract, separate from the operational evaluator:
+    27	  // MAD(xs) = sum(|x - sum(xs)/|xs||)/|xs|.
+    28	  syntax Num ::= "mathMAD" "(" Nums ")" [function]
+    29	  rule mathMAD(NS) =>
+    30	    divNum(sumAbs(NS, divNum(sumNums(NS), countNums(NS))), countNums(NS))
+    31	endmodule
+EXIT STATUS: 0
+
+COMMAND (numbered spec.k): nl -ba /tmp/audit-work/reconstruction/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Universal functional correctness for every nonempty finite rational
+     7	  // input list.  H and T are arbitrary, so this is not bounded testing.
+     8	  claim
+     9	    <mad>
+    10	      <k>
+    11	        init(solutionProgram, nums(H, T))
+    12	        => .K
+    13	      </k>
+    14	      <env>
+    15	        emptyEnv
+    16	        => bind("mean", divNum(sumNums(H, T), countNums(H, T)),
+    17	             bind("numbers", nums(H, T), emptyEnv))
+    18	      </env>
+    19	      <result>
+    20	        noResult
+    21	        => result(mathMAD(H, T))
+    22	      </result>
+    23	    </mad>
+    24	
+    25	endmodule
+EXIT STATUS: 0
+
+COMMAND (all local syntax, configuration, rule, and claim starts): rg -n \^\[\[:space:\]\]\*\(syntax\|configuration\|rule\|claim\)\(\[\[:space:\]\]\|\$\) /tmp/audit-work/reconstruction/semantic.k /tmp/audit-work/reconstruction/verification.k /tmp/audit-work/reconstruction/spec.k
+/tmp/audit-work/reconstruction/spec.k:8:  claim
+/tmp/audit-work/reconstruction/verification.k:7:  syntax ModuleAst ::= "solutionProgram" [function]
+/tmp/audit-work/reconstruction/verification.k:8:  rule solutionProgram =>
+/tmp/audit-work/reconstruction/verification.k:28:  syntax Num ::= "mathMAD" "(" Nums ")" [function]
+/tmp/audit-work/reconstruction/verification.k:29:  rule mathMAD(NS) =>
+/tmp/audit-work/reconstruction/semantic.k:7:  syntax ModuleAst ::= "Module" "(" Stmts ")"
+/tmp/audit-work/reconstruction/semantic.k:8:  syntax Stmts    ::= List{Stmt, ""}
+/tmp/audit-work/reconstruction/semantic.k:9:  syntax Strings  ::= List{String, ","}
+/tmp/audit-work/reconstruction/semantic.k:10:  syntax Exprs    ::= List{Expr, ","}
+/tmp/audit-work/reconstruction/semantic.k:11:  syntax CompFors ::= List{CompFor, ""}
+/tmp/audit-work/reconstruction/semantic.k:13:  syntax Params   ::= "Params"   "(" Strings ")"
+/tmp/audit-work/reconstruction/semantic.k:14:  syntax CellVars ::= "CellVars" "(" Strings ")"
+/tmp/audit-work/reconstruction/semantic.k:15:  syntax FreeVars ::= "FreeVars" "(" Strings ")"
+/tmp/audit-work/reconstruction/semantic.k:17:  syntax Stmt ::= "ImportFrom" "(" String "," Strings ")"
+/tmp/audit-work/reconstruction/semantic.k:23:  syntax Expr ::= "Name"     "(" String ")"
+/tmp/audit-work/reconstruction/semantic.k:31:  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+/tmp/audit-work/reconstruction/semantic.k:39:  syntax Num  ::= "rat" "(" Int "," Int ")"
+/tmp/audit-work/reconstruction/semantic.k:48:  syntax Nums ::= List{Num, ","}
+/tmp/audit-work/reconstruction/semantic.k:50:  syntax Value ::= Num
+/tmp/audit-work/reconstruction/semantic.k:54:  syntax Env ::= "emptyEnv"
+/tmp/audit-work/reconstruction/semantic.k:56:  syntax Value ::= "lookup" "(" String "," Env ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:58:  syntax Value ::= "eval" "(" Expr "," Env ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:66:  syntax Result ::= "noResult" | "result" "(" Value ")"
+/tmp/audit-work/reconstruction/semantic.k:68:  configuration
+/tmp/audit-work/reconstruction/semantic.k:75:  syntax KItem ::= "init" "(" ModuleAst "," Value ")"
+/tmp/audit-work/reconstruction/semantic.k:82:  rule <k> init(Module(SS), ARGS) => seekTarget(SS, ARGS) ... </k>
+/tmp/audit-work/reconstruction/semantic.k:83:  rule <k> seekTarget(ImportFrom(_, _) REST, ARGS)
+/tmp/audit-work/reconstruction/semantic.k:85:  rule <k> seekTarget(FuncDef("mean_absolute_deviation", Params("numbers"),
+/tmp/audit-work/reconstruction/semantic.k:89:  rule <k> seekTarget(FuncDef(_, _, _) REST, ARGS)
+/tmp/audit-work/reconstruction/semantic.k:91:  rule <k> seekTarget(FuncDef(F, _, _, _, _) REST, ARGS)
+/tmp/audit-work/reconstruction/semantic.k:96:  rule <k> exec(.Stmts) => .K ... </k>
+/tmp/audit-work/reconstruction/semantic.k:97:  rule <k> exec(Assign(Name(X), E) REST)
+/tmp/audit-work/reconstruction/semantic.k:100:  rule <k> setVar(X, V) => .K ... </k>
+/tmp/audit-work/reconstruction/semantic.k:102:  rule <k> exec(Return(E) _REST) => finish(eval(E, ENV)) ... </k>
+/tmp/audit-work/reconstruction/semantic.k:104:  rule <k> finish(V) => .K ... </k>
+/tmp/audit-work/reconstruction/semantic.k:108:  rule lookup(X, bind(X, V, _)) => V
+/tmp/audit-work/reconstruction/semantic.k:109:  rule lookup(X, bind(Y, _, ENV)) => lookup(X, ENV)
+/tmp/audit-work/reconstruction/semantic.k:114:  rule eval(Name(X), ENV) => lookup(X, ENV)
+/tmp/audit-work/reconstruction/semantic.k:115:  rule eval(Int(I), _) => rat(I, 1)
+/tmp/audit-work/reconstruction/semantic.k:116:  rule eval(BinOp("-", A, B), ENV)
+/tmp/audit-work/reconstruction/semantic.k:118:  rule eval(BinOp("/", A, B), ENV)
+/tmp/audit-work/reconstruction/semantic.k:120:  rule eval(Call(Name("sum"), E), ENV) => sumValue(eval(E, ENV))
+/tmp/audit-work/reconstruction/semantic.k:121:  rule eval(Call(Name("len"), E), ENV) => lenValue(eval(E, ENV))
+/tmp/audit-work/reconstruction/semantic.k:122:  rule eval(Call(Name("abs"), E), ENV) => absValue(eval(E, ENV))
+/tmp/audit-work/reconstruction/semantic.k:123:  rule eval(ListComp(E, CompFor(Name(X), ITER, Bool(true))), ENV)
+/tmp/audit-work/reconstruction/semantic.k:126:  rule makeComp(E, X, nums(NS), ENV) => comprehension(E, X, NS, ENV)
+/tmp/audit-work/reconstruction/semantic.k:127:  rule sumValue(nums(NS)) => sumNums(NS)
+/tmp/audit-work/reconstruction/semantic.k:128:  rule lenValue(nums(NS)) => countNums(NS)
+/tmp/audit-work/reconstruction/semantic.k:129:  rule absValue(N:Num) => absNum(N)
+/tmp/audit-work/reconstruction/semantic.k:130:  rule subValue(A:Num, B:Num) => subNum(A, B)
+/tmp/audit-work/reconstruction/semantic.k:131:  rule divValue(A:Num, B:Num) => divNum(A, B)
+/tmp/audit-work/reconstruction/semantic.k:136:  rule sumValue(comprehension(
+/tmp/audit-work/reconstruction/semantic.k:140:  rule asNum(N:Num) => N
+/tmp/audit-work/reconstruction/semantic.k:143:  rule addNum(rat(A, B), rat(C, D))
+/tmp/audit-work/reconstruction/semantic.k:145:  rule subNum(rat(A, B), rat(C, D))
+/tmp/audit-work/reconstruction/semantic.k:147:  rule divNum(rat(A, B), rat(C, D))
+/tmp/audit-work/reconstruction/semantic.k:149:  rule absNum(rat(A, B)) => rat(0 -Int A, B)
+/tmp/audit-work/reconstruction/semantic.k:151:  rule absNum(rat(A, B)) => rat(A, B)
+/tmp/audit-work/reconstruction/semantic.k:154:  rule sumNums(.Nums) => rat(0, 1)
+/tmp/audit-work/reconstruction/semantic.k:155:  rule sumNums(N, NS) => addNum(N, sumNums(NS))
+/tmp/audit-work/reconstruction/semantic.k:156:  rule countNums(.Nums) => rat(0, 1)
+/tmp/audit-work/reconstruction/semantic.k:157:  rule countNums(_N, NS) => addNum(rat(1, 1), countNums(NS))
+/tmp/audit-work/reconstruction/semantic.k:158:  rule sumAbs(.Nums, _MEAN) => rat(0, 1)
+/tmp/audit-work/reconstruction/semantic.k:159:  rule sumAbs(N, NS, MEAN) => addNum(absNum(subNum(N, MEAN)), sumAbs(NS, MEAN))
+EXIT STATUS: 0
+
+ATTRIBUTE INVENTORY
+/tmp/audit-work/reconstruction/verification.k:7:  syntax ModuleAst ::= "solutionProgram" [function]
+/tmp/audit-work/reconstruction/verification.k:28:  syntax Num ::= "mathMAD" "(" Nums ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:40:                | "addNum"   "(" Num "," Num ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:41:                | "subNum"   "(" Num "," Num ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:42:                | "divNum"   "(" Num "," Num ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:43:                | "absNum"   "(" Num ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:44:                | "sumNums"  "(" Nums ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:45:                | "countNums" "(" Nums ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:46:                | "sumAbs"   "(" Nums "," Num ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:47:                | "asNum"    "(" Value ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:56:  syntax Value ::= "lookup" "(" String "," Env ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:58:  syntax Value ::= "eval" "(" Expr "," Env ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:59:                 | "sumValue" "(" Value ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:60:                 | "lenValue" "(" Value ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:61:                 | "absValue" "(" Value ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:62:                 | "subValue" "(" Value "," Value ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:63:                 | "divValue" "(" Value "," Value ")" [function]
+/tmp/audit-work/reconstruction/semantic.k:64:                 | "makeComp" "(" Expr "," String "," Value "," Env ")" [function]
+
+EXPLICIT ABSENCE CHECKS
+PRESENT: function
+ABSENT: total
+ABSENT: functional
+ABSENT: simplification
+ABSENT: concrete
+ABSENT: priority
+ABSENT: owise
+ABSENT: opaque
+ABSENT: anywhere
+ABSENT: macro
+
+RULE COUNTS (multiline rules counted by rule-start lines)
+semantic.k rules: 39
+verification.k rules: 2
+spec.k claims: 1
+SCRIPT EXIT STATUS: 0

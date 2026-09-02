@@ -1,0 +1,33 @@
+requires "verification.k"
+
+module CONTEXT-SPEC
+  imports VERIFICATION
+
+  // The operational bridge accepts no continuation.  With #notB appended it
+  // must not match; fixed MPY execution returns false for [] and #notB yields
+  // true while preserving every caller-state cell.
+  claim [continuation-containment]:
+    <k> Call(Name("below_zero"), list(.ValSeq)) ~> #notB => true </k>
+    <env> 0 </env>
+    <scopes>
+      0 |-> scope(
+        "below_zero" |-> closureVal(
+          "operations", .ParamNames,
+          Assign(Name("balance"), Int(0))
+          Assign(Name("operation"), Int(0))
+          For(Name("operation"), Name("operations"),
+            AugAssign(Name("balance"), "+", Name("operation"))
+            If(Compare(Name("balance"), CmpOp("<", Int(0))),
+              Return(Bool(true)), .Stmts))
+          Return(Bool(false)), 0),
+        parent(-1))
+      -1 |-> builtinsScope
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+endmodule

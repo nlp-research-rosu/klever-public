@@ -1,0 +1,151 @@
+        raise AuditContractError(
+            f"tree file changed size while hashing: {path} "
+            f"(expected {expected_size}, read {bytes_read})"
+        )
+
+
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, f"tree root {root}")
+    entries: list[tuple[str, str, Path, int]] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as iterator:
+                children = list(iterator)
+        except OSError as error:
+            raise AuditContractError(f"cannot scan tree {directory}: {error}") from error
+        for entry in children:
+            path = Path(entry.path)
+            try:
+                entry_stat = entry.stat(follow_symlinks=False)
+            except OSError as error:
+                raise AuditContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            mode = entry_stat.st_mode
+            entry_type = _tree_entry_type(mode)
+            relative = path.relative_to(root).as_posix()
+            entries.append((relative, entry_type, path, entry_stat.st_size))
+            if entry_type == "directory":
+                pending.append(path)
+
+    digest = hashlib.sha256()
+    for relative, entry_type, path, size in sorted(
+        entries, key=lambda item: item[0]
+    ):
+        _framed_update(digest, os.fsencode(relative))
+        _framed_update(digest, entry_type.encode())
+        if entry_type == "file":
+            _framed_file_update(digest, path, size)
+        elif entry_type == "symlink":
+            try:
+                target = os.readlink(path)
+            except OSError as error:
+                raise AuditContractError(
+                    f"cannot read tree symlink {path}: {error}"
+                ) from error
+            _framed_update(digest, os.fsencode(target))
+        else:
+            _framed_update(digest, b"")
+    return digest.hexdigest()
+
+
+def _optional_tree_hash(root: Path) -> str | None:
+    try:
+        mode = root.lstat().st_mode
+    except OSError:
+        return None
+    if not stat.S_ISDIR(mode):
+        return None
+    try:
+        return sha256_tree(root)
+    except AuditContractError:
+        return None
+
+
+def legacy_content_tree_hash(root: Path) -> str:
+    """Reproduce the schema-v1 seed-tree hash used by imported runs."""
+
+    root = require_real_directory(root, "legacy seed tree")
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        try:
+            metadata = path.lstat()
+        except OSError as error:
+            raise AuditContractError(
+                f"cannot inspect legacy seed tree entry: {path}"
+            ) from error
+        if stat.S_ISDIR(metadata.st_mode):
+            continue
+        if not stat.S_ISREG(metadata.st_mode):
+            raise AuditContractError(
+                f"legacy seed tree contains a linked or unsupported entry: {path}"
+            )
+        relative = path.relative_to(root).as_posix().encode()
+        digest.update(len(relative).to_bytes(4, "big"))
+        digest.update(relative)
+        try:
+            content = path.read_bytes()
+        except OSError as error:
+            raise AuditContractError(
+                f"cannot read legacy seed tree entry: {path}"
+            ) from error
+        digest.update(len(content).to_bytes(8, "big"))
+        digest.update(content)
+    return digest.hexdigest()
+
+
+def require_generation_evidence(candidate: Path) -> dict[str, Path]:
+    evidence = {
+        "metrics": require_regular_file(candidate / "metrics.json"),
+        "codex_output": require_regular_file(candidate / "codex-output.log"),
+        "codex_last": require_regular_file(candidate / "codex-last.txt"),
+        "codex_trace": require_real_directory(
+            candidate / "codex-trace", "codex-trace generation evidence"
+        ),
+    }
+    return evidence
+
+
+def _manifest_condition(manifest: dict[str, Any]) -> str:
+    condition_block = manifest.get("condition")
+    if not isinstance(condition_block, dict):
+        raise AuditContractError("manifest condition must be an object")
+    condition = condition_block.get("name")
+    if not isinstance(condition, str):
+        raise AuditContractError("manifest condition name must be a string")
+    if condition not in CONDITIONS:
+        raise AuditContractError(f"unsupported manifest condition: {condition!r}")
+    return condition
+
+
+def _manifest_input_hash(manifest: dict[str, Any], name: str) -> object:
+    inputs = manifest.get("inputs")
+    if not isinstance(inputs, dict):
+        return None
+    return inputs.get(name)
+
+
+def build_resolution_and_hashes(
+    repo: Path,
+    config: str,
+    problem: str,
+    condition: str,
+    candidate: Path,
+    canonical: Path,
+    prompt: Path,
+    translator: Path,
+    semantics: Path | None,
+    manifest: dict[str, Any],
+    manifest_path: Path,
+    generation_evidence: dict[str, Path],
+) -> dict[str, object]:
+    candidate_prompt_hash = _optional_regular_file_hash(candidate / "prompt.py")
+    candidate_translator_hash = _optional_regular_file_hash(candidate / "py2mpy.py")
+    candidate_semantics_hash = _optional_tree_hash(candidate / "reference-semantics")
+    trusted_prompt_hash = sha256_file(prompt)
+    trusted_translator_hash = sha256_file(translator)
+    trusted_semantics_hash = sha256_tree(semantics) if semantics is not None else None
+
+    hashes = {

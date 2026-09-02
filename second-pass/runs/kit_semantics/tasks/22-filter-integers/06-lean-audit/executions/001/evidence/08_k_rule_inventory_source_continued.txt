@@ -1,0 +1,341 @@
+            continue
+
+        continuation = (
+            _rule_continuation(line)
+            if seen_rewrite and candidate_end is not None
+            else None
+        )
+        if candidate_end is not None:
+            if continuation is None and _starts_outer_transition(line):
+                return candidate_end
+            candidate_end = None
+
+        content_start = 0
+        if continuation is not None:
+            kind, content_start = continuation
+            if kind in {"requires", "ensures"}:
+                clause_has_content = False
+
+        if not seen_rewrite:
+            rewrite = line.find("=>")
+            if rewrite >= 0:
+                seen_rewrite = True
+                content_start = rewrite + 2
+            else:
+                content_start = len(line)
+
+        _scan_rule_delimiters(line, delimiters)
+        if seen_rewrite and line[content_start:].strip():
+            clause_has_content = True
+
+        if (
+            seen_rewrite
+            and clause_has_content
+            and not delimiters
+            and _terminal_attribute_line(line)
+        ):
+            return next_start
+        if seen_rewrite and clause_has_content and not delimiters:
+            candidate_end = next_start
+    if candidate_end is not None:
+        return candidate_end
+    return len(masked_text) + 1
+
+
+def _modules(masked_text: str) -> tuple[_Module, ...]:
+    modules: list[_Module] = []
+    open_module: tuple[
+        str, int, list[str], list[_Sentence]
+    ] | None = None
+    open_rule_until = 0
+    for line_start, line_end, keyword, rest in _line_heads(masked_text):
+        if line_start < open_rule_until:
+            continue
+        open_rule_until = 0
+        separated = bool(rest) and rest[0] in " \t"
+        if keyword == "module":
+            if not separated:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            named = _MODULE_NAME_RE.fullmatch(rest)
+            if named is None or open_module is not None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            open_module = (named.group("name"), line_end, [], [])
+            continue
+        if keyword == "endmodule":
+            if rest.strip():
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            if open_module is None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            name, content_start, imports, sentences = open_module
+            modules.append(
+                _Module(
+                    name=name,
+                    content_start=content_start,
+                    content_end=line_start,
+                    imports=tuple(imports),
+                    sentences=tuple(sentences),
+                )
+            )
+            open_module = None
+            continue
+        if open_module is not None and keyword == "rule":
+            open_module[3].append(
+                _Sentence(keyword=keyword, start=line_start)
+            )
+            open_rule_until = _rule_bubble_end(masked_text, line_start)
+            continue
+        if open_module is not None and keyword == "imports" and separated:
+            imported = rest.strip().split()
+            if len(imported) != 1:
+                raise KRuleInventoryError(
+                    "verification.k has malformed imports"
+                )
+            open_module[2].append(imported[0])
+        if (
+            open_module is not None
+            and keyword in _OUTER_SENTENCE_KEYWORDS
+            and separated
+        ):
+            open_module[3].append(
+                _Sentence(keyword=keyword, start=line_start)
+            )
+    if not modules or open_module is not None:
+        raise KRuleInventoryError(
+            "verification.k has malformed module boundaries"
+        )
+    return tuple(modules)
+
+
+def _verification_module(
+    modules: tuple[_Module, ...], selected_name: str | None = None
+) -> _Module:
+    if selected_name is not None:
+        selected = [module for module in modules if module.name == selected_name]
+        if len(selected) != 1:
+            raise KRuleInventoryError(
+                "prove.sh selects an unknown verification main module: "
+                + selected_name
+            )
+        return selected[0]
+    candidates = [
+        module
+        for module in modules
+        if module.name.endswith("VERIFICATION")
+        and not module.name.endswith("-SYNTAX")
+    ]
+    if len(candidates) != 1:
+        raise KRuleInventoryError(
+            "verification.k must contain exactly one verification module"
+        )
+    return candidates[0]
+
+
+def _last_verification_main_module(workspace: Path) -> str | None:
+    script = workspace / "prove.sh"
+    if not script.exists() and not script.is_symlink():
+        return None
+    try:
+        mode = script.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(f"cannot inspect prove.sh: {script}") from error
+    if not stat.S_ISREG(mode):
+        raise KRuleInventoryError(f"prove.sh must be a regular file: {script}")
+    try:
+        text = script.read_text()
+    except (OSError, UnicodeError) as error:
+        raise KRuleInventoryError(f"cannot read prove.sh: {script}") from error
+    logical = re.sub(r"\\\r?\n", " ", text)
+    selected: str | None = None
+    for line in logical.splitlines():
+        code = line.split("#", 1)[0]
+        if not re.search(r"(?:^|[;&|]\s*)kompile\s+", code):
+            continue
+        if re.search(r"(?:^|\s)(?:\./)?verification\.k(?:\s|$)", code) is None:
+            continue
+        match = re.search(
+            r"(?:^|\s)--main-module(?:=|\s+)([A-Za-z][A-Za-z0-9_'-]*)",
+            code,
+        )
+        if match is not None:
+            selected = match.group(1)
+    return selected
+
+
+def _verification_closure(
+    modules: tuple[_Module, ...], verification: _Module
+) -> tuple[_Module, ...]:
+    by_name = {module.name: module for module in modules}
+    reached: set[str] = set()
+    pending = [verification.name]
+    while pending:
+        name = pending.pop()
+        if name in reached:
+            continue
+        reached.add(name)
+        module = by_name.get(name)
+        if module is not None:
+            pending.extend(module.imports)
+    return tuple(module for module in modules if module.name in reached)
+
+
+def _without_comments(text: str) -> str:
+    """Remove K comments while preserving strings and their exact contents."""
+
+    output: list[str] = []
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                output.append(character)
+                state = "code"
+            index += 1
+            continue
+        if state == "string":
+            output.append(character)
+            if character == "\\" and following:
+                output.append(following)
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character in "\r\n":
+                output.append(character)
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output.append(" ")
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output.append(" ")
+            state = "block-comment"
+            block_depth = 1
+            index += 2
+            continue
+        output.append(character)
+        if character == '"':
+            state = "string"
+        index += 1
+    return "".join(output)
+
+
+def _attribute_tokens(text: str, masked_text: str) -> list[str]:
+    tokens: list[str] = []
+    start = 0
+    depth = 0
+    for index, character in enumerate(masked_text):
+        if character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth = max(depth - 1, 0)
+        elif character == "," and depth == 0:
+            token = _without_comments(text[start:index]).strip()
+            if token:
+                tokens.append(token)
+            start = index + 1
+    final = _without_comments(text[start:]).strip()
+    if final:
+        tokens.append(final)
+    return tokens
+
+
+def _rule_spans(text: str, module: _Module) -> list[_RuleSpan]:
+    masked_text = _mask_non_code(text)
+    sentences = module.sentences
+    rules: list[_RuleSpan] = []
+    seen_hashes: set[str] = set()
+    for index, sentence in enumerate(sentences):
+        if sentence.keyword != "rule":
+            continue
+        end_offset = (
+            sentences[index + 1].start
+            if index + 1 < len(sentences)
+            else module.content_end
+        )
+        start_offset = sentence.start
+        raw_segment = text[start_offset:end_offset]
+        masked_segment = masked_text[start_offset:end_offset]
+        logical_length = len(masked_segment.rstrip(" \t\r\n"))
+        if logical_length == 0:
+            continue
+        rule_text = raw_segment[:logical_length].rstrip(" \t\r\n")
+        masked_rule = _mask_non_code(rule_text)
+        attribute_match = _TRAILING_ATTRIBUTES_RE.search(masked_rule)
+        attribute_start = None
+        attribute_end = None
+        attributes: list[str] = []
+        if attribute_match is not None:
+            attribute_start = attribute_match.start("attributes")
+            attribute_end = attribute_match.end("attributes")
+            attributes = _attribute_tokens(
+                rule_text[attribute_start:attribute_end],
+                masked_rule[attribute_start:attribute_end],
+            )
+        normalized = " ".join(rule_text.split())
+        digest = hashlib.sha256(normalized.encode()).hexdigest()
+        if digest in seen_hashes:
+            raise KRuleInventoryError(
+                f"duplicate normalized simplification rule hash: {digest}"
+            )
+        seen_hashes.add(digest)
+        start_line = text.count("\n", 0, start_offset) + 1
+        end_line = start_line + rule_text.count("\n")
+        rule = KRule(
+            source_rule_id=f"rule-{digest}",
+            module=module.name,
+            start_line=start_line,
+            end_line=end_line,
+            normalized_sha256=digest,
+            attributes=attributes,
+            text=rule_text,
+        )
+        rules.append(
+            _RuleSpan(
+                rule=rule,
+                start_offset=start_offset,
+                end_offset=start_offset + len(rule_text),
+                attribute_start=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.start()
+                ),
+                attribute_end=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.end()
+                ),
+            )
+        )
+    return rules
+
+
+def _rule_documents(
+    text: str, modules: tuple[_Module, ...]
+) -> list[dict[str, Any]]:
+    spans = [span for module in modules for span in _rule_spans(text, module)]

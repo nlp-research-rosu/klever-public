@@ -1,0 +1,364 @@
+Script started on 2026-07-30 23:22:49-05:00 [<not executed on terminal>]
+Find producer source hash construction
+/reference/tools/klean_final_gate.py
+195-        generation / "generator-manifest.json", "generator manifest"
+196-    )
+197-    target = manifest.get("target")
+198-    if not isinstance(target, dict):
+199-        raise KleanFinalGateError("generator target is malformed")
+200:    before_generation = klean_export.tree_digest(generation)
+201:    before_candidate = klean_export.tree_digest(candidate)
+202-    _candidate_gate(candidate, target)
+203-    inventory = _regular_json(
+204-        generation / "trust-inventory.json", "trust inventory"
+205-    )
+206-    diagnostics: list[dict[str, Any]] = []
+207-    with tempfile.TemporaryDirectory(prefix="klean-proof-check-") as temporary:
+208-        project = Path(temporary) / "project"
+209-        shutil.copytree(candidate, project)
+210:        if klean_export.tree_digest(project) != before_candidate:
+211-            raise KleanFinalGateError(
+212-                "candidate changed while copying for mechanical audit"
+213-            )
+214-        shutil.rmtree(project / ".lake", ignore_errors=True)
+215-        shutil.rmtree(project / "Base", ignore_errors=True)
+--
+246-                    f"{' '.join(command)} failed ({code}): {output[-600:]}"
+247-                )
+248-        used_axioms = _parse_axioms(
+249-            outputs[("lake", "env", "lean", "AxiomAudit.lean")]
+250-        )
+251:    if klean_export.tree_digest(generation) != before_generation:
+252-        raise KleanFinalGateError(
+253-            "generation changed during mechanical audit"
+254-        )
+255:    if klean_export.tree_digest(candidate) != before_candidate:
+256-        raise KleanFinalGateError(
+257-            "candidate changed during mechanical audit"
+258-        )
+259-    if "sorryAx" in used_axioms:
+260-        raise KleanFinalGateError("Proof.final depends on forbidden sorryAx")
+--
+333-    try:
+334-        return {
+335-            "k_workspace_sha256": pipeline_contract.sha256_tree(
+336-                frozen_input
+337-            ),
+338:            "stage1_export_sha256": klean_export.tree_digest(
+339-                frozen_input
+340-            ),
+341-            "discovery_manifest_sha256": (
+342-                pipeline_contract.sha256_file(discovery_manifest)
+343-            ),
+--
+484-            ],
+485-            "input_hashes": signed_resolution["hashes"],
+486-            "semantic_classification": "NOT_EVALUATED",
+487-            "target": None,
+488-            "klean_preflight": preflight,
+489:            "generation_sha256": klean_export.tree_digest(generation),
+490-            "candidate_sha256": None,
+491-            "used_axioms": [],
+492-            "diagnostics": [],
+493-        }
+494-    if candidate is None:
+
+/reference/tools/klean_export.py
+1494-                    f"tree contains linked or unsupported entry: {path}"
+1495-                )
+1496-    return sorted(entries)
+1497-
+1498-
+1499:def tree_digest(root: Path) -> str:
+1500-    digest = hashlib.sha256()
+1501-    for relative, kind, path in _tree_entries(Path(root)):
+1502-        digest.update(relative.encode() + b"\0" + kind.encode() + b"\0")
+1503-        if kind == "file":
+1504-            digest.update(path.read_bytes())
+--
+1829-    )
+1830-    if re.fullmatch(r"[A-Za-z0-9_-]+", problem) is None:
+1831-        raise KleanExportError("problem ID is malformed")
+1832-    if not frozen_input.is_dir() or frozen_input.is_symlink():
+1833-        raise KleanExportError("frozen input must be a real directory")
+1834:    before_hash = tree_digest(frozen_input)
+1835-    if not discovery_manifest.is_file() or discovery_manifest.is_symlink():
+1836-        raise KleanExportError(
+1837-            "validated Stage 3 discovery manifest must be a regular file"
+1838-        )
+1839-    discovery_bytes = discovery_manifest.read_bytes()
+--
+1845-        raise KleanExportError(str(error)) from error
+1846-    if discovery_manifest.read_bytes() != discovery_bytes:
+1847-        raise KleanExportError(
+1848-            "validated Stage 3 discovery manifest changed during validation"
+1849-        )
+1850:    if tree_digest(frozen_input) != before_hash:
+1851-        raise KleanExportError(
+1852-            "frozen input changed during discovery validation"
+1853-        )
+1854-    discovery_manifest_sha256 = hashlib.sha256(discovery_bytes).hexdigest()
+1855-    if destination.exists() or destination.is_symlink():
+--
+2027-                break
+2028-            if build_code != 0:
+2029-                raise KleanExportError(
+2030-                    f"lake build failed ({build_code}): {build_output[-600:]}"
+2031-                )
+2032:            if tree_digest(frozen_input) != before_hash:
+2033-                raise KleanExportError("frozen input changed during export")
+2034-            if discovery_manifest.read_bytes() != discovery_bytes:
+2035-                raise KleanExportError(
+2036-                    "validated Stage 3 discovery manifest changed during export"
+2037-                )
+--
+2111-                    modeled_operational_hooks
+2112-                ),
+2113-                "modeled_recursive_functions": list(
+2114-                    modeled_recursive_functions
+2115-                ),
+2116:                "generated_tree_sha256": tree_digest(generated),
+2117-                "obligation_count": len(obligations),
+2118-                "obligation_map_sha256": hashlib.sha256(
+2119-                    (generated / "obligation-map.json").read_bytes()
+2120-                ).hexdigest(),
+2121-                "target": target,
+
+/reference/tools/klean_preflight.py
+67-        if len(sidecars) != len(_SIDECAR_NAMES):
+68-            raise KleanPreflightError(
+69-                "preflight sidecar set is incomplete or unsafe"
+70-            )
+71-        return PreflightSnapshot(
+72:            stage1_workspace_sha256=klean_export.tree_digest(
+73-                frozen_input
+74-            ),
+75-            stage3_discovery_manifest_sha256=hashlib.sha256(
+76-                discovery_manifest.read_bytes()
+77-            ).hexdigest(),
+78:            generated_tree_sha256=klean_export.tree_digest(generated),
+79-            sidecar_sha256=sidecars,
+80-        )
+81-    except (OSError, klean_export.KleanExportError) as error:
+82-        raise KleanPreflightError(
+83-            "cannot snapshot immutable preflight inputs"
+--
+615-    if output.exists() or output.is_symlink():
+616-        raise KleanPreflightError(f"preflight result already exists: {output}")
+617-
+618-    def error_document(error: KleanPreflightError) -> dict[str, Any]:
+619-        try:
+620:            stage1_hash = klean_export.tree_digest(frozen_input)
+621-        except (OSError, klean_export.KleanExportError):
+622-            stage1_hash = None
+623-        try:
+624-            stage3_hash = hashlib.sha256(
+625-                discovery_manifest.read_bytes()
+
+/reference/tools/stage5_runner.py
+471-        pipeline_contract.PipelineContractError,
+472-        stage4_runner.Stage4RunnerError,
+473-    ) as error:
+474-        raise Stage5RunnerError(str(error)) from error
+475-    try:
+476:        stage4_stage1_sha256 = klean_export.tree_digest(k_reference)
+477-    except (OSError, klean_export.KleanExportError) as error:
+478-        raise Stage5RunnerError(
+479-            "cannot hash the protected Stage 1 input"
+480-        ) from error
+481-    generation, manifest = _selected_generation(
+--
+711-    ):
+712-        raise Stage5RunnerError(
+713-            "protected Stage 1 input changed during Stage 5"
+714-        )
+715-    try:
+716:        stage4_stage1_sha256 = klean_export.tree_digest(k_reference)
+717-    except (OSError, klean_export.KleanExportError) as error:
+718-        raise Stage5RunnerError(
+719-            "protected Stage 1 input changed during Stage 5"
+720-        ) from error
+721-    if stage4_stage1_sha256 != expected.stage4_stage1_sha256:
+--
+996-            )
+997-            if mechanical_document["status"] != "PASS":
+998-                exit_code = 1
+999-            else:
+1000-                try:
+1001:                    observed_generation = klean_export.tree_digest(
+1002-                        protected.generation.path
+1003-                    )
+1004:                    observed_candidate = klean_export.tree_digest(workspace)
+1005-                except (OSError, klean_export.KleanExportError) as error:
+1006-                    raise Stage5RunnerError(
+1007-                        "cannot verify Stage 5 mechanical input hashes"
+1008-                    ) from error
+1009-                if (
+--
+1050-            if successful and mechanical is not None:
+1051-                try:
+1052-                    current_data, current_identity = _read_regular_nofollow(
+1053-                        mechanical.path, "Stage 5 mechanical evidence"
+1054-                    )
+1055:                    current_candidate = klean_export.tree_digest(workspace)
+1056:                    current_generation = klean_export.tree_digest(
+1057-                        protected.generation.path
+1058-                    )
+1059-                except (
+1060-                    Stage3RunnerError,
+1061-                    OSError,
+
+/reference/tools/stage6_resolution_contract.py
+20-        "semantics_mode",
+21-        "k_workspace",
+22-        "k_audit",
+23-        "discovery_manifest",
+24-        "klean_generation",
+25:        "generation_producer_sources",
+26-        "lean_workspace",
+27-        "lean_invocation",
+28-        "target",
+29-        "stage1_source_hashes",
+30-        "trust_inventory",
+
+/reference/tools/klean_audit_contract.py
+216-        }
+217-    except pipeline_contract.PipelineContractError as error:
+218-        raise _translate(error) from error
+219-
+220-
+221:def _generation_producer_sources(
+222-    repo: Path, generator_manifest: dict[str, Any]
+223-) -> tuple[Path, str]:
+224-    provenance = generator_manifest.get("provenance")
+225-    image_id = (
+226-        provenance.get("generator_image_id")
+--
+240-            repo / "data/stage4-producer-sources",
+241-            image_key,
+242-            "Stage 4 producer source bundle",
+243-        )
+244-        source_manifest = pipeline_contract._read_regular_json(
+245:            bundle / "source-manifest.json",
+246-            "Stage 4 producer source manifest",
+247-        )
+248-        expected_files = {
+249-            "klean_export.py": generator_manifest.get("exporter_sha256"),
+250-            "klean.py": generator_manifest.get("klean_py_sha256"),
+--
+268-            for path in pipeline_contract._walk_regular_files(
+269-                bundle, "Stage 4 producer source bundle"
+270-            )
+271-        }
+272-        if observed_names != {
+273:            "source-manifest.json",
+274-            "klean_export.py",
+275-            "klean.py",
+276-        }:
+277-            raise KleanAuditContractError(
+278-                "Stage 4 producer source bundle has unexpected files"
+--
+321-            or k_result["outputs"].get("workspace_sha256") != k_hash
+322-        ):
+323-            raise KleanAuditContractError(
+324-                "Stage 1 K workspace changed after success"
+325-            )
+326:        stage1_export_hash = klean_export.tree_digest(k_workspace)
+327-        stage1_source_hashes = _stage1_source_hashes(k_workspace)
+328-
+329-        k_audit, k_audit_selection = _selected(
+330-            task, "02-k-audit", "executions"
+331-        )
+--
+365-                "Stage 4 selection status differs from its preflight"
+366-            )
+367-        generator_manifest = pipeline_contract._read_regular_json(
+368-            generation / "generator-manifest.json", "generator manifest"
+369-        )
+370:        generation_producer_sources, producer_sources_hash = (
+371:            _generation_producer_sources(repo, generator_manifest)
+372-        )
+373-        generated = pipeline_contract.require_real_directory(
+374-            generation / "generated", "generated Klean project"
+375-        )
+376:        generated_hash = klean_export.tree_digest(generated)
+377-        if generator_manifest.get("generated_tree_sha256") != generated_hash:
+378-            raise KleanAuditContractError(
+379-                "selected Stage 4 generation changed after preflight"
+380-            )
+381-        provenance = generator_manifest.get("provenance")
+--
+433-            ),
+434-            "k_workspace": str(k_workspace),
+435-            "k_audit": str(k_audit),
+436-            "discovery_manifest": str(discovery.path),
+437-            "klean_generation": str(generation),
+438:            "generation_producer_sources": str(
+439:                generation_producer_sources
+440-            ),
+441-            "lean_workspace": (
+442-                str(lean_workspace)
+443-                if lean_workspace is not None
+444-                else None
+--
+462-                "discovery_manifest_sha256": discovery.sha256,
+463-                "k_audit_sha256": pipeline_contract.sha256_tree(k_audit),
+464-                "klean_generation_sha256": pipeline_contract.sha256_tree(
+465-                    generation
+466-                ),
+467:                "generation_producer_sources_sha256": (
+468:                    producer_sources_hash
+469-                ),
+470-                "generated_tree_sha256": generated_hash,
+471-                "lean_workspace_sha256": (
+472-                    pipeline_contract.sha256_tree(lean_workspace)
+473-                    if lean_workspace is not None
+
+/reference/tools/stage4_runner.py
+269-        raise Stage4RunnerError(
+270-            "container failed after recording a passing preflight"
+271-        )
+272-    if status in successful:
+273-        try:
+274:            generated_sha256 = klean_export.tree_digest(
+275-                generation / "generated"
+276-            )
+277-        except (OSError, klean_export.KleanExportError) as error:
+278-            raise Stage4RunnerError(
+279-                "passing preflight has no safe generated project"
+--
+444-    task, _state, _run = pipeline_contract._resolve_task_state(
+445-        repo, run_id, problem
+446-    )
+447-    eligibility = audit_contract.stage2_eligibility(repo, run_id, problem)
+448-    frozen, frozen_hash = _stage1_workspace(task)
+449:    stage1_workspace_sha256 = klean_export.tree_digest(frozen)
+450-    discovery = _protected_stage3_discovery(task)
+451-    image = subprocess.run(
+452-        [docker, "image", "inspect", IMAGE, "--format", "{{.Id}}"],
+453-        text=True,
+454-        stdout=subprocess.PIPE,
+--
+551-    ) != eligibility:
+552-        raise Stage4RunnerError(
+553-            "Stage 2 selected audit changed before Stage 4 selection"
+554-        )
+555-    if pipeline_contract.sha256_tree(frozen) != frozen_hash or (
+556:        klean_export.tree_digest(frozen) != stage1_workspace_sha256
+557-    ):
+558-        raise Stage4RunnerError(
+559-            "finalized Stage 1 workspace changed before Stage 4 selection"
+560-        )
+561-    if _protected_stage3_discovery(task) != discovery:
+
+Source file metadata
+regular file 644 41015 /reference/generation-tools/klean.py
+regular file 644 73426 /reference/generation-tools/klean_export.py
+regular file 644 333 /reference/generation-tools/source-manifest.json
+
+Simple concatenation/tar candidates
+42a38e6d65b74af3536acc49947b7cfbac809406bdfe5549841e3132af5a5c4d  /reference/generation-tools/klean.py
+bbd11ce0fe6ac12ea89d4bdc70c260044bc9f87c987ff310684b637ea6464a07  /reference/generation-tools/klean_export.py
+12ea75e9bde6ff407be83d69c051a8bb2393647e539547391a0e36ac0a9eaaa4  /reference/generation-tools/source-manifest.json
+
+Script done on 2026-07-30 23:22:49-05:00 [COMMAND_EXIT_CODE="0"]

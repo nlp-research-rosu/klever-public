@@ -1,0 +1,188 @@
+Script started on 2026-07-31 07:46:01-05:00 [<not executed on terminal>]
+#!/usr/bin/env python3
+"""Resolve immutable Stage 6 inputs and allocate independent Klean audits."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import stat
+import sys
+from pathlib import Path
+from typing import Any
+
+REPO = Path(__file__).resolve().parent.parent
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from tools import (
+    audit_contract,
+    klean_export,
+    pipeline_contract,
+    stage4_runner,
+    stage6_resolution_contract,
+)
+
+
+class KleanAuditContractError(RuntimeError):
+    pass
+
+
+_STAGE6_RESOLUTION_KEYS = stage6_resolution_contract.RESOLUTION_KEYS
+
+
+def _canonical_json_sha256(document: Any) -> str:
+    return stage6_resolution_contract.canonical_json_sha256(document)
+
+
+def _validate_sha256(value: object, label: str) -> str:
+    try:
+        return stage6_resolution_contract.validate_sha256(
+            value, label
+        )
+    except (
+        stage6_resolution_contract.Stage6ResolutionContractError
+    ) as error:
+        raise KleanAuditContractError(str(error)) from error
+
+
+def _stage6_audit_input(
+    resolution: dict[str, Any],
+) -> dict[str, Any]:
+    return stage6_resolution_contract.build_audit_input(resolution)
+
+
+def verify_stage6_audit_input(
+    document: dict[str, Any],
+) -> tuple[dict[str, Any], str]:
+    try:
+        return stage6_resolution_contract.verify_audit_input(document)
+    except (
+        stage6_resolution_contract.Stage6ResolutionContractError
+    ) as error:
+        raise KleanAuditContractError(str(error)) from error
+
+
+def _translate(error: Exception) -> KleanAuditContractError:
+    return KleanAuditContractError(str(error))
+
+
+def _read_json(path: Path, label: str) -> dict[str, Any]:
+    try:
+        return pipeline_contract._read_regular_json(path, label)
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _selected(
+    task: Path, stage_name: str, container_name: str
+) -> tuple[Path, dict[str, Any]]:
+    try:
+        stage = pipeline_contract.require_real_directory(
+            task / stage_name, stage_name
+        )
+        selected = pipeline_contract._read_regular_json(
+            stage / "selected.json", f"{stage_name} selection"
+        )
+        relative = selected.get("relative_path")
+        parts = Path(relative).parts if isinstance(relative, str) else ()
+        if len(parts) != 2 or parts[0] != container_name:
+            raise KleanAuditContractError(
+                f"{stage_name} selected path is malformed"
+            )
+        candidate = pipeline_contract._require_direct_directory(
+            stage / container_name,
+            parts[1],
+            f"selected {stage_name} output",
+        )
+        if (
+            pipeline_contract.sha256_tree(candidate)
+            != selected.get("artifact_sha256")
+        ):
+            noun = (
+                "generation"
+                if stage_name == "04-klean-generation"
+                else "audit"
+            )
+            raise KleanAuditContractError(
+                f"selected {stage_name} {noun} changed after selection"
+            )
+        return candidate, selected
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _require_stage5(task: Path) -> tuple[Path, Path, dict[str, Any]]:
+    try:
+        stage = pipeline_contract.require_real_directory(
+            task / "05-lean-proof", "Stage 5"
+        )
+        result = pipeline_contract._read_regular_json(
+            stage / "result.json", "Stage 5 result"
+        )
+        if result.get("status") != "SUCCEEDED":
+            raise KleanAuditContractError(
+                "Stage 5 must be SUCCEEDED before proof-bearing audit"
+            )
+        workspace = pipeline_contract.require_real_directory(
+            stage / "workspace", "Stage 5 Lean workspace"
+        )
+        invocation_name = pipeline_contract.validate_safe_component(
+            result.get("invocation"), "Stage 5 invocation"
+        )
+        invocation = pipeline_contract._require_direct_directory(
+            stage / "invocations",
+            invocation_name,
+            "successful Stage 5 invocation",
+        )
+        invocation_manifest = pipeline_contract._read_regular_json(
+            invocation / "invocation.json", "Stage 5 invocation manifest"
+        )
+        if (
+            invocation_manifest.get("status") != "SUCCEEDED"
+            or invocation_manifest.get("name") != invocation_name
+            or invocation_manifest.get("stage") != "05-lean-proof"
+            or invocation_manifest.get("session_id")
+            != result.get("session_id")
+        ):
+            raise KleanAuditContractError(
+                "selected Stage 5 invocation is not successful"
+            )
+        for name in ("metrics.json", "codex-output.log", "codex-last.txt"):
+            pipeline_contract.require_regular_file(
+                invocation / name, f"Stage 5 {name}"
+            )
+        pipeline_contract._walk_regular_files(
+            invocation / "codex-trace", "Stage 5 Codex trace"
+        )
+        for name in ("Proof.lean", "lakefile.lean", "lean-toolchain"):
+            pipeline_contract.require_regular_file(
+                workspace / name, f"Stage 5 {name}"
+            )
+        current_outputs = pipeline_contract._invocation_output_hashes(
+            invocation, workspace
+        )
+        result_outputs = result.get("outputs")
+        invocation_outputs = invocation_manifest.get("outputs")
+        if (
+            current_outputs.get("workspace_sha256")
+            != (
+                result_outputs.get("workspace_sha256")
+                if isinstance(result_outputs, dict)
+                else None
+            )
+            or current_outputs.get("workspace_sha256")
+            != (
+                invocation_outputs.get("workspace_sha256")
+                if isinstance(invocation_outputs, dict)
+                else None
+            )
+        ):
+            raise KleanAuditContractError(
+                "Lean workspace changed after Stage 5 succeeded"
+            )
+        if (
+
+Script done on 2026-07-31 07:46:01-05:00 [COMMAND_EXIT_CODE="0"]

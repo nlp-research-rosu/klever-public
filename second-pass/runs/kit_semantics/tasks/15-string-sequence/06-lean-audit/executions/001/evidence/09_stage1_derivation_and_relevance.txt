@@ -1,0 +1,78 @@
+Script started on 2026-07-30 23:10:46-05:00 [<not executed on terminal>]
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	cd "$(dirname "$0")"
+     5	
+     6	# Reproduce the translator outputs and check that the smoke artifact embeds the
+     7	# exact solution source before adding its top-level assertions.
+     8	python3 py2mpy.py solution.py > solution.mpy
+     9	python3 py2mpy.py smoke.py > smoke.mpy
+    10	solution_line_count=$(wc -l < solution.py)
+    11	head -n "$solution_line_count" smoke.py | cmp - solution.py
+    12	
+    13	# Concrete execution under the required LLVM definition.
+    14	kompile --backend llvm reference-semantics/semantics.k \
+    15	  --main-module MPY-KRUN \
+    16	  --syntax-module MPY-SYNTAX \
+    17	  --output-definition runtime-kompiled
+    18	krun smoke.mpy --definition runtime-kompiled | tee smoke.krun.out
+    19	rg -Uq '<exit-code>[[:space:]]*0[[:space:]]*</exit-code>' smoke.krun.out
+    20	
+    21	# Symbolic proof: this all-claims command loads the loop invariant alongside
+    22	# the entry claim and must print #Top with exit status 0.
+    23	kompile --backend haskell verification.k \
+    24	  --main-module VERIFICATION \
+    25	  --syntax-module MPY-SYNTAX \
+    26	  --output-definition verification-kompiled
+    27	kprove spec.k \
+    28	  --definition verification-kompiled \
+    29	  --spec-module SPEC | tee proof.out
+    30	rg -qx '#Top' proof.out
+    31	
+    32	# Gate A negative probes.  Both are expected to be rejected.
+    33	set +e
+    34	kprove spec-vacuity.k \
+    35	  --definition verification-kompiled \
+    36	  --spec-module SPEC-VACUITY > vacuity.out 2>&1
+    37	vacuity_status=$?
+    38	kprove spec-body-mutation.k \
+    39	  --definition verification-kompiled \
+    40	  --spec-module SPEC-BODY-MUTATION > body-mutation.out 2>&1
+    41	body_mutation_status=$?
+    42	set -e
+    43	
+    44	if (( vacuity_status == 0 )); then
+    45	  echo "ERROR: false-result mutation unexpectedly proved" >&2
+    46	  exit 1
+    47	fi
+    48	if (( body_mutation_status == 0 )); then
+    49	  echo "ERROR: comma-separator body mutation unexpectedly proved" >&2
+    50	  exit 1
+    51	fi
+    52	rg -q 'WarnStuckClaimState' vacuity.out
+    53	rg -Fq 'str ( iCons ( 48 , .IntSeq ) )' vacuity.out
+    54	rg -q 'WarnStuckClaimState' body-mutation.out
+    55	rg -Fq 'iCons ( 44 ,' body-mutation.out
+    56	
+    57	# Independent CPython differential evidence.
+    58	python3 differential_test.py | tee differential.out
+    59	
+    60	printf 'expected-failure vacuity exit: %s\n' "$vacuity_status"
+    61	printf 'expected-failure body mutation exit: %s\n' "$body_mutation_status"
+#Top
+/reference/k-proof/verification.k
+6:  // sequenceAcc(ACC, I, N) is the exact character-code accumulator after
+8:  syntax IntSeq ::= sequenceAcc(IntSeq, Int, Int) [function, total]
+10:  rule sequenceAcc(ACC, I, N) => ACC
+14:  rule sequenceAcc(ACC, I, N)
+15:    => sequenceAcc(
+26:  rule sequenceAcc(ACC, I, N) => ACC
+30:  rule sequenceAcc(
+36:    => sequenceAcc(ACC, I, N)
+48:    => sequenceAcc(iCons(48, .IntSeq), 1, N)
+
+/reference/k-proof/spec.k
+51:        "result" |-> (str(ACC) => str(sequenceAcc(ACC, I, N)))
+
+Script done on 2026-07-30 23:10:46-05:00 [COMMAND_EXIT_CODE="0"]

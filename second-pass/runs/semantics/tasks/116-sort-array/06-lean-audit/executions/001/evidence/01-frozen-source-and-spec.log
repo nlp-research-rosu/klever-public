@@ -1,0 +1,248 @@
+$ cd /audit-output
+$ printf '===== verification.k =====\n'
+nl -ba /reference/k-proof/verification.k
+printf '\n===== spec.k =====\n'
+nl -ba /reference/k-proof/spec.k
+printf '\n===== solution.py =====\n'
+nl -ba /reference/k-proof/solution.py
+printf '\n===== solution.mpy =====\n'
+nl -ba /reference/k-proof/solution.mpy
+printf '\n===== prompt.py =====\n'
+nl -ba /reference/k-proof/prompt.py
+printf '\n===== prove.sh =====\n'
+nl -ba /reference/k-proof/prove.sh
+
+===== verification.k =====
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module SORT-ARRAY-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // This is the translated program, factored into named terms so that the
+     7	  // specification can refer to exactly the code in solution.mpy.
+     8	  syntax Expr ::= "sortArrayLambda" [function, total]
+     9	  rule sortArrayLambda
+    10	    => Lambda(
+    11	         Params("value"),
+    12	         CellVars(.ParamNames),
+    13	         FreeVars(.ParamNames),
+    14	         IfExp(
+    15	           Compare(Name("value"), CmpOp("<", Int(0))),
+    16	           Int(0),
+    17	           Call(
+    18	             Attribute(Call(Name("bin"), Name("value")), "count"),
+    19	             Str("1"))))
+    20	
+    21	  syntax Stmts ::= "sortArrayBody" [function, total]
+    22	  rule sortArrayBody
+    23	    => Return(
+    24	         Call(
+    25	           Name("sorted"),
+    26	           Call(Name("sorted"), Name("arr")),
+    27	           KwArg("key", sortArrayLambda)))
+    28	
+    29	  syntax Val ::= "sortArrayClosure" [function, total]
+    30	  rule sortArrayClosure
+    31	    => closureVal("arr", sortArrayBody, 0)
+    32	
+    33	  syntax Module ::= "sortArrayModule" [function, total]
+    34	  rule sortArrayModule
+    35	    => Module(FuncDef("sort_array", Params("arr"), sortArrayBody))
+    36	
+    37	  // Evaluation of the annotated lambda above produces this closure.  The
+    38	  // reference semantics models keyed sorting by the trusted sortKeyVS
+    39	  // primitive, and ordinary integer sorting by sortVS.
+    40	  syntax Val ::= "popcountKeyClosure" [function, total]
+    41	  rule popcountKeyClosure
+    42	    => closureValC(
+    43	         "value",
+    44	         .ParamNames,
+    45	         Return(
+    46	           IfExp(
+    47	             Compare(Name("value"), CmpOp("<", Int(0))),
+    48	             Int(0),
+    49	             Call(
+    50	               Attribute(Call(Name("bin"), Name("value")), "count"),
+    51	               Str("1")))),
+    52	         .Map)
+    53	
+    54	  syntax ValSeq ::= sortArraySpec(ValSeq) [function, total]
+    55	  rule sortArraySpec(VS:ValSeq)
+    56	    => sortKeyVS(sortVS(VS), popcountKeyClosure)
+    57	
+    58	  syntax Bool ::= allNonNegativeInts(ValSeq) [function, total]
+    59	  rule allNonNegativeInts(.ValSeq) => true
+    60	  rule allNonNegativeInts(vCons(I:Int, REST:ValSeq))
+    61	    => I >=Int 0 andBool allNonNegativeInts(REST)
+    62	  rule allNonNegativeInts(vCons(_:Val, _:ValSeq)) => false [owise]
+    63	endmodule
+
+===== spec.k =====
+     1	requires "verification.k"
+     2	
+     3	module SORT-ARRAY-SPEC
+     4	  imports SORT-ARRAY-VERIFICATION
+     5	
+     6	  // Loading the exact translated module installs the closure used below.
+     7	  claim
+     8	    <k> #loadAll(sortArrayModule) => .K </k>
+     9	    <env> 0 </env>
+    10	    <scopes>
+    11	      0  |-> scope(.Map, parent(-1))
+    12	      -1 |-> builtinsScope
+    13	      =>
+    14	      0  |-> scope("sort_array" |-> sortArrayClosure, parent(-1))
+    15	      -1 |-> builtinsScope
+    16	    </scopes>
+    17	    <scopeLoc> 1 </scopeLoc>
+    18	    <heap> .Map </heap>
+    19	    <heapLoc> 0 </heapLoc>
+    20	    <stack> .List </stack>
+    21	    <ret> noRet </ret>
+    22	    <exc> NoExc </exc>
+    23	    <exit-code> 0 </exit-code>
+    24	
+    25	  // For every list in the task's stated domain, execution returns exactly the
+    26	  // reference semantics' stable sort by popcount and then decimal value.
+    27	  claim
+    28	    <k>
+    29	      Call(sortArrayClosure, list(VS))
+    30	      =>
+    31	      ref(1)
+    32	    </k>
+    33	    <env> 0 </env>
+    34	    <scopes>
+    35	      0  |-> scope(.Map, parent(-1))
+    36	      -1 |-> builtinsScope
+    37	    </scopes>
+    38	    <scopeLoc> 1 </scopeLoc>
+    39	    <heap>
+    40	      .Map
+    41	      =>
+    42	      0 |-> list(sortVS(VS))
+    43	      1 |-> list(sortArraySpec(VS))
+    44	    </heap>
+    45	    <heapLoc> 0 => 2 </heapLoc>
+    46	    <stack> .List </stack>
+    47	    <ret> noRet </ret>
+    48	    <exc> NoExc </exc>
+    49	    <exit-code> 0 </exit-code>
+    50	    requires allNonNegativeInts(VS)
+    51	
+    52	  // The key closure computes the number of "1" digits in bin(N).  The leading
+    53	  // "0b" contributes no matches, so this is the supplied semantics' popcount.
+    54	  claim
+    55	    <k>
+    56	      Call(popcountKeyClosure, Int(N))
+    57	      =>
+    58	      cntSub(
+    59	        iCons(48, iCons(98, binCodes(N))),
+    60	        iCons(49, .IntSeq))
+    61	    </k>
+    62	    <env> 0 </env>
+    63	    <scopes>
+    64	      0  |-> scope(.Map, parent(-1))
+    65	      -1 |-> builtinsScope
+    66	    </scopes>
+    67	    <scopeLoc> 1 </scopeLoc>
+    68	    <heap> .Map </heap>
+    69	    <heapLoc> 0 </heapLoc>
+    70	    <stack> .List </stack>
+    71	    <ret> noRet </ret>
+    72	    <exc> NoExc </exc>
+    73	    <exit-code> 0 </exit-code>
+    74	    requires N >=Int 0
+    75	
+    76	  // Outside the promised domain, the extension assigns every negative the
+    77	  // same key.  The stable decimal pre-sort therefore matches the prompt's
+    78	  // otherwise out-of-domain negative example.
+    79	  claim
+    80	    <k> Call(popcountKeyClosure, Int(N)) => 0 </k>
+    81	    <env> 0 </env>
+    82	    <scopes>
+    83	      0  |-> scope(.Map, parent(-1))
+    84	      -1 |-> builtinsScope
+    85	    </scopes>
+    86	    <scopeLoc> 1 </scopeLoc>
+    87	    <heap> .Map </heap>
+    88	    <heapLoc> 0 </heapLoc>
+    89	    <stack> .List </stack>
+    90	    <ret> noRet </ret>
+    91	    <exc> NoExc </exc>
+    92	    <exit-code> 0 </exit-code>
+    93	    requires N <Int 0
+    94	endmodule
+
+===== solution.py =====
+     1	def sort_array(arr):
+     2	    return sorted(
+     3	        sorted(arr),
+     4	        key=lambda value: (
+     5	            0
+     6	            if value < 0
+     7	            else bin(value).count("1")
+     8	        ),
+     9	    )
+
+===== solution.mpy =====
+     1	Module(
+     2	  FuncDef("sort_array", Params("arr"),
+     3	    Return(
+     4	      Call(
+     5	        Name("sorted"),
+     6	        Call(Name("sorted"), Name("arr")),
+     7	        KwArg(
+     8	          "key",
+     9	          Lambda(
+    10	            Params("value"),
+    11	            CellVars(),
+    12	            FreeVars(),
+    13	            IfExp(
+    14	              Compare(Name("value"), CmpOp("<", Int(0))),
+    15	              Int(0),
+    16	              Call(
+    17	                Attribute(Call(Name("bin"), Name("value")), "count"),
+    18	                Str("1")))))))))
+
+===== prompt.py =====
+     1	
+     2	def sort_array(arr):
+     3	    """
+     4	    In this Kata, you have to sort an array of non-negative integers according to
+     5	    number of ones in their binary representation in ascending order.
+     6	    For similar number of ones, sort based on decimal value.
+     7	
+     8	    It must be implemented like this:
+     9	    >>> sort_array([1, 5, 2, 3, 4]) == [1, 2, 3, 4, 5]
+    10	    >>> sort_array([-2, -3, -4, -5, -6]) == [-6, -5, -4, -3, -2]
+    11	    >>> sort_array([1, 0, 2, 3, 4]) [0, 1, 2, 3, 4]
+    12	    """
+
+===== prove.sh =====
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	
+     6	kompile reference-semantics/semantics.k \
+     7	  --backend llvm \
+     8	  --main-module MPY-KRUN \
+     9	  --syntax-module MPY-SYNTAX \
+    10	  --output-definition runtime-kompiled
+    11	
+    12	python3 py2mpy.py concrete-tests.py > concrete-tests.mpy
+    13	krun concrete-tests.mpy --definition runtime-kompiled
+    14	python3 differential_test.py
+    15	
+    16	kompile verification.k \
+    17	  --backend haskell \
+    18	  --main-module SORT-ARRAY-VERIFICATION \
+    19	  --syntax-module MPY-SYNTAX \
+    20	  --output-definition verification-kompiled
+    21	
+    22	kprove spec.k \
+    23	  --definition verification-kompiled \
+    24	  --spec-module SORT-ARRAY-SPEC
+
+[exit_code=0]
+

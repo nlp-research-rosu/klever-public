@@ -1,0 +1,46 @@
+$ sandbox PID namespace diagnosis and compatibility shim source
+SHELL_PID=2
+PROC_SELF_EXE=/usr/bin/readlink
+PROC_NUMERIC_PID_LOOKUP=missing (expected in this audit sandbox)
+$ sha256sum compatibility shim source and binary
+d5754345be9d53df94acfa2728c4a27f5c62b9e660e040eb602976d9d5fedf36  /tmp/audit-work/proc_self_readlink.c
+ec52755ad3145985cd449320ec8ab9848f73cb709c65646a06c4f3f41c65dad9  /tmp/audit-work/proc-self-readlink.so
+$ source
+     1	#define _GNU_SOURCE
+     2	#include <ctype.h>
+     3	#include <stddef.h>
+     4	#include <string.h>
+     5	#include <sys/syscall.h>
+     6	#include <unistd.h>
+     7	
+     8	/*
+     9	 * The audit sandbox exposes a host-PID /proc mount while getpid() returns a
+    10	 * nested-namespace PID. Lean 4.22 resolves its executable through
+    11	 * /proc/<getpid()>/exe, which therefore does not exist. Redirect only that
+    12	 * executable lookup to the namespace-stable /proc/self/exe path.
+    13	 */
+    14	ssize_t readlink(const char *path, char *buffer, size_t size) {
+    15	    const char prefix[] = "/proc/";
+    16	    const char suffix[] = "/exe";
+    17	    size_t length = strlen(path);
+    18	    int is_process_exe =
+    19	        length > sizeof(prefix) - 1 + sizeof(suffix) - 1 &&
+    20	        strncmp(path, prefix, sizeof(prefix) - 1) == 0 &&
+    21	        strcmp(path + length - (sizeof(suffix) - 1), suffix) == 0;
+    22	    if (is_process_exe) {
+    23	        const char *cursor = path + sizeof(prefix) - 1;
+    24	        const char *end = path + length - (sizeof(suffix) - 1);
+    25	        while (cursor < end && isdigit((unsigned char)*cursor)) {
+    26	            ++cursor;
+    27	        }
+    28	        is_process_exe = cursor == end;
+    29	    }
+    30	    return syscall(
+    31	        SYS_readlink,
+    32	        is_process_exe ? "/proc/self/exe" : path,
+    33	        buffer,
+    34	        size);
+    35	}
+$ pinned toolchain smoke test under compatibility shim
+Lean (version 4.22.0, x86_64-unknown-linux-gnu, commit ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05, Release)
+Lake version 5.0.0-src+ba2cbbf (Lean version 4.22.0)

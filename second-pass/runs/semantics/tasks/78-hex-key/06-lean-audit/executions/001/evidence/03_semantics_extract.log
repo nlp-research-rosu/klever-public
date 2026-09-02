@@ -1,0 +1,225 @@
+$ nl -ba /reference/k-proof/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module HEX-KEY-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // The exact statement trees emitted for solution.py, named so that the
+     7	  // implementation and the proof claims share one readable representation.
+     8	  syntax Stmts ::= "hexKeyLoopBody" [macro]
+     9	  rule hexKeyLoopBody
+    10	    => If(Compare(Name("digit"), CmpOp("in", Str("2357BD"))),
+    11	          AugAssign(Name("count"), "+", Int(1)),
+    12	          .Stmts)
+    13	
+    14	  syntax Stmts ::= "hexKeyBody" [macro]
+    15	  rule hexKeyBody
+    16	    => Assign(Name("count"), Int(0))
+    17	       Assign(Name("digit"), Str(""))
+    18	       For(Name("digit"), Name("num"), hexKeyLoopBody)
+    19	       Return(Name("count"))
+    20	
+    21	  // Mathematical contract: count exactly the codes for 2, 3, 5, 7, B, D.
+    22	  syntax Bool ::= isPrimeHexCode(Int) [function, total]
+    23	  rule isPrimeHexCode(C:Int)
+    24	    => strContains(iCons(C, .IntSeq),
+    25	                   iCons(50, iCons(51, iCons(53, iCons(55,
+    26	                   iCons(66, iCons(68, .IntSeq)))))))
+    27	
+    28	  syntax Int ::= primeHexBit(Int) [function, total]
+    29	  rule primeHexBit(C:Int)
+    30	    => #if isPrimeHexCode(C) #then 1 #else 0 #fi
+    31	
+    32	  syntax Int ::= hexCount(IntSeq) [function, total]
+    33	  rule hexCount(.IntSeq) => 0
+    34	  rule hexCount(iCons(C:Int, REST:IntSeq))
+    35	    => primeHexBit(C) +Int hexCount(REST)
+    36	
+    37	  // The loop's final value for its induction variable (used only in the loop
+    38	  // invariant; it is not observable in hex_key's return value).
+    39	  syntax Val ::= finalDigit(IntSeq, Val) [function, total]
+    40	  rule finalDigit(.IntSeq, OLD:Val) => OLD
+    41	  rule finalDigit(iCons(C:Int, REST:IntSeq), _OLD:Val)
+    42	    => finalDigit(REST, str(iCons(C, .IntSeq)))
+    43	endmodule
+$ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module HEX-KEY-SPEC
+     4	  imports HEX-KEY-VERIFICATION
+     5	
+     6	  // Inductive loop lemma: count accumulates the mathematical count, and the
+     7	  // induction variable retains its old value on empty input or the final
+     8	  // character otherwise.
+     9	  claim
+    10	    <k>
+    11	      #loop(str(CS:IntSeq), Name("digit"), hexKeyLoopBody)
+    12	      ~> CONT:K
+    13	      => CONT
+    14	    </k>
+    15	    <env> L:Int </env>
+    16	    <scopes>
+    17	      (L |-> scope("count" |-> ACC
+    18	                   "digit" |-> DIGIT:Val
+    19	                   "num" |-> NUM:Val,
+    20	                   parent(0))) CALLERSCOPES:Map
+    21	      =>
+    22	      (L |-> scope("count" |-> (ACC +Int hexCount(CS))
+    23	                   "digit" |-> finalDigit(CS, DIGIT)
+    24	                   "num" |-> NUM,
+    25	                   parent(0))) CALLERSCOPES
+    26	    </scopes>
+    27	    <scopeLoc> _SCOPELOC:Int </scopeLoc>
+    28	    <heap> _HEAP:Map </heap>
+    29	    <heapLoc> _HEAPLOC:Int </heapLoc>
+    30	    <stack> _STACK:List </stack>
+    31	    <ret> noRet </ret>
+    32	    <exc> NoExc </exc>
+    33	    <exit-code> 0 </exit-code>
+    34	    [label(loop-lemma)]
+    35	
+    36	  // Entry-point theorem for every symbolic string.
+    37	  claim
+    38	    <k>
+    39	      #loadAll(Module(
+    40	        FuncDef("hex_key", Params("num"), hexKeyBody)))
+    41	      ~> Call(Name("hex_key"), str(CS:IntSeq))
+    42	      => hexCount(CS)
+    43	    </k>
+    44	    <env> 0 </env>
+    45	    <scopes>
+    46	      (0 |-> scope(.Map, parent(-1))
+    47	       =>
+    48	       0 |-> scope(
+    49	         "hex_key" |-> closureVal(("num", .ParamNames), hexKeyBody, 0),
+    50	         parent(-1)))
+    51	      -1 |-> builtinsScope
+    52	    </scopes>
+    53	    <scopeLoc> 1 </scopeLoc>
+    54	    <heap> .Map </heap>
+    55	    <heapLoc> 0 </heapLoc>
+    56	    <stack> .List </stack>
+    57	    <ret> noRet </ret>
+    58	    <exc> NoExc </exc>
+    59	    <exit-code> 0 </exit-code>
+    60	    [label(entry-point)]
+    61	endmodule
+$ nl -ba /reference/k-proof/solution.py
+     1	def hex_key(num):
+     2	    count = 0
+     3	    digit = ""
+     4	    for digit in num:
+     5	        if digit in "2357BD":
+     6	            count += 1
+     7	    return count
+$ nl -ba /reference/k-proof/solution.mpy
+     1	Module(
+     2	  FuncDef("hex_key", Params("num"),
+     3	    Assign(Name("count"), Int(0))
+     4	    Assign(Name("digit"), Str(""))
+     5	    For(Name("digit"), Name("num"),
+     6	      If(Compare(Name("digit"), CmpOp("in", Str("2357BD"))),
+     7	        AugAssign(Name("count"), "+", Int(1)),
+     8	        ))
+     9	    Return(Name("count"))))
+$ sed -n relevant controls.k rules
+     8	  // ==== Assign / AugAssign (write the current scope; RHS evaluated by strictness) ==
+     9	  rule <k> Assign(Name(X:String), V:Val) => .K ... </k>
+    10	       <env> L:Int </env>
+    11	       <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>
+    12	  rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k>
+    13	       <env> L:Int </env>
+    14	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    15	       requires "$cells" in_keys(M)
+    16	        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+    17	        andBool X in_keys(M) andBool isCellRef({M[X]}:>Val)
+    18	       [priority(40)]
+    19	
+    20	  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k>
+    21	       <env> L:Int </env>
+    22	       <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes>
+    23	       requires X in_keys(M)
+    24	  // `lst += [..]` where lst is a heap ref: the generic rule leaves applyBin(OP, ref, V) — but the
+    25	  // ref-deref preemption is BinOp-level (operators.k), so applyBin never derefs and it sticks. Route
+    26	  // the ref case through BinOp so the deref + list-concat + #alloc path fires (result is a fresh ref).
+    27	  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k>
+    28	       <env> L:Int </env>
+    29	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    30	       requires X in_keys(M) andBool isRefV({M[X]}:>Val)
+    31	       [priority(40)]
+    50	  // ==== If (condition evaluated by strictness) ==============================
+    51	  syntax KItem ::= #branch(Bool, Stmts, Stmts)
+    52	  rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>
+    53	  rule <k> #branch(true,  T:Stmts, _:Stmts) => T ... </k>
+    54	  rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>
+    55	
+    56	  // ==== IfExp: ternary T if C else E ========================================
+    57	  rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k>
+    58	       requires truthy(V)
+    59	  rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k>
+    60	       requires notBool truthy(V)
+    61	
+    62	  // ==== For: one loop, in-cell continuation, over #iterNext =================
+    63	  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+    64	  // circularities anchor on #loop and narrowing substitutes the structure)
+    65	  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+    66	                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+    67	                 | #loopLbl(K) | "#cont" | "#brk"
+    68	
+    69	  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+    70	
+    71	  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+    72	  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+    73	  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+    74	        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+    75	
+$ sed -n relevant str.k rules
+     7	  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+     8	  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+     9	  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+    10	        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+    11	
+    12	  // ==== str literal (ASCII-only) ============================================
+    13	  syntax IntSeq ::= strToCodes(String) [function]
+    14	  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+    15	  rule strToCodes("") => .IntSeq
+    16	  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    17	    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+    18	
+    19	  // ==== operators: + / == / != / in =========================================
+    20	  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+    21	  rule seqConcat(.IntSeq, T:IntSeq)                => T
+    22	  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+    23	
+    24	  rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+    25	  rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+    26	  rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)
+    27	
+    28	  // substring membership: `P in X` iff the code-seq P occurs contiguously in X
+    29	  rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)
+    30	  rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)
+    31	
+    32	  syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]
+    33	  rule strPrefix(.IntSeq, _:IntSeq)               => true
+    34	  rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false
+    35	  rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)
+    36	
+    37	  syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]
+    38	  rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)
+    39	  rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)
+    40	  rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs)
+    41	       requires notBool strPrefix(P, iCons(C, Xs))
+$ sed -n relevant operators.k rules
+    10	  rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>
+    11	
+    12	  rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+    13	
+    14	  // Compare's right operand sits under the CmpOp wrapper — contexts instead of attributes
+    15	  context Compare(HOLE, _)
+    16	  context Compare(_:Val, CmpOp(_, HOLE))
+    17	  rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]
+    18	
+    19	  rule applyCmp("is",     V:Val, noneV) => V ==K noneV
+    20	  rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)
+$ rg simplification /reference/k-proof/verification.k
+NO simplification attributes

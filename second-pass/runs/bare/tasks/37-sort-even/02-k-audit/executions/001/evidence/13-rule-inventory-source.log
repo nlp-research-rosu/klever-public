@@ -1,0 +1,372 @@
+COMMAND: bash -lc cd\ /tmp/audit-work/37-sort-even\;\ printf\ \"%s\\n\"\ \"\[semantic.k\ numbered\]\"\;\ nl\ -ba\ semantic.k\;\ printf\ \"%s\\n\"\ \"\[verification.k\ numbered\]\"\;\ nl\ -ba\ verification.k\;\ printf\ \"%s\\n\"\ \"\[spec.k\ claims\]\"\;\ rg\ -n\ \"\^\ \ claim\|label\\\\\(\"\ spec.k\;\ printf\ \"%s\\n\"\ \"\[declarations\ and\ rules\]\"\;\ rg\ -n\ \"\^\ \ syntax\|\^\ \ rule\|\\\[.\*\(function\|functional\|total\|simplification\|priority\|owise\|smtlib\)\|\^\ \ configuration\"\ semantic.k\ verification.k
+START_UTC: 2026-07-23T12:31:09Z
+[semantic.k numbered]
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports BOOL-SYNTAX
+     6	  imports STRING-SYNTAX
+     7	  imports LIST
+     8	
+     9	  syntax Program ::= "Module" "(" Stmts ")"
+    10	
+    11	  syntax Stmts ::= List{Stmt, ""}
+    12	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    13	                | "Return" "(" Expr ")"
+    14	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    15	
+    16	  syntax Params ::= "Params" "(" Strings ")"
+    17	  syntax Strings ::= List{String, ","}
+    18	
+    19	  syntax Exprs ::= List{Expr, ","}
+    20	  syntax Expr ::= "Int" "(" Int ")"
+    21	                | "Name" "(" String ")"
+    22	                | "ListExpr" "(" Exprs ")"
+    23	                | "BinOp" "(" String "," Expr "," Expr ")"
+    24	                | "Compare" "(" Expr "," CmpOps ")"
+    25	                | "Subscript" "(" Expr "," Expr ")"
+    26	                | "Slice" "(" Bound "," Bound "," Bound ")"
+    27	                | "Call" "(" Expr "," Exprs ")"
+    28	  syntax CmpOps ::= List{CmpOp, ","}
+    29	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    30	  syntax Bound ::= Expr | "NoBound"
+    31	
+    32	  syntax PyVal ::= "pyInt" "(" Int ")"
+    33	                 | "pyBool" "(" Bool ")"
+    34	                 | "pyList" "(" List ")"
+    35	endmodule
+    36	
+    37	module MPY
+    38	  imports MPY-SYNTAX
+    39	  imports INT
+    40	  imports BOOL
+    41	  imports STRING
+    42	  imports MAP
+    43	  imports LIST
+    44	
+    45	  // Runtime lists contain K Int values. This is the task-relevant fragment of
+    46	  // Python lists; the AST syntax remains the translator's literal structure.
+    47	
+    48	  configuration
+    49	    <mpy>
+    50	      <k> run($INPUT:PyVal) </k>
+    51	      <program> $PGM:Program </program>
+    52	    </mpy>
+    53	
+    54	  syntax KItem ::= "run" "(" PyVal ")"
+    55	                 | "applyFunction" "(" String "," List ")"
+    56	                 | "applyFound" "(" Function "," List ")"
+    57	                 | "exec" "(" Stmts "," Map ")"
+    58	                 | "eval" "(" Expr "," Map ")"
+    59	                 | "ifResult" "(" Stmts "," Stmts "," Map ")"
+    60	                 | "plusLeft" "(" Expr "," Map ")"
+    61	                 | "plusRight" "(" PyVal ")"
+    62	                 | "compareLeft" "(" String "," Expr "," Map ")"
+    63	                 | "compareRight" "(" String "," PyVal ")"
+    64	                 | "indexResult" "(" Int ")"
+    65	                 | "sliceResult" "(" Int ")"
+    66	                 | "evalCallArgs" "(" String "," Exprs "," Map "," List ")"
+    67	                 | "callArgResult" "(" String "," Exprs "," Map "," List ")"
+    68	                 | "evalListItems" "(" Exprs "," Map "," List ")"
+    69	                 | "listItemResult" "(" Exprs "," Map "," List ")"
+    70	  syntax PyVal ::= "comparison" "(" String "," Int "," Int ")"
+    71	  syntax Function ::= "findFunction" "(" String "," Stmts ")" [function]
+    72	  syntax Map ::= "bind" "(" Params "," List ")" [function]
+    73	  syntax List ::= "dropList" "(" List "," Int ")" [function, total]
+    74	  syntax Int ::= "headInt" "(" List ")" [function, total, smtlib(headInt)]
+    75	  syntax Function ::= "function" "(" Params "," Stmts ")"
+    76	
+    77	  rule dropList(L, 0) => L
+    78	  rule dropList(L, I) => range(L, minInt(I, size(L)), 0)
+    79	    requires I >Int 0
+    80	  rule headInt(ListItem(I:Int) _REST) => I
+    81	
+    82	  rule run(V) => applyFunction("sort_even", ListItem(V))
+    83	
+    84	  rule <k> applyFunction(F, VS) => applyFound(findFunction(F, S), VS) ... </k>
+    85	       <program> Module(S) </program>
+    86	  rule applyFound(function(PS, BODY), VS) => exec(BODY, bind(PS, VS))
+    87	
+    88	  rule findFunction(F, FuncDef(F, PS, BODY) _REST)
+    89	    => function(PS, BODY)
+    90	  rule findFunction(F, FuncDef(G, _PS, _BODY) REST)
+    91	    => findFunction(F, REST)
+    92	    requires F =/=String G
+    93	
+    94	  rule bind(Params(.Strings), .List) => .Map
+    95	  rule bind(Params(X, XS), ListItem(V) VS)
+    96	    => (X |-> V) bind(Params(XS), VS)
+    97	
+    98	  rule exec(Return(E) _REST, ENV) => eval(E, ENV)
+    99	  rule exec(If(COND, THEN, ELSE) _REST, ENV)
+   100	    => eval(COND, ENV) ~> ifResult(THEN, ELSE, ENV)
+   101	  rule comparison("==", I, J) ~> ifResult(THEN, _ELSE, ENV) => exec(THEN, ENV)
+   102	    requires I ==Int J
+   103	  rule comparison("==", I, J) ~> ifResult(_THEN, ELSE, ENV) => exec(ELSE, ENV)
+   104	    requires I =/=Int J
+   105	  rule comparison("<=", I, J) ~> ifResult(THEN, _ELSE, ENV) => exec(THEN, ENV)
+   106	    requires I <=Int J
+   107	  rule comparison("<=", I, J) ~> ifResult(_THEN, ELSE, ENV) => exec(ELSE, ENV)
+   108	    requires I >Int J
+   109	
+   110	  rule eval(Int(I), _ENV) => pyInt(I)
+   111	  rule eval(Name(X), (X |-> V) _REST) => V
+   112	  rule eval(ListExpr(ES), ENV) => evalListItems(ES, ENV, .List)
+   113	  rule eval(BinOp("+", E1, E2), ENV)
+   114	    => eval(E1, ENV) ~> plusLeft(E2, ENV)
+   115	  rule V1:PyVal ~> plusLeft(E2, ENV)
+   116	    => eval(E2, ENV) ~> plusRight(V1)
+   117	  rule pyList(L2) ~> plusRight(pyList(L1)) => pyList(L1 L2)
+   118	
+   119	  rule eval(Compare(E1, CmpOp("==", E2)), ENV)
+   120	    => eval(E1, ENV) ~> compareLeft("==", E2, ENV)
+   121	  rule eval(Compare(E1, CmpOp("<=", E2)), ENV)
+   122	    => eval(E1, ENV) ~> compareLeft("<=", E2, ENV)
+   123	  rule V1:PyVal ~> compareLeft(OP, E2, ENV)
+   124	    => eval(E2, ENV) ~> compareRight(OP, V1)
+   125	  rule pyList(.List) ~> compareRight("==", pyList(L))
+   126	    => comparison("==", size(L), 0)
+   127	  rule pyInt(J) ~> compareRight("==", pyInt(I)) => comparison("==", I, J)
+   128	  rule pyInt(J) ~> compareRight("<=", pyInt(I)) => comparison("<=", I, J)
+   129	
+   130	  rule eval(Subscript(E, Int(I)), ENV)
+   131	    => eval(E, ENV) ~> indexResult(I)
+   132	  rule eval(Subscript(E, Slice(Int(I), NoBound, NoBound)), ENV)
+   133	    => eval(E, ENV) ~> sliceResult(I)
+   134	
+   135	  rule pyList(L) ~> indexResult(I) => pyInt(headInt(dropList(L, I)))
+   136	
+   137	  rule pyList(L) ~> sliceResult(I) => pyList(dropList(L, I))
+   138	
+   139	  rule eval(Call(Name(F), ES), ENV)
+   140	    => evalCallArgs(F, ES, ENV, .List)
+   141	
+   142	  rule evalCallArgs(F, .Exprs, _ENV, VS) => applyFunction(F, VS)
+   143	  rule evalCallArgs(F, E, ES, ENV, VS)
+   144	    => eval(E, ENV) ~> callArgResult(F, ES, ENV, VS)
+   145	  rule V:PyVal ~> callArgResult(F, ES, ENV, VS)
+   146	    => evalCallArgs(F, ES, ENV, VS ListItem(V))
+   147	
+   148	  rule evalListItems(.Exprs, _ENV, ITEMS) => pyList(ITEMS)
+   149	  rule evalListItems(E, ES, ENV, ITEMS)
+   150	    => eval(E, ENV) ~> listItemResult(ES, ENV, ITEMS)
+   151	  rule pyInt(I) ~> listItemResult(ES, ENV, ITEMS)
+   152	    => evalListItems(ES, ENV, ITEMS ListItem(I))
+   153	endmodule
+[verification.k numbered]
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // This nullary function is the exact constructor term in solution.mpy.
+     7	  syntax Program ::= "solutionProgram" "(" ")" [function]
+     8	  rule solutionProgram() =>
+     9	    Module(
+    10	      FuncDef("insert_sorted", Params("x", "xs"),
+    11	        If(Compare(Name("xs"), CmpOp("==", ListExpr(.Exprs))),
+    12	          Return(ListExpr(Name("x"))),
+    13	          If(Compare(Name("x"), CmpOp("<=", Subscript(Name("xs"), Int(0)))),
+    14	            Return(BinOp("+", ListExpr(Name("x")), Name("xs"))),
+    15	            Return(
+    16	              BinOp(
+    17	                "+",
+    18	                ListExpr(Subscript(Name("xs"), Int(0))),
+    19	                Call(
+    20	                  Name("insert_sorted"),
+    21	                  Name("x"),
+    22	                  Subscript(Name("xs"), Slice(Int(1), NoBound, NoBound))))))))
+    23	      FuncDef("sort_values", Params("xs"),
+    24	        If(Compare(Name("xs"), CmpOp("==", ListExpr(.Exprs))),
+    25	          Return(ListExpr(.Exprs)),
+    26	          Return(
+    27	            Call(
+    28	              Name("insert_sorted"),
+    29	              Subscript(Name("xs"), Int(0)),
+    30	              Call(
+    31	                Name("sort_values"),
+    32	                Subscript(Name("xs"), Slice(Int(1), NoBound, NoBound)))))))
+    33	      FuncDef("even_values", Params("l"),
+    34	        If(Compare(Name("l"), CmpOp("==", ListExpr(.Exprs))),
+    35	          Return(ListExpr(.Exprs)),
+    36	          Return(
+    37	            BinOp(
+    38	              "+",
+    39	              ListExpr(Subscript(Name("l"), Int(0))),
+    40	              Call(
+    41	                Name("even_values"),
+    42	                Subscript(Name("l"), Slice(Int(2), NoBound, NoBound)))))))
+    43	      FuncDef("rebuild", Params("l", "evens"),
+    44	        If(Compare(Name("l"), CmpOp("==", ListExpr(.Exprs))),
+    45	          Return(ListExpr(.Exprs)),
+    46	          If(Compare(
+    47	            Subscript(Name("l"), Slice(Int(1), NoBound, NoBound)),
+    48	            CmpOp("==", ListExpr(.Exprs))),
+    49	            Return(ListExpr(Subscript(Name("evens"), Int(0)))),
+    50	            Return(
+    51	              BinOp(
+    52	                "+",
+    53	                ListExpr(
+    54	                  Subscript(Name("evens"), Int(0)),
+    55	                  Subscript(Name("l"), Int(1))),
+    56	                Call(
+    57	                  Name("rebuild"),
+    58	                  Subscript(Name("l"), Slice(Int(2), NoBound, NoBound)),
+    59	                  Subscript(Name("evens"), Slice(Int(1), NoBound, NoBound))))))))
+    60	      FuncDef("sort_even", Params("l"),
+    61	        Return(
+    62	          Call(
+    63	            Name("rebuild"),
+    64	            Name("l"),
+    65	            Call(Name("sort_values"), Call(Name("even_values"), Name("l")))))))
+    66	
+    67	  // Mathematical reference functions over runtime lists.
+    68	  syntax List ::= "evenPositions" "(" List ")" [function]
+    69	                | "oddPositions" "(" List ")" [function]
+    70	                | "insertReference" "(" PyVal "," List ")" [function]
+    71	                | "sortReference" "(" List ")" [function]
+    72	                | "rebuildReference" "(" List "," List ")" [function]
+    73	                | "sortEvenReference" "(" List ")" [function]
+    74	
+    75	  rule evenPositions(L) => .List
+    76	    requires size(L) ==Int 0
+    77	  rule evenPositions(L)
+    78	    => ListItem(headInt(L)) evenPositions(dropList(L, 2))
+    79	    requires notBool size(L) ==Int 0
+    80	
+    81	  rule oddPositions(L) => evenPositions(dropList(L, 1))
+    82	
+    83	  rule insertReference(pyInt(X), L) => ListItem(X)
+    84	    requires size(L) ==Int 0
+    85	  rule insertReference(pyInt(X), L) => ListItem(X) L
+    86	    requires notBool size(L) ==Int 0
+    87	     andBool X <=Int headInt(L)
+    88	  rule insertReference(pyInt(X), L)
+    89	    => ListItem(headInt(L))
+    90	       insertReference(pyInt(X), dropList(L, 1))
+    91	    requires notBool size(L) ==Int 0
+    92	     andBool notBool X <=Int headInt(L)
+    93	
+    94	  rule sortReference(L) => .List
+    95	    requires size(L) ==Int 0
+    96	  rule sortReference(L)
+    97	    => insertReference(pyInt(headInt(L)), sortReference(dropList(L, 1)))
+    98	    requires notBool size(L) ==Int 0
+    99	
+   100	  rule rebuildReference(L, _EVENS) => .List
+   101	    requires size(L) ==Int 0
+   102	  rule rebuildReference(L, EVENS) => ListItem(headInt(EVENS))
+   103	    requires notBool size(L) ==Int 0
+   104	     andBool size(dropList(L, 1)) ==Int 0
+   105	  rule rebuildReference(L, EVENS)
+   106	    => ListItem(headInt(EVENS)) ListItem(headInt(dropList(L, 1)))
+   107	       rebuildReference(dropList(L, 2), dropList(EVENS, 1))
+   108	    requires notBool size(L) ==Int 0
+   109	     andBool notBool size(dropList(L, 1)) ==Int 0
+   110	
+   111	  rule sortEvenReference(L)
+   112	    => rebuildReference(L, sortReference(evenPositions(L)))
+   113	endmodule
+[spec.k claims]
+6:  claim <k>
+12:    [label(empty-example)]
+14:  claim <k>
+25:    [label(prompt-example)]
+27:  claim <k>
+33:    [label(first-prompt-example)]
+37:  claim <k>
+44:    [label(symbolic-four-ordered)]
+46:  claim <k>
+53:    [label(symbolic-four-reversed)]
+55:  claim <k>
+62:    [label(even-correct)]
+64:  claim <k>
+72:    [label(insert-correct)]
+74:  claim <k>
+81:    [label(sort-correct)]
+83:  claim <k>
+90:    [label(rebuild-correct)]
+92:  claim <k>
+98:    [label(top-correct)]
+[declarations and rules]
+verification.k:7:  syntax Program ::= "solutionProgram" "(" ")" [function]
+verification.k:8:  rule solutionProgram() =>
+verification.k:68:  syntax List ::= "evenPositions" "(" List ")" [function]
+verification.k:69:                | "oddPositions" "(" List ")" [function]
+verification.k:70:                | "insertReference" "(" PyVal "," List ")" [function]
+verification.k:71:                | "sortReference" "(" List ")" [function]
+verification.k:72:                | "rebuildReference" "(" List "," List ")" [function]
+verification.k:73:                | "sortEvenReference" "(" List ")" [function]
+verification.k:75:  rule evenPositions(L) => .List
+verification.k:77:  rule evenPositions(L)
+verification.k:81:  rule oddPositions(L) => evenPositions(dropList(L, 1))
+verification.k:83:  rule insertReference(pyInt(X), L) => ListItem(X)
+verification.k:85:  rule insertReference(pyInt(X), L) => ListItem(X) L
+verification.k:88:  rule insertReference(pyInt(X), L)
+verification.k:94:  rule sortReference(L) => .List
+verification.k:96:  rule sortReference(L)
+verification.k:100:  rule rebuildReference(L, _EVENS) => .List
+verification.k:102:  rule rebuildReference(L, EVENS) => ListItem(headInt(EVENS))
+verification.k:105:  rule rebuildReference(L, EVENS)
+verification.k:111:  rule sortEvenReference(L)
+semantic.k:9:  syntax Program ::= "Module" "(" Stmts ")"
+semantic.k:11:  syntax Stmts ::= List{Stmt, ""}
+semantic.k:12:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+semantic.k:16:  syntax Params ::= "Params" "(" Strings ")"
+semantic.k:17:  syntax Strings ::= List{String, ","}
+semantic.k:19:  syntax Exprs ::= List{Expr, ","}
+semantic.k:20:  syntax Expr ::= "Int" "(" Int ")"
+semantic.k:28:  syntax CmpOps ::= List{CmpOp, ","}
+semantic.k:29:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+semantic.k:30:  syntax Bound ::= Expr | "NoBound"
+semantic.k:32:  syntax PyVal ::= "pyInt" "(" Int ")"
+semantic.k:48:  configuration
+semantic.k:54:  syntax KItem ::= "run" "(" PyVal ")"
+semantic.k:70:  syntax PyVal ::= "comparison" "(" String "," Int "," Int ")"
+semantic.k:71:  syntax Function ::= "findFunction" "(" String "," Stmts ")" [function]
+semantic.k:72:  syntax Map ::= "bind" "(" Params "," List ")" [function]
+semantic.k:73:  syntax List ::= "dropList" "(" List "," Int ")" [function, total]
+semantic.k:74:  syntax Int ::= "headInt" "(" List ")" [function, total, smtlib(headInt)]
+semantic.k:75:  syntax Function ::= "function" "(" Params "," Stmts ")"
+semantic.k:77:  rule dropList(L, 0) => L
+semantic.k:78:  rule dropList(L, I) => range(L, minInt(I, size(L)), 0)
+semantic.k:80:  rule headInt(ListItem(I:Int) _REST) => I
+semantic.k:82:  rule run(V) => applyFunction("sort_even", ListItem(V))
+semantic.k:84:  rule <k> applyFunction(F, VS) => applyFound(findFunction(F, S), VS) ... </k>
+semantic.k:86:  rule applyFound(function(PS, BODY), VS) => exec(BODY, bind(PS, VS))
+semantic.k:88:  rule findFunction(F, FuncDef(F, PS, BODY) _REST)
+semantic.k:90:  rule findFunction(F, FuncDef(G, _PS, _BODY) REST)
+semantic.k:94:  rule bind(Params(.Strings), .List) => .Map
+semantic.k:95:  rule bind(Params(X, XS), ListItem(V) VS)
+semantic.k:98:  rule exec(Return(E) _REST, ENV) => eval(E, ENV)
+semantic.k:99:  rule exec(If(COND, THEN, ELSE) _REST, ENV)
+semantic.k:101:  rule comparison("==", I, J) ~> ifResult(THEN, _ELSE, ENV) => exec(THEN, ENV)
+semantic.k:103:  rule comparison("==", I, J) ~> ifResult(_THEN, ELSE, ENV) => exec(ELSE, ENV)
+semantic.k:105:  rule comparison("<=", I, J) ~> ifResult(THEN, _ELSE, ENV) => exec(THEN, ENV)
+semantic.k:107:  rule comparison("<=", I, J) ~> ifResult(_THEN, ELSE, ENV) => exec(ELSE, ENV)
+semantic.k:110:  rule eval(Int(I), _ENV) => pyInt(I)
+semantic.k:111:  rule eval(Name(X), (X |-> V) _REST) => V
+semantic.k:112:  rule eval(ListExpr(ES), ENV) => evalListItems(ES, ENV, .List)
+semantic.k:113:  rule eval(BinOp("+", E1, E2), ENV)
+semantic.k:115:  rule V1:PyVal ~> plusLeft(E2, ENV)
+semantic.k:117:  rule pyList(L2) ~> plusRight(pyList(L1)) => pyList(L1 L2)
+semantic.k:119:  rule eval(Compare(E1, CmpOp("==", E2)), ENV)
+semantic.k:121:  rule eval(Compare(E1, CmpOp("<=", E2)), ENV)
+semantic.k:123:  rule V1:PyVal ~> compareLeft(OP, E2, ENV)
+semantic.k:125:  rule pyList(.List) ~> compareRight("==", pyList(L))
+semantic.k:127:  rule pyInt(J) ~> compareRight("==", pyInt(I)) => comparison("==", I, J)
+semantic.k:128:  rule pyInt(J) ~> compareRight("<=", pyInt(I)) => comparison("<=", I, J)
+semantic.k:130:  rule eval(Subscript(E, Int(I)), ENV)
+semantic.k:132:  rule eval(Subscript(E, Slice(Int(I), NoBound, NoBound)), ENV)
+semantic.k:135:  rule pyList(L) ~> indexResult(I) => pyInt(headInt(dropList(L, I)))
+semantic.k:137:  rule pyList(L) ~> sliceResult(I) => pyList(dropList(L, I))
+semantic.k:139:  rule eval(Call(Name(F), ES), ENV)
+semantic.k:142:  rule evalCallArgs(F, .Exprs, _ENV, VS) => applyFunction(F, VS)
+semantic.k:143:  rule evalCallArgs(F, E, ES, ENV, VS)
+semantic.k:145:  rule V:PyVal ~> callArgResult(F, ES, ENV, VS)
+semantic.k:148:  rule evalListItems(.Exprs, _ENV, ITEMS) => pyList(ITEMS)
+semantic.k:149:  rule evalListItems(E, ES, ENV, ITEMS)
+semantic.k:151:  rule pyInt(I) ~> listItemResult(ES, ENV, ITEMS)
+EXIT_STATUS: 0
+END_UTC: 2026-07-23T12:31:09Z

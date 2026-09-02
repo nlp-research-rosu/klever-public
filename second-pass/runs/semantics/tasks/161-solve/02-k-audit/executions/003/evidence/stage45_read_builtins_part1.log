@@ -1,0 +1,244 @@
+WORKDIR: /tmp/audit-work/161-solve
+COMMAND: bash -lc nl\ -ba\ reference-semantics/semantics/builtins.k\ \|\ sed\ -n\ \"1\,240p\"
+     1	// reference/src/semantics/builtins.k — MPY-BUILTINS
+     2	
+     3	module MPY-BUILTINS
+     4	  imports MPY-CORE
+     5	  imports MPY-STR
+     6	  imports MPY-SET
+     7	  imports MPY-ITER
+     8	  imports MPY-RANGE
+     9	  imports MPY-INT
+    10	  imports MPY-METHODS
+    11	
+    12	  // the builtins REGISTRY is core.k's builtinsScope (the -1 frame); names resolve by lookup
+    13	
+    14	  // Call routing + argument evaluation live in call.k, which also routes the fold
+    15	  // builtins (sum/all/any/max/min) to the #_Acc folds below and everything else to
+    16	  // applyBuiltin. This module owns applyBuiltin + the fold implementations.
+    17	  syntax Val ::= applyBuiltin(String, Vals) [function]
+    18	
+    19	  // ==== len(obj) — O(1) per kind ============================================
+    20	  syntax Int ::= seqLen(Val) [function]
+    21	  rule applyBuiltin("len", OBJ:Val, .Vals) => seqLen(OBJ)
+    22	  rule seqLen(list(VS:ValSeq))                  => vsLen(VS)
+    23	  rule seqLen(tuple(VS:ValSeq))                 => vsLen(VS)
+    24	  rule seqLen(str(IS:IntSeq))                   => isLen(IS)
+    25	  rule seqLen(setV(DS:IntSeq))                  => isLen(DS)
+    26	  rule seqLen(rangeObj(LO:Int, HI:Int, ST:Int)) => rangeLen(LO, HI, ST)
+    27	
+    28	  // ==== list(seq) — materialize a list/tuple into a list (e.g. list(d.keys())) ==
+    29	  // Minimal: the "copy a sequence" case (list of a list is itself; list of a tuple keeps order).
+    30	  // list() of other iterables (str/range/set/zip) is added via the iterator fold when needed.
+    31	  // (k-cell — list() constructs a NEW object)
+    32	  rule <k> #applyK(toCall(builtinV("list")), (list(VS:ValSeq),  .Vals)) => #alloc(list(VS)) ... </k>
+    33	  rule <k> #applyK(toCall(builtinV("list")), (tuple(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>
+    34	  rule <k> #applyK(toCall(builtinV("list")), .Vals)                     => #alloc(list(.ValSeq)) ... </k>
+    35	  rule <k> #applyK(toCall(builtinV("list")), (str(CS:IntSeq), .Vals))   => #alloc(list(charsOf(CS))) ... </k>
+    36	  syntax ValSeq ::= charsOf(IntSeq) [function, total]
+    37	  rule charsOf(.IntSeq)                => .ValSeq
+    38	  rule charsOf(iCons(C:Int, R:IntSeq)) => vCons(str(iCons(C, .IntSeq)), charsOf(R))
+    39	
+    40	  // ==== set(str) — distinct character codes =================================
+    41	  rule applyBuiltin("set", str(CS:IntSeq), .Vals) => setV(dedupCodes(CS))
+    42	
+    43	  // ==== abs(int) ============================================================
+    44	  rule applyBuiltin("abs", I:Int, .Vals) => absInt(I)
+    45	
+    46	  // ==== sum(iterable) — one #iterNext fold; intOf = int value of an int/bool ==
+    47	  syntax KItem ::= #sumAcc(Iterable, Int) | #sumCont(Int)
+    48	  rule <k> #sumAcc(IT:Iterable, ACC:Int) => #iterNext(IT) ~> #sumCont(ACC) ... </k>
+    49	  rule <k> #iterDone ~> #sumCont(ACC:Int) => ACC ... </k>
+    50	  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int)
+    51	        => #sumAcc(R, ACC +Int intOf(V)) ... </k>
+    52	       requires isInt(V) orBool isBool(V)
+    53	
+    54	  syntax Int ::= intOf(Val) [function]
+    55	  rule intOf(I:Int)  => I
+    56	  rule intOf(B:Bool) => #if B #then 1 #else 0 #fi
+    57	
+    58	  // ==== all / any (short-circuiting #iterNext folds) ========================
+    59	  syntax KItem ::= #allAcc(Iterable) | "#allCont"
+    60	  rule <k> #allAcc(IT:Iterable) => #iterNext(IT) ~> #allCont ... </k>
+    61	  rule <k> #iterDone ~> #allCont => true ... </k>
+    62	  rule <k> #iterYield(V:Val, R:Iterable) ~> #allCont => #allAcc(R) ... </k>
+    63	       requires truthy(V)
+    64	  rule <k> #iterYield(V:Val, _:Iterable) ~> #allCont => false ... </k>
+    65	       requires notBool truthy(V)
+    66	
+    67	  syntax KItem ::= #anyAcc(Iterable) | "#anyCont"
+    68	  rule <k> #anyAcc(IT:Iterable) => #iterNext(IT) ~> #anyCont ... </k>
+    69	  rule <k> #iterDone ~> #anyCont => false ... </k>
+    70	  rule <k> #iterYield(V:Val, _:Iterable) ~> #anyCont => true ... </k>
+    71	       requires truthy(V)
+    72	  rule <k> #iterYield(V:Val, R:Iterable) ~> #anyCont => #anyAcc(R) ... </k>
+    73	       requires notBool truthy(V)
+    74	
+    75	  // ==== max / min over an iterable (#iterNext folds; first element seeds) ====
+    76	  syntax KItem ::= #maxAcc0(Iterable) | "#maxCont0" | #maxAcc(Iterable, Int) | #maxCont(Int)
+    77	  rule <k> #maxAcc0(IT:Iterable) => #iterNext(IT) ~> #maxCont0 ... </k>
+    78	  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAcc(R, {V}:>Int) ... </k>
+    79	       requires isInt(V)
+    80	  rule <k> #maxAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #maxCont(M) ... </k>
+    81	  rule <k> #iterDone ~> #maxCont(M:Int) => M ... </k>
+    82	  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont(M:Int)
+    83	        => #maxAcc(R, maxInt(M, {V}:>Int)) ... </k>
+    84	       requires isInt(V)
+    85	
+    86	  syntax KItem ::= #minAcc0(Iterable) | "#minCont0" | #minAcc(Iterable, Int) | #minCont(Int)
+    87	  rule <k> #minAcc0(IT:Iterable) => #iterNext(IT) ~> #minCont0 ... </k>
+    88	  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAcc(R, {V}:>Int) ... </k>
+    89	       requires isInt(V)
+    90	  rule <k> #minAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #minCont(M) ... </k>
+    91	  rule <k> #iterDone ~> #minCont(M:Int) => M ... </k>
+    92	  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont(M:Int)
+    93	        => #minAcc(R, minInt(M, {V}:>Int)) ... </k>
+    94	       requires isInt(V)
+    95	
+    96	  // ==== variadic max / min (a Vals fold) ====================================
+    97	  syntax Int ::= maxVals(Int, Vals) [function]
+    98	  rule applyBuiltin("max", I:Int, REST:Vals) => maxVals(I, REST)
+    99	  rule maxVals(M:Int, .Vals)           => M
+   100	  rule maxVals(M:Int, (I:Int, R:Vals)) => maxVals(maxInt(M, I), R)
+   101	
+   102	  syntax Int ::= minVals(Int, Vals) [function]
+   103	  rule applyBuiltin("min", I:Int, REST:Vals) => minVals(I, REST)
+   104	  rule minVals(M:Int, .Vals)           => M
+   105	  rule minVals(M:Int, (I:Int, R:Vals)) => minVals(minInt(M, I), R)
+   106	
+   107	  // ==== bin(n) — "0b" + binary digit codes (promoted from 103's defined fold) ==
+   108	  rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(48, iCons(98, binCodes(N))))
+   109	       requires N >=Int 0
+   110	  // negative operand: the '-' sign prefixes the magnitude's digits
+   111	  rule applyBuiltin("bin", N:Int, .Vals)
+   112	    => str(iCons(45, iCons(48, iCons(98, binCodes(0 -Int N)))))
+   113	       requires N <Int 0
+   114	  syntax IntSeq ::= binCodes(Int) [function, total]
+   115	  rule binCodes(0) => iCons(48, .IntSeq)
+   116	  rule binCodes(N:Int) => binAcc(N, .IntSeq) requires N >Int 0
+   117	  syntax IntSeq ::= binAcc(Int, IntSeq) [function, total]
+   118	  rule binAcc(0, ACC:IntSeq) => ACC
+   119	  rule binAcc(N:Int, ACC:IntSeq)
+   120	    => binAcc((N -Int pyMod(N, 2)) /Int 2, iCons(48 +Int pyMod(N, 2), ACC))
+   121	       requires N >Int 0
+   122	
+   123	  // ==== enumerate(xs) — pairs (i, v); materialized eagerly over a list =========
+   124	  rule <k> #applyK(toCall(builtinV("enumerate")), (list(VS:ValSeq), .Vals))
+   125	        => #alloc(list(enumVS(VS, 0))) ... </k>
+   126	  syntax ValSeq ::= enumVS(ValSeq, Int) [function, total]
+   127	  rule enumVS(.ValSeq, _:Int) => .ValSeq
+   128	  rule enumVS(vCons(V:Val, R:ValSeq), I:Int)
+   129	    => vCons(tuple(vCons(I, vCons(V, .ValSeq))), enumVS(R, I +Int 1))
+   130	
+   131	  // ==== map(str, xs) — eager (only the str case is in the subset) =============
+   132	  rule <k> #applyK(toCall(builtinV("map")), (typeV("str"), list(VS:ValSeq), .Vals))
+   133	        => #alloc(list(mapStrVS(VS))) ... </k>
+   134	  syntax ValSeq ::= mapStrVS(ValSeq) [function, total]
+   135	  rule mapStrVS(.ValSeq) => .ValSeq
+   136	  rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))
+   137	  rule mapStrVS(vCons(str(CS:IntSeq), R:ValSeq)) => vCons(str(CS), mapStrVS(R))
+   138	
+   139	  // ==== int(x) identities (int(round(x)) composes through) ====================
+   140	  rule applyBuiltin("int", I:Int, .Vals) => I
+   141	
+   142	  // ==== ord / chr ===========================================================
+   143	  rule applyBuiltin("ord", str(iCons(C:Int, .IntSeq)), .Vals) => C
+   144	  rule applyBuiltin("chr", I:Int, .Vals) => str(iCons(I, .IntSeq))
+   145	       requires 0 <=Int I andBool I <Int 128
+   146	
+   147	  // ==== str(int) / str(str) =================================================
+   148	  rule applyBuiltin("str", I:Int, .Vals)       => str(strToCodes(Int2String(I)))
+   149	  rule applyBuiltin("str", str(CS:IntSeq), .Vals) => str(CS)
+   150	
+   151	  // ==== int(str) — a single digit char ('0'..'9', code 48..57) to its value =====
+   152	  rule applyBuiltin("int", str(iCons(C:Int, .IntSeq)), .Vals) => C -Int 48
+   153	       requires 48 <=Int C andBool C <=Int 57
+   154	
+   155	  // ==== int(str) — a multi-digit non-negative numeral (Horner fold; the single-char rule covers len 1)
+   156	  rule applyBuiltin("int", str(CS:IntSeq), .Vals) => intDigAcc(CS, 0)
+   157	       requires isLen(CS) >=Int 2
+   158	  syntax Int ::= intDigAcc(IntSeq, Int) [function, total]
+   159	  rule intDigAcc(.IntSeq, ACC:Int)             => ACC
+   160	  rule intDigAcc(iCons(C:Int, R:IntSeq), ACC:Int) => intDigAcc(R, (ACC *Int 10) +Int (C -Int 48))
+   161	
+   162	  // ==== zip(a, b) — parallel iterable of pairs, truncating to the shorter =====
+   163	  rule applyBuiltin("zip", list(A:ValSeq), list(B:ValSeq), .Vals) => zipObj(A, B)
+   164	  rule applyBuiltin("zip", str(A:IntSeq), str(B:IntSeq), .Vals)   => zipObjS(A, B)
+   165	
+   166	  // zip's iterator-protocol cases (zip is created here, so its #iterNext lives here)
+   167	  rule <k> #iterNext(zipObj(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq)))
+   168	        => #iterYield(tuple(vCons(A, vCons(B, .ValSeq))), zipObj(As, Bs)) ... </k>
+   169	  rule <k> #iterNext(zipObj(.ValSeq, _:ValSeq))               => #iterDone ... </k>
+   170	  rule <k> #iterNext(zipObj(vCons(_:Val, _:ValSeq), .ValSeq)) => #iterDone ... </k>
+   171	  rule <k> #iterNext(zipObjS(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)))
+   172	        => #iterYield(tuple(vCons(str(iCons(A, .IntSeq)), vCons(str(iCons(B, .IntSeq)), .ValSeq))), zipObjS(As, Bs)) ... </k>
+   173	  rule <k> #iterNext(zipObjS(.IntSeq, _:IntSeq))              => #iterDone ... </k>
+   174	  rule <k> #iterNext(zipObjS(iCons(_:Int, _:IntSeq), .IntSeq)) => #iterDone ... </k>
+   175	
+   176	  // ==== range(stop) / range(start, stop) / range(start, stop, step) =========
+   177	  rule applyBuiltin("range", I:Int, .Vals)               => rangeObj(0, I, 1)
+   178	  rule applyBuiltin("range", A:Int, B:Int, .Vals)        => rangeObj(A, B, 1)
+   179	  rule applyBuiltin("range", A:Int, B:Int, S:Int, .Vals) => rangeObj(A, B, S)
+   180	       requires S =/=Int 0
+   181	
+   182	  // ==== eval(str) — arithmetic expressions (ints, + - * // **, spaces) ========
+   183	  // Python precedence: ** right-assoc, then * //, then + -. Promoted from 160's
+   184	  // trusted pass evaluator, now DEFINED in the reference and driven by a
+   185	  // code-level tokenizer. Reduces on concrete strings (krun); a symbolic
+   186	  // argument leaves the call unevaluated for problem-level folds.
+   187	  rule applyBuiltin("eval", str(CS:IntSeq), .Vals) => evalArith(CS)
+   188	  syntax Int ::= evalArith(IntSeq) [function]
+   189	  rule evalArith(CS:IntSeq)
+   190	    => firstNdE(passAddE(passMulE(passPowE(tokOps(CS), tokNds(CS)))))
+   191	
+   192	  syntax OpSeq ::= ".OpSeq" | oCons(String, OpSeq)
+   193	
+   194	  syntax Bool ::= evDigit(Int) [function, total]
+   195	  rule evDigit(C:Int) => C >=Int 48 andBool C <=Int 57
+   196	  syntax Bool ::= evHead42(IntSeq) [function, total]
+   197	  rule evHead42(iCons(42, _:IntSeq)) => true
+   198	  rule evHead42(_:IntSeq)            => false [owise]
+   199	  syntax Bool ::= evHead47(IntSeq) [function, total]
+   200	  rule evHead47(iCons(47, _:IntSeq)) => true
+   201	  rule evHead47(_:IntSeq)            => false [owise]
+   202	
+   203	  syntax OpSeq ::= tokOps(IntSeq) [function, total]
+   204	  rule tokOps(.IntSeq)                 => .OpSeq
+   205	  rule tokOps(iCons(32, R:IntSeq))     => tokOps(R)
+   206	  rule tokOps(iCons(C:Int, R:IntSeq))  => tokOps(R) requires evDigit(C)
+   207	  rule tokOps(iCons(42, iCons(42, R:IntSeq))) => oCons("**", tokOps(R))
+   208	  rule tokOps(iCons(42, R:IntSeq))     => oCons("*", tokOps(R)) requires notBool evHead42(R)
+   209	  rule tokOps(iCons(47, iCons(47, R:IntSeq))) => oCons("//", tokOps(R))
+   210	  rule tokOps(iCons(47, R:IntSeq))     => oCons("/", tokOps(R)) requires notBool evHead47(R)
+   211	  rule tokOps(iCons(43, R:IntSeq))     => oCons("+", tokOps(R))
+   212	  rule tokOps(iCons(45, R:IntSeq))     => oCons("-", tokOps(R))
+   213	
+   214	  syntax IntSeq ::= tokNds(IntSeq) [function, total]
+   215	                  | tokNdAcc(Int, IntSeq) [function, total]
+   216	  rule tokNds(.IntSeq)                => .IntSeq
+   217	  rule tokNds(iCons(32, R:IntSeq))    => tokNds(R)
+   218	  rule tokNds(iCons(C:Int, R:IntSeq)) => tokNdAcc(C -Int 48, R) requires evDigit(C)
+   219	  rule tokNds(iCons(C:Int, R:IntSeq)) => tokNds(R)
+   220	       requires notBool evDigit(C) andBool C =/=Int 32
+   221	  rule tokNdAcc(A:Int, iCons(C:Int, R:IntSeq)) => tokNdAcc(A *Int 10 +Int (C -Int 48), R)
+   222	       requires evDigit(C)
+   223	  rule tokNdAcc(A:Int, S:IntSeq) => iCons(A, tokNds(S)) [owise]
+   224	
+   225	  syntax EvPair ::= evp(OpSeq, IntSeq)
+   226	  syntax Int ::= firstNdE(EvPair) [function, total]
+   227	  rule firstNdE(evp(_:OpSeq, iCons(N:Int, _:IntSeq))) => N
+   228	  rule firstNdE(_:EvPair) => 0 [owise]
+   229	
+   230	  syntax Int ::= applyOpE(String, Int, Int) [function, total]
+   231	  rule applyOpE("+",  A:Int, B:Int) => A +Int B
+   232	  rule applyOpE("-",  A:Int, B:Int) => A -Int B
+   233	  rule applyOpE("*",  A:Int, B:Int) => A *Int B
+   234	  rule applyOpE("//", A:Int, B:Int) => A divInt B
+   235	  rule applyOpE("**", A:Int, B:Int) => A ^Int B
+   236	  rule applyOpE(_:String, A:Int, _:Int) => A [owise]
+   237	
+   238	  syntax EvPair ::= passPowE(OpSeq, IntSeq) [function, total]
+   239	  rule passPowE(.OpSeq, NDS:IntSeq) => evp(.OpSeq, NDS)
+   240	  rule passPowE(oCons("**", OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCombE(N, passPowE(OPS, NDS))
+
+EXIT_STATUS: 0

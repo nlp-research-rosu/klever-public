@@ -1,0 +1,272 @@
++ sed -n 1,320p /opt/elan/toolchains/leanprover--lean4---v4.22.0/share/lean/lean.mk
+# Copyright (c) 2018 Simon Hudon. All rights reserved.
+# Released under Apache 2.0 license as described in the file LICENSE.
+# Authors: Simon Hudon, Sebastian Ullrich, Leonardo de Moura
+
+# We compile all source files in $PKG/ as well as $PKG.lean. $PKG is also used for naming binary files.
+ifndef PKG
+  PKG = $(strip $(subst .lean,, $(wildcard *.lean)))
+  ifneq ($(words $(PKG)), 1)
+    $(error no unique .lean file found in current directory, please specify PKG)
+  endif
+endif
+
+LEAN = lean
+LEANC = leanc
+LEAN_AR = /home/runner/work/lean4/lean4/build/llvm-host/bin/llvm-ar
+OUT = build
+OLEAN_OUT = $(OUT)
+TEMP_OUT = $(OUT)/temp
+C_OUT = $(TEMP_OUT)
+BC_OUT = $(TEMP_OUT)
+BIN_OUT = $(OUT)/bin
+LIB_OUT = $(OUT)/lib
+BIN_NAME = $(PKG)
+STATIC_LIB_NAME = lib$(PKG).a
+LEAN_OPTS += -DwarningAsError=true
+LEANC_OPTS = -O3 -DNDEBUG
+LINK_OPTS =
+
+# more FS entries to build SRCS from, for parallel build of .oleans (but not .os)
+EXTRA_SRC_ROOTS =
+
+# ignore error messages from missing parts, e.g. Leanc/
+SRCS = $(shell find $(PKG) $(PKG).lean $(EXTRA_SRC_ROOTS) -name '*.lean' 2> /dev/null)
+DEPS = $(addprefix $(TEMP_OUT)/,$(SRCS:.lean=.depend))
+export LEAN_PATH += :$(OLEAN_OUT)
+OBJS = $(addprefix $(OLEAN_OUT)/, $(SRCS:.lean=.olean))
+ifdef C_ONLY
+# There are no .lean files in stage0/src/
+NAT_OBJS = $(patsubst %.c,$(TEMP_OUT)/%.o,$(shell cd $(C_OUT); find $(PKG) $(PKG).c -name '*.c' 2> /dev/null))
+ALL_NAT_OBJS = $(NAT_OBJS)
+else
+NAT_OBJS = $(patsubst %.lean,$(TEMP_OUT)/%.o,$(shell find $(PKG) $(PKG).lean -name '*.lean' 2> /dev/null))
+# include `EXTRA_SRC_ROOTS` when compiling individual `.o`s but not when building libraries
+ALL_NAT_OBJS = $(patsubst %.lean,$(TEMP_OUT)/%.o,$(SRCS))
+endif
+
+SHELL = /usr/bin/env bash -euo pipefail
+
+.PHONY: all bin lib depends clean
+# Disable all default make rules
+.SUFFIXES:
+
+objs: $(OBJS) $(ALL_NAT_OBJS)
+
+bin: $(BIN_OUT)/$(BIN_NAME)
+
+lib: $(LIB_OUT)/$(STATIC_LIB_NAME)
+lib.export: $(LIB_OUT)/$(STATIC_LIB_NAME).export
+
+depends: $(DEPS)
+
+$(OLEAN_OUT)/$(PKG) $(LIB_OUT) $(BIN_OUT):
+	@mkdir -p "$@"
+
+# Make sure the .olean output directory exists so that `lean --deps` knows where this package's
+# .olean files will be located even before any of them are actually built.
+$(TEMP_OUT)/%.depend: %.lean | $(OLEAN_OUT)/$(PKG)
+	@mkdir -p "$(TEMP_OUT)/$(*D)"
+# convert path separators and newlines on Windows
+	deps=`$(LEAN) --deps $<` || (echo "$(LEAN) --deps $< failed ($$?): $$deps"; exit 1); \
+  deps=`echo "$$deps" | tr '\\\\' / | tr -d '\\r'`; \
+  echo $(OLEAN_OUT)/$*.olean: $$deps > $@
+
+$(OLEAN_OUT)/%.olean: %.lean $(TEMP_OUT)/%.depend $(MORE_DEPS)
+ifdef CMAKE_LIKE_OUTPUT
+	@echo "[    ] Building $<"
+endif
+	@mkdir -p $(OLEAN_OUT)/$(*D)
+	LEAN_OPTS="$(LEAN_OPTS)"; \
+	[[ -z "$(LLVM)" ]] || LEAN_OPTS+=" --bc=$(TEMP_OUT)/$*.bc.tmp"; \
+	$(LEAN) $$LEAN_OPTS -o "$@" -i "$(OLEAN_OUT)/$*.ilean" --c="$(TEMP_OUT)/$*.c.tmp" "$<"
+# create the .c file atomically
+	@mv "$(TEMP_OUT)/$*.c.tmp" "$(C_OUT)/$*.c"
+ifdef LLVM
+	@mv "$(TEMP_OUT)/$*.bc.tmp" "$(BC_OUT)/$*.bc"
+endif
+
+$(OLEAN_OUT)/%.ilean: $(OLEAN_OUT)/%.olean
+	@
+
+ifndef C_ONLY
+$(C_OUT)/%.c: $(OLEAN_OUT)/%.olean
+	@
+
+$(BC_OUT)/%.bc: $(OLEAN_OUT)/%.olean
+	@
+endif
+
+ifdef LLVM
+$(TEMP_OUT)/%.o.export: $(BC_OUT)/%.bc
+else
+$(TEMP_OUT)/%.o.export: $(C_OUT)/%.c
+endif
+ifdef CMAKE_LIKE_OUTPUT
+	@echo "[    ] Building $<"
+endif
+	@mkdir -p "$(@D)"
+	$(LEANC) -c -o $@ $< $(LEANC_OPTS) -DLEAN_EXPORTING
+
+# On Windows, rebuild .o not intended for shared libraries
+# without dllexport because of symbol limit;
+# on other platforms, no point in bothering
+ifeq (Linux, Windows)
+ifdef LLVM
+$(TEMP_OUT)/%.o: $(BC_OUT)/%.bc
+else
+$(TEMP_OUT)/%.o: $(C_OUT)/%.c
+endif
+ifdef CMAKE_LIKE_OUTPUT
+	@echo "[    ] Building $<"
+endif
+	@mkdir -p "$(@D)"
+	$(LEANC) -c -o $@ $< $(LEANC_OPTS)
+else
+$(TEMP_OUT)/%.o: $(TEMP_OUT)/%.o.export
+	ln -f $< $@
+endif
+
+$(BIN_OUT)/$(BIN_NAME): $(LIB_OUT)/$(STATIC_LIB_NAME).export | $(BIN_OUT)
+ifdef CMAKE_LIKE_OUTPUT
+	@echo "[    ] Linking $@"
+endif
+# on Windows, must remove binary before writing a new one (since the old one may be in use)
+	@rm -f $@
+	$(LEANC) -o "$@" $< $(LEANC_OPTS) $(LINK_OPTS)
+
+ifeq (Linux, Windows)
+$(LIB_OUT)/$(STATIC_LIB_NAME): $(NAT_OBJS) | $(LIB_OUT)
+	@rm -f $@
+	$(file >$@.in) $(foreach O,$^,$(file >>$@.in,"$O"))
+	@$(LEAN_AR) rcs $@ @$@.in
+	@rm -f $@.in
+$(LIB_OUT)/$(STATIC_LIB_NAME).export: $(addsuffix .export,$(NAT_OBJS)) | $(LIB_OUT)
+	@rm -f $@
+	$(file >$@.in) $(foreach O,$^,$(file >>$@.in,"$O"))
+	# "T"hin archive seems necessary to preserve paths so that we can distinguish
+	# between object files with the same file name when manipulating the archive for
+	# `libleanshared_1`
+	@$(LEAN_AR) rcsT $@ @$@.in
+	@rm -f $@.in
+else
+$(LIB_OUT)/$(STATIC_LIB_NAME): $(NAT_OBJS) | $(LIB_OUT)
+	@rm -f $@
+# no response file support on macOS, but also no need for them
+	@$(LEAN_AR) rcs $@ $^
+$(LIB_OUT)/$(STATIC_LIB_NAME).export: $(LIB_OUT)/$(STATIC_LIB_NAME)
+	ln -f $< $@
+endif
+
+clean:
+	rm -rf $(OUT)
+
+.PRECIOUS: $(BC_OUT)/%.bc $(C_OUT)/%.c $(TEMP_OUT)/%.o $(TEMP_OUT)/%.o.export
+
+ifndef C_ONLY
+ifndef UNSAFE_ASSUME_OLD
+include $(DEPS)
+endif
+endif
++ nm /opt/elan/toolchains/leanprover--lean4---v4.22.0/lib/lean/libLean.a
++ rg '(^| )_lean_main$|Lean_main|lean_main|Lean_Shell_main'
++ head -n 200
++ nm /opt/elan/toolchains/leanprover--lean4---v4.22.0/lib/lean/libLean.a
++ rg 'initialize_Lean_Shell|Lean_Shell'
++ head -n 200
+0000000000006340 T initialize_Lean_Shell
+0000000000000150 T l___private_Lean_Shell_0__Lean_Internal_getBuildType___boxed
+00000000000000f0 T l___private_Lean_Shell_0__Lean_Internal_hasAddressSanitizer___boxed
+0000000000000130 T l___private_Lean_Shell_0__Lean_Internal_isDebug___boxed
+0000000000000110 T l___private_Lean_Shell_0__Lean_Internal_isMultiThread___boxed
+0000000000000000 T l___private_Lean_Shell_0__Lean_decodeLossyUTF8___boxed
+00000000000000e0 T l___private_Lean_Shell_0__Lean_displayCumulativeProfilingTimes___boxed
+0000000000001bc0 T l___private_Lean_Shell_0__Lean_displayHelp___boxed
+0000000000000008 b l___private_Lean_Shell_0__Lean_displayHelp___closed__0
+0000000000000010 b l___private_Lean_Shell_0__Lean_displayHelp___closed__1
+0000000000000058 b l___private_Lean_Shell_0__Lean_displayHelp___closed__10
+0000000000000060 b l___private_Lean_Shell_0__Lean_displayHelp___closed__11
+0000000000000068 b l___private_Lean_Shell_0__Lean_displayHelp___closed__12
+0000000000000070 b l___private_Lean_Shell_0__Lean_displayHelp___closed__13
+0000000000000078 b l___private_Lean_Shell_0__Lean_displayHelp___closed__14
+0000000000000080 b l___private_Lean_Shell_0__Lean_displayHelp___closed__15
+0000000000000088 b l___private_Lean_Shell_0__Lean_displayHelp___closed__16
+0000000000000090 b l___private_Lean_Shell_0__Lean_displayHelp___closed__17
+0000000000000098 b l___private_Lean_Shell_0__Lean_displayHelp___closed__18
+00000000000000a0 b l___private_Lean_Shell_0__Lean_displayHelp___closed__19
+0000000000000018 b l___private_Lean_Shell_0__Lean_displayHelp___closed__2
+00000000000000a8 b l___private_Lean_Shell_0__Lean_displayHelp___closed__20
+00000000000000b0 b l___private_Lean_Shell_0__Lean_displayHelp___closed__21
+00000000000000b8 b l___private_Lean_Shell_0__Lean_displayHelp___closed__22
+00000000000000c0 b l___private_Lean_Shell_0__Lean_displayHelp___closed__23
+00000000000000c8 b l___private_Lean_Shell_0__Lean_displayHelp___closed__24
+00000000000000d0 b l___private_Lean_Shell_0__Lean_displayHelp___closed__25
+00000000000000d8 b l___private_Lean_Shell_0__Lean_displayHelp___closed__26
+00000000000000e0 b l___private_Lean_Shell_0__Lean_displayHelp___closed__27
+00000000000000e8 b l___private_Lean_Shell_0__Lean_displayHelp___closed__28
+00000000000000f0 b l___private_Lean_Shell_0__Lean_displayHelp___closed__29
+0000000000000020 b l___private_Lean_Shell_0__Lean_displayHelp___closed__3
+00000000000000f8 b l___private_Lean_Shell_0__Lean_displayHelp___closed__30
+0000000000000100 b l___private_Lean_Shell_0__Lean_displayHelp___closed__31
+0000000000000108 b l___private_Lean_Shell_0__Lean_displayHelp___closed__32
+0000000000000110 b l___private_Lean_Shell_0__Lean_displayHelp___closed__33
+0000000000000118 b l___private_Lean_Shell_0__Lean_displayHelp___closed__34
+0000000000000120 b l___private_Lean_Shell_0__Lean_displayHelp___closed__35
+0000000000000128 b l___private_Lean_Shell_0__Lean_displayHelp___closed__36
+0000000000000130 b l___private_Lean_Shell_0__Lean_displayHelp___closed__37
+0000000000000138 b l___private_Lean_Shell_0__Lean_displayHelp___closed__38
+0000000000000140 b l___private_Lean_Shell_0__Lean_displayHelp___closed__39
+0000000000000028 b l___private_Lean_Shell_0__Lean_displayHelp___closed__4
+0000000000000148 b l___private_Lean_Shell_0__Lean_displayHelp___closed__40
+0000000000000030 b l___private_Lean_Shell_0__Lean_displayHelp___closed__5
+0000000000000038 b l___private_Lean_Shell_0__Lean_displayHelp___closed__6
+0000000000000040 b l___private_Lean_Shell_0__Lean_displayHelp___closed__7
+0000000000000048 b l___private_Lean_Shell_0__Lean_displayHelp___closed__8
+0000000000000050 b l___private_Lean_Shell_0__Lean_displayHelp___closed__9
+00000000000000d0 T l___private_Lean_Shell_0__Lean_emitLLVM___boxed
+00000000000000c0 T l___private_Lean_Shell_0__Lean_initLLVM___boxed
+0000000000000030 T l___private_Lean_Shell_0__Lean_runMain___boxed
+0000000000005f90 T l___private_Lean_Shell_0__Lean_shellMain___boxed
+0000000000000190 B l___private_Lean_Shell_0__Lean_shellMain___boxed__const__1
+00000000000001c0 B l___private_Lean_Shell_0__Lean_shellMain___boxed__const__2
+0000000000000168 b l___private_Lean_Shell_0__Lean_shellMain___closed__0
+0000000000000170 b l___private_Lean_Shell_0__Lean_shellMain___closed__1
+00000000000001a8 b l___private_Lean_Shell_0__Lean_shellMain___closed__10
+00000000000001b0 b l___private_Lean_Shell_0__Lean_shellMain___closed__11
+00000000000001b8 b l___private_Lean_Shell_0__Lean_shellMain___closed__12
+00000000000001c8 b l___private_Lean_Shell_0__Lean_shellMain___closed__13
+00000000000001d0 b l___private_Lean_Shell_0__Lean_shellMain___closed__14
+0000000000000178 b l___private_Lean_Shell_0__Lean_shellMain___closed__2
+0000000000000180 b l___private_Lean_Shell_0__Lean_shellMain___closed__3
+0000000000000188 b l___private_Lean_Shell_0__Lean_shellMain___closed__4
+0000000000000268 b l___private_Lean_Shell_0__Lean_shellMain___closed__5
+0000000000000198 b l___private_Lean_Shell_0__Lean_shellMain___closed__6
+0000000000000270 b l___private_Lean_Shell_0__Lean_shellMain___closed__7
+0000000000000278 b l___private_Lean_Shell_0__Lean_shellMain___closed__8
+00000000000001a0 b l___private_Lean_Shell_0__Lean_shellMain___closed__9
+0000000000001c10 T l___private_Lean_Shell_0__Lean_shellMain___lam__0
+0000000000005ef0 T l___private_Lean_Shell_0__Lean_shellMain___lam__0___boxed
+0000000000000160 B l___private_Lean_Shell_0__Lean_shellMain___lam__0___boxed__const__1
+0000000000000158 B l___private_Lean_Shell_0__Lean_shellMain___lam__0___boxed__const__2
+0000000000000150 b l___private_Lean_Shell_0__Lean_shellMain___lam__0___closed__0
+0000000000001e90 T l___private_Lean_Shell_0__Lean_shellMain___lam__1
+0000000000005f60 T l___private_Lean_Shell_0__Lean_shellMain___lam__1___boxed
+0000000000000218 B l___private_Lean_Shell_0__Lean_shortVersionString
+00000000000001e0 b l___private_Lean_Shell_0__Lean_shortVersionString___closed__0
+00000000000001e8 b l___private_Lean_Shell_0__Lean_shortVersionString___closed__2
+00000000000001f0 b l___private_Lean_Shell_0__Lean_shortVersionString___closed__3
+00000000000001f8 b l___private_Lean_Shell_0__Lean_shortVersionString___closed__4
+0000000000000200 b l___private_Lean_Shell_0__Lean_shortVersionString___closed__5
+0000000000000208 b l___private_Lean_Shell_0__Lean_shortVersionString___closed__6
+0000000000000210 b l___private_Lean_Shell_0__Lean_shortVersionString___closed__7
+0000000000000000 B l___private_Lean_Shell_0__Lean_versionHeader
+0000000000000220 b l___private_Lean_Shell_0__Lean_versionHeader___closed__0
+0000000000000228 b l___private_Lean_Shell_0__Lean_versionHeader___closed__1
+0000000000000260 b l___private_Lean_Shell_0__Lean_versionHeader___closed__10
+0000000000000230 b l___private_Lean_Shell_0__Lean_versionHeader___closed__2
+0000000000000238 b l___private_Lean_Shell_0__Lean_versionHeader___closed__3
+0000000000000240 b l___private_Lean_Shell_0__Lean_versionHeader___closed__5
+0000000000000248 b l___private_Lean_Shell_0__Lean_versionHeader___closed__6
+0000000000000250 b l___private_Lean_Shell_0__Lean_versionHeader___closed__8
+0000000000000258 b l___private_Lean_Shell_0__Lean_versionHeader___closed__9
+                 U initialize_Lean_Shell

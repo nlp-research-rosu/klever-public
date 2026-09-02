@@ -1,0 +1,191 @@
+COMMAND: bash -lc sha256sum\ semantic.k\ verification.k\ spec.k\ \&\&\ nl\ -ba\ semantic.k\ \&\&\ nl\ -ba\ verification.k\ \&\&\ nl\ -ba\ spec.k\ \&\&\ printf\ \"COUNTS\\n\"\ \&\&\ printf\ \"semantic\ syntax\ declarations:\ \"\ \&\&\ rg\ -c\ \"\^\[\[:space:\]\]\*syntax\ \"\ semantic.k\ \&\&\ printf\ \"semantic\ operational\ rules:\ \"\ \&\&\ rg\ -c\ \"\^\[\[:space:\]\]\*rule\ \"\ semantic.k\ \&\&\ printf\ \"verification\ syntax\ declarations:\ \"\ \&\&\ rg\ -c\ \"\^\[\[:space:\]\]\*syntax\ \"\ verification.k\ \&\&\ printf\ \"verification\ equations:\ \"\ \&\&\ rg\ -c\ \"\^\[\[:space:\]\]\*rule\ \"\ verification.k\ \&\&\ printf\ \"spec\ claims:\ \"\ \&\&\ rg\ -c\ \"\^\[\[:space:\]\]\*claim\ \"\ spec.k\ \&\&\ printf\ \"local\ special\ attributes\\n\"\ \&\&\ rg\ -n\ \"\\\[\(function\|total\|functional\|simplification\|concrete\|priority\|owise\|anywhere\|macro\|macro-rec\|trusted\|circularity\)\"\ semantic.k\ verification.k\ spec.k\ \|\|\ true
+76337a1c2205069bab8f211be4179fce879e9a0c0d7113bea8d86083d8ce6110  semantic.k
+2bcf4b98c0ab283190e7f18d67ce40c4995229a5b61c9382dcceef818ea945c8  verification.k
+acdf4d40ebfdc46a7a8cfda877f10494736c6eb84e2f7bf926a1d38145c01d5b  spec.k
+     1	module MPY-SYNTAX
+     2	  imports BOOL
+     3	  imports INT
+     4	  imports STRING
+     5	
+     6	  syntax Program ::= "Module" "(" Stmts ")"
+     7	  syntax Stmts ::= List{Stmt, ""}
+     8	  syntax Params ::= "Params" "(" Strings ")"
+     9	  syntax Strings ::= List{String, ","}
+    10	
+    11	  syntax Stmt ::= "ImportFrom" "(" String "," Strings ")"
+    12	                | "FuncDef" "(" String "," Params "," Stmts ")"
+    13	                | "Assign" "(" Expr "," Expr ")"
+    14	                | "AugAssign" "(" Expr "," String "," Expr ")"
+    15	                | "For" "(" Expr "," Expr "," Stmts ")"
+    16	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    17	                | "Return" "(" Expr ")"
+    18	
+    19	  syntax Expr ::= "Name" "(" String ")"
+    20	                | "Int" "(" Int ")"
+    21	                | "Bool" "(" Bool ")"
+    22	                | "Compare" "(" Expr "," CmpOps ")"
+    23	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    24	  syntax CmpOps ::= List{CmpOp, ","}
+    25	
+    26	  syntax IntList ::= ".IntList"
+    27	                   | "cons" "(" Int "," IntList ")"
+    28	  syntax PyVal ::= "IntV" "(" Int ")"
+    29	                 | "BoolV" "(" Bool ")"
+    30	                 | "ListV" "(" IntList ")"
+    31	  syntax Result ::= "NoResult" | PyVal
+    32	endmodule
+    33	
+    34	module SEMANTIC
+    35	  imports MPY-SYNTAX
+    36	
+    37	  configuration
+    38	    <mpy>
+    39	      <k> $PGM:Program </k>
+    40	      <input> $OPERATIONS:IntList </input>
+    41	      <balance> 0 </balance>
+    42	      <current> 0 </current>
+    43	      <result> NoResult </result>
+    44	    </mpy>
+    45	
+    46	  syntax KItem ::= "execStmts" "(" Stmts ")"
+    47	                 | "setBalance"
+    48	                 | "branch" "(" Stmts "," Stmts ")"
+    49	                 | "loop" "(" Stmts ")"
+    50	                 | "doReturn"
+    51	
+    52	  rule <k> Module(SS) => execStmts(SS) ... </k>
+    53	
+    54	  rule <k> execStmts(.Stmts) => .K ... </k>
+    55	  rule <k> execStmts(S SS) => S ~> execStmts(SS) ... </k>
+    56	
+    57	  // Imports and annotations have no run-time effect in this subset.
+    58	  rule <k> ImportFrom(_, _) => .K ... </k>
+    59	
+    60	  // The module is run as a call to the required entry point.  Its sole
+    61	  // argument is supplied by the <input> cell.
+    62	  rule <k> FuncDef("below_zero", Params("operations"), BODY)
+    63	        => execStmts(BODY) ... </k>
+    64	
+    65	  rule <k> Assign(Name("balance"), E) => E ~> setBalance ... </k>
+    66	  rule <k> IntV(I) ~> setBalance => .K ... </k>
+    67	       <balance> _ => I </balance>
+    68	
+    69	  rule <k> AugAssign(Name("balance"), "+", Name("operation")) => .K ... </k>
+    70	       <balance> B => B +Int I </balance>
+    71	       <current> I </current>
+    72	
+    73	  rule <k> For(Name("operation"), E, BODY) => E ~> loop(BODY) ... </k>
+    74	  rule <k> ListV(.IntList) ~> loop(_) => .K ... </k>
+    75	  rule <k> ListV(cons(I, IS)) ~> loop(BODY)
+    76	        => execStmts(BODY) ~> ListV(IS) ~> loop(BODY) ... </k>
+    77	       <current> _ => I </current>
+    78	
+    79	  rule <k> If(E, THEN, ELSE) => E ~> branch(THEN, ELSE) ... </k>
+    80	  rule <k> BoolV(true) ~> branch(THEN, _) => execStmts(THEN) ... </k>
+    81	  rule <k> BoolV(false) ~> branch(_, ELSE) => execStmts(ELSE) ... </k>
+    82	
+    83	  rule <k> Return(E) => E ~> doReturn ... </k>
+    84	  rule <k> V:PyVal ~> doReturn ~> _ => .K </k>
+    85	       <balance> _ => 0 </balance>
+    86	       <current> _ => 0 </current>
+    87	       <result> NoResult => V </result>
+    88	
+    89	  rule <k> Int(I) => IntV(I) ... </k>
+    90	  rule <k> Bool(B) => BoolV(B) ... </k>
+    91	  rule <k> Name("operations") => ListV(IS) ... </k>
+    92	       <input> IS </input>
+    93	  rule <k> Name("operation") => IntV(I) ... </k>
+    94	       <current> I </current>
+    95	  rule <k> Name("balance") => IntV(B) ... </k>
+    96	       <balance> B </balance>
+    97	
+    98	  // Comparisons remain chains in the transliterated syntax.  This task uses
+    99	  // the one-link integer case, whose meaning is Python integer comparison.
+   100	  rule <k> Compare(Name("balance"), CmpOp("<", Int(0)))
+   101	        => BoolV(B <Int 0) ... </k>
+   102	       <balance> B </balance>
+   103	endmodule
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	  imports K-EQUAL
+     6	
+     7	  // Independent mathematical contract: starting from balance B, report
+     8	  // whether some running prefix makes the balance negative.
+     9	  syntax Bool ::= belowZeroFrom(Int, IntList) [function, total]
+    10	
+    11	  rule belowZeroFrom(_, .IntList) => false
+    12	  rule belowZeroFrom(B, cons(I, IS))
+    13	    => #if B +Int I <Int 0
+    14	       #then true
+    15	       #else belowZeroFrom(B +Int I, IS)
+    16	       #fi
+    17	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // The actual Module term generated in solution.mpy reaches the semantic
+     7	  // state immediately before iteration, for an arbitrary input list.
+     8	  claim [entry-reaches-loop]:
+     9	    <mpy>
+    10	      <k>
+    11	        Module(
+    12	          ImportFrom("typing", "List")
+    13	          FuncDef("below_zero", Params("operations"),
+    14	            Assign(Name("balance"), Int(0))
+    15	            For(Name("operation"), Name("operations"),
+    16	              AugAssign(Name("balance"), "+", Name("operation"))
+    17	              If(Compare(Name("balance"), CmpOp("<", Int(0))),
+    18	                Return(Bool(true)),
+    19	                .Stmts))
+    20	            Return(Bool(false))))
+    21	        =>
+    22	        ListV(OPS) ~> loop(
+    23	          AugAssign(Name("balance"), "+", Name("operation"))
+    24	          If(Compare(Name("balance"), CmpOp("<", Int(0))),
+    25	            Return(Bool(true)),
+    26	            .Stmts))
+    27	          ~> execStmts(Return(Bool(false)))
+    28	          ~> execStmts(.Stmts)
+    29	      </k>
+    30	      <input> OPS </input>
+    31	      <balance> 0 </balance>
+    32	      <current> 0 </current>
+    33	      <result> NoResult </result>
+    34	    </mpy>
+    35	
+    36	  // Induction over OPS.  The claim mentions the exact translated loop body
+    37	  // and exact post-loop return, so it proves early return and the boundary
+    38	  // condition (zero is not below zero), not merely a helper function.
+    39	  claim [loop-correct]:
+    40	    <mpy>
+    41	      <k>
+    42	        ListV(OPS) ~> loop(
+    43	          AugAssign(Name("balance"), "+", Name("operation"))
+    44	          If(Compare(Name("balance"), CmpOp("<", Int(0))),
+    45	            Return(Bool(true)),
+    46	            .Stmts))
+    47	          ~> execStmts(Return(Bool(false)))
+    48	          ~> execStmts(.Stmts)
+    49	        => .K
+    50	      </k>
+    51	      <input> _ORIGINAL </input>
+    52	      <balance> B => 0 </balance>
+    53	      <current> _C => 0 </current>
+    54	      <result> NoResult => BoolV(belowZeroFrom(B, OPS)) </result>
+    55	    </mpy>
+    56	    [circularity]
+    57	endmodule
+COUNTS
+semantic syntax declarations: 12
+semantic operational rules: 22
+verification syntax declarations: 1
+verification equations: 2
+spec claims: 2
+local special attributes
+spec.k:56:    [circularity]
+verification.k:9:  syntax Bool ::= belowZeroFrom(Int, IntList) [function, total]
+EXIT_STATUS: 0

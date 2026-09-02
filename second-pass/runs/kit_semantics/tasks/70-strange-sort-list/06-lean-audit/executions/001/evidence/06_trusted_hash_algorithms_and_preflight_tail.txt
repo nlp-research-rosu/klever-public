@@ -1,0 +1,263 @@
++ sed -n 650,860p /reference/tools/k_rule_inventory.py
+            _without_comments(text[start:]).strip(),
+        )
+    )
+    return spans
+
+
+def _blank_non_newlines(text: str) -> str:
+    return "".join(
+        character if character in "\r\n" else " "
+        for character in text
+    )
+
+
+def desimplify_rule_ids(
+    text: str,
+    source_rule_ids: list[str],
+) -> str:
+    """Remove simplification from exactly the selected canonical rule IDs."""
+
+    if len(source_rule_ids) != len(set(source_rule_ids)):
+        raise KRuleInventoryError(
+            "exact rule transformation contains a duplicate source rule ID"
+        )
+    selected = set(source_rule_ids)
+    modules = _modules(_mask_non_code(text))
+    spans = [
+        span
+        for local_module in modules
+        for span in _rule_spans(text, local_module)
+    ]
+    by_id = {span.rule.source_rule_id: span for span in spans}
+    unknown = sorted(selected - set(by_id))
+    if unknown:
+        raise KRuleInventoryError(
+            "exact rule transformation names an unknown source rule ID: "
+            + ", ".join(unknown)
+        )
+
+    edits: list[tuple[int, int]] = []
+    for source_rule_id in source_rule_ids:
+        span = by_id[source_rule_id]
+        if span.attribute_start is None or span.attribute_end is None:
+            raise KRuleInventoryError(
+                "selected source rule has no simplification attribute: "
+                f"{source_rule_id}"
+            )
+        attribute_text = text[
+            span.attribute_start + 1 : span.attribute_end - 1
+        ]
+        masked_attributes = _mask_non_code(attribute_text)
+        tokens = _attribute_token_spans(
+            attribute_text,
+            masked_attributes,
+        )
+        matches = [
+            index
+            for index, (_start, _end, token) in enumerate(tokens)
+            if token == "simplification"
+        ]
+        if len(matches) != 1:
+            raise KRuleInventoryError(
+                "selected source rule has ambiguous simplification "
+                f"attributes: {source_rule_id}"
+            )
+        token_index = matches[0]
+        if len(tokens) == 1:
+            edit_start = span.attribute_start
+            edit_end = span.attribute_end
+        elif token_index < len(tokens) - 1:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index][0]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index + 1][0]
+            )
+        else:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index - 1][1]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index][1]
+            )
+        edits.append((edit_start, edit_end))
+
+    transformed = text
+    for start, end in sorted(edits, reverse=True):
+        transformed = (
+            transformed[:start]
+            + _blank_non_newlines(transformed[start:end])
+            + transformed[end:]
+        )
+    return transformed
+
+
+def inventory_verification(workspace: Path) -> dict[str, Any]:
+    workspace = Path(workspace)
+    try:
+        workspace_mode = workspace.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        ) from error
+    if not stat.S_ISDIR(workspace_mode):
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        )
+    verification = workspace / "verification.k"
+    try:
+        verification_mode = verification.stat(
+            follow_symlinks=False
+        ).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace has no regular verification.k: {verification}"
+        ) from error
+    if not stat.S_ISREG(verification_mode):
+        raise KRuleInventoryError(
+            f"workspace has no regular verification.k: {verification}"
+        )
+    try:
+        verification_bytes = verification.read_bytes()
+        text = verification_bytes.decode()
+    except (OSError, UnicodeError) as error:
+        raise KRuleInventoryError(
+            f"cannot read verification.k: {verification}"
+        ) from error
+    masked_text = _mask_non_code(text)
+    modules = _modules(masked_text)
+    module = _verification_module(
+        modules, _last_verification_main_module(workspace)
+    )
+    closure = _verification_closure(modules, module)
+    rule_documents = _rule_documents(text, closure)
+    return {
+        "schema_version": 2,
+        "verification_file": "verification.k",
+        "verification_sha256": hashlib.sha256(verification_bytes).hexdigest(),
+        "verification_module": module.name,
+        "verification_modules": [module.name for module in closure],
+        "rules": rule_documents,
+        "inventory_sha256": canonical_json_sha256(rule_documents),
+    }
++ sed -n 540,640p /reference/tools/klean_preflight.py
+                f"duplicate trust allowlist entry: {name}"
+            )
+        expected[name] = (kind, lean_type)
+    if declared != expected:
+        raise KleanPreflightError(
+            "generated axiom/opaque declarations differ from trust allowlist"
+        )
+    _check_imports(generated, sources)
+    export_bindings = {
+        "frozen_input_sha256": input_hash,
+        "stage3_discovery_manifest_sha256": discovery_hash,
+        "generated_tree_sha256": generated_hash,
+        "trust_inventory_sha256": sidecar_hashes[
+            "trust-inventory.json"
+        ],
+    }
+    for field, expected_hash in export_bindings.items():
+        if export_result.get(field) != expected_hash:
+            label = (
+                "trust inventory hash"
+                if field == "trust_inventory_sha256"
+                else field
+            )
+            raise KleanPreflightError(
+                f"export result {label} does not match immutable inputs"
+            )
+
+    with tempfile.TemporaryDirectory(prefix="klean-preflight-") as temporary:
+        clean = Path(temporary) / "project"
+        shutil.copytree(generated, clean)
+        diagnostics: list[dict[str, Any]] = []
+        for command in (["lake", "clean"], ["lake", "build"]):
+            code, output = run_command(command, cwd=clean, timeout=600)
+            diagnostics.append(
+                {
+                    "command": command,
+                    "exit_code": code,
+                    "output_sha256": hashlib.sha256(output.encode()).hexdigest(),
+                    "output_tail": output[-4000:],
+                }
+            )
+            if code != 0:
+                raise KleanPreflightError(
+                    f"{' '.join(command)} failed ({code}): {output[-600:]}"
+                )
+    _require_unchanged_snapshot(
+        snapshot, frozen_input, discovery_manifest, generation
+    )
+    return {
+        "schema_version": 3,
+        "status": "PASS" if obligations else "KLEAN_NO_OBLIGATIONS",
+        "frozen_input_sha256": input_hash,
+        "stage1_workspace_sha256": input_hash,
+        "stage3_discovery_manifest_sha256": discovery_hash,
+        "generated_tree_sha256": generated_hash,
+        "target": target,
+        "obligation_count": len(obligations),
+        "trust_declaration_count": len(declared),
+        "designated_sorry_count": 0,
+        "diagnostics": diagnostics,
+    }
+
+
+def run_preflight(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    *,
+    toolchain_lock: Path,
+    run_command: Callable[..., tuple[int, str]] = _run,
+) -> dict[str, Any]:
+    frozen_input = Path(frozen_input)
+    discovery_manifest = Path(discovery_manifest)
+    generation = Path(generation)
+    output = generation / "preflight.json"
+    if output.exists() or output.is_symlink():
+        raise KleanPreflightError(f"preflight result already exists: {output}")
+
+    def error_document(error: KleanPreflightError) -> dict[str, Any]:
+        try:
+            stage1_hash = klean_export.tree_digest(frozen_input)
+        except (OSError, klean_export.KleanExportError):
+            stage1_hash = None
+        try:
+            stage3_hash = hashlib.sha256(
+                discovery_manifest.read_bytes()
+            ).hexdigest()
+        except OSError:
+            stage3_hash = None
+        return {
+            "schema_version": 3,
+            "status": "KLEAN_PREFLIGHT_ERROR",
+            "error": str(error),
+            "stage1_workspace_sha256": stage1_hash,
+            "stage3_discovery_manifest_sha256": stage3_hash,
+        }
+
+    publication_snapshot: PreflightSnapshot | None = None
+    try:
+        publication_snapshot = _preflight_snapshot(
+            frozen_input, discovery_manifest, generation
++ rg -n 'def tree_digest|def _tree_entries|def target_statement|def expected_target_definition|def _domain_source_rules|def lean_trust_declarations|def sha256_text' /reference/tools/klean_export.py /reference/generation-tools/klean_export.py
+/reference/generation-tools/klean_export.py:402:def sha256_text(text: str) -> str:
+/reference/generation-tools/klean_export.py:406:def lean_trust_declarations(path: Path) -> list[dict[str, str]]:
+/reference/generation-tools/klean_export.py:1322:def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+/reference/generation-tools/klean_export.py:1345:def tree_digest(root: Path) -> str:
+/reference/generation-tools/klean_export.py:1451:def target_statement(generated: Path) -> dict[str, Any] | None:
+/reference/generation-tools/klean_export.py:1536:def expected_target_definition(obligation_map: dict[str, Any]) -> str | None:
+/reference/generation-tools/klean_export.py:1568:def _domain_source_rules(
+/reference/tools/klean_export.py:481:def sha256_text(text: str) -> str:
+/reference/tools/klean_export.py:485:def lean_trust_declarations(path: Path) -> list[dict[str, str]]:
+/reference/tools/klean_export.py:1476:def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+/reference/tools/klean_export.py:1499:def tree_digest(root: Path) -> str:
+/reference/tools/klean_export.py:1605:def target_statement(generated: Path) -> dict[str, Any] | None:
+/reference/tools/klean_export.py:1690:def expected_target_definition(obligation_map: dict[str, Any]) -> str | None:
+/reference/tools/klean_export.py:1722:def _domain_source_rules(
++ rg -n 'def sha256_tree|def _walk_regular_files' /reference/tools/pipeline_contract.py
+190:def sha256_tree(root: Path) -> str:
+733:def _walk_regular_files(root: Path, label: str) -> list[Path]:

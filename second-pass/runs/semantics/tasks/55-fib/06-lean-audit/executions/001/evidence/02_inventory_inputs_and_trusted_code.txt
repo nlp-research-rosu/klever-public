@@ -1,0 +1,721 @@
+--- trusted k_rule_inventory.py ---
+#!/usr/bin/env python3
+"""Canonical lexical inventory of simplification rules in verification.k."""
+
+from __future__ import annotations
+
+import dataclasses
+import hashlib
+import json
+import re
+import stat
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+_MODULE_NAME_RE = re.compile(
+    r"^[ \t]+(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"(?:[ \t]+\[[^\]\r\n]*\])?[ \t]*$"
+)
+_TRAILING_ATTRIBUTES_RE = re.compile(
+    r"\[(?P<attributes>[^\[\]]*)\][ \t\r\n]*\Z", re.S
+)
+_CELL_TAG_RE = re.compile(
+    r"<(?P<close>/)?(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"[ \t]*(?P<self_close>/)?>"
+)
+_OUTER_SENTENCE_KEYWORDS = {
+    "imports",
+    "syntax",
+    "rule",
+    "configuration",
+    "context",
+    "claim",
+    "alias",
+}
+
+
+class KRuleInventoryError(RuntimeError):
+    """Raised when verification.k cannot produce a canonical inventory."""
+
+
+@dataclass(frozen=True)
+class KRule:
+    source_rule_id: str
+    module: str
+    start_line: int
+    end_line: int
+    normalized_sha256: str
+    attributes: list[str]
+    text: str
+
+
+@dataclass(frozen=True)
+class _Sentence:
+    keyword: str
+    start: int
+
+
+@dataclass(frozen=True)
+class _Module:
+    name: str
+    content_start: int
+    content_end: int
+    imports: tuple[str, ...]
+    sentences: tuple[_Sentence, ...]
+
+
+@dataclass(frozen=True)
+class _RuleSpan:
+    rule: KRule
+    start_offset: int
+    end_offset: int
+    attribute_start: int | None
+    attribute_end: int | None
+
+
+def canonical_json_sha256(document: Any) -> str:
+    encoded = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _mask_non_code(text: str) -> str:
+    """Mask comments and string bodies without changing source offsets."""
+
+    output = list(text)
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                state = "code"
+            else:
+                output[index] = " "
+            index += 1
+            continue
+        if state == "string":
+            if character == "\\" and following:
+                output[index] = " "
+                output[index + 1] = " "
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            elif character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                output[index] = output[index + 1] = " "
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                output[index] = output[index + 1] = " "
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output[index] = output[index + 1] = " "
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output[index] = output[index + 1] = " "
+            state = "block-comment"
+            block_depth = 1
+            index += 2
+            continue
+        if character == '"':
+            state = "string"
+        index += 1
+    return "".join(output)
+
+
+def _line_ranges(text: str, start: int = 0) -> list[tuple[int, int, int]]:
+    ranges: list[tuple[int, int, int]] = []
+    line_start = start
+    while line_start < len(text):
+        newline = text.find("\n", line_start)
+        next_start = len(text) if newline < 0 else newline + 1
+        line_end = len(text) if newline < 0 else newline
+        content_end = (
+            line_end - 1
+            if line_end > line_start and text[line_end - 1] == "\r"
+            else line_end
+        )
+        ranges.append((line_start, content_end, next_start))
+        if newline < 0:
+            break
+        line_start = next_start
+    return ranges
+
+
+def _line_heads(text: str) -> list[tuple[int, int, str, str]]:
+    """Return physical-line word heads without assigning K grammar meaning."""
+
+    heads: list[tuple[int, int, str, str]] = []
+    for line_start, content_end, _next_start in _line_ranges(text):
+        index = line_start
+        while index < content_end and text[index] in " \t":
+            index += 1
+        word_end = index
+        while word_end < content_end and (
+            text[word_end].isalnum() or text[word_end] in "_'"
+        ):
+            word_end += 1
+        if word_end > index:
+            heads.append(
+                (
+                    line_start,
+                    content_end,
+                    text[index:word_end],
+                    text[word_end:content_end],
+                )
+            )
+    return heads
+
+
+def _line_word(line: str) -> tuple[str, str, int]:
+    stripped = line.lstrip()
+    indent = len(line) - len(stripped)
+    word_end = 0
+    while word_end < len(stripped) and (
+        stripped[word_end].isalnum() or stripped[word_end] in "_'"
+    ):
+        word_end += 1
+    return stripped[:word_end], stripped[word_end:], indent + word_end
+
+
+def _rule_continuation(line: str) -> tuple[str, int] | None:
+    stripped = line.lstrip()
+    if stripped.startswith("["):
+        return "attributes", len(line) - len(stripped)
+    word, rest, word_end = _line_word(line)
+    for keyword in ("requires", "ensures"):
+        if word == keyword and (
+            not rest
+            or not (
+                rest[0].isalnum()
+                or rest[0] in "_'"
+            )
+        ):
+            return keyword, word_end
+    return None
+
+
+def _starts_outer_transition(line: str) -> bool:
+    keyword, rest, _word_end = _line_word(line)
+    separated = bool(rest) and rest[0] in " \t"
+    if keyword == "module":
+        return separated and _MODULE_NAME_RE.fullmatch(rest) is not None
+    if keyword == "endmodule":
+        return not rest.strip()
+    if keyword == "rule":
+        return not rest or separated
+    return keyword in _OUTER_SENTENCE_KEYWORDS and separated
+
+
+def _terminal_attribute_line(line: str) -> bool:
+    match = _TRAILING_ATTRIBUTES_RE.search(line)
+    if match is None:
+        return False
+    start = match.start()
+    return start == 0 or line[start - 1].isspace()
+
+
+def _scan_rule_delimiters(
+    line: str,
+    delimiters: list[str],
+) -> None:
+    closing = {")": "(", "]": "[", "}": "{"}
+    index = 0
+    while index < len(line):
+        if line[index] == "<":
+            cell = _CELL_TAG_RE.match(line, index)
+            if cell is not None:
+                marker = f"<{cell.group('name')}>"
+                if cell.group("close"):
+                    if delimiters and delimiters[-1] == marker:
+                        delimiters.pop()
+                elif not cell.group("self_close"):
+                    delimiters.append(marker)
+                index = cell.end()
+                continue
+        character = line[index]
+        if character in "([{":
+            delimiters.append(character)
+        elif character in closing:
+            if delimiters and delimiters[-1] == closing[character]:
+                delimiters.pop()
+        index += 1
+
+
+def _rule_bubble_end(masked_text: str, start: int) -> int:
+    """Find when an outer rule bubble returns control to outer parsing."""
+
+    seen_rewrite = False
+    clause_has_content = False
+    candidate_end: int | None = None
+    delimiters: list[str] = []
+    ranges = _line_ranges(masked_text, start)
+    for line_start, line_end, next_start in ranges:
+        line = masked_text[line_start:line_end]
+        if not line.strip():
+            continue
+
+        continuation = (
+            _rule_continuation(line)
+            if seen_rewrite and candidate_end is not None
+            else None
+        )
+        if candidate_end is not None:
+            if continuation is None and _starts_outer_transition(line):
+                return candidate_end
+            candidate_end = None
+
+        content_start = 0
+        if continuation is not None:
+            kind, content_start = continuation
+            if kind in {"requires", "ensures"}:
+                clause_has_content = False
+
+        if not seen_rewrite:
+            rewrite = line.find("=>")
+            if rewrite >= 0:
+                seen_rewrite = True
+                content_start = rewrite + 2
+            else:
+                content_start = len(line)
+
+        _scan_rule_delimiters(line, delimiters)
+        if seen_rewrite and line[content_start:].strip():
+            clause_has_content = True
+
+        if (
+            seen_rewrite
+            and clause_has_content
+            and not delimiters
+            and _terminal_attribute_line(line)
+        ):
+            return next_start
+        if seen_rewrite and clause_has_content and not delimiters:
+            candidate_end = next_start
+    if candidate_end is not None:
+        return candidate_end
+    return len(masked_text) + 1
+
+
+def _modules(masked_text: str) -> tuple[_Module, ...]:
+    modules: list[_Module] = []
+    open_module: tuple[
+        str, int, list[str], list[_Sentence]
+    ] | None = None
+    open_rule_until = 0
+    for line_start, line_end, keyword, rest in _line_heads(masked_text):
+        if line_start < open_rule_until:
+            continue
+        open_rule_until = 0
+        separated = bool(rest) and rest[0] in " \t"
+        if keyword == "module":
+            if not separated:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            named = _MODULE_NAME_RE.fullmatch(rest)
+            if named is None or open_module is not None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            open_module = (named.group("name"), line_end, [], [])
+            continue
+        if keyword == "endmodule":
+            if rest.strip():
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            if open_module is None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            name, content_start, imports, sentences = open_module
+            modules.append(
+                _Module(
+                    name=name,
+                    content_start=content_start,
+--- trusted lemma_discovery_contract.py ---
+#!/usr/bin/env python3
+"""Validate Stage 3 classifications against the canonical K rule inventory."""
+
+from __future__ import annotations
+
+import json
+import stat
+from pathlib import Path
+from typing import Any
+
+from tools.k_rule_inventory import KRuleInventoryError, inventory_verification
+
+
+_MANIFEST_KEYS = {"schema_version", "inventory_sha256", "rules"}
+_RULE_KEYS = {"source_rule_id", "classification", "rationale"}
+_CLASSIFICATIONS = {
+    "DEFINITION",
+    "OPERATIONAL_RULE",
+    "PROVED_DERIVED_LEMMA",
+    "DOMAIN_LEMMA",
+}
+
+
+class LemmaDiscoveryContractError(RuntimeError):
+    """Raised when a Stage 3 manifest crosses its trust boundary."""
+
+
+def _regular_json(path: Path) -> dict[str, Any]:
+    path = Path(path)
+    try:
+        mode = path.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest must be a regular file: {path}"
+        ) from error
+    if not stat.S_ISREG(mode):
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest must be a regular file: {path}"
+        )
+    try:
+        document = json.loads(path.read_bytes())
+    except (OSError, UnicodeError, ValueError) as error:
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest is malformed: {path}"
+        ) from error
+    if not isinstance(document, dict):
+        raise LemmaDiscoveryContractError(
+            "lemma discovery manifest must be a JSON object"
+        )
+    return document
+
+
+def _exact_keys(
+    document: dict[str, Any], expected: set[str], label: str
+) -> None:
+    unexpected = sorted(set(document) - expected)
+    if unexpected:
+        raise LemmaDiscoveryContractError(
+            f"{label} has unexpected key: {unexpected[0]}"
+        )
+    missing = sorted(expected - set(document))
+    if missing:
+        raise LemmaDiscoveryContractError(
+            f"{label} is missing key: {missing[0]}"
+        )
+
+
+def validate_trust_boundary(
+    workspace: Path, manifest: Path
+) -> dict[str, Any]:
+    try:
+        inventory = inventory_verification(Path(workspace))
+    except KRuleInventoryError as error:
+        raise LemmaDiscoveryContractError(str(error)) from error
+    document = _regular_json(Path(manifest))
+    _exact_keys(document, _MANIFEST_KEYS, "lemma discovery manifest")
+    schema_version = document["schema_version"]
+    if (
+        not isinstance(schema_version, int)
+        or isinstance(schema_version, bool)
+        or schema_version != 2
+    ):
+        raise LemmaDiscoveryContractError(
+            "lemma discovery schema_version must be 2"
+        )
+    if document["inventory_sha256"] != inventory["inventory_sha256"]:
+        raise LemmaDiscoveryContractError(
+            "lemma discovery inventory_sha256 does not match canonical inventory"
+        )
+    entries = document["rules"]
+    if not isinstance(entries, list):
+        raise LemmaDiscoveryContractError(
+            "lemma discovery rules must be a JSON list"
+        )
+    canonical_rules = inventory["rules"]
+    canonical_by_id = {
+        rule["source_rule_id"]: rule for rule in canonical_rules
+    }
+    classified_by_id: dict[str, dict[str, str]] = {}
+    for index, entry in enumerate(entries):
+        label = f"lemma discovery rule {index}"
+        if not isinstance(entry, dict):
+            raise LemmaDiscoveryContractError(f"{label} must be an object")
+        _exact_keys(entry, _RULE_KEYS, label)
+        source_rule_id = entry["source_rule_id"]
+        if not isinstance(source_rule_id, str) or not source_rule_id:
+            raise LemmaDiscoveryContractError(
+                f"{label} source_rule_id must be a nonempty string"
+            )
+        if source_rule_id in classified_by_id:
+            raise LemmaDiscoveryContractError(
+                f"duplicate lemma discovery source_rule_id: {source_rule_id}"
+            )
+        if source_rule_id not in canonical_by_id:
+            raise LemmaDiscoveryContractError(
+                f"unknown lemma discovery source_rule_id: {source_rule_id}"
+            )
+        classification = entry["classification"]
+        if (
+            not isinstance(classification, str)
+            or classification not in _CLASSIFICATIONS
+        ):
+            raise LemmaDiscoveryContractError(
+                f"{label} classification must be DEFINITION, "
+                "OPERATIONAL_RULE, PROVED_DERIVED_LEMMA, or DOMAIN_LEMMA"
+            )
+        canonical_rule = canonical_by_id[source_rule_id]
+        if (
+            "simplification" in canonical_rule["attributes"]
+            and classification
+            in {"OPERATIONAL_RULE", "PROVED_DERIVED_LEMMA"}
+        ):
+            raise LemmaDiscoveryContractError(
+                f"{label} simplification rule must be classified as "
+                "DEFINITION or DOMAIN_LEMMA"
+            )
+        rationale = entry["rationale"]
+        if not isinstance(rationale, str) or not rationale.strip():
+            raise LemmaDiscoveryContractError(
+                f"{label} rationale must be a nonempty string"
+            )
+        classified_by_id[source_rule_id] = {
+            "classification": classification,
+            "rationale": rationale,
+        }
+    missing = [
+        rule["source_rule_id"]
+        for rule in canonical_rules
+        if rule["source_rule_id"] not in classified_by_id
+    ]
+    if missing:
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest is missing source_rule_id: {missing[0]}"
+        )
+    definitions: list[dict[str, Any]] = []
+    operational_rules: list[dict[str, Any]] = []
+    proved_derived_lemmas: list[dict[str, Any]] = []
+    domain_lemmas: list[dict[str, Any]] = []
+    for rule in canonical_rules:
+        classification = classified_by_id[rule["source_rule_id"]]
+        classified_rule = {**rule, **classification}
+        role = classification["classification"]
+        if role == "DEFINITION":
+            definitions.append(classified_rule)
+        elif role == "OPERATIONAL_RULE":
+            operational_rules.append(classified_rule)
+        elif role == "PROVED_DERIVED_LEMMA":
+            proved_derived_lemmas.append(classified_rule)
+        else:
+            domain_lemmas.append(classified_rule)
+    return {
+        **inventory,
+        "definitions": definitions,
+        "operational_rules": operational_rules,
+        "proved_derived_lemmas": proved_derived_lemmas,
+        "domain_lemmas": domain_lemmas,
+    }
+--- verification.k ---
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module FIB-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  syntax Stmts ::= "fibBody" [function]
+     7	  syntax Val ::= "fibClosure" [function]
+     8	  syntax Module ::= "fibProgram" [function]
+     9	
+    10	  rule fibBody =>
+    11	    Expr(
+    12	      Str(
+    13	        "Return n-th Fibonacci number.\n    >>> fib(10)\n    55\n    >>> fib(1)\n    1\n    >>> fib(8)\n    21\n    "))
+    14	    Assign(Name("a"), Int(0))
+    15	    Assign(Name("b"), Int(1))
+    16	    Assign(Name("_"), Int(0))
+    17	    For(Name("_"), Call(Name("range"), Name("n")),
+    18	      Assign(
+    19	        TupleExpr(Name("a"), Name("b")),
+    20	        TupleExpr(Name("b"), BinOp("+", Name("a"), Name("b")))))
+    21	    Return(Name("a"))
+    22	
+    23	  rule fibClosure =>
+    24	    closureVal(("n", .ParamNames), fibBody, 0)
+    25	
+    26	  rule fibProgram =>
+    27	    Module(FuncDef("fib", Params("n"), fibBody))
+    28	
+    29	  // A mathematical tail-recursive Fibonacci fold. Starting from
+    30	  // (A,B,I) = (0,1,0), it returns the N-th Fibonacci number.
+    31	  syntax Int ::= fibRun(Int, Int, Int, Int) [function, total]
+    32	  syntax Int ::= fibSpec(Int) [function, total]
+    33	
+    34	  rule fibRun(A:Int, _:Int, I:Int, N:Int) => A
+    35	    requires I >=Int N
+    36	
+    37	  rule fibRun(A:Int, B:Int, I:Int, N:Int)
+    38	    => fibRun(B, A +Int B, I +Int 1, N)
+    39	    requires I <Int N
+    40	
+    41	  rule fibSpec(N:Int) => fibRun(0, 1, 0, N)
+    42	endmodule
+--- spec.k ---
+     1	requires "verification.k"
+     2	
+     3	module FIB-SPEC
+     4	  imports FIB-VERIFICATION
+     5	
+     6	  // The result of the remaining loop is the mathematical fold fibRun.
+     7	  claim [fib-loop]:
+     8	    <k>
+     9	      #loop(
+    10	        rangeObj(I:Int, N:Int, 1),
+    11	        Name("_"),
+    12	        Assign(
+    13	          TupleExpr(Name("a"), Name("b")),
+    14	          TupleExpr(Name("b"), BinOp("+", Name("a"), Name("b")))))
+    15	      ~> CONT:K
+    16	      =>
+    17	      CONT
+    18	    </k>
+    19	    <env> L:Int </env>
+    20	    <scopes>
+    21	      (REST:Map
+    22	       L |-> scope(
+    23	         ("n" |-> N
+    24	          "a" |-> A:Int
+    25	          "b" |-> B:Int
+    26	          "_" |-> OLD_INDEX:Int),
+    27	         parent(0)))
+    28	      =>
+    29	      (REST
+    30	       L |-> scope(
+    31	         ("n" |-> N
+    32	          "a" |-> fibRun(A, B, I, N)
+    33	          "b" |-> ?FINAL_B:Int
+    34	          "_" |-> ?FINAL_INDEX:Int),
+    35	         parent(0)))
+    36	    </scopes>
+    37	    <scopeLoc> NEXT:Int </scopeLoc>
+    38	    <heap> HEAP:Map </heap>
+    39	    <heapLoc> HEAPNEXT:Int </heapLoc>
+    40	    <stack> STACK:List </stack>
+    41	    <ret> RET:RetState </ret>
+    42	    <exc> EXC:Exc </exc>
+    43	    <exit-code> EXIT:Int </exit-code>
+    44	    [circularity]
+    45	
+    46	  // For every natural-number input, running the translated function returns
+    47	  // the mathematical Fibonacci value.
+    48	  claim [fib-all-natural]:
+    49	    <k>
+    50	      #loadAll(fibProgram) ~> Call(Name("fib"), Int(N:Int))
+    51	      =>
+    52	      fibSpec(N)
+    53	    </k>
+    54	    <env> 0 </env>
+    55	    <scopes>
+    56	      (0 |-> scope(.Map, parent(-1))
+    57	       -1 |-> builtinsScope)
+    58	      =>
+    59	      (0 |-> scope("fib" |-> fibClosure, parent(-1))
+    60	       -1 |-> builtinsScope)
+    61	    </scopes>
+    62	    <scopeLoc> 1 </scopeLoc>
+    63	    <heap> .Map </heap>
+    64	    <heapLoc> 0 </heapLoc>
+    65	    <stack> .List </stack>
+    66	    <ret> noRet </ret>
+    67	    <exc> NoExc </exc>
+    68	    <exit-code> 0 </exit-code>
+    69	    requires N >=Int 0
+    70	    [depends(FIB-SPEC.fib-loop)]
+    71	endmodule
+--- solution.py ---
+     1	def fib(n: int):
+     2	    """Return n-th Fibonacci number.
+     3	    >>> fib(10)
+     4	    55
+     5	    >>> fib(1)
+     6	    1
+     7	    >>> fib(8)
+     8	    21
+     9	    """
+    10	    a = 0
+    11	    b = 1
+    12	    _ = 0
+    13	    for _ in range(n):
+    14	        a, b = b, a + b
+    15	    return a
+--- solution.mpy ---
+     1	Module(
+     2	  FuncDef("fib", Params("n"),
+     3	    Expr(
+     4	      Str(
+     5	        "Return n-th Fibonacci number.\n    >>> fib(10)\n    55\n    >>> fib(1)\n    1\n    >>> fib(8)\n    21\n    "))
+     6	    Assign(Name("a"), Int(0))
+     7	    Assign(Name("b"), Int(1))
+     8	    Assign(Name("_"), Int(0))
+     9	    For(Name("_"), Call(Name("range"), Name("n")),
+    10	      Assign(
+    11	        TupleExpr(Name("a"), Name("b")),
+    12	        TupleExpr(Name("b"), BinOp("+", Name("a"), Name("b")))))
+    13	    Return(Name("a"))))
+--- lemma-discovery.json ---
+{
+  "schema_version": 2,
+  "inventory_sha256": "77a34be1066a3b4fb0f3b4eff8c5199ec1606c7cc2b8823a18c6c1ed4ff9c111",
+  "rules": [
+    {
+      "source_rule_id": "rule-951beb64fbce92e456fcd1184e719112a1dfae8f2920b4e92ea537317f07c8c5",
+      "classification": "DEFINITION",
+      "rationale": "Expands the named fibBody proof term into the translated Python function body; it is a macro-style program representation, not an additional fact."
+    },
+    {
+      "source_rule_id": "rule-b493b8e29897cc7c9832cedd71cf42347ac6c23cc41617ee3267d644fcb82fa4",
+      "classification": "DEFINITION",
+      "rationale": "Defines the named fibClosure value from the parameter list, fibBody, and module environment location."
+    },
+    {
+      "source_rule_id": "rule-3c19c1ace444c19fcd0440bc740ffbe7c0b8d126b80d72d81a12abde7a68205c",
+      "classification": "DEFINITION",
+      "rationale": "Defines the named fibProgram module term containing the translated fib function definition."
+    },
+    {
+      "source_rule_id": "rule-0cfc2191eeac25cc4298d7ecca5a92d3f57f7715af391c09d3156408ff6479f1",
+      "classification": "DEFINITION",
+      "rationale": "Gives the terminating equation of the mathematical fibRun summary when the iteration index has reached or passed its bound."
+    },
+    {
+      "source_rule_id": "rule-8386dc93afab6158fba2ead31c4b2fbee2813be9182a6f184fca09c3dd0f7026",
+      "classification": "DEFINITION",
+      "rationale": "Gives the recursive equation of the mathematical fibRun summary for one Fibonacci-state transition before the bound."
+    },
+    {
+      "source_rule_id": "rule-aefa2ce110bb5a36b28fe6339c0379ad6d3bccd04b6da20c57f6208b69da53ee",
+      "classification": "DEFINITION",
+      "rationale": "Defines fibSpec as the fibRun summary initialized with the standard Fibonacci state (0, 1, 0)."
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+$ sed -n "1,240p" /tmp/audit-work/lean-proc-self-shim.c
+#define _GNU_SOURCE
+
+#include <dlfcn.h>
+#include <errno.h>
+#include <stddef.h>
+#include <string.h>
+#include <unistd.h>
+
+/*
+ * The Codex audit sandbox uses a private PID namespace with the host /proc
+ * mount. Lean 4.22 asks readlink("/proc/<inner-pid>/exe"), which therefore
+ * fails with ENOENT. Preserve normal readlink behavior and retry only that
+ * failed executable-path lookup through the kernel's /proc/self alias.
+ */
+ssize_t readlink(const char *path, char *buffer, size_t size) {
+    static ssize_t (*real_readlink)(const char *, char *, size_t) = NULL;
+    if (real_readlink == NULL) {
+        real_readlink = dlsym(RTLD_NEXT, "readlink");
+        if (real_readlink == NULL) {
+            errno = ENOSYS;
+            return -1;
+        }
+    }
+
+    ssize_t result = real_readlink(path, buffer, size);
+    if (result >= 0 || errno != ENOENT || path == NULL) {
+        return result;
+    }
+
+    const char prefix[] = "/proc/";
+    const char suffix[] = "/exe";
+    size_t length = strlen(path);
+    if (length > sizeof(prefix) - 1 + sizeof(suffix) - 1 &&
+        strncmp(path, prefix, sizeof(prefix) - 1) == 0 &&
+        strcmp(path + length - (sizeof(suffix) - 1), suffix) == 0) {
+        return real_readlink("/proc/self/exe", buffer, size);
+    }
+    return result;
+}
+$ cc -shared -fPIC -Wall -Wextra -Werror -o /tmp/audit-work/lean-proc-self-shim.so /tmp/audit-work/lean-proc-self-shim.c -ldl
+/tmp/audit-work/lean-proc-self-shim.c: In function ‘readlink’:
+/tmp/audit-work/lean-proc-self-shim.c:26:40: error: ‘nonnull’ argument ‘path’ compared to NULL [-Werror=nonnull-compare]
+   26 |     if (result >= 0 || errno != ENOENT || path == NULL) {
+      |                                        ^
+cc1: all warnings being treated as errors
+COMPILE_EXIT_CODE: 1
+$ sha256sum /tmp/audit-work/lean-proc-self-shim.c /tmp/audit-work/lean-proc-self-shim.so
+f96b9ba3121423062311ac9d060f65d19b7c328ca15ccd5861e8811a5c1a77d6  /tmp/audit-work/lean-proc-self-shim.c
+sha256sum: /tmp/audit-work/lean-proc-self-shim.so: No such file or directory
+$ LD_PRELOAD=/tmp/audit-work/lean-proc-self-shim.so /opt/elan/toolchains/leanprover--lean4---v4.22.0/bin/lean --version
+ERROR: ld.so: object '/tmp/audit-work/lean-proc-self-shim.so' from LD_PRELOAD cannot be preloaded (cannot open shared object file): ignored.
+error: failed to locate application
+LEAN_EXIT_CODE: 1
+$ cc -shared -fPIC -Wall -Wextra -Werror -o /tmp/audit-work/lean-proc-self-shim.so /tmp/audit-work/lean-proc-self-shim.c -ldl
+COMPILE_EXIT_CODE: 0
+$ sha256sum /tmp/audit-work/lean-proc-self-shim.c /tmp/audit-work/lean-proc-self-shim.so
+5848507694e7c20d484cea5a13529f4e130c6d23bc3128e76279724b0315570b  /tmp/audit-work/lean-proc-self-shim.c
+6245f6ccf6cf00467460c9de2dca0ef82e4f70313bc64c90f36f03c8f5b54ccf  /tmp/audit-work/lean-proc-self-shim.so
+$ LD_PRELOAD=/tmp/audit-work/lean-proc-self-shim.so /opt/elan/toolchains/leanprover--lean4---v4.22.0/bin/lean --version
+Lean (version 4.22.0, x86_64-unknown-linux-gnu, commit ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05, Release)
+LEAN_EXIT_CODE: 0

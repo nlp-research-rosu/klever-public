@@ -1,0 +1,601 @@
+$ wc -l trusted checker sources
+   791 /reference/tools/k_rule_inventory.py
+   709 /reference/tools/klean_preflight.py
+  1208 /reference/tools/klean.py
+  1962 /reference/tools/klean_export.py
+  4670 total
+$ sed -n k_rule_inventory.py
+#!/usr/bin/env python3
+"""Canonical lexical inventory of simplification rules in verification.k."""
+
+from __future__ import annotations
+
+import dataclasses
+import hashlib
+import json
+import re
+import stat
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+_MODULE_NAME_RE = re.compile(
+    r"^[ \t]+(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"(?:[ \t]+\[[^\]\r\n]*\])?[ \t]*$"
+)
+_TRAILING_ATTRIBUTES_RE = re.compile(
+    r"\[(?P<attributes>[^\[\]]*)\][ \t\r\n]*\Z", re.S
+)
+_CELL_TAG_RE = re.compile(
+    r"<(?P<close>/)?(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"[ \t]*(?P<self_close>/)?>"
+)
+_OUTER_SENTENCE_KEYWORDS = {
+    "imports",
+    "syntax",
+    "rule",
+    "configuration",
+    "context",
+    "claim",
+    "alias",
+}
+
+
+class KRuleInventoryError(RuntimeError):
+    """Raised when verification.k cannot produce a canonical inventory."""
+
+
+@dataclass(frozen=True)
+class KRule:
+    source_rule_id: str
+    module: str
+    start_line: int
+    end_line: int
+    normalized_sha256: str
+    attributes: list[str]
+    text: str
+
+
+@dataclass(frozen=True)
+class _Sentence:
+    keyword: str
+    start: int
+
+
+@dataclass(frozen=True)
+class _Module:
+    name: str
+    content_start: int
+    content_end: int
+    imports: tuple[str, ...]
+    sentences: tuple[_Sentence, ...]
+
+
+@dataclass(frozen=True)
+class _RuleSpan:
+    rule: KRule
+    start_offset: int
+    end_offset: int
+    attribute_start: int | None
+    attribute_end: int | None
+
+
+def canonical_json_sha256(document: Any) -> str:
+    encoded = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _mask_non_code(text: str) -> str:
+    """Mask comments and string bodies without changing source offsets."""
+
+    output = list(text)
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                state = "code"
+            else:
+                output[index] = " "
+            index += 1
+            continue
+        if state == "string":
+            if character == "\\" and following:
+                output[index] = " "
+                output[index + 1] = " "
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            elif character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                output[index] = output[index + 1] = " "
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                output[index] = output[index + 1] = " "
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output[index] = output[index + 1] = " "
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output[index] = output[index + 1] = " "
+            state = "block-comment"
+            block_depth = 1
+            index += 2
+            continue
+        if character == '"':
+            state = "string"
+        index += 1
+    return "".join(output)
+
+
+def _line_ranges(text: str, start: int = 0) -> list[tuple[int, int, int]]:
+    ranges: list[tuple[int, int, int]] = []
+    line_start = start
+    while line_start < len(text):
+        newline = text.find("\n", line_start)
+        next_start = len(text) if newline < 0 else newline + 1
+        line_end = len(text) if newline < 0 else newline
+        content_end = (
+            line_end - 1
+            if line_end > line_start and text[line_end - 1] == "\r"
+            else line_end
+        )
+        ranges.append((line_start, content_end, next_start))
+        if newline < 0:
+            break
+        line_start = next_start
+    return ranges
+
+
+def _line_heads(text: str) -> list[tuple[int, int, str, str]]:
+    """Return physical-line word heads without assigning K grammar meaning."""
+
+    heads: list[tuple[int, int, str, str]] = []
+    for line_start, content_end, _next_start in _line_ranges(text):
+        index = line_start
+        while index < content_end and text[index] in " \t":
+            index += 1
+        word_end = index
+        while word_end < content_end and (
+            text[word_end].isalnum() or text[word_end] in "_'"
+        ):
+            word_end += 1
+        if word_end > index:
+            heads.append(
+                (
+                    line_start,
+                    content_end,
+                    text[index:word_end],
+                    text[word_end:content_end],
+                )
+            )
+    return heads
+
+
+def _line_word(line: str) -> tuple[str, str, int]:
+    stripped = line.lstrip()
+    indent = len(line) - len(stripped)
+    word_end = 0
+    while word_end < len(stripped) and (
+        stripped[word_end].isalnum() or stripped[word_end] in "_'"
+    ):
+        word_end += 1
+    return stripped[:word_end], stripped[word_end:], indent + word_end
+
+
+def _rule_continuation(line: str) -> tuple[str, int] | None:
+    stripped = line.lstrip()
+    if stripped.startswith("["):
+        return "attributes", len(line) - len(stripped)
+    word, rest, word_end = _line_word(line)
+    for keyword in ("requires", "ensures"):
+        if word == keyword and (
+            not rest
+            or not (
+                rest[0].isalnum()
+                or rest[0] in "_'"
+            )
+        ):
+            return keyword, word_end
+    return None
+
+
+def _starts_outer_transition(line: str) -> bool:
+    keyword, rest, _word_end = _line_word(line)
+    separated = bool(rest) and rest[0] in " \t"
+    if keyword == "module":
+        return separated and _MODULE_NAME_RE.fullmatch(rest) is not None
+    if keyword == "endmodule":
+        return not rest.strip()
+    if keyword == "rule":
+        return not rest or separated
+    return keyword in _OUTER_SENTENCE_KEYWORDS and separated
+
+
+def _terminal_attribute_line(line: str) -> bool:
+    match = _TRAILING_ATTRIBUTES_RE.search(line)
+    if match is None:
+        return False
+    start = match.start()
+    return start == 0 or line[start - 1].isspace()
+
+
+def _scan_rule_delimiters(
+    line: str,
+    delimiters: list[str],
+) -> None:
+    closing = {")": "(", "]": "[", "}": "{"}
+    index = 0
+    while index < len(line):
+        if line[index] == "<":
+            cell = _CELL_TAG_RE.match(line, index)
+            if cell is not None:
+                marker = f"<{cell.group('name')}>"
+                if cell.group("close"):
+                    if delimiters and delimiters[-1] == marker:
+                        delimiters.pop()
+                elif not cell.group("self_close"):
+                    delimiters.append(marker)
+                index = cell.end()
+                continue
+        character = line[index]
+        if character in "([{":
+            delimiters.append(character)
+        elif character in closing:
+            if delimiters and delimiters[-1] == closing[character]:
+                delimiters.pop()
+        index += 1
+
+
+def _rule_bubble_end(masked_text: str, start: int) -> int:
+    """Find when an outer rule bubble returns control to outer parsing."""
+
+    seen_rewrite = False
+    clause_has_content = False
+    candidate_end: int | None = None
+    delimiters: list[str] = []
+    ranges = _line_ranges(masked_text, start)
+    for line_start, line_end, next_start in ranges:
+        line = masked_text[line_start:line_end]
+        if not line.strip():
+            continue
+
+        continuation = (
+            _rule_continuation(line)
+            if seen_rewrite and candidate_end is not None
+            else None
+        )
+        if candidate_end is not None:
+            if continuation is None and _starts_outer_transition(line):
+                return candidate_end
+            candidate_end = None
+
+        content_start = 0
+        if continuation is not None:
+            kind, content_start = continuation
+            if kind in {"requires", "ensures"}:
+                clause_has_content = False
+
+        if not seen_rewrite:
+            rewrite = line.find("=>")
+            if rewrite >= 0:
+                seen_rewrite = True
+                content_start = rewrite + 2
+            else:
+                content_start = len(line)
+
+        _scan_rule_delimiters(line, delimiters)
+        if seen_rewrite and line[content_start:].strip():
+            clause_has_content = True
+
+        if (
+            seen_rewrite
+            and clause_has_content
+            and not delimiters
+            and _terminal_attribute_line(line)
+        ):
+            return next_start
+        if seen_rewrite and clause_has_content and not delimiters:
+            candidate_end = next_start
+    if candidate_end is not None:
+        return candidate_end
+    return len(masked_text) + 1
+
+
+def _modules(masked_text: str) -> tuple[_Module, ...]:
+    modules: list[_Module] = []
+    open_module: tuple[
+        str, int, list[str], list[_Sentence]
+    ] | None = None
+    open_rule_until = 0
+    for line_start, line_end, keyword, rest in _line_heads(masked_text):
+        if line_start < open_rule_until:
+            continue
+        open_rule_until = 0
+        separated = bool(rest) and rest[0] in " \t"
+        if keyword == "module":
+            if not separated:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            named = _MODULE_NAME_RE.fullmatch(rest)
+            if named is None or open_module is not None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            open_module = (named.group("name"), line_end, [], [])
+            continue
+        if keyword == "endmodule":
+            if rest.strip():
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            if open_module is None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            name, content_start, imports, sentences = open_module
+            modules.append(
+                _Module(
+                    name=name,
+                    content_start=content_start,
+                    content_end=line_start,
+                    imports=tuple(imports),
+                    sentences=tuple(sentences),
+                )
+            )
+            open_module = None
+            continue
+        if open_module is not None and keyword == "rule":
+            open_module[3].append(
+                _Sentence(keyword=keyword, start=line_start)
+            )
+            open_rule_until = _rule_bubble_end(masked_text, line_start)
+            continue
+        if open_module is not None and keyword == "imports" and separated:
+            imported = rest.strip().split()
+            if len(imported) != 1:
+                raise KRuleInventoryError(
+                    "verification.k has malformed imports"
+                )
+            open_module[2].append(imported[0])
+        if (
+            open_module is not None
+            and keyword in _OUTER_SENTENCE_KEYWORDS
+            and separated
+        ):
+            open_module[3].append(
+                _Sentence(keyword=keyword, start=line_start)
+            )
+    if not modules or open_module is not None:
+        raise KRuleInventoryError(
+            "verification.k has malformed module boundaries"
+        )
+    return tuple(modules)
+
+
+def _verification_module(
+    modules: tuple[_Module, ...], selected_name: str | None = None
+) -> _Module:
+    if selected_name is not None:
+        selected = [module for module in modules if module.name == selected_name]
+        if len(selected) != 1:
+            raise KRuleInventoryError(
+                "prove.sh selects an unknown verification main module: "
+                + selected_name
+            )
+        return selected[0]
+    candidates = [
+        module
+        for module in modules
+        if module.name.endswith("VERIFICATION")
+        and not module.name.endswith("-SYNTAX")
+    ]
+    if len(candidates) != 1:
+        raise KRuleInventoryError(
+            "verification.k must contain exactly one verification module"
+        )
+    return candidates[0]
+
+
+def _last_verification_main_module(workspace: Path) -> str | None:
+    script = workspace / "prove.sh"
+    if not script.exists() and not script.is_symlink():
+        return None
+    try:
+        mode = script.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(f"cannot inspect prove.sh: {script}") from error
+    if not stat.S_ISREG(mode):
+        raise KRuleInventoryError(f"prove.sh must be a regular file: {script}")
+    try:
+        text = script.read_text()
+    except (OSError, UnicodeError) as error:
+        raise KRuleInventoryError(f"cannot read prove.sh: {script}") from error
+    logical = re.sub(r"\\\r?\n", " ", text)
+    selected: str | None = None
+    for line in logical.splitlines():
+        code = line.split("#", 1)[0]
+        if not re.search(r"(?:^|[;&|]\s*)kompile\s+", code):
+            continue
+        if re.search(r"(?:^|\s)(?:\./)?verification\.k(?:\s|$)", code) is None:
+            continue
+        match = re.search(
+            r"(?:^|\s)--main-module(?:=|\s+)([A-Za-z][A-Za-z0-9_'-]*)",
+            code,
+        )
+        if match is not None:
+            selected = match.group(1)
+    return selected
+
+
+def _verification_closure(
+    modules: tuple[_Module, ...], verification: _Module
+) -> tuple[_Module, ...]:
+    by_name = {module.name: module for module in modules}
+    reached: set[str] = set()
+    pending = [verification.name]
+    while pending:
+        name = pending.pop()
+        if name in reached:
+            continue
+        reached.add(name)
+        module = by_name.get(name)
+        if module is not None:
+            pending.extend(module.imports)
+    return tuple(module for module in modules if module.name in reached)
+
+
+def _without_comments(text: str) -> str:
+    """Remove K comments while preserving strings and their exact contents."""
+
+    output: list[str] = []
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                output.append(character)
+                state = "code"
+            index += 1
+            continue
+        if state == "string":
+            output.append(character)
+            if character == "\\" and following:
+                output.append(following)
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character in "\r\n":
+                output.append(character)
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output.append(" ")
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output.append(" ")
+            state = "block-comment"
+            block_depth = 1
+            index += 2
+            continue
+        output.append(character)
+$ rg check_generation/classifications in klean_preflight.py
+6:import argparse
+34:    "trust-inventory.json",
+183:    the immutable target module must contain only a proposition definition,
+212:def _source_and_obligation_gate(
+229:    if input_manifest.get("inventory_sha256") != validated[
+230:        "inventory_sha256"
+233:            "Stage 1/Stage 3 inventory hash changed after deterministic export"
+240:            "Stage 3 DOMAIN_LEMMA inventory changed after deterministic export"
+247:    mapping_path = generated / "obligation-map.json"
+248:    obligation_map = _regular_json(mapping_path, "obligation map")
+249:    if obligation_map.get("source_rules") != source_rules:
+251:            "source rules and generated obligations are not bijective"
+253:    obligations = obligation_map.get("obligations")
+254:    if not isinstance(obligations, list):
+255:        raise KleanPreflightError("generated obligation list is malformed")
+259:    for obligation in obligations:
+260:        if not isinstance(obligation, dict):
+261:            raise KleanPreflightError("generated obligation is malformed")
+262:        source_rule_id = obligation.get("source_rule_id")
+264:            raise KleanPreflightError("generated obligation ID is malformed")
+266:        lean_conjunct = obligation.get("lean_conjunct")
+269:        if obligation.get("lean_conjunct_sha256") != klean_export.sha256_text(
+276:        if source_rule is None or obligation.get("source_span") != {
+281:                "source rules and generated obligations are not bijective"
+285:            "inventory_sha256",
+288:            if obligation.get(key) != source_rule[key]:
+290:                    "generated obligation provenance differs from "
+297:            "source rules and generated obligations are not bijective"
+299:    parameters = obligation_map.get("trust_parameters")
+303:    if generator_manifest.get("obligation_count") != len(obligations):
+304:        raise KleanPreflightError("generator obligation count changed")
+305:    if generator_manifest.get("obligation_map_sha256") != hashlib.sha256(
+308:        raise KleanPreflightError("generated obligation map hash changed")
+309:    expected_definition = klean_export.expected_target_definition(
+310:        obligation_map
+313:        target = klean_export.target_statement(generated)
+317:        if target is not None:
+319:                "zero obligations unexpectedly generated a target proposition"
+322:        target is None
+323:        or target.get("definition_sha256")
+327:            "generated target is not the exact conjunction of mapped obligations"
+329:    return source_rules, obligations
+352:                "trust parameter is not bound to source obligations"
+389:def check_generation(
+422:    inventory = _regular_json(
+423:        generation / "trust-inventory.json", "trust inventory"
+468:    if provenance.get("inventory_sha256") != input_manifest.get(
+469:        "inventory_sha256"
+472:            "Stage 1/Stage 3 inventory provenance differs"
+474:    _source_rules, obligations = _source_and_obligation_gate(
+481:    expected_export_status = "OK" if obligations else "KLEAN_NO_OBLIGATIONS"
+484:            "export status disagrees with generated obligation count"
+486:    if export_result.get("obligation_count") != len(obligations):
+488:            "export result obligation_count does not match generated obligations"
+492:        target = klean_export.target_statement(generated)
+495:    expected_target = generator_manifest.get("target")
+496:    if target != expected_target:
+497:        raise KleanPreflightError("target theorem statement or location changed")
+498:    if bool(obligations) != bool(target):
+500:            "target proposition and obligation inventory disagree"
+515:    if inventory.get("designated_sorries") != 0 or inventory.get(
+518:        raise KleanPreflightError("trust inventory has unexpected proof-hole counts")
+522:    allowlist = inventory.get("allowlist")
+524:        raise KleanPreflightError("trust inventory allowlist is malformed")
+552:        "trust_inventory_sha256": sidecar_hashes[
+553:            "trust-inventory.json"
+559:                "trust inventory hash"
+560:                if field == "trust_inventory_sha256"
+590:        "status": "PASS" if obligations else "KLEAN_NO_OBLIGATIONS",
+595:        "target": target,
+596:        "obligation_count": len(obligations),
+680:    parser = argparse.ArgumentParser(description=__doc__)
+708:if __name__ == "__main__":

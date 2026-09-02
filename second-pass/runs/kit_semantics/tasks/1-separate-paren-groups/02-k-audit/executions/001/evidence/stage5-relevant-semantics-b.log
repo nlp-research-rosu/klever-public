@@ -1,0 +1,378 @@
+COMMAND: bash -lc for\ f\ in\ reference-semantics/semantics/controls.k\ reference-semantics/semantics/operators.k\ reference-semantics/semantics/int.k\ reference-semantics/semantics/bool.k\ reference-semantics/semantics/str.k\ reference-semantics/semantics/list.k\ reference-semantics/semantics/iter.k\;\ do\ echo\ \"=====\ \$f\"\;\ nl\ -ba\ \"\$f\"\;\ done
+===== reference-semantics/semantics/controls.k
+     1	// reference/src/semantics/controls.k — MPY-CONTROLS
+     2	
+     3	module MPY-CONTROLS
+     4	  imports MPY-CORE
+     5	  imports MPY-TUPLE
+     6	  imports MPY-ITER
+     7	
+     8	  // ==== Assign / AugAssign (write the current scope; RHS evaluated by strictness) ==
+     9	  rule <k> Assign(Name(X:String), V:Val) => .K ... </k>
+    10	       <env> L:Int </env>
+    11	       <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>
+    12	  rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k>
+    13	       <env> L:Int </env>
+    14	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    15	       requires "$cells" in_keys(M)
+    16	        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+    17	        andBool X in_keys(M) andBool isCellRef({M[X]}:>Val)
+    18	       [priority(40)]
+    19	
+    20	  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k>
+    21	       <env> L:Int </env>
+    22	       <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes>
+    23	       requires X in_keys(M)
+    24	  // `lst += [..]` where lst is a heap ref: the generic rule leaves applyBin(OP, ref, V) — but the
+    25	  // ref-deref preemption is BinOp-level (operators.k), so applyBin never derefs and it sticks. Route
+    26	  // the ref case through BinOp so the deref + list-concat + #alloc path fires (result is a fresh ref).
+    27	  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k>
+    28	       <env> L:Int </env>
+    29	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    30	       requires X in_keys(M) andBool isRefV({M[X]}:>Val)
+    31	       [priority(40)]
+    32	
+    33	  // ==== import trivia: `from math import floor, ceil` binds the supported
+    34	  // names as builtins in the current scope; every other import is a no-op
+    35	  rule <k> ImportFrom("math", NS:ParamNames) => #bindImports(NS) ... </k>
+    36	  rule <k> ImportFrom(_:String, _:ParamNames) => .K ... </k> [owise]
+    37	  syntax KItem ::= #bindImports(ParamNames)
+    38	  rule <k> #bindImports(.ParamNames) => .K ... </k>
+    39	  rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>
+    40	       <env> L:Int </env>
+    41	       <scopes> ... L |-> scope(M:Map => M [ N <- builtinV(N) ], _) ... </scopes>
+    42	       requires N ==String "floor" orBool N ==String "ceil"
+    43	  rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>
+    44	       requires notBool (N ==String "floor" orBool N ==String "ceil")
+    45	
+    46	  // ==== Expr statement: evaluate for effect, discard the value ===============
+    47	  // (bare calls — mutator methods, docstrings; the WP0 statement-trivia rung)
+    48	  rule <k> Expr(_:Val) => .K ... </k>
+    49	
+    50	  // ==== If (condition evaluated by strictness) ==============================
+    51	  syntax KItem ::= #branch(Bool, Stmts, Stmts)
+    52	  rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>
+    53	  rule <k> #branch(true,  T:Stmts, _:Stmts) => T ... </k>
+    54	  rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>
+    55	
+    56	  // ==== IfExp: ternary T if C else E ========================================
+    57	  rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k>
+    58	       requires truthy(V)
+    59	  rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k>
+    60	       requires notBool truthy(V)
+    61	
+    62	  // ==== For: one loop, in-cell continuation, over #iterNext =================
+    63	  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+    64	  // circularities anchor on #loop and narrowing substitutes the structure)
+    65	  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+    66	                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+    67	                 | #loopLbl(K) | "#cont" | "#brk"
+    68	
+    69	  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+    70	
+    71	  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+    72	  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+    73	  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+    74	        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+    75	
+    76	  // ==== While ==============================================================
+    77	  rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>
+    78	  rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>
+    79	  rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k>
+    80	       requires truthy(V)
+    81	  rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k>
+    82	       requires notBool truthy(V)
+    83	
+    84	  // ==== loop control (break / continue) =====================================
+    85	  rule <k> #loopLbl(NEXT:K) => NEXT ... </k>
+    86	  rule <k> Continue => #cont ... </k>
+    87	  rule <k> Break => #brk ... </k>
+    88	  rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>
+    89	  rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]
+    90	  rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>
+    91	  rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]
+    92	
+    93	  // ==== heap-object deref at the truthiness/iteration consumers ==============
+    94	  // (priority(40) preempts the generic Val rules so truthy/#loop never see a ref)
+    95	  rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k>
+    96	       <heap> ... H |-> V:Val ... </heap>
+    97	       [priority(40)]
+    98	  rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k>
+    99	       <heap> ... H |-> V:Val ... </heap>
+   100	       [priority(40)]
+   101	  rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k>
+   102	       <heap> ... H |-> V:Val ... </heap>
+   103	       [priority(40)]
+   104	  // For derefs its iterable ONCE at loop start (iteration is over the snapshot;
+   105	  // mutating the iterated list inside its own loop is outside the subset)
+   106	  rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k>
+   107	       <heap> ... H |-> V:Val ... </heap>
+   108	       [priority(40)]
+   109	endmodule
+===== reference-semantics/semantics/operators.k
+     1	// reference/src/semantics/operators.k — MPY-OPERATORS
+     2	// The operator DISPATCH layer: operands evaluate by strictness (heat/cool over KResult=Val),
+     3	// the cooled node hands to applyUn/applyBin/applyCmp (declared in core.k; each domain file
+     4	// owns its cases — bool.k, int.k, float.k, str.k, list.k, tuple.k, set.k, dict.k).
+     5	
+     6	module MPY-OPERATORS
+     7	  imports MPY-CORE
+     8	  imports MPY-ITER
+     9	
+    10	  rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>
+    11	
+    12	  rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+    13	
+    14	  // Compare's right operand sits under the CmpOp wrapper — contexts instead of attributes
+    15	  context Compare(HOLE, _)
+    16	  context Compare(_:Val, CmpOp(_, HOLE))
+    17	  rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]
+    18	
+    19	  rule applyCmp("is",     V:Val, noneV) => V ==K noneV
+    20	  rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)
+    21	
+    22	  // ==== operand deref: heap objects combine/compare by STRUCTURE ============
+    23	  // (Python: list == is structural; identity only via `is`.) priority(40)
+    24	  // preempts the generic dispatch so applyUn/applyBin/applyCmp never see a ref.
+    25	  rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k>
+    26	       <heap> ... H |-> V:Val ... </heap>
+    27	       [priority(40)]
+    28	  rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k>
+    29	       <heap> ... H |-> V:Val ... </heap>
+    30	       requires notBool isRefV(L)
+    31	       [priority(40)]
+    32	
+    33	  // the left operand of `in`/`not in` is an ELEMENT (compares by ==K) — never deref'd
+    34	  rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k>
+    35	       <heap> ... H |-> V:Val ... </heap>
+    36	       requires OP =/=String "in" andBool OP =/=String "not in"
+    37	       [priority(40)]
+    38	  rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k>
+    39	       <heap> ... H |-> V:Val ... </heap>
+    40	       requires notBool isRefV(L)
+    41	        orBool OP ==String "in" orBool OP ==String "not in"
+    42	       [priority(40)]
+    43	
+    44	  rule <k> UnaryOp(OP:String, ref(H:Int)) => UnaryOp(OP, V) ... </k>
+    45	       <heap> ... H |-> V:Val ... </heap>
+    46	       [priority(40)]
+    47	endmodule
+===== reference-semantics/semantics/int.k
+     1	// reference/src/semantics/int.k — MPY-INT
+     2	// Int cases of the operator dispatch; Python // and % are floored (pyMod).
+     3	
+     4	module MPY-INT
+     5	  imports MPY-CORE
+     6	
+     7	  rule applyUn("-", I:Int) => 0 -Int I
+     8	
+     9	  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    10	  // Bool participates in int arithmetic (x += (a == b))
+    11	  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+    12	  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+    13	  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+    14	  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+    15	  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+    16	  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+    17	  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+    18	
+    19	  syntax Int ::= pyMod(Int, Int) [function]
+    20	  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+    21	
+    22	  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+    23	  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+    24	  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+    25	  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+    26	  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+    27	  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+    28	endmodule
+===== reference-semantics/semantics/bool.k
+     1	// reference/src/semantics/bool.k — MPY-BOOL
+     2	// Bool operator cases + the truthy boolean operations (not / and / or; and-or are
+     3	// value-returning short-circuit over any Vals, per Python).
+     4	
+     5	module MPY-BOOL
+     6	  imports MPY-CORE
+     7	
+     8	  rule applyUn("not", V:Val) => notBool truthy(V)
+     9	
+    10	  rule applyCmp("==", B1:Bool, B2:Bool) => B1 ==Bool B2
+    11	  rule applyCmp("!=", B1:Bool, B2:Bool) => B1 =/=Bool B2
+    12	
+    13	  // ==== BoolOp: short-circuit, value-returning and / or =====================
+    14	  // the node is its own accumulator: heat the HEAD element only, then either return it
+    15	  // (short-circuit) or drop it and continue
+    16	  context BoolOp(_, (HOLE:Expr, _:Exprs))
+    17	  rule <k> BoolOp(_:String, (V:Val, .Exprs)) => V ... </k>
+    18	  rule <k> BoolOp("and", (V:Val, A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>
+    19	       requires truthy(V)
+    20	  rule <k> BoolOp("and", (V:Val, _:Expr, _:Exprs)) => V ... </k>
+    21	       requires notBool truthy(V)
+    22	  rule <k> BoolOp("or",  (V:Val, _:Expr, _:Exprs)) => V ... </k>
+    23	       requires truthy(V)
+    24	  rule <k> BoolOp("or",  (V:Val, A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>
+    25	       requires notBool truthy(V)
+    26	
+    27	  // ==== heap-object head: decide truthiness THROUGH the heap, never rewrite the
+    28	  // operand — and/or return the OBJECT itself (Python identity), not its structure
+    29	  rule <k> BoolOp(_:String, (ref(H:Int), .Exprs)) => ref(H) ... </k>
+    30	       [priority(40)]
+    31	  rule <k> BoolOp("and", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>
+    32	       <heap> ... H |-> V:Val ... </heap>
+    33	       requires truthy(V)
+    34	       [priority(40)]
+    35	  rule <k> BoolOp("and", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k>
+    36	       <heap> ... H |-> V:Val ... </heap>
+    37	       requires notBool truthy(V)
+    38	       [priority(40)]
+    39	  rule <k> BoolOp("or", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k>
+    40	       <heap> ... H |-> V:Val ... </heap>
+    41	       requires truthy(V)
+    42	       [priority(40)]
+    43	  rule <k> BoolOp("or", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>
+    44	       <heap> ... H |-> V:Val ... </heap>
+    45	       requires notBool truthy(V)
+    46	       [priority(40)]
+    47	endmodule
+===== reference-semantics/semantics/str.k
+     1	// reference/src/semantics/str.k — MPY-STR
+     2	
+     3	module MPY-STR
+     4	  imports MPY-CORE
+     5	  imports MPY-ITER
+     6	
+     7	  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+     8	  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+     9	  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+    10	        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+    11	
+    12	  // ==== str literal (ASCII-only) ============================================
+    13	  syntax IntSeq ::= strToCodes(String) [function]
+    14	  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+    15	  rule strToCodes("") => .IntSeq
+    16	  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    17	    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+    18	
+    19	  // ==== operators: + / == / != / in =========================================
+    20	  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+    21	  rule seqConcat(.IntSeq, T:IntSeq)                => T
+    22	  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+    23	
+    24	  rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+    25	  rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+    26	  rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)
+    27	
+    28	  // substring membership: `P in X` iff the code-seq P occurs contiguously in X
+    29	  rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)
+    30	  rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)
+    31	
+    32	  syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]
+    33	  rule strPrefix(.IntSeq, _:IntSeq)               => true
+    34	  rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false
+    35	  rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)
+    36	
+    37	  syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]
+    38	  rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)
+    39	  rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)
+    40	  rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs)
+    41	       requires notBool strPrefix(P, iCons(C, Xs))
+    42	
+    43	  // ==== lexicographic order: < / <= / > / >= by code point (= Python str order on the code
+    44	  // model). strLt reduces on GROUND code-seqs (krun) but is inert/OPAQUE on symbolic ones
+    45	  // (a proof's codesProj(V) is an abstract IntSeq — no constructor rule matches), so a symbolic
+    46	  // str `<` stays a trusted opaque term the way sortVS / intFloatDiv do. Additive: fires only on
+    47	  // str </<=/>/>= comparisons.
+    48	  syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]
+    49	  rule strLt(.IntSeq, .IntSeq)                => false
+    50	  rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true
+    51	  rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false
+    52	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true          requires A  <Int B
+    53	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false         requires A  >Int B
+    54	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B
+    55	
+    56	  rule applyCmp("<",  str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+    57	  rule applyCmp(">",  str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)
+    58	  rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)
+    59	  rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)
+    60	endmodule
+===== reference-semantics/semantics/list.k
+     1	// reference/src/semantics/list.k — MPY-LIST
+     2	
+     3	module MPY-LIST
+     4	  imports MPY-CORE
+     5	  imports MPY-ITER
+     6	  imports MPY-OPERATORS
+     7	
+     8	  // ==== iteration (the iterator protocol's list case) =======================
+     9	  rule <k> #iterNext(list(.ValSeq))                => #iterDone ... </k>
+    10	  rule <k> #iterNext(list(vCons(V:Val, R:ValSeq))) => #iterYield(V, list(R)) ... </k>
+    11	
+    12	  // ==== ListExpr: [...] literal -> a fresh heap object =======================
+    13	  syntax ApplyK ::= "toList"
+    14	  rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>
+    15	  rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>
+    16	
+    17	  // ==== list ops: + / == / != ===============================================
+    18	  syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]
+    19	  rule valSeqConcat(.ValSeq, T:ValSeq)                => T
+    20	  rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))
+    21	
+    22	  // list + list constructs a NEW object (k-cell — it allocates; operands land here
+    23	  // already deref'd). priority(45) beats the generic BinOp dispatch.
+    24	  rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k>
+    25	       [priority(45)]
+    26	
+    27	  rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B
+    28	  rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B)
+    29	
+    30	  // ==== deep equality when elements are heap objects (list-of-lists) ========
+    31	  // Python == is structural at every depth. Fires ONLY when a ref is present
+    32	  // (the guard decides on concrete seqs); the plain ==K path above is unchanged.
+    33	  syntax Bool ::= hasRefVS(ValSeq) [function, total]
+    34	  rule hasRefVS(.ValSeq)                => false
+    35	  rule hasRefVS(vCons(V:Val, R:ValSeq)) => isRefV(V) orBool hasRefVS(R)
+    36	
+    37	  syntax Bool ::= deepEqVS(ValSeq, ValSeq, Map) [function]
+    38	                | deepEqV(Val, Val, Map)        [function]
+    39	  rule deepEqVS(.ValSeq, .ValSeq, _:Map)                   => true
+    40	  rule deepEqVS(.ValSeq, vCons(_:Val, _:ValSeq), _:Map)    => false
+    41	  rule deepEqVS(vCons(_:Val, _:ValSeq), .ValSeq, _:Map)    => false
+    42	  rule deepEqVS(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq), HP:Map)
+    43	    => deepEqV(A, B, HP) andBool deepEqVS(As, Bs, HP)
+    44	
+    45	  rule deepEqV(ref(H:Int), B:Val, HP:Map) => deepEqV({HP[H]}:>Val, B, HP)
+    46	       requires H in_keys(HP)
+    47	  rule deepEqV(A:Val, ref(H:Int), HP:Map) => deepEqV(A, {HP[H]}:>Val, HP)
+    48	       requires notBool isRefV(A) andBool H in_keys(HP)
+    49	  rule deepEqV(list(A:ValSeq), list(B:ValSeq), HP:Map) => deepEqVS(A, B, HP)
+    50	  rule deepEqV(A:Val, B:Val, _:Map) => A ==K B [owise]
+    51	
+    52	  // ==== mutator: xs.append(v) — an in-place heap write ======================
+    53	  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "append")), (V:Val, .Vals)) => noneV ... </k>
+    54	       <heap> ... H |-> list(VS:ValSeq => valSeqConcat(VS, vCons(V, .ValSeq))) ... </heap>
+    55	       [priority(40)]
+    56	
+    57	  // ==== `x in list` — a <k>-cell fold over #iterNext ========================
+    58	  syntax KItem ::= #memberAcc(Val, Iterable) | #memberCont(Val) | "#notB"
+    59	  rule <k> Compare(LV:Val, CmpOp("in",     list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ... </k>
+    60	  rule <k> Compare(LV:Val, CmpOp("not in", list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ~> #notB ... </k>
+    61	  rule <k> #memberAcc(V:Val, IT:Iterable) => #iterNext(IT) ~> #memberCont(V) ... </k>
+    62	  rule <k> #iterDone ~> #memberCont(_V:Val) => false ... </k>
+    63	  rule <k> #iterYield(E:Val, _:Iterable) ~> #memberCont(V:Val) => true ... </k>
+    64	       requires E ==K V
+    65	  rule <k> #iterYield(E:Val, R:Iterable) ~> #memberCont(V:Val) => #memberAcc(V, R) ... </k>
+    66	       requires notBool (E ==K V)
+    67	  rule <k> B:Bool ~> #notB => notBool B ... </k>
+    68	endmodule
+===== reference-semantics/semantics/iter.k
+     1	// reference/src/semantics/iter.k — MPY-ITER
+     2	// The iterator protocol, DECLARATION ONLY. Each iterable's #iterNext case lives in that
+     3	// iterable's own module (list/tuple/str in their modules, rangeObj in range.k, zip in
+     4	// builtins.k). Consumers (the for-loop, `x in _`, sum/all/any/max/min) import this.
+     5	
+     6	module MPY-ITER
+     7	  imports MPY-CORE
+     8	  syntax KItem ::= #iterNext(Iterable) | "#iterDone" | #iterYield(Val, Iterable)
+     9	endmodule
+
+EXIT_STATUS: 0

@@ -1,0 +1,363 @@
++ sed -n 1,140p /reference/tools/audit_contract.py
+#!/usr/bin/env python3
+"""Resolve immutable audit inputs and normalize reviewer verdicts."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import stat
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any
+
+MODULE_REPO = Path(__file__).resolve().parent.parent
+if str(MODULE_REPO) not in sys.path:
+    sys.path.insert(0, str(MODULE_REPO))
+
+
+CONDITIONS = {
+    "bare": False,
+    "kit": False,
+    "semantics": True,
+    "kit-semantics": True,
+}
+
+VALID_PAIRS = {
+    ("PASS", "LEGIT"),
+    ("CONCERNS", "LEGIT"),
+    ("FAIL", "NOT_LEGIT"),
+}
+
+TRUSTED_CANONICAL_FILENAME = "canonical" + ".py"
+
+_VERDICT_MARKER = re.compile(r"VERDICT: (PASS|CONCERNS|FAIL)")
+_LEGITIMACY_MARKER = re.compile(r"LEGITIMACY: (LEGIT|NOT_LEGIT)")
+_HASH_CHUNK_SIZE = 1024 * 1024
+
+
+class AuditContractError(RuntimeError):
+    """Raised when an audit input violates the host-side safety contract."""
+
+
+def validate_safe_component(
+    value: object, label: str, *, allow_hidden: bool
+) -> None:
+    if not isinstance(value, str):
+        raise AuditContractError(f"{label} must be a string path component")
+    path = Path(value)
+    unsafe = (
+        not value
+        or value in {".", ".."}
+        or (not allow_hidden and value.startswith("."))
+        or path.is_absolute()
+        or len(path.parts) != 1
+        or "/" in value
+        or "\\" in value
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+    )
+    if unsafe:
+        visibility = "nonhidden " if not allow_hidden else ""
+        raise AuditContractError(
+            f"{label} must be one safe {visibility}path component: {value!r}"
+        )
+
+
+def _lstat(path: Path, label: str) -> os.stat_result:
+    try:
+        return path.lstat()
+    except OSError as error:
+        raise AuditContractError(f"{label} is missing or cannot be inspected: {path}") from error
+
+
+def require_real_directory(path: Path, label: str) -> Path:
+    mode = _lstat(path, label).st_mode
+    if not stat.S_ISDIR(mode):
+        raise AuditContractError(f"{label} must be a real directory: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise AuditContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def require_regular_file(path: Path, label: str | None = None) -> Path:
+    description = label or str(path)
+    mode = _lstat(path, description).st_mode
+    if not stat.S_ISREG(mode):
+        raise AuditContractError(
+            f"{description} must be a real regular file: {path}"
+        )
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise AuditContractError(f"{description} cannot be resolved: {path}") from error
+
+
+def require_direct_child(parent: Path, name: str, label: str) -> Path:
+    parent = require_real_directory(parent, f"parent of {label}")
+    child = parent / name
+    resolved = require_real_directory(child, label)
+    if resolved.parent != parent:
+        raise AuditContractError(f"{label} must resolve directly below {parent}: {name!r}")
+    return resolved
+
+
+def read_regular_json(path: Path) -> dict[str, Any]:
+    regular = require_regular_file(path)
+    try:
+        document = json.loads(regular.read_text())
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise AuditContractError(f"{path}: malformed JSON: {error}") from error
+    if not isinstance(document, dict):
+        raise AuditContractError(f"{path}: JSON document must be an object")
+    return document
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise AuditContractError(f"cannot hash regular file {path}: {error}") from error
+    return digest.hexdigest()
+
+
+def _optional_regular_file_hash(path: Path) -> str | None:
+    try:
+        mode = path.lstat().st_mode
+    except OSError:
+        return None
+    if not stat.S_ISREG(mode):
+        return None
+    try:
+        return sha256_file(path)
+    except AuditContractError:
+        return None
++ sed -n 90,180p /reference/tools/audit_contract.py
+        raise AuditContractError(
+            f"{description} must be a real regular file: {path}"
+        )
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise AuditContractError(f"{description} cannot be resolved: {path}") from error
+
+
+def require_direct_child(parent: Path, name: str, label: str) -> Path:
+    parent = require_real_directory(parent, f"parent of {label}")
+    child = parent / name
+    resolved = require_real_directory(child, label)
+    if resolved.parent != parent:
+        raise AuditContractError(f"{label} must resolve directly below {parent}: {name!r}")
+    return resolved
+
+
+def read_regular_json(path: Path) -> dict[str, Any]:
+    regular = require_regular_file(path)
+    try:
+        document = json.loads(regular.read_text())
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise AuditContractError(f"{path}: malformed JSON: {error}") from error
+    if not isinstance(document, dict):
+        raise AuditContractError(f"{path}: JSON document must be an object")
+    return document
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise AuditContractError(f"cannot hash regular file {path}: {error}") from error
+    return digest.hexdigest()
+
+
+def _optional_regular_file_hash(path: Path) -> str | None:
+    try:
+        mode = path.lstat().st_mode
+    except OSError:
+        return None
+    if not stat.S_ISREG(mode):
+        return None
+    try:
+        return sha256_file(path)
+    except AuditContractError:
+        return None
+
+
+def _tree_entry_type(mode: int) -> str:
+    if stat.S_ISDIR(mode):
+        return "directory"
+    if stat.S_ISREG(mode):
+        return "file"
+    if stat.S_ISLNK(mode):
+        return "symlink"
+    if stat.S_ISFIFO(mode):
+        return "fifo"
+    if stat.S_ISSOCK(mode):
+        return "socket"
+    if stat.S_ISBLK(mode):
+        return "block-device"
+    if stat.S_ISCHR(mode):
+        return "character-device"
+    return "unknown"
+
+
+def _framed_update(digest: Any, value: bytes) -> None:
+    digest.update(len(value).to_bytes(8, "big"))
+    digest.update(value)
+
+
+def _framed_file_update(
+    digest: Any, path: Path, expected_size: int
+) -> None:
+    digest.update(expected_size.to_bytes(8, "big"))
+    bytes_read = 0
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        with os.fdopen(os.open(path, flags), "rb") as stream:
+            for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                bytes_read += len(chunk)
+                digest.update(chunk)
+    except OSError as error:
+        raise AuditContractError(f"cannot read tree file {path}: {error}") from error
+    if bytes_read != expected_size:
+        raise AuditContractError(
++ sed -n 120,230p /reference/tools/klean_export.py
+                if not word.startswith("-") and word.endswith(".k")
+            ),
+            None,
+        )
+        if source_word is None:
+            continue
+        source = (workspace / source_word).resolve()
+        try:
+            source.relative_to(workspace)
+        except ValueError:
+            continue
+        if not source.is_file() or source.is_symlink():
+            continue
+
+        def option(name: str) -> str | None:
+            if name not in arguments:
+                return None
+            option_index = arguments.index(name)
+            if option_index + 1 >= len(arguments):
+                return None
+            return arguments[option_index + 1]
+
+        commands.append(
+            KompileCommand(
+                source=source,
+                main_module=option("--main-module"),
+                syntax_module=option("--syntax-module"),
+                backend=option("--backend"),
+            )
+        )
+    return tuple(commands)
+
+
+def _workspace_k_files(workspace: Path) -> tuple[Path, ...]:
+    workspace = Path(workspace)
+    if not workspace.is_dir() or workspace.is_symlink():
+        raise KleanExportError("K definition workspace must be a real directory")
+    files = tuple(
+        path.resolve()
+        for _relative, kind, path in _tree_entries(workspace)
+        if kind == "file" and path.suffix == ".k"
+    )
+    if not files:
+        raise KleanExportError("K definition workspace contains no .k files")
+    return tuple(sorted(files, key=str))
+
+
+def _local_required_file(source: Path, required: str, workspace: Path) -> Path | None:
+    candidate = Path(required)
+    unresolved = (
+        candidate
+        if candidate.is_absolute()
+        else source.parent / candidate
+    )
+    resolved = unresolved.resolve()
+    try:
+        resolved.relative_to(workspace)
+    except ValueError:
+        raise KleanExportError(
+            "K definition requires a file outside the frozen workspace: "
+            f"{required}"
+        )
+    if not resolved.exists():
+        if resolved.suffix == ".k":
+            raise KleanExportError(
+                f"K definition requires a missing workspace .k file: {required}"
+            )
+        return None
+    if unresolved.is_symlink() or not resolved.is_file() or resolved.suffix != ".k":
+        raise KleanExportError(
+            f"K definition require is not a regular workspace .k file: {resolved}"
+        )
+    return resolved
+
+
+def resolve_definition_closure(workspace: Path) -> DefinitionResolution:
+    original_workspace = Path(workspace)
+    try:
+        workspace_mode = original_workspace.stat(
+            follow_symlinks=False
+        ).st_mode
+    except OSError as error:
+        raise KleanExportError(
+            "K definition workspace must be a real directory"
+        ) from error
+    if not stat.S_ISDIR(workspace_mode):
+        raise KleanExportError(
+            "K definition workspace must be a real directory"
+        )
+    workspace = original_workspace.resolve()
+    verification_file = workspace / "verification.k"
+    if not verification_file.is_file() or verification_file.is_symlink():
+        raise KleanExportError(
+            "K definition workspace is missing regular verification.k"
+        )
+    files = _workspace_k_files(workspace)
+    modules: dict[str, tuple[Path, tuple[str, ...]]] = {}
+    file_modules: dict[Path, tuple[str, ...]] = {}
+    file_requires: dict[Path, tuple[Path, ...]] = {}
+    for path in files:
+        text = path.read_text()
+        declared: list[str] = []
+        for block in MODULE_BLOCK_RE.finditer(text):
+            name = block.group("name")
+            if name in modules:
+                previous = modules[name][0]
+                raise KleanExportError(
+                    f"duplicate module definition {name}: {previous} and {path}"
+                )
+            imports = tuple(IMPORT_RE.findall(block.group("body")))
+            modules[name] = (path, imports)
++ rg -n 'def (sha256_tree|tree_digest|_tree_entries)|artifact_sha256|k_workspace_sha256' /reference/tools
+/reference/tools/klean_final_gate.py:186:            "k_workspace_sha256": pipeline_contract.sha256_tree(
+/reference/tools/klean_export.py:647:def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+/reference/tools/klean_export.py:670:def tree_digest(root: Path) -> str:
+/reference/tools/populate_runs.py:91:def sha256_tree(root: Path) -> str:
+/reference/tools/stage5_runner.py:271:    expected_candidate_sha256 = selected.get("artifact_sha256")
+/reference/tools/legacy_migration.py:285:def _tree_entries(root: Path, label: str) -> list[tuple[str, str, Path, int]]:
+/reference/tools/legacy_migration.py:1844:        "artifact_sha256": pipeline_contract.sha256_tree(execution),
+/reference/tools/pipeline_contract.py:190:def sha256_tree(root: Path) -> str:
+/reference/tools/pipeline_contract.py:1953:        "artifact_sha256": candidate_sha256,
+/reference/tools/usage_accounting.py:93:def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+/reference/tools/usage_accounting.py:148:def sha256_tree(root: Path) -> str:
+/reference/tools/klean_audit_contract.py:101:            != selected.get("artifact_sha256")
+/reference/tools/klean_audit_contract.py:460:                "k_workspace_sha256": k_hash,
+/reference/tools/run_pipeline.py:123:        "artifact_sha256"
+/reference/tools/audit_contract.py:186:def sha256_tree(root: Path) -> str:
+/reference/tools/audit_contract.py:792:    if current_hash != selected.get("artifact_sha256"):
+/reference/tools/audit_contract.py:814:        "selected_artifact_sha256": current_hash,

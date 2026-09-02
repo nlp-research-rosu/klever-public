@@ -1,0 +1,331 @@
+Script started on 2026-07-31 06:39:47-05:00 [<not executed on terminal>]
+k_rule_inventory help:
+
+klean_preflight exported signatures:
+(frozen_input: 'Path', discovery_manifest: 'Path', generation: 'Path', *, toolchain_lock: 'Path', run_command: 'Callable[..., tuple[int, str]]' = <function _run at 0x7fe1a2b8a440>) -> 'dict[str, Any]'
+def check_generation(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    *,
+    toolchain_lock: Path,
+    run_command: Callable[..., tuple[int, str]] = _run,
+) -> dict[str, Any]:
+    frozen_input = Path(frozen_input)
+    discovery_manifest = Path(discovery_manifest)
+    generation = Path(generation)
+    generated = generation / "generated"
+    if not frozen_input.is_dir() or frozen_input.is_symlink():
+        raise KleanPreflightError("frozen K input must be a real directory")
+    if not discovery_manifest.is_file() or discovery_manifest.is_symlink():
+        raise KleanPreflightError(
+            "validated Stage 3 discovery manifest must be a regular file"
+        )
+    if not generation.is_dir() or generation.is_symlink():
+        raise KleanPreflightError("generation must be a real directory")
+    if not generated.is_dir() or generated.is_symlink():
+        raise KleanPreflightError("generated project must be a real directory")
+    # Traversing every entry rejects symlinks/FIFOs before any build command.
+    klean_export._tree_entries(generated)
+    snapshot = _preflight_snapshot(
+        frozen_input, discovery_manifest, generation
+    )
+    input_manifest = _regular_json(
+        generation / "input-manifest.json", "input manifest"
+    )
+    generator_manifest = _regular_json(
+        generation / "generator-manifest.json", "generator manifest"
+    )
+    inventory = _regular_json(
+        generation / "trust-inventory.json", "trust inventory"
+    )
+    export_result = _regular_json(
+        generation / "export-result.json", "export result"
+    )
+    lock = _regular_json(Path(toolchain_lock), "toolchain lock")
+    export_status = export_result.get("status")
+    if export_result.get("schema_version") != 3:
+        raise KleanPreflightError("export result schema version is not 3")
+    if export_status not in {"OK", "KLEAN_NO_OBLIGATIONS"}:
+        raise KleanPreflightError("export result status is invalid")
+    input_hash = snapshot.stage1_workspace_sha256
+    discovery_hash = snapshot.stage3_discovery_manifest_sha256
+    generated_hash = snapshot.generated_tree_sha256
+    sidecar_hashes = dict(snapshot.sidecar_sha256)
+    if input_manifest.get("schema_version") != 3:
+        raise KleanPreflightError("input manifest schema version is not 3")
+    if generator_manifest.get("schema_version") != 3:
+        raise KleanPreflightError("generator manifest schema version is not 3")
+    if input_manifest.get("frozen_input_sha256") != input_hash:
+        raise KleanPreflightError("frozen Stage 1 input hash changed")
+    if input_manifest.get("stage1_workspace_sha256") != input_hash:
+        raise KleanPreflightError("Stage 1 workspace hash changed")
+    if (
+        input_manifest.get("stage3_discovery_manifest_sha256")
+        != discovery_hash
+    ):
+        raise KleanPreflightError(
+            "validated Stage 3 discovery manifest hash changed"
+        )
+    if generator_manifest.get("generated_tree_sha256") != generated_hash:
+        raise KleanPreflightError("generated project hash changed")
+    if generator_manifest.get("toolchain") != lock:
+        raise KleanPreflightError("generator toolchain differs from pinned lock")
+    provenance = generator_manifest.get("provenance")
+    if not isinstance(provenance, dict):
+        raise KleanPreflightError("generator provenance is malformed")
+    if provenance.get("stage1_workspace_sha256") != input_hash:
+        raise KleanPreflightError(
+            "Stage 1 provenance differs between generation manifests"
+        )
+    if provenance.get("stage3_discovery_manifest_sha256") != discovery_hash:
+        raise KleanPreflightError(
+            "Stage 3 provenance differs between generation manifests"
+        )
+    if provenance.get("inventory_sha256") != input_manifest.get(
+        "inventory_sha256"
+    ):
+        raise KleanPreflightError(
+            "Stage 1/Stage 3 inventory provenance differs"
+        )
+    _source_rules, obligations = _source_and_obligation_gate(
+        frozen_input,
+        discovery_manifest,
+        generated,
+        input_manifest,
+        generator_manifest,
+    )
+    expected_export_status = "OK" if obligations else "KLEAN_NO_OBLIGATIONS"
+    if export_status != expected_export_status:
+        raise KleanPreflightError(
+            "export status disagrees with generated obligation count"
+        )
+    if export_result.get("obligation_count") != len(obligations):
+        raise KleanPreflightError(
+            "export result obligation_count does not match generated obligations"
+        )
+
+    try:
+        target = klean_export.target_statement(generated)
+    except klean_export.KleanExportError as error:
+        raise KleanPreflightError(str(error)) from error
+    expected_target = generator_manifest.get("target")
+    if target != expected_target:
+        raise KleanPreflightError("target theorem statement or location changed")
+    if bool(obligations) != bool(target):
+        raise KleanPreflightError(
+            "target proposition and obligation inventory disagree"
+        )
+    sources = _lean_sources(generated)
+    sorry_locations: list[str] = []
+    for source in sources:
+        text = source.read_text()
+        for forbidden in (r"\badmit\b", r"\bunsafe\b"):
+            if re.search(forbidden, text):
+                raise KleanPreflightError(
+                    f"forbidden Lean token in {source.relative_to(generated)}"
+                )
+        for match in re.finditer(r"\bsorry\b", text):
+            sorry_locations.append(source.relative_to(generated).as_posix())
+    if sorry_locations:
+        raise KleanPreflightError("generated immutable project contains sorry")
+    if inventory.get("designated_sorries") != 0 or inventory.get(
+        "other_sorries"
+    ) != 0:
+        raise KleanPreflightError("trust inventory has unexpected proof-hole counts")
+
+    declared = _trust_declarations(sources)
+    _reject_proposition_trust(generated, sources, declared)
+    allowlist = inventory.get("allowlist")
+    if not isinstance(allowlist, list):
+        raise KleanPreflightError("trust inventory allowlist is malformed")
+    expected: dict[str, tuple[str, str]] = {}
+    for entry in allowlist:
+        if not isinstance(entry, dict):
+            raise KleanPreflightError("trust allowlist entry is malformed")
+        name = entry.get("name")
+        kind = entry.get("kind")
+        lean_type = entry.get("type")
+        reason = entry.get("reason")
+        if not all(
+            isinstance(value, str) and value
+            for value in (name, kind, lean_type, reason)
+        ):
+            raise KleanPreflightError("trust allowlist entry is incomplete")
+        if name in expected:
+            raise KleanPreflightError(
+                f"duplicate trust allowlist entry: {name}"
+            )
+        expected[name] = (kind, lean_type)
+    if declared != expected:
+        raise KleanPreflightError(
+            "generated axiom/opaque declarations differ from trust allowlist"
+        )
+    _check_imports(generated, sources)
+    export_bindings = {
+        "frozen_input_sha256": input_hash,
+        "stage3_discovery_manifest_sha256": discovery_hash,
+        "generated_tree_sha256": generated_hash,
+        "trust_inventory_sha256": sidecar_hashes[
+            "trust-inventory.json"
+        ],
+    }
+    for field, expected_hash in export_bindings.items():
+        if export_result.get(field) != expected_hash:
+            label = (
+                "trust inventory hash"
+                if field == "trust_inventory_sha256"
+                else field
+            )
+            raise KleanPreflightError(
+                f"export result {label} does not match immutable inputs"
+            )
+
+    with tempfile.TemporaryDirectory(prefix="klean-preflight-") as temporary:
+        clean = Path(temporary) / "project"
+        shutil.copytree(generated, clean)
+        diagnostics: list[dict[str, Any]] = []
+        for command in (["lake", "clean"], ["lake", "build"]):
+            code, output = run_command(command, cwd=clean, timeout=600)
+            diagnostics.append(
+                {
+                    "command": command,
+                    "exit_code": code,
+                    "output_sha256": hashlib.sha256(output.encode()).hexdigest(),
+                    "output_tail": output[-4000:],
+                }
+            )
+            if code != 0:
+                raise KleanPreflightError(
+                    f"{' '.join(command)} failed ({code}): {output[-600:]}"
+                )
+    _require_unchanged_snapshot(
+        snapshot, frozen_input, discovery_manifest, generation
+    )
+    return {
+        "schema_version": 3,
+        "status": "PASS" if obligations else "KLEAN_NO_OBLIGATIONS",
+        "frozen_input_sha256": input_hash,
+        "stage1_workspace_sha256": input_hash,
+        "stage3_discovery_manifest_sha256": discovery_hash,
+        "generated_tree_sha256": generated_hash,
+        "target": target,
+        "obligation_count": len(obligations),
+        "trust_declaration_count": len(declared),
+        "designated_sorry_count": 0,
+        "diagnostics": diagnostics,
+    }
+
+
+relevant hash helpers:
+/reference/tools/stage4_runner.py
+68:        outputs.get("workspace_sha256")
+236:    stage1_workspace_sha256: str,
+251:        preflight.get("stage1_workspace_sha256")
+252:        != stage1_workspace_sha256
+281:        if preflight.get("generated_tree_sha256") != generated_sha256:
+316:    stage1_workspace_sha256: str,
+331:        stage1_workspace_sha256=stage1_workspace_sha256,
+349:        generated_sha256 = preflight["generated_tree_sha256"]
+363:            != stage1_workspace_sha256
+364:            or input_manifest.get("stage1_workspace_sha256")
+365:            != stage1_workspace_sha256
+374:            generator_manifest.get("generated_tree_sha256")
+377:            or provenance.get("stage1_workspace_sha256")
+378:            != stage1_workspace_sha256
+394:            != stage1_workspace_sha256
+397:            or export_result.get("generated_tree_sha256")
+399:            or export_result.get("trust_inventory_sha256")
+449:    stage1_workspace_sha256 = klean_export.tree_digest(frozen)
+545:        stage1_workspace_sha256=stage1_workspace_sha256,
+556:        klean_export.tree_digest(frozen) != stage1_workspace_sha256
+570:        stage1_workspace_sha256=stage1_workspace_sha256,
+
+/reference/tools/klean_export.py
+845:        source_rule_id = rule.get("source_rule_id")
+846:        if not isinstance(text, str) or not isinstance(source_rule_id, str):
+860:        lowered_ids.append(source_rule_id)
+1646:        source_rule_ids = parameter.get("source_rule_ids")
+1655:            not isinstance(source_rule_ids, list)
+1656:            or not source_rule_ids
+1658:                isinstance(source_rule_id, str) and source_rule_id
+1659:                for source_rule_id in source_rule_ids
+1667:            "source_rule_ids": source_rule_ids,
+1726:    inventory_sha256 = validated["inventory_sha256"]
+1730:            "inventory_sha256": inventory_sha256,
+1743:            "source_rule_id": rule["source_rule_id"],
+1764:    expected_ids = [rule["source_rule_id"] for rule in domain_rules]
+1766:        obligation.get("source_rule_id")
+1795:                "inventory_sha256": rule["inventory_sha256"],
+2057:                "stage1_workspace_sha256": before_hash,
+2069:                "inventory_sha256": validated["inventory_sha256"],
+2116:                "generated_tree_sha256": tree_digest(generated),
+2123:                    "stage1_workspace_sha256": before_hash,
+2127:                    "inventory_sha256": validated["inventory_sha256"],
+2137:                "generated_tree_sha256": generator_manifest[
+2138:                    "generated_tree_sha256"
+2144:                "trust_inventory_sha256": "",
+2153:            result["trust_inventory_sha256"] = hashlib.sha256(
+
+/reference/tools/pipeline_contract.py
+1175:            "workspace_sha256": sha256_tree(stage_root / "workspace"),
+1234:        or previous_outputs.get("workspace_sha256") != current_workspace
+1269:        "inputs": {"workspace_sha256": current_workspace},
+1337:        or previous_outputs.get("workspace_sha256") != current_workspace
+1370:        "inputs": {"workspace_sha256": current_workspace},
+1456:            inputs.get("workspace_sha256")
+1461:            outputs.get("workspace_sha256")
+1578:        "inputs": {"workspace_sha256": current_workspace},
+1620:def _invocation_output_hashes(invocation: Path, workspace: Path) -> dict[str, Any]:
+1627:        "workspace_sha256": sha256_tree(workspace),
+
+/reference/tools/klean_preflight.py
+41:    stage1_workspace_sha256: str
+43:    generated_tree_sha256: str
+72:            stage1_workspace_sha256=klean_export.tree_digest(
+78:            generated_tree_sha256=klean_export.tree_digest(generated),
+96:    if current.stage1_workspace_sha256 != (
+97:        expected.stage1_workspace_sha256
+108:    if current.generated_tree_sha256 != expected.generated_tree_sha256:
+229:    if input_manifest.get("inventory_sha256") != validated[
+230:        "inventory_sha256"
+257:    expected_ids = [rule["source_rule_id"] for rule in eligible]
+262:        source_rule_id = obligation.get("source_rule_id")
+263:        if not isinstance(source_rule_id, str):
+265:        observed_ids.append(source_rule_id)
+285:            "inventory_sha256",
+341:        source_rule_ids = parameter.get("source_rule_ids")
+343:            not isinstance(source_rule_ids, list)
+344:            or not source_rule_ids
+346:                isinstance(source_rule_id, str)
+347:                and source_rule_id in expected_ids
+348:                for source_rule_id in source_rule_ids
+354:        bound_rule_ids.update(source_rule_ids)
+434:    input_hash = snapshot.stage1_workspace_sha256
+436:    generated_hash = snapshot.generated_tree_sha256
+444:    if input_manifest.get("stage1_workspace_sha256") != input_hash:
+453:    if generator_manifest.get("generated_tree_sha256") != generated_hash:
+460:    if provenance.get("stage1_workspace_sha256") != input_hash:
+468:    if provenance.get("inventory_sha256") != input_manifest.get(
+469:        "inventory_sha256"
+551:        "generated_tree_sha256": generated_hash,
+552:        "trust_inventory_sha256": sidecar_hashes[
+560:                if field == "trust_inventory_sha256"
+592:        "stage1_workspace_sha256": input_hash,
+594:        "generated_tree_sha256": generated_hash,
+633:            "stage1_workspace_sha256": stage1_hash,
+
+/reference/tools/k_rule_inventory.py
+44:    source_rule_id: str
+589:            source_rule_id=f"rule-{digest}",
+665:    source_rule_ids: list[str],
+669:    if len(source_rule_ids) != len(set(source_rule_ids)):
+673:    selected = set(source_rule_ids)
+680:    by_id = {span.rule.source_rule_id: span for span in spans}
+689:    for source_rule_id in source_rule_ids:
+690:        span = by_id[source_rule_id]
+694:                f"{source_rule_id}"
+712:                f"attributes: {source_rule_id}"
+790:        "inventory_sha256": canonical_json_sha256(rule_documents),
+
+Script done on 2026-07-31 06:39:47-05:00 [COMMAND_EXIT_CODE="0"]

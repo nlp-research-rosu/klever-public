@@ -1,0 +1,245 @@
+
+$ nl -ba /tmp/audit-work/reconstruction/semantic.k
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports BOOL-SYNTAX
+     4	  imports STRING-SYNTAX
+     5	
+     6	  // The source grammar mirrors the constructors emitted by py2mpy.py for the
+     7	  // deliberately small Python fragment used by solution.py.
+     8	  syntax Pgm ::= "Module" "(" Stmts ")"
+     9	  syntax Stmts ::= List{Stmt, ""}
+    10	  syntax Strings ::= List{String, ","}
+    11	  syntax Params ::= "Params" "(" Strings ")"
+    12	
+    13	  syntax Stmt ::= "ImportFrom" "(" String "," Strings ")"
+    14	                | "FuncDef" "(" String "," Params "," Stmts ")"
+    15	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    16	                | "Return" "(" Expr ")"
+    17	
+    18	  syntax Exprs ::= List{Expr, ","}
+    19	  syntax Expr ::= "Name" "(" String ")"
+    20	                | "Int" "(" Int ")"
+    21	                | "Call" "(" Expr "," Exprs ")"
+    22	                | "Compare" "(" Expr "," CmpOp ")"
+    23	                | "BinOp" "(" String "," Expr "," Expr ")"
+    24	                | "ListExpr" "(" Exprs ")"
+    25	                | "Subscript" "(" Expr "," Index ")"
+    26	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    27	  syntax Bound ::= Expr | "NoBound"
+    28	  syntax Index ::= Expr
+    29	                 | "Slice" "(" Bound "," Bound "," Bound ")"
+    30	
+    31	  // Semantic values. Ints is a mathematical finite sequence of integers.
+    32	  syntax Ints ::= List{Int, ","}
+    33	  syntax Val ::= "VInt" "(" Int ")"
+    34	               | "VBool" "(" Bool ")"
+    35	               | "VList" "(" "[" Ints "]" ")"
+    36	  syntax Vals ::= List{Val, ","}
+    37	
+    38	  syntax Run ::= "Invoke" "(" Pgm "," String "," Vals ")"
+    39	endmodule
+    40	
+    41	module MPY
+    42	  imports MPY-SYNTAX
+    43	  imports INT
+    44	  imports BOOL
+    45	
+    46	  configuration <k> $PGM:Run </k>
+    47	
+    48	  // The environment and whole translated program are explicit. Recursive
+    49	  // source calls therefore re-enter Invoke with the same parsed program.
+    50	  syntax Env ::= "env" "(" Ints "," Int ")"
+    51	  syntax KItem ::= "exec" "(" Stmts "," Env "," Pgm ")"
+    52	                 | "eval" "(" Expr "," Env "," Pgm ")"
+    53	                 | "decide" "(" Stmts "," Stmts "," Stmts "," Env "," Pgm ")"
+    54	                 | "listSecond" "(" Expr "," Env "," Pgm ")"
+    55	                 | "makePair" "(" Val ")"
+    56	                 | "binopRight" "(" Expr "," Env "," Pgm ")"
+    57	                 | "concatWith" "(" Val ")"
+    58	                 | "concat" "(" Val "," Val ")"
+    59	                 | "prepend" "(" Int ")"
+    60	                 | "callSecond" "(" Expr "," Env "," Pgm ")"
+    61	                 | "callWith" "(" Val "," Pgm ")"
+    62	
+    63	  rule <k>
+    64	    Invoke(
+    65	      Module(ImportFrom(MOD, IMPS)
+    66	             FuncDef(F, PARAMS, BODY)),
+    67	      F,
+    68	      VList([IS]), VInt(D))
+    69	    => exec(BODY, env(IS, D),
+    70	            Module(ImportFrom(MOD, IMPS)
+    71	                   FuncDef(F, PARAMS, BODY))) ...
+    72	  </k>
+    73	
+    74	  rule <k> exec(Return(E) _REST, ENV, PGM) => eval(E, ENV, PGM) ... </k>
+    75	  rule <k> exec(If(COND, THEN, ELSE) REST, ENV, PGM)
+    76	        => eval(COND, ENV, PGM)
+    77	        ~> decide(THEN, ELSE, REST, ENV, PGM) ... </k>
+    78	  rule <k> VBool(true) ~> decide(THEN, _ELSE, _REST, ENV, PGM)
+    79	        => exec(THEN, ENV, PGM) ... </k>
+    80	  rule <k> VBool(false) ~> decide(_THEN, .Stmts, REST, ENV, PGM)
+    81	        => exec(REST, ENV, PGM) ... </k>
+    82	
+    83	  rule <k> eval(Name("numbers"), env(IS, _D), _PGM) => VList([IS]) ... </k>
+    84	  rule <k> eval(Name("delimeter"), env(_IS, D), _PGM) => VInt(D) ... </k>
+    85	  rule <k> eval(Int(I), _ENV, _PGM) => VInt(I) ... </k>
+    86	
+    87	  // This is the exact meaning of the source test len(numbers) <= 1. Lists
+    88	  // carry their structure directly, so the primitive can decide after at most
+    89	  // two constructors (as a real Python list's stored length does).
+    90	  rule <k> eval(Compare(Call(Name("len"), Name("numbers")),
+    91	                       CmpOp("<=", Int(1))),
+    92	                  env(.Ints, _D), _PGM)
+    93	        => VBool(true) ... </k>
+    94	  rule <k> eval(Compare(Call(Name("len"), Name("numbers")),
+    95	                       CmpOp("<=", Int(1))),
+    96	                  env(_I, .Ints, _D), _PGM)
+    97	        => VBool(true) ... </k>
+    98	  rule <k> eval(Compare(Call(Name("len"), Name("numbers")),
+    99	                       CmpOp("<=", Int(1))),
+   100	                  env(_I, _J, _REST, _D), _PGM)
+   101	        => VBool(false) ... </k>
+   102	
+   103	  rule <k> eval(Subscript(Name("numbers"), Int(0)),
+   104	                  env(I, _REST, _D), _PGM)
+   105	        => VInt(I) ... </k>
+   106	  rule <k> eval(Subscript(Name("numbers"),
+   107	                         Slice(Int(1), NoBound, NoBound)),
+   108	                  env(_I, REST, _D), _PGM)
+   109	        => VList([REST]) ... </k>
+   110	
+   111	  rule <k> eval(ListExpr(E1, E2), ENV, PGM)
+   112	        => eval(E1, ENV, PGM) ~> listSecond(E2, ENV, PGM) ... </k>
+   113	  rule <k> V1:Val ~> listSecond(E2, ENV, PGM)
+   114	        => eval(E2, ENV, PGM) ~> makePair(V1) ... </k>
+   115	  rule <k> VInt(J) ~> makePair(VInt(I)) => VList([I, J]) ... </k>
+   116	
+   117	  rule <k> eval(BinOp("+", E1, E2), ENV, PGM)
+   118	        => eval(E1, ENV, PGM) ~> binopRight(E2, ENV, PGM) ... </k>
+   119	  rule <k> V1:Val ~> binopRight(E2, ENV, PGM)
+   120	        => eval(E2, ENV, PGM) ~> concatWith(V1) ... </k>
+   121	  rule <k> V2:Val ~> concatWith(V1) => concat(V1, V2) ... </k>
+   122	  rule <k> concat(VList([.Ints]), VList([JS])) => VList([JS]) ... </k>
+   123	  rule <k> concat(VList([I, IS]), VList([JS]))
+   124	        => concat(VList([IS]), VList([JS])) ~> prepend(I) ... </k>
+   125	  rule <k> VList([JS]) ~> prepend(I) => VList([I, JS]) ... </k>
+   126	
+   127	  rule <k> eval(Call(Name("intersperse"), E1, E2), ENV, PGM)
+   128	        => eval(E1, ENV, PGM) ~> callSecond(E2, ENV, PGM) ... </k>
+   129	  rule <k> V1:Val ~> callSecond(E2, ENV, PGM)
+   130	        => eval(E2, ENV, PGM) ~> callWith(V1, PGM) ... </k>
+   131	  rule <k> VInt(D) ~> callWith(VList([IS]), PGM)
+   132	        => Invoke(PGM, "intersperse", VList([IS]), VInt(D)) ... </k>
+   133	endmodule
+[exit 0]
+
+$ nl -ba /tmp/audit-work/reconstruction/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Independent recursive contract used only on the right-hand side of proof
+     7	  // claims: retain every input integer and put D between adjacent elements.
+     8	  syntax Ints ::= intersperseSpec(Ints, Int) [function, total]
+     9	  rule intersperseSpec(.Ints, _D) => .Ints
+    10	  rule intersperseSpec(I, .Ints, _D) => I, .Ints
+    11	  rule intersperseSpec(I, J, REST, D)
+    12	    => I, D, intersperseSpec(J, REST, D)
+    13	endmodule
+[exit 0]
+
+$ nl -ba /tmp/audit-work/reconstruction/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Total functional correctness for every finite integer list and delimiter.
+     7	  claim <k>
+     8	    Invoke(
+     9	      Module(
+    10	        ImportFrom("typing", "List")
+    11	        FuncDef("intersperse", Params("numbers", "delimeter"),
+    12	          If(Compare(Call(Name("len"), Name("numbers")), CmpOp("<=", Int(1))),
+    13	            Return(Name("numbers")),
+    14	            .Stmts)
+    15	          Return(
+    16	            BinOp(
+    17	              "+",
+    18	              ListExpr(Subscript(Name("numbers"), Int(0)), Name("delimeter")),
+    19	              Call(
+    20	                Name("intersperse"),
+    21	                Subscript(Name("numbers"), Slice(Int(1), NoBound, NoBound)),
+    22	                Name("delimeter")))))),
+    23	      "intersperse",
+    24	      VList([IS]), VInt(D)) ~> KONT:K
+    25	    => VList([intersperseSpec(IS, D)]) ~> KONT
+    26	  </k>
+    27	endmodule
+[exit 0]
+
+$ rg -n \\\[\(function\|total\|functional\|simplification\|concrete\|priority\|owise\|anywhere\|macro\|alias\) /tmp/audit-work/reconstruction/semantic.k /tmp/audit-work/reconstruction/verification.k /tmp/audit-work/reconstruction/spec.k
+/tmp/audit-work/reconstruction/verification.k:8:  syntax Ints ::= intersperseSpec(Ints, Int) [function, total]
+[exit 0]
+
+$ rg -n \^\[\[:space:\]\]\*rule\(\[\[:space:\]\]\|\$\) /tmp/audit-work/reconstruction/semantic.k /tmp/audit-work/reconstruction/verification.k
+/tmp/audit-work/reconstruction/verification.k:9:  rule intersperseSpec(.Ints, _D) => .Ints
+/tmp/audit-work/reconstruction/verification.k:10:  rule intersperseSpec(I, .Ints, _D) => I, .Ints
+/tmp/audit-work/reconstruction/verification.k:11:  rule intersperseSpec(I, J, REST, D)
+/tmp/audit-work/reconstruction/semantic.k:63:  rule <k>
+/tmp/audit-work/reconstruction/semantic.k:74:  rule <k> exec(Return(E) _REST, ENV, PGM) => eval(E, ENV, PGM) ... </k>
+/tmp/audit-work/reconstruction/semantic.k:75:  rule <k> exec(If(COND, THEN, ELSE) REST, ENV, PGM)
+/tmp/audit-work/reconstruction/semantic.k:78:  rule <k> VBool(true) ~> decide(THEN, _ELSE, _REST, ENV, PGM)
+/tmp/audit-work/reconstruction/semantic.k:80:  rule <k> VBool(false) ~> decide(_THEN, .Stmts, REST, ENV, PGM)
+/tmp/audit-work/reconstruction/semantic.k:83:  rule <k> eval(Name("numbers"), env(IS, _D), _PGM) => VList([IS]) ... </k>
+/tmp/audit-work/reconstruction/semantic.k:84:  rule <k> eval(Name("delimeter"), env(_IS, D), _PGM) => VInt(D) ... </k>
+/tmp/audit-work/reconstruction/semantic.k:85:  rule <k> eval(Int(I), _ENV, _PGM) => VInt(I) ... </k>
+/tmp/audit-work/reconstruction/semantic.k:90:  rule <k> eval(Compare(Call(Name("len"), Name("numbers")),
+/tmp/audit-work/reconstruction/semantic.k:94:  rule <k> eval(Compare(Call(Name("len"), Name("numbers")),
+/tmp/audit-work/reconstruction/semantic.k:98:  rule <k> eval(Compare(Call(Name("len"), Name("numbers")),
+/tmp/audit-work/reconstruction/semantic.k:103:  rule <k> eval(Subscript(Name("numbers"), Int(0)),
+/tmp/audit-work/reconstruction/semantic.k:106:  rule <k> eval(Subscript(Name("numbers"),
+/tmp/audit-work/reconstruction/semantic.k:111:  rule <k> eval(ListExpr(E1, E2), ENV, PGM)
+/tmp/audit-work/reconstruction/semantic.k:113:  rule <k> V1:Val ~> listSecond(E2, ENV, PGM)
+/tmp/audit-work/reconstruction/semantic.k:115:  rule <k> VInt(J) ~> makePair(VInt(I)) => VList([I, J]) ... </k>
+/tmp/audit-work/reconstruction/semantic.k:117:  rule <k> eval(BinOp("+", E1, E2), ENV, PGM)
+/tmp/audit-work/reconstruction/semantic.k:119:  rule <k> V1:Val ~> binopRight(E2, ENV, PGM)
+/tmp/audit-work/reconstruction/semantic.k:121:  rule <k> V2:Val ~> concatWith(V1) => concat(V1, V2) ... </k>
+/tmp/audit-work/reconstruction/semantic.k:122:  rule <k> concat(VList([.Ints]), VList([JS])) => VList([JS]) ... </k>
+/tmp/audit-work/reconstruction/semantic.k:123:  rule <k> concat(VList([I, IS]), VList([JS]))
+/tmp/audit-work/reconstruction/semantic.k:125:  rule <k> VList([JS]) ~> prepend(I) => VList([I, JS]) ... </k>
+/tmp/audit-work/reconstruction/semantic.k:127:  rule <k> eval(Call(Name("intersperse"), E1, E2), ENV, PGM)
+/tmp/audit-work/reconstruction/semantic.k:129:  rule <k> V1:Val ~> callSecond(E2, ENV, PGM)
+/tmp/audit-work/reconstruction/semantic.k:131:  rule <k> VInt(D) ~> callWith(VList([IS]), PGM)
+[exit 0]
+
+$ kprove /tmp/audit-work/reconstruction/spec-body-mutation.k --definition /tmp/audit-work/reconstruction/verification-fresh-kompiled --spec-module SPEC-BODY-MUTATION --dry-run
+kore-exec /tmp/audit-work/reconstruction/verification-fresh-kompiled/definition.kore --module VERIFICATION --prove /tmp/.kprove-2026-07-23-05-20-14-846-0704d339-d87f-44ef-8484-0f4fedf80d7e/spec.kore --spec-module SPEC-BODY-MUTATION --output /tmp/.kprove-2026-07-23-05-20-14-846-0704d339-d87f-44ef-8484-0f4fedf80d7e/result.kore
+[exit 0]
+
+$ kprove /tmp/audit-work/reconstruction/spec-body-mutation.k --definition /tmp/audit-work/reconstruction/verification-fresh-kompiled --spec-module SPEC-BODY-MUTATION
+kore-exec: [300463] Warning (WarnStuckClaimState):
+    The configuration's term unifies with the destination's term, but the implication check between the conditions has failed. Location: /tmp/audit-work/reconstruction/spec-body-mutation.k:8:9-29:7
+Context:
+    (InfoReachability) while checking the implication
+  #Not ( {
+    _I
+  #Equals
+    D
+  } )
+#And
+  <k>
+    VList ( [ _I , _I , intersperseSpec ( _J , _REST , D ) ] ) ~> KONT ~> .K
+  </k>
+#And
+  {
+    IS
+  #Equals
+    _I , _J , _REST
+  }
+[Error] Prover: backend terminated because the configuration cannot be
+rewritten further. See output for more details.
+[exit 1]

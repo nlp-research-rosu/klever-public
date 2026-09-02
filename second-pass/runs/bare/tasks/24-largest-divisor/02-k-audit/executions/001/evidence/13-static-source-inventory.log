@@ -1,0 +1,210 @@
+COMMAND: bash -lc nl\ -ba\ semantic.k\ \&\&\ nl\ -ba\ verification.k\ \&\&\ nl\ -ba\ spec.k\ \&\&\ printf\ \"ATTRIBUTE_SEARCH\\n\"\ \&\&\ rg\ -n\ \"\\\[\(function\|total\|functional\|simplification\|concrete\|priority\|owise\|anywhere\|macro\)\|syntax\ priority\|rule\|claim\|configuration\|syntax\ \"\ semantic.k\ verification.k\ spec.k
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports STRING-SYNTAX
+     4	
+     5	  // The concrete constructor syntax emitted by py2mpy.py for the subset used
+     6	  // by solution.py.  Statement lists use juxtaposition, exactly as the
+     7	  // translator prints them.
+     8	  syntax Pgm    ::= "Module" "(" Stmts ")"                     [symbol(Module)]
+     9	  syntax Params ::= "Params" "(" String ")"                    [symbol(Params)]
+    10	  syntax Expr   ::= "Int" "(" Int ")"                          [symbol(IntExpr)]
+    11	                  | "Name" "(" String ")"                      [symbol(Name)]
+    12	                  | "BinOp" "(" String "," Expr "," Expr ")" [symbol(BinOp)]
+    13	                  | "Compare" "(" Expr "," CmpOp ")"          [symbol(Compare)]
+    14	  syntax CmpOp  ::= "CmpOp" "(" String "," Expr ")"           [symbol(CmpOp)]
+    15	  syntax Stmt   ::= "FuncDef" "(" String "," Params "," Stmts ")" [symbol(FuncDef)]
+    16	                  | "Assign" "(" Expr "," Expr ")"             [symbol(Assign)]
+    17	                  | "While" "(" Expr "," Stmts ")"             [symbol(While)]
+    18	                  | "If" "(" Expr "," Stmts "," Stmts ")"      [symbol(If)]
+    19	                  | "Return" "(" Expr ")"                       [symbol(Return)]
+    20	  syntax Stmts ::= List{Stmt, ""}
+    21	endmodule
+    22	
+    23	module MPY
+    24	  imports MPY-SYNTAX
+    25	  imports BOOL
+    26	  imports INT
+    27	  imports MAP
+    28	
+    29	  syntax KItem ::= "noResult"
+    30	
+    31	  configuration
+    32	    <mpy>
+    33	      <k> $PGM:Pgm </k>
+    34	      <arg> $ARG:Int </arg>
+    35	      <env> .Map </env>
+    36	      <result> noResult </result>
+    37	    </mpy>
+    38	
+    39	  // Environment lookup and expression evaluation are semantic functions.
+    40	  syntax Int ::= envInt(Map, String) [function]
+    41	  rule envInt(ENV, X) => {ENV [ X ]}:>Int
+    42	
+    43	  syntax Int ::= evalInt(Expr, Map) [function]
+    44	  rule evalInt(Int(I),             _)   => I
+    45	  rule evalInt(Name(X),            ENV) => envInt(ENV, X)
+    46	  rule evalInt(BinOp("-", A, B),   ENV) => evalInt(A, ENV) -Int  evalInt(B, ENV)
+    47	  rule evalInt(BinOp("%", A, B),   ENV) => evalInt(A, ENV) modInt evalInt(B, ENV)
+    48	
+    49	  syntax Bool ::= evalBool(Expr, Map) [function]
+    50	  rule evalBool(Compare(A, CmpOp("!=", B)), ENV)
+    51	    => evalInt(A, ENV) =/=Int evalInt(B, ENV)
+    52	  rule evalBool(Compare(A, CmpOp("==", B)), ENV)
+    53	    => evalInt(A, ENV) ==Int evalInt(B, ENV)
+    54	  rule evalBool(Compare(A, CmpOp(">", B)), ENV)
+    55	    => evalInt(A, ENV) >Int evalInt(B, ENV)
+    56	
+    57	  // A module containing one entry point is invoked with the configured
+    58	  // integer argument.  The remaining rules are ordinary small-step rules.
+    59	  rule <k> Module(FuncDef(_, Params(P), BODY)) => BODY ... </k>
+    60	       <arg> N </arg>
+    61	       <env> .Map => P |-> N </env>
+    62	
+    63	  rule <k> S:Stmt REST:Stmts => S ~> REST ... </k>
+    64	  rule <k> .Stmts => .K ... </k>
+    65	
+    66	  rule <k> Assign(Name(X), E) => .K ... </k>
+    67	       <env> ENV => ENV [ X <- evalInt(E, ENV) ] </env>
+    68	
+    69	  // Keep the recursive loop marker in K (rather than appending it to BODY's
+    70	  // list).  This makes list cleanup happen before the next test and exposes a
+    71	  // stable loop-head configuration for invariant proofs.
+    72	  syntax KItem ::= "whileBranch" "(" Expr "," Stmts ")"
+    73	  rule <k> While(COND, BODY) => evalBool(COND, ENV) ~> whileBranch(COND, BODY) ... </k>
+    74	       <env> ENV </env>
+    75	  rule <k> true  ~> whileBranch(COND, BODY) => BODY ~> While(COND, BODY) ... </k>
+    76	  rule <k> false ~> whileBranch(_, _) => .K ... </k>
+    77	
+    78	  syntax KItem ::= "branch" "(" Stmts "," Stmts ")"
+    79	  rule <k> If(COND, THEN, ELSE) => evalBool(COND, ENV) ~> branch(THEN, ELSE) ... </k>
+    80	       <env> ENV </env>
+    81	  rule <k> true  ~> branch(THEN, _) => THEN ... </k>
+    82	  rule <k> false ~> branch(_, ELSE) => ELSE ... </k>
+    83	
+    84	  rule <k> Return(E) ~> _:K => .K </k>
+    85	       <env> ENV </env>
+    86	       <result> noResult => evalInt(E, ENV) </result>
+    87	endmodule
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Declarative maximality check over a finite interval.  It says that every
+     7	  // candidate from LO through HI fails to divide N.
+     8	  syntax Bool ::= noDivisorFrom(Int, Int, Int) [function]
+     9	  rule noDivisorFrom(_, LO, HI) => true
+    10	    requires LO >Int HI
+    11	  rule noDivisorFrom(N, LO, HI)
+    12	    => (N modInt LO =/=Int 0) andBool noDivisorFrom(N, LO +Int 1, HI)
+    13	    requires LO <=Int HI
+    14	
+    15	  syntax Bool ::= isLargestThrough(Int, Int, Int) [function]
+    16	  rule isLargestThrough(N, D, UPPER)
+    17	    => D >Int 0
+    18	       andBool D <=Int UPPER
+    19	       andBool N modInt D ==Int 0
+    20	       andBool noDivisorFrom(N, D +Int 1, UPPER)
+    21	
+    22	  syntax Bool ::= isLargestProperDivisor(Int, Int) [function]
+    23	  rule isLargestProperDivisor(N, D)
+    24	    => D <Int N andBool isLargestThrough(N, D, N -Int 1)
+    25	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Direct loop contract.  The precondition records that candidates already
+     7	  // skipped above D are non-divisors; the existential result must satisfy the
+     8	  // declarative natural-language contract.
+     9	  claim [largest-divisor-loop-contract]:
+    10	    <k>
+    11	      While(
+    12	        Compare(BinOp("%", Name("n"), Name("divisor")), CmpOp("!=", Int(0))),
+    13	        Assign(Name("divisor"), BinOp("-", Name("divisor"), Int(1))))
+    14	      ~> (Return(Name("divisor")) .Stmts)
+    15	      ~> .K
+    16	    => .K
+    17	    </k>
+    18	    <arg> N </arg>
+    19	    <env>
+    20	      ("n" |-> N) ("divisor" |-> D)
+    21	    => ("n" |-> N) ("divisor" |-> ?RESULT)
+    22	    </env>
+    23	    <result> noResult => ?RESULT </result>
+    24	    requires N >Int 1
+    25	         andBool D >Int 0
+    26	         andBool D <Int N
+    27	         andBool noDivisorFrom(N, D +Int 1, N -Int 1)
+    28	    ensures isLargestProperDivisor(N, ?RESULT)
+    29	
+    30	  // End-to-end proof of the exact constructor tree in solution.mpy against
+    31	  // the declarative contract.
+    32	  claim [largest-divisor-natural-contract]:
+    33	    <k>
+    34	      Module(
+    35	        FuncDef("largest_divisor", Params("n"),
+    36	          Assign(Name("divisor"), BinOp("-", Name("n"), Int(1)))
+    37	          While(
+    38	            Compare(BinOp("%", Name("n"), Name("divisor")), CmpOp("!=", Int(0))),
+    39	            Assign(Name("divisor"), BinOp("-", Name("divisor"), Int(1))))
+    40	          Return(Name("divisor"))))
+    41	    => .K
+    42	    </k>
+    43	    <arg> N </arg>
+    44	    <env>
+    45	      .Map
+    46	    => ("n" |-> N) ("divisor" |-> ?RESULT)
+    47	    </env>
+    48	    <result> noResult => ?RESULT </result>
+    49	    requires N >Int 1
+    50	    ensures isLargestProperDivisor(N, ?RESULT)
+    51	endmodule
+ATTRIBUTE_SEARCH
+spec.k:9:  claim [largest-divisor-loop-contract]:
+spec.k:32:  claim [largest-divisor-natural-contract]:
+verification.k:8:  syntax Bool ::= noDivisorFrom(Int, Int, Int) [function]
+verification.k:9:  rule noDivisorFrom(_, LO, HI) => true
+verification.k:11:  rule noDivisorFrom(N, LO, HI)
+verification.k:15:  syntax Bool ::= isLargestThrough(Int, Int, Int) [function]
+verification.k:16:  rule isLargestThrough(N, D, UPPER)
+verification.k:22:  syntax Bool ::= isLargestProperDivisor(Int, Int) [function]
+verification.k:23:  rule isLargestProperDivisor(N, D)
+semantic.k:5:  // The concrete constructor syntax emitted by py2mpy.py for the subset used
+semantic.k:8:  syntax Pgm    ::= "Module" "(" Stmts ")"                     [symbol(Module)]
+semantic.k:9:  syntax Params ::= "Params" "(" String ")"                    [symbol(Params)]
+semantic.k:10:  syntax Expr   ::= "Int" "(" Int ")"                          [symbol(IntExpr)]
+semantic.k:14:  syntax CmpOp  ::= "CmpOp" "(" String "," Expr ")"           [symbol(CmpOp)]
+semantic.k:15:  syntax Stmt   ::= "FuncDef" "(" String "," Params "," Stmts ")" [symbol(FuncDef)]
+semantic.k:20:  syntax Stmts ::= List{Stmt, ""}
+semantic.k:29:  syntax KItem ::= "noResult"
+semantic.k:31:  configuration
+semantic.k:40:  syntax Int ::= envInt(Map, String) [function]
+semantic.k:41:  rule envInt(ENV, X) => {ENV [ X ]}:>Int
+semantic.k:43:  syntax Int ::= evalInt(Expr, Map) [function]
+semantic.k:44:  rule evalInt(Int(I),             _)   => I
+semantic.k:45:  rule evalInt(Name(X),            ENV) => envInt(ENV, X)
+semantic.k:46:  rule evalInt(BinOp("-", A, B),   ENV) => evalInt(A, ENV) -Int  evalInt(B, ENV)
+semantic.k:47:  rule evalInt(BinOp("%", A, B),   ENV) => evalInt(A, ENV) modInt evalInt(B, ENV)
+semantic.k:49:  syntax Bool ::= evalBool(Expr, Map) [function]
+semantic.k:50:  rule evalBool(Compare(A, CmpOp("!=", B)), ENV)
+semantic.k:52:  rule evalBool(Compare(A, CmpOp("==", B)), ENV)
+semantic.k:54:  rule evalBool(Compare(A, CmpOp(">", B)), ENV)
+semantic.k:58:  // integer argument.  The remaining rules are ordinary small-step rules.
+semantic.k:59:  rule <k> Module(FuncDef(_, Params(P), BODY)) => BODY ... </k>
+semantic.k:63:  rule <k> S:Stmt REST:Stmts => S ~> REST ... </k>
+semantic.k:64:  rule <k> .Stmts => .K ... </k>
+semantic.k:66:  rule <k> Assign(Name(X), E) => .K ... </k>
+semantic.k:71:  // stable loop-head configuration for invariant proofs.
+semantic.k:72:  syntax KItem ::= "whileBranch" "(" Expr "," Stmts ")"
+semantic.k:73:  rule <k> While(COND, BODY) => evalBool(COND, ENV) ~> whileBranch(COND, BODY) ... </k>
+semantic.k:75:  rule <k> true  ~> whileBranch(COND, BODY) => BODY ~> While(COND, BODY) ... </k>
+semantic.k:76:  rule <k> false ~> whileBranch(_, _) => .K ... </k>
+semantic.k:78:  syntax KItem ::= "branch" "(" Stmts "," Stmts ")"
+semantic.k:79:  rule <k> If(COND, THEN, ELSE) => evalBool(COND, ENV) ~> branch(THEN, ELSE) ... </k>
+semantic.k:81:  rule <k> true  ~> branch(THEN, _) => THEN ... </k>
+semantic.k:82:  rule <k> false ~> branch(_, ELSE) => ELSE ... </k>
+semantic.k:84:  rule <k> Return(E) ~> _:K => .K </k>
+EXIT_STATUS: 0

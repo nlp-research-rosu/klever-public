@@ -1,0 +1,252 @@
+COMMAND: /audit-output/evidence/static_inventory.sh
+SOURCE: /tmp/audit-work/src/solution.mpy
+     1	Module(
+     2	  FuncDef("total_match", Params("lst1", "lst2"),
+     3	    Return(
+     4	      IfExp(
+     5	        Compare(
+     6	          Call(
+     7	            Name("sum"),
+     8	            Call(Name("map"), Name("len"), Name("lst1"))),
+     9	          CmpOp(
+    10	            "<=",
+    11	            Call(
+    12	              Name("sum"),
+    13	              Call(Name("map"), Name("len"), Name("lst2"))))),
+    14	        Name("lst1"),
+    15	        Name("lst2")))))
+SOURCE: /tmp/audit-work/src/semantic.k
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports BOOL-SYNTAX
+     5	  imports INT-SYNTAX
+     6	  imports STRING-SYNTAX
+     7	
+     8	  syntax Program ::= "Module" "(" Stmt ")"
+     9	
+    10	  syntax Params ::= "Params" "(" String "," String ")"
+    11	
+    12	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
+    13	                | "Return" "(" Expr ")"
+    14	
+    15	  syntax Expr ::= "Name" "(" String ")"
+    16	                | "Call" "(" Expr "," Expr ")"
+    17	                | "Call" "(" Expr "," Expr "," Expr ")"
+    18	                | "IfExp" "(" Expr "," Expr "," Expr ")"
+    19	                | "Compare" "(" Expr "," CmpOp ")"
+    20	
+    21	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    22	endmodule
+    23	
+    24	module SEMANTIC
+    25	  imports MPY-SYNTAX
+    26	  imports BOOL
+    27	  imports INT
+    28	  imports STRING
+    29	
+    30	  // Runtime values for the Python subset used by solution.py.
+    31	  syntax PyString ::= "pyStr" "(" String ")"
+    32	  syntax StrVals ::= ".StrVals"
+    33	                   | PyString "::" StrVals
+    34	  syntax IntVals ::= ".IntVals"
+    35	                   | IntVal "::" IntVals
+    36	  syntax IntVal ::= "pyInt" "(" Int ")"
+    37	  syntax Value ::= PyString
+    38	                 | IntVal
+    39	                 | "pyList" "(" StrVals ")"
+    40	                 | "pyInts" "(" IntVals ")"
+    41	                 | "pyBool" "(" Bool ")"
+    42	                 | "builtin" "(" String ")"
+    43	
+    44	  syntax Args ::= "args" "(" Value "," Value ")"
+    45	  syntax Env ::= "env" "(" Value "," Value ")"
+    46	
+    47	  // Pure evaluator functions.  The source program has no side effects, so
+    48	  // its expression semantics can be given compositionally.
+    49	  syntax Value ::= eval(Expr, Env) [function]
+    50	                 | apply1(Value, Value) [function]
+    51	                 | apply2(Value, Value, Value) [function]
+    52	                 | lessEqual(Value, Value) [function]
+    53	                 | ifValue(Value, Value, Value) [function]
+    54	  syntax IntVals ::= mapLengths(StrVals) [function]
+    55	  syntax Int ::= sumInts(IntVals) [function]
+    56	
+    57	  rule eval(Name("lst1"), env(V1, _V2)) => V1
+    58	  rule eval(Name("lst2"), env(_V1, V2)) => V2
+    59	  rule eval(Name("len"),  _ENV) => builtin("len")
+    60	  rule eval(Name("map"),  _ENV) => builtin("map")
+    61	  rule eval(Name("sum"),  _ENV) => builtin("sum")
+    62	
+    63	  rule eval(Call(F, A), ENV)
+    64	    => apply1(eval(F, ENV), eval(A, ENV))
+    65	  rule eval(Call(F, A, B), ENV)
+    66	    => apply2(eval(F, ENV), eval(A, ENV), eval(B, ENV))
+    67	  rule eval(Compare(L, CmpOp("<=", R)), ENV)
+    68	    => lessEqual(eval(L, ENV), eval(R, ENV))
+    69	  rule eval(IfExp(COND, THEN, ELSE), ENV)
+    70	    => ifValue(eval(COND, ENV), eval(THEN, ENV), eval(ELSE, ENV))
+    71	
+    72	  rule apply1(builtin("len"), pyStr(S)) => pyInt(lengthString(S))
+    73	  rule apply1(builtin("sum"), pyInts(IS)) => pyInt(sumInts(IS))
+    74	  rule apply2(builtin("map"), builtin("len"), pyList(SS))
+    75	    => pyInts(mapLengths(SS))
+    76	
+    77	  rule mapLengths(.StrVals) => .IntVals
+    78	  rule mapLengths(pyStr(S) :: REST)
+    79	    => pyInt(lengthString(S)) :: mapLengths(REST)
+    80	
+    81	  rule sumInts(.IntVals) => 0
+    82	  rule sumInts(pyInt(I) :: REST) => I +Int sumInts(REST)
+    83	
+    84	  rule lessEqual(pyInt(I), pyInt(J)) => pyBool(true)
+    85	    requires I <=Int J
+    86	  rule lessEqual(pyInt(I), pyInt(J)) => pyBool(true)
+    87	    requires I ==Int J
+    88	  rule lessEqual(pyInt(I), pyInt(J)) => pyBool(false)
+    89	    requires I >Int J
+    90	  rule ifValue(pyBool(true),  THEN, _ELSE) => THEN
+    91	  rule ifValue(pyBool(false), _THEN, ELSE) => ELSE
+    92	
+    93	  // A module is executed by invoking its translated two-argument function.
+    94	  syntax KItem ::= run(Program, Args)
+    95	  rule run(
+    96	         Module(FuncDef("total_match", Params("lst1", "lst2"), Return(BODY))),
+    97	         args(V1, V2))
+    98	    => eval(BODY, env(V1, V2))
+    99	
+   100	  configuration <k> run($PGM:Program, $ARGS:Args) </k>
+   101	endmodule
+   102	
+   103	module SEMANTIC-SYNTAX
+   104	  imports MPY-SYNTAX
+   105	  imports SEMANTIC
+   106	endmodule
+SOURCE: /tmp/audit-work/src/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // The exact AST emitted into solution.mpy, named for readable claims.
+     7	  syntax Program ::= "solutionProgram" [macro]
+     8	  rule solutionProgram =>
+     9	    Module(
+    10	      FuncDef("total_match", Params("lst1", "lst2"),
+    11	        Return(
+    12	          IfExp(
+    13	            Compare(
+    14	              Call(Name("sum"), Call(Name("map"), Name("len"), Name("lst1"))),
+    15	              CmpOp("<=",
+    16	                Call(Name("sum"), Call(Name("map"), Name("len"), Name("lst2"))))),
+    17	            Name("lst1"),
+    18	            Name("lst2")))))
+    19	
+    20	  // Mathematical character-count measure used by the contract.
+    21	  syntax Int ::= totalChars(StrVals) [function]
+    22	  rule totalChars(SS) => sumInts(mapLengths(SS))
+    23	endmodule
+SOURCE: /tmp/audit-work/src/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // sum(map(len, ...)) is precisely the sum of every string's length.
+     7	  claim <k> totalChars(.StrVals) => 0 </k>
+     8	
+     9	  claim <k>
+    10	          totalChars(pyStr(S) :: REST)
+    11	        => lengthString(S) +Int totalChars(REST)
+    12	        </k>
+    13	
+    14	  // If the first total is no greater, total_match returns the first list.
+    15	  claim <k>
+    16	          run(solutionProgram,
+    17	              args(pyList(LIST1), pyList(LIST2)))
+    18	        => pyList(LIST1)
+    19	        </k>
+    20	    requires totalChars(LIST1) <=Int totalChars(LIST2)
+    21	
+    22	  // If the second total is strictly smaller, it is returned.
+    23	  claim <k>
+    24	          run(solutionProgram,
+    25	              args(pyList(LIST1), pyList(LIST2)))
+    26	        => pyList(LIST2)
+    27	        </k>
+    28	    requires totalChars(LIST1) >Int totalChars(LIST2)
+    29	
+    30	  // The tie behavior from the natural-language contract is explicit.
+    31	  claim <k>
+    32	          run(solutionProgram,
+    33	              args(pyList(LIST1), pyList(LIST2)))
+    34	        => pyList(LIST1)
+    35	        </k>
+    36	    requires totalChars(LIST1) ==Int totalChars(LIST2)
+    37	endmodule
+DECLARATION/RULE ATTRIBUTE SEARCH
+/tmp/audit-work/src/verification.k:6:  // The exact AST emitted into solution.mpy, named for readable claims.
+/tmp/audit-work/src/verification.k:7:  syntax Program ::= "solutionProgram" [macro]
+/tmp/audit-work/src/verification.k:8:  rule solutionProgram =>
+/tmp/audit-work/src/verification.k:10:      FuncDef("total_match", Params("lst1", "lst2"),
+/tmp/audit-work/src/verification.k:21:  syntax Int ::= totalChars(StrVals) [function]
+/tmp/audit-work/src/verification.k:22:  rule totalChars(SS) => sumInts(mapLengths(SS))
+/tmp/audit-work/src/semantic.k:8:  syntax Program ::= "Module" "(" Stmt ")"
+/tmp/audit-work/src/semantic.k:10:  syntax Params ::= "Params" "(" String "," String ")"
+/tmp/audit-work/src/semantic.k:12:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
+/tmp/audit-work/src/semantic.k:15:  syntax Expr ::= "Name" "(" String ")"
+/tmp/audit-work/src/semantic.k:21:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+/tmp/audit-work/src/semantic.k:31:  syntax PyString ::= "pyStr" "(" String ")"
+/tmp/audit-work/src/semantic.k:32:  syntax StrVals ::= ".StrVals"
+/tmp/audit-work/src/semantic.k:34:  syntax IntVals ::= ".IntVals"
+/tmp/audit-work/src/semantic.k:36:  syntax IntVal ::= "pyInt" "(" Int ")"
+/tmp/audit-work/src/semantic.k:37:  syntax Value ::= PyString
+/tmp/audit-work/src/semantic.k:44:  syntax Args ::= "args" "(" Value "," Value ")"
+/tmp/audit-work/src/semantic.k:45:  syntax Env ::= "env" "(" Value "," Value ")"
+/tmp/audit-work/src/semantic.k:47:  // Pure evaluator functions.  The source program has no side effects, so
+/tmp/audit-work/src/semantic.k:49:  syntax Value ::= eval(Expr, Env) [function]
+/tmp/audit-work/src/semantic.k:50:                 | apply1(Value, Value) [function]
+/tmp/audit-work/src/semantic.k:51:                 | apply2(Value, Value, Value) [function]
+/tmp/audit-work/src/semantic.k:52:                 | lessEqual(Value, Value) [function]
+/tmp/audit-work/src/semantic.k:53:                 | ifValue(Value, Value, Value) [function]
+/tmp/audit-work/src/semantic.k:54:  syntax IntVals ::= mapLengths(StrVals) [function]
+/tmp/audit-work/src/semantic.k:55:  syntax Int ::= sumInts(IntVals) [function]
+/tmp/audit-work/src/semantic.k:57:  rule eval(Name("lst1"), env(V1, _V2)) => V1
+/tmp/audit-work/src/semantic.k:58:  rule eval(Name("lst2"), env(_V1, V2)) => V2
+/tmp/audit-work/src/semantic.k:59:  rule eval(Name("len"),  _ENV) => builtin("len")
+/tmp/audit-work/src/semantic.k:60:  rule eval(Name("map"),  _ENV) => builtin("map")
+/tmp/audit-work/src/semantic.k:61:  rule eval(Name("sum"),  _ENV) => builtin("sum")
+/tmp/audit-work/src/semantic.k:63:  rule eval(Call(F, A), ENV)
+/tmp/audit-work/src/semantic.k:65:  rule eval(Call(F, A, B), ENV)
+/tmp/audit-work/src/semantic.k:67:  rule eval(Compare(L, CmpOp("<=", R)), ENV)
+/tmp/audit-work/src/semantic.k:69:  rule eval(IfExp(COND, THEN, ELSE), ENV)
+/tmp/audit-work/src/semantic.k:72:  rule apply1(builtin("len"), pyStr(S)) => pyInt(lengthString(S))
+/tmp/audit-work/src/semantic.k:73:  rule apply1(builtin("sum"), pyInts(IS)) => pyInt(sumInts(IS))
+/tmp/audit-work/src/semantic.k:74:  rule apply2(builtin("map"), builtin("len"), pyList(SS))
+/tmp/audit-work/src/semantic.k:77:  rule mapLengths(.StrVals) => .IntVals
+/tmp/audit-work/src/semantic.k:78:  rule mapLengths(pyStr(S) :: REST)
+/tmp/audit-work/src/semantic.k:81:  rule sumInts(.IntVals) => 0
+/tmp/audit-work/src/semantic.k:82:  rule sumInts(pyInt(I) :: REST) => I +Int sumInts(REST)
+/tmp/audit-work/src/semantic.k:84:  rule lessEqual(pyInt(I), pyInt(J)) => pyBool(true)
+/tmp/audit-work/src/semantic.k:86:  rule lessEqual(pyInt(I), pyInt(J)) => pyBool(true)
+/tmp/audit-work/src/semantic.k:88:  rule lessEqual(pyInt(I), pyInt(J)) => pyBool(false)
+/tmp/audit-work/src/semantic.k:90:  rule ifValue(pyBool(true),  THEN, _ELSE) => THEN
+/tmp/audit-work/src/semantic.k:91:  rule ifValue(pyBool(false), _THEN, ELSE) => ELSE
+/tmp/audit-work/src/semantic.k:93:  // A module is executed by invoking its translated two-argument function.
+/tmp/audit-work/src/semantic.k:94:  syntax KItem ::= run(Program, Args)
+/tmp/audit-work/src/semantic.k:95:  rule run(
+/tmp/audit-work/src/semantic.k:96:         Module(FuncDef("total_match", Params("lst1", "lst2"), Return(BODY))),
+/tmp/audit-work/src/semantic.k:100:  configuration <k> run($PGM:Program, $ARGS:Args) </k>
+/tmp/audit-work/src/spec.k:7:  claim <k> totalChars(.StrVals) => 0 </k>
+/tmp/audit-work/src/spec.k:9:  claim <k>
+/tmp/audit-work/src/spec.k:10:          totalChars(pyStr(S) :: REST)
+/tmp/audit-work/src/spec.k:11:        => lengthString(S) +Int totalChars(REST)
+/tmp/audit-work/src/spec.k:14:  // If the first total is no greater, total_match returns the first list.
+/tmp/audit-work/src/spec.k:15:  claim <k>
+/tmp/audit-work/src/spec.k:20:    requires totalChars(LIST1) <=Int totalChars(LIST2)
+/tmp/audit-work/src/spec.k:22:  // If the second total is strictly smaller, it is returned.
+/tmp/audit-work/src/spec.k:23:  claim <k>
+/tmp/audit-work/src/spec.k:28:    requires totalChars(LIST1) >Int totalChars(LIST2)
+/tmp/audit-work/src/spec.k:31:  claim <k>
+/tmp/audit-work/src/spec.k:36:    requires totalChars(LIST1) ==Int totalChars(LIST2)
+EXIT_STATUS: 0

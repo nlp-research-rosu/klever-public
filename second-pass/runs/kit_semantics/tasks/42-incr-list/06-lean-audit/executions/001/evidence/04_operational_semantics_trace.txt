@@ -1,0 +1,287 @@
+Script started on 2026-07-31 05:24:00-05:00 [<not executed on terminal>]
+COMMAND: relevant supplied-semantics excerpts
+    12	  // ==== values, the algebraic lists, and the scope heap =====================
+    13	  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+    14	  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+    15	  syntax Str    ::= str(IntSeq)
+    16	
+    17	  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+    18	  syntax Iterable ::= list(ValSeq)
+    19	                    | tuple(ValSeq)
+    20	                    | Str
+    21	                    | rangeObj(Int, Int, Int)
+    22	                    | zipObj(ValSeq, ValSeq)
+    23	                    | zipObjS(IntSeq, IntSeq)
+    24	
+    25	  syntax Val      ::= Int
+    26	                    | Bool
+    27	                    | "noneV"
+    28	                    | Iterable
+    29	                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+    30	                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+    31	                    | closureVal(ParamNames, Stmts, Int)
+    32	                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+   117	  syntax KItem ::= #alloc(Val)
+   118	  rule <k> #alloc(V:Val) => ref(N) ... </k>
+   119	       <heap>    H:Map => (N |-> V) H </heap>
+   120	       <heapLoc> N:Int => N +Int 1 </heapLoc>
+   121	       requires notBool N in_keys(H)
+   188	                  | #applyK(ApplyK, Vals)
+   189	  rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>
+   190	  rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>
+   191	  rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>
+   192	
+   193	  // ==== Int / Bool / None literals ==========================================
+   194	  rule <k> Int(I:Int)   => I ... </k>
+   195	  rule <k> Bool(B:Bool) => B ... </k>
+   196	  rule <k> NoneVal      => noneV ... </k>
+   197	
+   198	  // ==== truthy (If, Assert, BoolOp, IfExp, not, While) ======================
+   199	  syntax Bool ::= truthy(Val) [function]
+   200	  rule truthy(B:Bool)          => B
+   201	  rule truthy(noneV)           => false
+   202	  rule truthy(I:Int)           => I =/=Int 0
+   203	  rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)
+   204	  rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)
+   205	  rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)
+   206	
+   207	  // ==== extensible operator dispatch (cases added by the construct modules) ==
+   208	  syntax Val  ::= applyUn(String, Val) [function]
+   209	  syntax Val  ::= applyBin(String, Val, Val) [function]
+   210	  syntax Bool ::= applyCmp(String, Val, Val) [function]
+   211	
+   212	  // ==== shared list helpers =================================================
+   213	  syntax Vals ::= appendVal(Vals, Val) [function, total]
+   214	  rule appendVal(.Vals, V:Val)              => V , .Vals
+   215	  rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+   216	
+   217	  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+   218	  rule vals2valSeq(.Vals)            => .ValSeq
+   219	  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+   220	
+     1	// reference/src/semantics/operators.k — MPY-OPERATORS
+     2	// The operator DISPATCH layer: operands evaluate by strictness (heat/cool over KResult=Val),
+     3	// the cooled node hands to applyUn/applyBin/applyCmp (declared in core.k; each domain file
+     4	// owns its cases — bool.k, int.k, float.k, str.k, list.k, tuple.k, set.k, dict.k).
+     5	
+     6	module MPY-OPERATORS
+     7	  imports MPY-CORE
+     8	  imports MPY-ITER
+     9	
+    10	  rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>
+    11	
+    12	  rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+    13	
+    14	  // Compare's right operand sits under the CmpOp wrapper — contexts instead of attributes
+    15	  context Compare(HOLE, _)
+    16	  context Compare(_:Val, CmpOp(_, HOLE))
+    17	  rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]
+    18	
+    19	  rule applyCmp("is",     V:Val, noneV) => V ==K noneV
+    20	  rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)
+    21	
+    22	  // ==== operand deref: heap objects combine/compare by STRUCTURE ============
+    23	  // (Python: list == is structural; identity only via `is`.) priority(40)
+    24	  // preempts the generic dispatch so applyUn/applyBin/applyCmp never see a ref.
+    25	  rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k>
+    26	       <heap> ... H |-> V:Val ... </heap>
+    27	       [priority(40)]
+    28	  rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k>
+    29	       <heap> ... H |-> V:Val ... </heap>
+    30	       requires notBool isRefV(L)
+    31	       [priority(40)]
+    32	
+    33	  // the left operand of `in`/`not in` is an ELEMENT (compares by ==K) — never deref'd
+    34	  rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k>
+    35	       <heap> ... H |-> V:Val ... </heap>
+    36	       requires OP =/=String "in" andBool OP =/=String "not in"
+    37	       [priority(40)]
+    38	  rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k>
+    39	       <heap> ... H |-> V:Val ... </heap>
+    40	       requires notBool isRefV(L)
+    41	        orBool OP ==String "in" orBool OP ==String "not in"
+    42	       [priority(40)]
+    43	
+    44	  rule <k> UnaryOp(OP:String, ref(H:Int)) => UnaryOp(OP, V) ... </k>
+    45	       <heap> ... H |-> V:Val ... </heap>
+    46	       [priority(40)]
+    47	endmodule
+     1	// reference/src/semantics/int.k — MPY-INT
+     2	// Int cases of the operator dispatch; Python // and % are floored (pyMod).
+     3	
+     4	module MPY-INT
+     5	  imports MPY-CORE
+     6	
+     7	  rule applyUn("-", I:Int) => 0 -Int I
+     8	
+     9	  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    10	  // Bool participates in int arithmetic (x += (a == b))
+    11	  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+    12	  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+    13	  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+    14	  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+    15	  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+    16	  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+    17	  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+    18	
+    19	  syntax Int ::= pyMod(Int, Int) [function]
+    20	  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+    21	
+    22	  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+    23	  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+    24	  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+     1	// reference/src/semantics/float.k — MPY-FLOAT
+     2	//
+     3	// Minimal, TRUSTED float support. K/Haskell (kprove) has no usable symbolic IEEE-754 theory and
+     4	// no Int2Float hook, so a float value stays an OPAQUE proof-domain primitive: `intFloatDiv(I, F)`
+     5	// (the Python true division I / F) is `[no-evaluators]` for kprove — it never reduces on symbolic
+     6	// input, and the proof verifies only the STRUCTURE (the result is the exact term the program
+     7	// builds). The `[concrete]` rule evaluates it for krun (llvm HAS the Int2Float / /Float hooks), so
+     8	// smoke tests run the real float value.
+     9	//
+    10	// Only the pieces needed so far: Float as a Val, the float literal, and Int / float true division
+    11	// (the `a * h / 2.0` idiom). More float ops (float +/-/*, comparison) are added as float problems
+    12	// need them — kept minimal + sound.
+    13	
+    14	module MPY-FLOAT
+    15	  imports MPY-OPERATORS
+    16	  imports MPY-BUILTINS
+    17	  imports FLOAT
+    18	
+    19	  // Float is a value; the float literal evaluates to the K Float.
+    20	  syntax Val ::= Float
+    21	  rule <k> Float(F:Float) => F ... </k>
+    22	
+    23	  // Int / float true division. OPAQUE for kprove (no-evaluators); concrete for krun.
+    24	  syntax Float ::= intFloatDiv(Int, Float) [function, total, symbol(intFloatDiv), no-evaluators]
+    25	  rule intFloatDiv(I:Int, F:Float) => Int2Float(I, 53, 11) /Float F [concrete]
+    26	
+    27	  rule applyBin("/", I:Int, F:Float) => intFloatDiv(I, F)
+    28	
+    29	  // Int / Int true division (Python: always a float). OPAQUE for kprove; concrete for krun.
+    30	  syntax Float ::= divII(Int, Int) [function, total, symbol(divII), no-evaluators]
+    31	  rule divII(I1:Int, I2:Int) => Int2Float(I1, 53, 11) /Float Int2Float(I2, 53, 11) [concrete]
+    32	  rule applyBin("/", I1:Int, I2:Int) => divII(I1, I2)
+    33	
+    34	  // float % float (e.g. `number % 1.0` = the fractional part). OPAQUE for kprove, concrete for
+    35	  // krun. Python's float `%` is floor-based: a % b = a - floor(a/b)*b (K's %Float is IEEE
+    36	  // remainder, which differs — 3.5 %Float 1.0 = -0.5 vs Python 0.5 — so it is NOT used).
+    37	  syntax Float ::= floatMod(Float, Float) [function, total, symbol(floatMod), no-evaluators]
+    38	  rule floatMod(F1:Float, F2:Float) => F1 -Float (floorFloat(F1 /Float F2) *Float F2) [concrete]
+    39	  rule applyBin("%", F1:Float, F2:Float) => floatMod(F1, F2)
+    40	
+    41	  // float equality — for concrete krun asserts (e.g. `area == 7.5`); the FLOAT.eq hook is fine on
+    42	  // concrete floats. kprove proofs return floats structurally and do not compare them.
+    43	  rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2
+    44	  rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2)
+    45	
+    46	  // float `<` and abs — OPAQUE for kprove ([no-evaluators], so a SYMBOLIC float compare stays an
+    47	  // uninterpreted Bool a proof case-splits on — a SINGLE compare per branch, not a nonlinear cascade),
+    48	  // [concrete] for krun. Additive, sort-disjoint from the Int rules. (has_close_elements: the pairwise
+    49	  // `abs(a-b) < t` proximity test.)
+    50	  syntax Bool ::= floatLt(Float, Float) [function, total, symbol(floatLt), no-evaluators]
+    51	  rule floatLt(F1:Float, F2:Float) => F1 <Float F2 [concrete]
+    52	  rule applyCmp("<", F1:Float, F2:Float) => floatLt(F1, F2)
+    53	
+    54	  syntax Float ::= absF(Float) [function, total, symbol(absF), no-evaluators]
+    55	  rule absF(F:Float) => absFloat(F) [concrete]
+    56	  rule applyBuiltin("abs", F:Float, .Vals) => absF(F)
+    57	
+    58	  // ==== math.ceil ===========================================================
+    59	  // `import X` is a no-op (we intercept the specific math functions syntactically; `math` itself is
+    60	  // never bound as a value).
+    61	  rule <k> Import(_:String) => .K ... </k>
+    62	
+    63	  // math.ceil(x): ceiling to an int. Intercepted at the Call BEFORE `math` is looked up (higher
+    64	  // priority than the generic Attribute/method dispatch in call.k).
+    65	  syntax KItem ::= "#mathCeil"
+    66	  rule <k> Call(Attribute(Name("math"), "ceil"), (E:Expr, .Exprs)) => E ~> #mathCeil ... </k> [priority(40)]
+    67	  rule <k> V:Val ~> #mathCeil => ceilF(V) ... </k>
+    68	
+    69	  // math.floor(x) — same interception shape as math.ceil
+    70	  syntax KItem ::= "#mathFloor"
+    71	  rule <k> Call(Attribute(Name("math"), "floor"), (E:Expr, .Exprs)) => E ~> #mathFloor ... </k> [priority(40)]
+    72	  rule <k> V:Val ~> #mathFloor => floorFI(V) ... </k>
+    73	  syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]
+    74	  rule floorFI(I:Int)   => I                        [concrete]
+    75	  rule floorFI(F:Float) => Float2Int(floorFloat(F)) [concrete]
+    76	
+    77	  // bare floor/ceil (bound by `from math import floor, ceil`)
+    78	  rule applyBuiltin("floor", V:Val, .Vals) => floorFI(V)
+    79	  rule applyBuiltin("ceil",  V:Val, .Vals) => ceilF(V)
+    80	
+    14	  rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>
+    15	  rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>
+    16	
+    17	  // ==== list ops: + / == / != ===============================================
+    18	  syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]
+    19	  rule valSeqConcat(.ValSeq, T:ValSeq)                => T
+    20	  rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))
+    21	
+    22	  // list + list constructs a NEW object (k-cell — it allocates; operands land here
+    23	  // already deref'd). priority(45) beats the generic BinOp dispatch.
+    24	  rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k>
+    25	       [priority(45)]
+    26	
+    27	  rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B
+    28	  rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B)
+    29	
+    30	  // ==== deep equality when elements are heap objects (list-of-lists) ========
+    31	  // Python == is structural at every depth. Fires ONLY when a ref is present
+    32	  // (the guard decides on concrete seqs); the plain ==K path above is unchanged.
+    33	  syntax Bool ::= hasRefVS(ValSeq) [function, total]
+    34	  rule hasRefVS(.ValSeq)                => false
+    35	  rule hasRefVS(vCons(V:Val, R:ValSeq)) => isRefV(V) orBool hasRefVS(R)
+    36	
+    37	  syntax Bool ::= deepEqVS(ValSeq, ValSeq, Map) [function]
+    38	                | deepEqV(Val, Val, Map)        [function]
+    39	  rule deepEqVS(.ValSeq, .ValSeq, _:Map)                   => true
+    40	  rule deepEqVS(.ValSeq, vCons(_:Val, _:ValSeq), _:Map)    => false
+    41	  rule deepEqVS(vCons(_:Val, _:ValSeq), .ValSeq, _:Map)    => false
+    42	  rule deepEqVS(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq), HP:Map)
+    43	    => deepEqV(A, B, HP) andBool deepEqVS(As, Bs, HP)
+    44	
+    45	  rule deepEqV(ref(H:Int), B:Val, HP:Map) => deepEqV({HP[H]}:>Val, B, HP)
+    46	       requires H in_keys(HP)
+    47	  rule deepEqV(A:Val, ref(H:Int), HP:Map) => deepEqV(A, {HP[H]}:>Val, HP)
+    48	       requires notBool isRefV(A) andBool H in_keys(HP)
+    49	  rule deepEqV(list(A:ValSeq), list(B:ValSeq), HP:Map) => deepEqVS(A, B, HP)
+    50	  rule deepEqV(A:Val, B:Val, _:Map) => A ==K B [owise]
+    51	
+    52	  // ==== mutator: xs.append(v) — an in-place heap write ======================
+    53	  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "append")), (V:Val, .Vals)) => noneV ... </k>
+    54	       <heap> ... H |-> list(VS:ValSeq => valSeqConcat(VS, vCons(V, .ValSeq))) ... </heap>
+    55	       [priority(40)]
+    56	
+    57	  // ==== `x in list` — a <k>-cell fold over #iterNext ========================
+    58	  syntax KItem ::= #memberAcc(Val, Iterable) | #memberCont(Val) | "#notB"
+    60	       requires notBool truthy(V)
+    61	
+    62	  // ==== For: one loop, in-cell continuation, over #iterNext =================
+    63	  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+    64	  // circularities anchor on #loop and narrowing substitutes the structure)
+    65	  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+    66	                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+    67	                 | #loopLbl(K) | "#cont" | "#brk"
+    68	
+    69	  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+    70	
+    71	  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+    72	  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+    73	  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+    74	        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+    75	
+    76	  // ==== While ==============================================================
+    77	  rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>
+    78	  rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>
+     1	// reference/src/semantics/iter.k — MPY-ITER
+     2	// The iterator protocol, DECLARATION ONLY. Each iterable's #iterNext case lives in that
+     3	// iterable's own module (list/tuple/str in their modules, rangeObj in range.k, zip in
+     4	// builtins.k). Consumers (the for-loop, `x in _`, sum/all/any/max/min) import this.
+     5	
+     6	module MPY-ITER
+     7	  imports MPY-CORE
+     8	  syntax KItem ::= #iterNext(Iterable) | "#iterDone" | #iterYield(Val, Iterable)
+     9	endmodule
+
+Script done on 2026-07-31 05:24:00-05:00 [COMMAND_EXIT_CODE="0"]

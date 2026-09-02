@@ -1,0 +1,1 @@
+python3 py2mpy.py k_concrete_cases.py > k_concrete_cases.mpy && python3 py2mpy.py k_huge_int_case.py > k_huge_int_case.mpy && sha256sum k_concrete_cases.py k_concrete_cases.mpy k_huge_int_case.py k_huge_int_case.mpy

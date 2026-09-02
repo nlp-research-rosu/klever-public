@@ -1,0 +1,134 @@
+COMMAND: bash -lc set\ -e\;\ sed\ -n\ \"180\,220p\"\ /opt/humaneval/tools/pipeline_contract.py\;\ sed\ -n\ \"1680\,1785p\"\ /opt/humaneval/tools/pipeline_contract.py\;\ rg\ -n\ \"generation_codex_trace_sha256\|candidate_tree_sha256\|audit_campaign_lock_sha256\"\ /opt/humaneval\ /opt\ 2\>/dev/null\ \|\ head\ -200
+START_UTC: 2026-07-26T13:22:01Z
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise PipelineContractError(f"cannot hash file {path}: {error}") from error
+    return digest.hexdigest()
+
+
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, "tree root")
+    digest = hashlib.sha256()
+    pending = [root]
+    entries: list[tuple[str, str, Path]] = []
+    while pending:
+        directory = pending.pop()
+        try:
+            children = list(os.scandir(directory))
+        except OSError as error:
+            raise PipelineContractError(f"cannot scan tree {directory}: {error}") from error
+        for child in children:
+            path = Path(child.path)
+            try:
+                mode = child.stat(follow_symlinks=False).st_mode
+            except OSError as error:
+                raise PipelineContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise PipelineContractError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    for relative, kind, path in sorted(entries):
+        encoded = relative.encode()
+        raise PipelineContractError(f"unsupported selection stage: {stage}")
+    if expected_candidate_sha256 is not None and (
+        not isinstance(expected_candidate_sha256, str)
+        or re.fullmatch(r"[0-9a-f]{64}", expected_candidate_sha256) is None
+    ):
+        raise PipelineContractError(
+            "expected candidate hash is malformed"
+        )
+    candidate_name = validate_safe_component(candidate_name, "candidate name")
+    stage_root = _require_direct_directory(task, stage, stage)
+    container_name, _document_name = _SELECTION_STAGES[stage]
+    container = _require_direct_directory(
+        stage_root, container_name, f"{stage} candidates"
+    )
+    candidate = _require_direct_directory(
+        container, candidate_name, f"{stage} candidate"
+    )
+    status = _selection_status(stage, candidate)
+    selected_path = stage_root / "selected.json"
+    previous: dict[str, Any] | None = None
+    if selected_path.exists() or selected_path.is_symlink():
+        previous = _read_regular_json(selected_path, f"{stage} selection")
+        previous_relative = previous.get("relative_path")
+        if not isinstance(previous_relative, str):
+            raise PipelineContractError("previous selection path is malformed")
+        parts = Path(previous_relative).parts
+        if len(parts) != 2 or parts[0] != container_name:
+            raise PipelineContractError("previous selection escapes its stage")
+        previous_candidate = _require_direct_directory(
+            container, parts[1], f"previous {stage} candidate"
+        )
+        previous_status = _selection_status(stage, previous_candidate)
+        retryable = (
+            previous_status == "KLEAN_PREFLIGHT_ERROR"
+            if stage == "04-klean-generation"
+            else previous_status == "AUDIT_ERROR"
+        )
+        if not retryable:
+            raise PipelineContractError(
+                f"{stage} selection is terminal and cannot be replaced"
+            )
+    candidate_sha256 = sha256_tree(candidate)
+    if (
+        expected_candidate_sha256 is not None
+        and candidate_sha256 != expected_candidate_sha256
+    ):
+        raise PipelineContractError(
+            f"{stage} candidate changed before selection"
+        )
+    document = {
+        "schema_version": SCHEMA_VERSION,
+        "stage": stage,
+        "relative_path": f"{container_name}/{candidate_name}",
+        "artifact_sha256": candidate_sha256,
+        "status": status,
+        "selected_at": datetime.now(timezone.utc).isoformat(),
+        "replaces": previous.get("relative_path") if previous else None,
+    }
+    write_json_atomic(selected_path, document)
+    _append_ledger(
+        state,
+        {
+            "event": "stage_output_selected",
+            "stage": stage,
+            "relative_path": document["relative_path"],
+            "status": status,
+        },
+    )
+    return document
+
+
+def select_stage_output(
+    repo: Path,
+    run_id: str,
+    problem_id: str,
+    stage: str,
+    candidate_name: str,
+    *,
+    expected_candidate_sha256: str | None = None,
+) -> dict[str, Any]:
+    """Select a stage output resolved through the public run layout."""
+
+    task, state, _run_manifest = _resolve_task_state(repo, run_id, problem_id)
+    return select_stage_output_at(
+        task,
+        state,
+        stage,
+        candidate_name,
+        expected_candidate_sha256=expected_candidate_sha256,
+    )
+EXIT_STATUS: 0

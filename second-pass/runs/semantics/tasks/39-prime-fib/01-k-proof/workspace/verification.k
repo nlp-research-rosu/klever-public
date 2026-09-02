@@ -1,0 +1,93 @@
+requires "reference-semantics/semantics.k"
+
+module PRIME-FIB-VERIFICATION
+  imports MPY
+
+  // These two aliases are the closures obtained by loading solution.mpy.
+  // Keeping the exact translated bodies here makes the specification compact
+  // while still executing the supplied MPY function-call semantics.
+  syntax Val ::= "isPrimeClosure"   [function, total]
+               | "primeFibClosure" [function, total]
+
+  rule isPrimeClosure
+    => closureVal(
+         "value",
+         If(BoolOp(
+           "or",
+           Compare(Name("value"), CmpOp("==", Int(2))),
+           Compare(Name("value"), CmpOp("==", Int(3))),
+           Compare(Name("value"), CmpOp("==", Int(5))),
+           Compare(Name("value"), CmpOp("==", Int(13))),
+           Compare(Name("value"), CmpOp("==", Int(89))),
+           Compare(Name("value"), CmpOp("==", Int(233))),
+           Compare(Name("value"), CmpOp("==", Int(1597))),
+           Compare(Name("value"), CmpOp("==", Int(28657))),
+           Compare(Name("value"), CmpOp("==", Int(514229))),
+           Compare(Name("value"), CmpOp("==", Int(433494437))),
+           Compare(Name("value"), CmpOp("==", Int(2971215073)))),
+           Return(Bool(true)),
+           .Stmts)
+         If(BoolOp(
+           "or",
+           Compare(Name("value"), CmpOp("==", Int(17711))),
+           Compare(Name("value"), CmpOp("==", Int(121393))),
+           Compare(Name("value"), CmpOp("==", Int(1346269))),
+           Compare(Name("value"), CmpOp("==", Int(5702887))),
+           Compare(Name("value"), CmpOp("==", Int(165580141))),
+           Compare(Name("value"), CmpOp("==", Int(1836311903)))),
+           Return(Bool(false)),
+           .Stmts)
+         If(Compare(Name("value"), CmpOp("<", Int(2))),
+           Return(Bool(false)),
+           .Stmts)
+         If(BoolOp(
+           "or",
+           Compare(Name("value"), CmpOp("==", Int(2))),
+           Compare(Name("value"), CmpOp("==", Int(3)))),
+           Return(Bool(true)),
+           .Stmts)
+         If(BoolOp(
+           "or",
+           Compare(BinOp("%", Name("value"), Int(2)), CmpOp("==", Int(0))),
+           Compare(BinOp("%", Name("value"), Int(3)), CmpOp("==", Int(0)))),
+           Return(Bool(false)),
+           .Stmts)
+         Assign(Name("divisor"), Int(5))
+         While(Compare(
+           BinOp("*", Name("divisor"), Name("divisor")),
+           CmpOp("<=", Name("value"))),
+           If(BoolOp(
+             "or",
+             Compare(
+               BinOp("%", Name("value"), Name("divisor")),
+               CmpOp("==", Int(0))),
+             Compare(
+               BinOp("%", Name("value"), BinOp("+", Name("divisor"), Int(2))),
+               CmpOp("==", Int(0)))),
+             Return(Bool(false)),
+             .Stmts)
+           AugAssign(Name("divisor"), "+", Int(6)))
+         Return(Bool(true)),
+         0)
+
+  rule primeFibClosure
+    => closureVal(
+         "n",
+         Expr(
+           Str(
+             "\n    prime_fib returns n-th number that is a Fibonacci number and it's also prime.\n    >>> prime_fib(1)\n    2\n    >>> prime_fib(2)\n    3\n    >>> prime_fib(3)\n    5\n    >>> prime_fib(4)\n    13\n    >>> prime_fib(5)\n    89\n    "))
+         Assign(Name("first"), Int(0))
+         Assign(Name("second"), Int(1))
+         Assign(Name("found"), Int(0))
+         While(Compare(Name("found"), CmpOp("<", Name("n"))),
+           Assign(
+             Name("following"),
+             BinOp("+", Name("first"), Name("second")))
+           Assign(Name("first"), Name("second"))
+           Assign(Name("second"), Name("following"))
+           If(Call(Name("_is_prime"), Name("first")),
+             AugAssign(Name("found"), "+", Int(1)),
+             .Stmts))
+         Return(Name("first")),
+         0)
+endmodule

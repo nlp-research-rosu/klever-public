@@ -1,0 +1,166 @@
+$ sed -n "1,120p" /reference/tools/stage6_resolution_contract.py
+#!/usr/bin/env python3
+"""Dependency-light signed-resolution contract for Stage 6 audit inputs."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from typing import Any
+
+
+SCHEMA_VERSION = 3
+RESOLUTION_KEYS = frozenset(
+    {
+        "schema_version",
+        "run_id",
+        "problem_id",
+        "condition",
+        "mode",
+        "semantics_mode",
+        "k_workspace",
+        "k_audit",
+        "discovery_manifest",
+        "klean_generation",
+        "lean_workspace",
+        "lean_invocation",
+        "target",
+        "stage1_source_hashes",
+        "trust_inventory",
+        "hashes",
+        "selections",
+        "stage4_preflight",
+        "stage5_result",
+    }
+)
+
+
+class Stage6ResolutionContractError(RuntimeError):
+    """Raised when a Stage 6 signed resolution is malformed."""
+
+
+def canonical_json_sha256(document: Any) -> str:
+    encoded = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def validate_sha256(value: object, label: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(
+        r"[0-9a-f]{64}", value
+    ) is None:
+        raise Stage6ResolutionContractError(f"{label} is malformed")
+    return value
+
+
+def build_audit_input(
+    resolution: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "resolution": resolution,
+        "resolved_input_sha256": canonical_json_sha256(resolution),
+    }
+
+
+def verify_audit_input(
+    document: dict[str, Any],
+) -> tuple[dict[str, Any], str]:
+    required = {
+        "schema_version",
+        "resolution",
+        "resolved_input_sha256",
+    }
+    keys = set(document)
+    if (
+        (keys != required and keys != required | {"audit"})
+        or document.get("schema_version") != SCHEMA_VERSION
+    ):
+        raise Stage6ResolutionContractError(
+            "Stage 6 audit input envelope is malformed"
+        )
+    audit = document.get("audit")
+    if "audit" in document and not isinstance(audit, dict):
+        raise Stage6ResolutionContractError(
+            "Stage 6 audit metadata is malformed"
+        )
+    resolution = document.get("resolution")
+    if (
+        not isinstance(resolution, dict)
+        or set(resolution) != RESOLUTION_KEYS
+        or resolution.get("schema_version") != SCHEMA_VERSION
+    ):
+        raise Stage6ResolutionContractError(
+            "Stage 6 signed resolution is malformed"
+        )
+    digest = validate_sha256(
+        document.get("resolved_input_sha256"),
+        "Stage 6 resolved-input digest",
+    )
+    if canonical_json_sha256(resolution) != digest:
+        raise Stage6ResolutionContractError(
+            "Stage 6 audit input digest does not match signed resolution"
+        )
+    return resolution, digest
+$ sed -n "140,195p" /reference/tools/klean_final_gate.py
+    matches = re.findall(r"depends on axioms:\s*\[([^\]]*)\]", output)
+    if len(matches) != 1:
+        raise KleanFinalGateError("#print axioms output is missing or ambiguous")
+    return {
+        token.strip()
+        for token in matches[0].split(",")
+        if token.strip()
+    }
+
+
+def _audit_input_binding(path: Path) -> dict[str, Any]:
+    document = _regular_json(path, "Stage 6 audit input")
+    try:
+        resolution, digest = (
+            stage6_resolution_contract.verify_audit_input(document)
+        )
+    except (
+        stage6_resolution_contract.Stage6ResolutionContractError
+    ) as error:
+        raise KleanFinalGateError(str(error)) from error
+    mode = resolution.get("mode")
+    hashes = resolution.get("hashes")
+    if (
+        mode not in {
+            "CLASSIFICATION_ONLY",
+            "CLASSIFICATION_AND_PROOF",
+        }
+        or not isinstance(hashes, dict)
+    ):
+        raise KleanFinalGateError(
+            "Stage 6 audit input binding is malformed"
+        )
+    return {
+        "resolution": resolution,
+        "resolved_input_sha256": digest,
+    }
+
+
+def _input_hashes(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    candidate: Path | None,
+) -> dict[str, Any]:
+    try:
+        return {
+            "k_workspace_sha256": pipeline_contract.sha256_tree(
+                frozen_input
+            ),
+            "stage1_export_sha256": klean_export.tree_digest(
+                frozen_input
+            ),
+            "discovery_manifest_sha256": (
+                pipeline_contract.sha256_file(discovery_manifest)
+            ),
+            "klean_generation_sha256": (

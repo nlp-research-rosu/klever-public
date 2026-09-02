@@ -1,0 +1,1327 @@
+$ sed -n 301,760p /reference/tools/k_rule_inventory.py
+                seen_rewrite = True
+                content_start = rewrite + 2
+            else:
+                content_start = len(line)
+
+        _scan_rule_delimiters(line, delimiters)
+        if seen_rewrite and line[content_start:].strip():
+            clause_has_content = True
+
+        if (
+            seen_rewrite
+            and clause_has_content
+            and not delimiters
+            and _terminal_attribute_line(line)
+        ):
+            return next_start
+        if seen_rewrite and clause_has_content and not delimiters:
+            candidate_end = next_start
+    if candidate_end is not None:
+        return candidate_end
+    return len(masked_text) + 1
+
+
+def _modules(masked_text: str) -> tuple[_Module, ...]:
+    modules: list[_Module] = []
+    open_module: tuple[
+        str, int, list[str], list[_Sentence]
+    ] | None = None
+    open_rule_until = 0
+    for line_start, line_end, keyword, rest in _line_heads(masked_text):
+        if line_start < open_rule_until:
+            continue
+        open_rule_until = 0
+        separated = bool(rest) and rest[0] in " \t"
+        if keyword == "module":
+            if not separated:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            named = _MODULE_NAME_RE.fullmatch(rest)
+            if named is None or open_module is not None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            open_module = (named.group("name"), line_end, [], [])
+            continue
+        if keyword == "endmodule":
+            if rest.strip():
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            if open_module is None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            name, content_start, imports, sentences = open_module
+            modules.append(
+                _Module(
+                    name=name,
+                    content_start=content_start,
+                    content_end=line_start,
+                    imports=tuple(imports),
+                    sentences=tuple(sentences),
+                )
+            )
+            open_module = None
+            continue
+        if open_module is not None and keyword == "rule":
+            open_module[3].append(
+                _Sentence(keyword=keyword, start=line_start)
+            )
+            open_rule_until = _rule_bubble_end(masked_text, line_start)
+            continue
+        if open_module is not None and keyword == "imports" and separated:
+            imported = rest.strip().split()
+            if len(imported) != 1:
+                raise KRuleInventoryError(
+                    "verification.k has malformed imports"
+                )
+            open_module[2].append(imported[0])
+        if (
+            open_module is not None
+            and keyword in _OUTER_SENTENCE_KEYWORDS
+            and separated
+        ):
+            open_module[3].append(
+                _Sentence(keyword=keyword, start=line_start)
+            )
+    if not modules or open_module is not None:
+        raise KRuleInventoryError(
+            "verification.k has malformed module boundaries"
+        )
+    return tuple(modules)
+
+
+def _verification_module(
+    modules: tuple[_Module, ...], selected_name: str | None = None
+) -> _Module:
+    if selected_name is not None:
+        selected = [module for module in modules if module.name == selected_name]
+        if len(selected) != 1:
+            raise KRuleInventoryError(
+                "prove.sh selects an unknown verification main module: "
+                + selected_name
+            )
+        return selected[0]
+    candidates = [
+        module
+        for module in modules
+        if module.name.endswith("VERIFICATION")
+        and not module.name.endswith("-SYNTAX")
+    ]
+    if len(candidates) != 1:
+        raise KRuleInventoryError(
+            "verification.k must contain exactly one verification module"
+        )
+    return candidates[0]
+
+
+def _last_verification_main_module(workspace: Path) -> str | None:
+    script = workspace / "prove.sh"
+    if not script.exists() and not script.is_symlink():
+        return None
+    try:
+        mode = script.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(f"cannot inspect prove.sh: {script}") from error
+    if not stat.S_ISREG(mode):
+        raise KRuleInventoryError(f"prove.sh must be a regular file: {script}")
+    try:
+        text = script.read_text()
+    except (OSError, UnicodeError) as error:
+        raise KRuleInventoryError(f"cannot read prove.sh: {script}") from error
+    logical = re.sub(r"\\\r?\n", " ", text)
+    selected: str | None = None
+    for line in logical.splitlines():
+        code = line.split("#", 1)[0]
+        if not re.search(r"(?:^|[;&|]\s*)kompile\s+", code):
+            continue
+        if re.search(r"(?:^|\s)(?:\./)?verification\.k(?:\s|$)", code) is None:
+            continue
+        match = re.search(
+            r"(?:^|\s)--main-module(?:=|\s+)([A-Za-z][A-Za-z0-9_'-]*)",
+            code,
+        )
+        if match is not None:
+            selected = match.group(1)
+    return selected
+
+
+def _verification_closure(
+    modules: tuple[_Module, ...], verification: _Module
+) -> tuple[_Module, ...]:
+    by_name = {module.name: module for module in modules}
+    reached: set[str] = set()
+    pending = [verification.name]
+    while pending:
+        name = pending.pop()
+        if name in reached:
+            continue
+        reached.add(name)
+        module = by_name.get(name)
+        if module is not None:
+            pending.extend(module.imports)
+    return tuple(module for module in modules if module.name in reached)
+
+
+def _without_comments(text: str) -> str:
+    """Remove K comments while preserving strings and their exact contents."""
+
+    output: list[str] = []
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                output.append(character)
+                state = "code"
+            index += 1
+            continue
+        if state == "string":
+            output.append(character)
+            if character == "\\" and following:
+                output.append(following)
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character in "\r\n":
+                output.append(character)
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output.append(" ")
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output.append(" ")
+            state = "block-comment"
+            block_depth = 1
+            index += 2
+            continue
+        output.append(character)
+        if character == '"':
+            state = "string"
+        index += 1
+    return "".join(output)
+
+
+def _attribute_tokens(text: str, masked_text: str) -> list[str]:
+    tokens: list[str] = []
+    start = 0
+    depth = 0
+    for index, character in enumerate(masked_text):
+        if character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth = max(depth - 1, 0)
+        elif character == "," and depth == 0:
+            token = _without_comments(text[start:index]).strip()
+            if token:
+                tokens.append(token)
+            start = index + 1
+    final = _without_comments(text[start:]).strip()
+    if final:
+        tokens.append(final)
+    return tokens
+
+
+def _rule_spans(text: str, module: _Module) -> list[_RuleSpan]:
+    masked_text = _mask_non_code(text)
+    sentences = module.sentences
+    rules: list[_RuleSpan] = []
+    seen_hashes: set[str] = set()
+    for index, sentence in enumerate(sentences):
+        if sentence.keyword != "rule":
+            continue
+        end_offset = (
+            sentences[index + 1].start
+            if index + 1 < len(sentences)
+            else module.content_end
+        )
+        start_offset = sentence.start
+        raw_segment = text[start_offset:end_offset]
+        masked_segment = masked_text[start_offset:end_offset]
+        logical_length = len(masked_segment.rstrip(" \t\r\n"))
+        if logical_length == 0:
+            continue
+        rule_text = raw_segment[:logical_length].rstrip(" \t\r\n")
+        masked_rule = _mask_non_code(rule_text)
+        attribute_match = _TRAILING_ATTRIBUTES_RE.search(masked_rule)
+        attribute_start = None
+        attribute_end = None
+        attributes: list[str] = []
+        if attribute_match is not None:
+            attribute_start = attribute_match.start("attributes")
+            attribute_end = attribute_match.end("attributes")
+            attributes = _attribute_tokens(
+                rule_text[attribute_start:attribute_end],
+                masked_rule[attribute_start:attribute_end],
+            )
+        normalized = " ".join(rule_text.split())
+        digest = hashlib.sha256(normalized.encode()).hexdigest()
+        if digest in seen_hashes:
+            raise KRuleInventoryError(
+                f"duplicate normalized simplification rule hash: {digest}"
+            )
+        seen_hashes.add(digest)
+        start_line = text.count("\n", 0, start_offset) + 1
+        end_line = start_line + rule_text.count("\n")
+        rule = KRule(
+            source_rule_id=f"rule-{digest}",
+            module=module.name,
+            start_line=start_line,
+            end_line=end_line,
+            normalized_sha256=digest,
+            attributes=attributes,
+            text=rule_text,
+        )
+        rules.append(
+            _RuleSpan(
+                rule=rule,
+                start_offset=start_offset,
+                end_offset=start_offset + len(rule_text),
+                attribute_start=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.start()
+                ),
+                attribute_end=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.end()
+                ),
+            )
+        )
+    return rules
+
+
+def _rule_documents(
+    text: str, modules: tuple[_Module, ...]
+) -> list[dict[str, Any]]:
+    spans = [span for module in modules for span in _rule_spans(text, module)]
+    spans.sort(key=lambda span: span.start_offset)
+    return [dataclasses.asdict(span.rule) for span in spans]
+
+
+def _attribute_token_spans(
+    text: str,
+    masked_text: str,
+) -> list[tuple[int, int, str]]:
+    spans: list[tuple[int, int, str]] = []
+    start = 0
+    depth = 0
+    for index, character in enumerate(masked_text):
+        if character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth = max(depth - 1, 0)
+        elif character == "," and depth == 0:
+            spans.append(
+                (
+                    start,
+                    index,
+                    _without_comments(text[start:index]).strip(),
+                )
+            )
+            start = index + 1
+    spans.append(
+        (
+            start,
+            len(text),
+            _without_comments(text[start:]).strip(),
+        )
+    )
+    return spans
+
+
+def _blank_non_newlines(text: str) -> str:
+    return "".join(
+        character if character in "\r\n" else " "
+        for character in text
+    )
+
+
+def desimplify_rule_ids(
+    text: str,
+    source_rule_ids: list[str],
+) -> str:
+    """Remove simplification from exactly the selected canonical rule IDs."""
+
+    if len(source_rule_ids) != len(set(source_rule_ids)):
+        raise KRuleInventoryError(
+            "exact rule transformation contains a duplicate source rule ID"
+        )
+    selected = set(source_rule_ids)
+    modules = _modules(_mask_non_code(text))
+    spans = [
+        span
+        for local_module in modules
+        for span in _rule_spans(text, local_module)
+    ]
+    by_id = {span.rule.source_rule_id: span for span in spans}
+    unknown = sorted(selected - set(by_id))
+    if unknown:
+        raise KRuleInventoryError(
+            "exact rule transformation names an unknown source rule ID: "
+            + ", ".join(unknown)
+        )
+
+    edits: list[tuple[int, int]] = []
+    for source_rule_id in source_rule_ids:
+        span = by_id[source_rule_id]
+        if span.attribute_start is None or span.attribute_end is None:
+            raise KRuleInventoryError(
+                "selected source rule has no simplification attribute: "
+                f"{source_rule_id}"
+            )
+        attribute_text = text[
+            span.attribute_start + 1 : span.attribute_end - 1
+        ]
+        masked_attributes = _mask_non_code(attribute_text)
+        tokens = _attribute_token_spans(
+            attribute_text,
+            masked_attributes,
+        )
+        matches = [
+            index
+            for index, (_start, _end, token) in enumerate(tokens)
+            if token == "simplification"
+        ]
+        if len(matches) != 1:
+            raise KRuleInventoryError(
+                "selected source rule has ambiguous simplification "
+                f"attributes: {source_rule_id}"
+            )
+        token_index = matches[0]
+        if len(tokens) == 1:
+            edit_start = span.attribute_start
+            edit_end = span.attribute_end
+        elif token_index < len(tokens) - 1:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index][0]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index + 1][0]
+            )
+        else:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index - 1][1]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index][1]
+            )
+        edits.append((edit_start, edit_end))
+
+    transformed = text
+    for start, end in sorted(edits, reverse=True):
+        transformed = (
+            transformed[:start]
+            + _blank_non_newlines(transformed[start:end])
+            + transformed[end:]
+        )
+    return transformed
+
+
+def inventory_verification(workspace: Path) -> dict[str, Any]:
+    workspace = Path(workspace)
+    try:
+        workspace_mode = workspace.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        ) from error
+    if not stat.S_ISDIR(workspace_mode):
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        )
+    verification = workspace / "verification.k"
+    try:
+        verification_mode = verification.stat(
+            follow_symlinks=False
+        ).st_mode
+$ sed -n 360,720p /reference/tools/klean_preflight.py
+        for line in source.read_text().splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("import "):
+                continue
+            imported = stripped.removeprefix("import ").strip()
+            if (
+                not imported
+                or imported.startswith(("/", "."))
+                or ".." in imported
+                or '"' in imported
+                or "\\" in imported
+            ):
+                raise KleanPreflightError(
+                    f"untrusted Lean import in {source}: {imported!r}"
+                )
+    for name in ("lakefile.toml", "lakefile.lean", "lean-toolchain"):
+        path = generated / name
+        if path.exists() and (not path.is_file() or path.is_symlink()):
+            raise KleanPreflightError(
+                f"generated dependency metadata is not regular: {path}"
+            )
+        if path.is_file():
+            text = path.read_text()
+            if re.search(r"(?m)^\s*(?:path|dir)\s*=\s*\"/", text):
+                raise KleanPreflightError(
+                    f"absolute dependency path in generated {name}"
+                )
+
+
+def check_generation(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    *,
+    toolchain_lock: Path,
+    run_command: Callable[..., tuple[int, str]] = _run,
+) -> dict[str, Any]:
+    frozen_input = Path(frozen_input)
+    discovery_manifest = Path(discovery_manifest)
+    generation = Path(generation)
+    generated = generation / "generated"
+    if not frozen_input.is_dir() or frozen_input.is_symlink():
+        raise KleanPreflightError("frozen K input must be a real directory")
+    if not discovery_manifest.is_file() or discovery_manifest.is_symlink():
+        raise KleanPreflightError(
+            "validated Stage 3 discovery manifest must be a regular file"
+        )
+    if not generation.is_dir() or generation.is_symlink():
+        raise KleanPreflightError("generation must be a real directory")
+    if not generated.is_dir() or generated.is_symlink():
+        raise KleanPreflightError("generated project must be a real directory")
+    # Traversing every entry rejects symlinks/FIFOs before any build command.
+    klean_export._tree_entries(generated)
+    snapshot = _preflight_snapshot(
+        frozen_input, discovery_manifest, generation
+    )
+    input_manifest = _regular_json(
+        generation / "input-manifest.json", "input manifest"
+    )
+    generator_manifest = _regular_json(
+        generation / "generator-manifest.json", "generator manifest"
+    )
+    inventory = _regular_json(
+        generation / "trust-inventory.json", "trust inventory"
+    )
+    export_result = _regular_json(
+        generation / "export-result.json", "export result"
+    )
+    lock = _regular_json(Path(toolchain_lock), "toolchain lock")
+    export_status = export_result.get("status")
+    if export_result.get("schema_version") != 3:
+        raise KleanPreflightError("export result schema version is not 3")
+    if export_status not in {"OK", "KLEAN_NO_OBLIGATIONS"}:
+        raise KleanPreflightError("export result status is invalid")
+    input_hash = snapshot.stage1_workspace_sha256
+    discovery_hash = snapshot.stage3_discovery_manifest_sha256
+    generated_hash = snapshot.generated_tree_sha256
+    sidecar_hashes = dict(snapshot.sidecar_sha256)
+    if input_manifest.get("schema_version") != 3:
+        raise KleanPreflightError("input manifest schema version is not 3")
+    if generator_manifest.get("schema_version") != 3:
+        raise KleanPreflightError("generator manifest schema version is not 3")
+    if input_manifest.get("frozen_input_sha256") != input_hash:
+        raise KleanPreflightError("frozen Stage 1 input hash changed")
+    if input_manifest.get("stage1_workspace_sha256") != input_hash:
+        raise KleanPreflightError("Stage 1 workspace hash changed")
+    if (
+        input_manifest.get("stage3_discovery_manifest_sha256")
+        != discovery_hash
+    ):
+        raise KleanPreflightError(
+            "validated Stage 3 discovery manifest hash changed"
+        )
+    if generator_manifest.get("generated_tree_sha256") != generated_hash:
+        raise KleanPreflightError("generated project hash changed")
+    if generator_manifest.get("toolchain") != lock:
+        raise KleanPreflightError("generator toolchain differs from pinned lock")
+    provenance = generator_manifest.get("provenance")
+    if not isinstance(provenance, dict):
+        raise KleanPreflightError("generator provenance is malformed")
+    if provenance.get("stage1_workspace_sha256") != input_hash:
+        raise KleanPreflightError(
+            "Stage 1 provenance differs between generation manifests"
+        )
+    if provenance.get("stage3_discovery_manifest_sha256") != discovery_hash:
+        raise KleanPreflightError(
+            "Stage 3 provenance differs between generation manifests"
+        )
+    if provenance.get("inventory_sha256") != input_manifest.get(
+        "inventory_sha256"
+    ):
+        raise KleanPreflightError(
+            "Stage 1/Stage 3 inventory provenance differs"
+        )
+    _source_rules, obligations = _source_and_obligation_gate(
+        frozen_input,
+        discovery_manifest,
+        generated,
+        input_manifest,
+        generator_manifest,
+    )
+    expected_export_status = "OK" if obligations else "KLEAN_NO_OBLIGATIONS"
+    if export_status != expected_export_status:
+        raise KleanPreflightError(
+            "export status disagrees with generated obligation count"
+        )
+    if export_result.get("obligation_count") != len(obligations):
+        raise KleanPreflightError(
+            "export result obligation_count does not match generated obligations"
+        )
+
+    try:
+        target = klean_export.target_statement(generated)
+    except klean_export.KleanExportError as error:
+        raise KleanPreflightError(str(error)) from error
+    expected_target = generator_manifest.get("target")
+    if target != expected_target:
+        raise KleanPreflightError("target theorem statement or location changed")
+    if bool(obligations) != bool(target):
+        raise KleanPreflightError(
+            "target proposition and obligation inventory disagree"
+        )
+    sources = _lean_sources(generated)
+    sorry_locations: list[str] = []
+    for source in sources:
+        text = source.read_text()
+        for forbidden in (r"\badmit\b", r"\bunsafe\b"):
+            if re.search(forbidden, text):
+                raise KleanPreflightError(
+                    f"forbidden Lean token in {source.relative_to(generated)}"
+                )
+        for match in re.finditer(r"\bsorry\b", text):
+            sorry_locations.append(source.relative_to(generated).as_posix())
+    if sorry_locations:
+        raise KleanPreflightError("generated immutable project contains sorry")
+    if inventory.get("designated_sorries") != 0 or inventory.get(
+        "other_sorries"
+    ) != 0:
+        raise KleanPreflightError("trust inventory has unexpected proof-hole counts")
+
+    declared = _trust_declarations(sources)
+    _reject_proposition_trust(generated, sources, declared)
+    allowlist = inventory.get("allowlist")
+    if not isinstance(allowlist, list):
+        raise KleanPreflightError("trust inventory allowlist is malformed")
+    expected: dict[str, tuple[str, str]] = {}
+    for entry in allowlist:
+        if not isinstance(entry, dict):
+            raise KleanPreflightError("trust allowlist entry is malformed")
+        name = entry.get("name")
+        kind = entry.get("kind")
+        lean_type = entry.get("type")
+        reason = entry.get("reason")
+        if not all(
+            isinstance(value, str) and value
+            for value in (name, kind, lean_type, reason)
+        ):
+            raise KleanPreflightError("trust allowlist entry is incomplete")
+        if name in expected:
+            raise KleanPreflightError(
+                f"duplicate trust allowlist entry: {name}"
+            )
+        expected[name] = (kind, lean_type)
+    if declared != expected:
+        raise KleanPreflightError(
+            "generated axiom/opaque declarations differ from trust allowlist"
+        )
+    _check_imports(generated, sources)
+    export_bindings = {
+        "frozen_input_sha256": input_hash,
+        "stage3_discovery_manifest_sha256": discovery_hash,
+        "generated_tree_sha256": generated_hash,
+        "trust_inventory_sha256": sidecar_hashes[
+            "trust-inventory.json"
+        ],
+    }
+    for field, expected_hash in export_bindings.items():
+        if export_result.get(field) != expected_hash:
+            label = (
+                "trust inventory hash"
+                if field == "trust_inventory_sha256"
+                else field
+            )
+            raise KleanPreflightError(
+                f"export result {label} does not match immutable inputs"
+            )
+
+    with tempfile.TemporaryDirectory(prefix="klean-preflight-") as temporary:
+        clean = Path(temporary) / "project"
+        shutil.copytree(generated, clean)
+        diagnostics: list[dict[str, Any]] = []
+        for command in (["lake", "clean"], ["lake", "build"]):
+            code, output = run_command(command, cwd=clean, timeout=600)
+            diagnostics.append(
+                {
+                    "command": command,
+                    "exit_code": code,
+                    "output_sha256": hashlib.sha256(output.encode()).hexdigest(),
+                    "output_tail": output[-4000:],
+                }
+            )
+            if code != 0:
+                raise KleanPreflightError(
+                    f"{' '.join(command)} failed ({code}): {output[-600:]}"
+                )
+    _require_unchanged_snapshot(
+        snapshot, frozen_input, discovery_manifest, generation
+    )
+    return {
+        "schema_version": 3,
+        "status": "PASS" if obligations else "KLEAN_NO_OBLIGATIONS",
+        "frozen_input_sha256": input_hash,
+        "stage1_workspace_sha256": input_hash,
+        "stage3_discovery_manifest_sha256": discovery_hash,
+        "generated_tree_sha256": generated_hash,
+        "target": target,
+        "obligation_count": len(obligations),
+        "trust_declaration_count": len(declared),
+        "designated_sorry_count": 0,
+        "diagnostics": diagnostics,
+    }
+
+
+def run_preflight(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    *,
+    toolchain_lock: Path,
+    run_command: Callable[..., tuple[int, str]] = _run,
+) -> dict[str, Any]:
+    frozen_input = Path(frozen_input)
+    discovery_manifest = Path(discovery_manifest)
+    generation = Path(generation)
+    output = generation / "preflight.json"
+    if output.exists() or output.is_symlink():
+        raise KleanPreflightError(f"preflight result already exists: {output}")
+
+    def error_document(error: KleanPreflightError) -> dict[str, Any]:
+        try:
+            stage1_hash = klean_export.tree_digest(frozen_input)
+        except (OSError, klean_export.KleanExportError):
+            stage1_hash = None
+        try:
+            stage3_hash = hashlib.sha256(
+                discovery_manifest.read_bytes()
+            ).hexdigest()
+        except OSError:
+            stage3_hash = None
+        return {
+            "schema_version": 3,
+            "status": "KLEAN_PREFLIGHT_ERROR",
+            "error": str(error),
+            "stage1_workspace_sha256": stage1_hash,
+            "stage3_discovery_manifest_sha256": stage3_hash,
+        }
+
+    publication_snapshot: PreflightSnapshot | None = None
+    try:
+        publication_snapshot = _preflight_snapshot(
+            frozen_input, discovery_manifest, generation
+        )
+        document = check_generation(
+            frozen_input,
+            discovery_manifest,
+            generation,
+            toolchain_lock=toolchain_lock,
+            run_command=run_command,
+        )
+        _require_unchanged_snapshot(
+            publication_snapshot,
+            frozen_input,
+            discovery_manifest,
+            generation,
+        )
+    except KleanPreflightError as error:
+        document = error_document(error)
+    temporary = output.with_name(f".{output.name}.tmp")
+    temporary.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+    if (
+        document.get("status") in {"PASS", "KLEAN_NO_OBLIGATIONS"}
+        and publication_snapshot is not None
+    ):
+        try:
+            _require_unchanged_snapshot(
+                publication_snapshot,
+                frozen_input,
+                discovery_manifest,
+                generation,
+            )
+        except KleanPreflightError as error:
+            document = error_document(error)
+            temporary.write_text(
+                json.dumps(document, indent=2, sort_keys=True) + "\n"
+            )
+    os.replace(temporary, output)
+    return document
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", required=True, type=Path)
+    parser.add_argument("--discovery-manifest", required=True, type=Path)
+    parser.add_argument("--generation", required=True, type=Path)
+    parser.add_argument(
+        "--toolchain-lock",
+        type=Path,
+        default=REPO / "data/klean-toolchain.lock.json",
+    )
+    arguments = parser.parse_args(argv)
+    try:
+        result = run_preflight(
+            arguments.input,
+            arguments.discovery_manifest,
+            arguments.generation,
+            toolchain_lock=arguments.toolchain_lock,
+        )
+    except KleanPreflightError as error:
+        print(f"Klean preflight failed: {error}", file=sys.stderr)
+        return 2
+    print(json.dumps(result, sort_keys=True))
+    return (
+        0
+        if result["status"] in {"PASS", "KLEAN_NO_OBLIGATIONS"}
+        else 1
+    )
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+$ sed -n 100,280p /reference/tools/audit_contract.py
+    parent = require_real_directory(parent, f"parent of {label}")
+    child = parent / name
+    resolved = require_real_directory(child, label)
+    if resolved.parent != parent:
+        raise AuditContractError(f"{label} must resolve directly below {parent}: {name!r}")
+    return resolved
+
+
+def read_regular_json(path: Path) -> dict[str, Any]:
+    regular = require_regular_file(path)
+    try:
+        document = json.loads(regular.read_text())
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise AuditContractError(f"{path}: malformed JSON: {error}") from error
+    if not isinstance(document, dict):
+        raise AuditContractError(f"{path}: JSON document must be an object")
+    return document
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise AuditContractError(f"cannot hash regular file {path}: {error}") from error
+    return digest.hexdigest()
+
+
+def _optional_regular_file_hash(path: Path) -> str | None:
+    try:
+        mode = path.lstat().st_mode
+    except OSError:
+        return None
+    if not stat.S_ISREG(mode):
+        return None
+    try:
+        return sha256_file(path)
+    except AuditContractError:
+        return None
+
+
+def _tree_entry_type(mode: int) -> str:
+    if stat.S_ISDIR(mode):
+        return "directory"
+    if stat.S_ISREG(mode):
+        return "file"
+    if stat.S_ISLNK(mode):
+        return "symlink"
+    if stat.S_ISFIFO(mode):
+        return "fifo"
+    if stat.S_ISSOCK(mode):
+        return "socket"
+    if stat.S_ISBLK(mode):
+        return "block-device"
+    if stat.S_ISCHR(mode):
+        return "character-device"
+    return "unknown"
+
+
+def _framed_update(digest: Any, value: bytes) -> None:
+    digest.update(len(value).to_bytes(8, "big"))
+    digest.update(value)
+
+
+def _framed_file_update(
+    digest: Any, path: Path, expected_size: int
+) -> None:
+    digest.update(expected_size.to_bytes(8, "big"))
+    bytes_read = 0
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        with os.fdopen(os.open(path, flags), "rb") as stream:
+            for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                bytes_read += len(chunk)
+                digest.update(chunk)
+    except OSError as error:
+        raise AuditContractError(f"cannot read tree file {path}: {error}") from error
+    if bytes_read != expected_size:
+        raise AuditContractError(
+            f"tree file changed size while hashing: {path} "
+            f"(expected {expected_size}, read {bytes_read})"
+        )
+
+
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, f"tree root {root}")
+    entries: list[tuple[str, str, Path, int]] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as iterator:
+                children = list(iterator)
+        except OSError as error:
+            raise AuditContractError(f"cannot scan tree {directory}: {error}") from error
+        for entry in children:
+            path = Path(entry.path)
+            try:
+                entry_stat = entry.stat(follow_symlinks=False)
+            except OSError as error:
+                raise AuditContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            mode = entry_stat.st_mode
+            entry_type = _tree_entry_type(mode)
+            relative = path.relative_to(root).as_posix()
+            entries.append((relative, entry_type, path, entry_stat.st_size))
+            if entry_type == "directory":
+                pending.append(path)
+
+    digest = hashlib.sha256()
+    for relative, entry_type, path, size in sorted(
+        entries, key=lambda item: item[0]
+    ):
+        _framed_update(digest, os.fsencode(relative))
+        _framed_update(digest, entry_type.encode())
+        if entry_type == "file":
+            _framed_file_update(digest, path, size)
+        elif entry_type == "symlink":
+            try:
+                target = os.readlink(path)
+            except OSError as error:
+                raise AuditContractError(
+                    f"cannot read tree symlink {path}: {error}"
+                ) from error
+            _framed_update(digest, os.fsencode(target))
+        else:
+            _framed_update(digest, b"")
+    return digest.hexdigest()
+
+
+def _optional_tree_hash(root: Path) -> str | None:
+    try:
+        mode = root.lstat().st_mode
+    except OSError:
+        return None
+    if not stat.S_ISDIR(mode):
+        return None
+    try:
+        return sha256_tree(root)
+    except AuditContractError:
+        return None
+
+
+def legacy_content_tree_hash(root: Path) -> str:
+    """Reproduce the schema-v1 seed-tree hash used by imported runs."""
+
+    root = require_real_directory(root, "legacy seed tree")
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        try:
+            metadata = path.lstat()
+        except OSError as error:
+            raise AuditContractError(
+                f"cannot inspect legacy seed tree entry: {path}"
+            ) from error
+        if stat.S_ISDIR(metadata.st_mode):
+            continue
+        if not stat.S_ISREG(metadata.st_mode):
+            raise AuditContractError(
+                f"legacy seed tree contains a linked or unsupported entry: {path}"
+            )
+        relative = path.relative_to(root).as_posix().encode()
+        digest.update(len(relative).to_bytes(4, "big"))
+        digest.update(relative)
+        try:
+            content = path.read_bytes()
+        except OSError as error:
+            raise AuditContractError(
+                f"cannot read legacy seed tree entry: {path}"
+            ) from error
+        digest.update(len(content).to_bytes(8, "big"))
+        digest.update(content)
+    return digest.hexdigest()
+
+
+def require_generation_evidence(candidate: Path) -> dict[str, Path]:
+    evidence = {
+        "metrics": require_regular_file(candidate / "metrics.json"),
+$ sed -n 200,265p /reference/tools/klean_audit_contract.py
+                "Stage 5 invocation evidence changed after success"
+            )
+        return workspace, invocation, result
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _stage1_source_hashes(workspace: Path) -> dict[str, str]:
+    try:
+        return {
+            path.relative_to(workspace).as_posix(): (
+                pipeline_contract.sha256_file(path)
+            )
+            for path in pipeline_contract._walk_regular_files(
+                workspace, "Stage 1 source workspace"
+            )
+        }
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _generation_producer_sources(
+    repo: Path, generator_manifest: dict[str, Any]
+) -> tuple[Path, str]:
+    provenance = generator_manifest.get("provenance")
+    image_id = (
+        provenance.get("generator_image_id")
+        if isinstance(provenance, dict)
+        else None
+    )
+    if not isinstance(image_id, str) or not image_id.startswith("sha256:"):
+        raise KleanAuditContractError(
+            "generator image ID is missing from Stage 4 provenance"
+        )
+    image_key = image_id.removeprefix("sha256:")
+    try:
+        image_key = pipeline_contract.validate_safe_component(
+            image_key, "generator image ID"
+        )
+        bundle = pipeline_contract._require_direct_directory(
+            repo / "data/stage4-producer-sources",
+            image_key,
+            "Stage 4 producer source bundle",
+        )
+        source_manifest = pipeline_contract._read_regular_json(
+            bundle / "source-manifest.json",
+            "Stage 4 producer source manifest",
+        )
+        expected_files = {
+            "klean_export.py": generator_manifest.get("exporter_sha256"),
+            "klean.py": generator_manifest.get("klean_py_sha256"),
+        }
+        if (
+            set(source_manifest) != {
+                "schema_version",
+                "generator_image_id",
+                "files",
+            }
+            or source_manifest.get("schema_version") != 1
+            or source_manifest.get("generator_image_id") != image_id
+            or source_manifest.get("files") != expected_files
+        ):
+            raise KleanAuditContractError(
+                "Stage 4 producer source manifest differs from generator "
+                "provenance"
+            )
+$ sed -n 760,1040p /reference/tools/k_rule_inventory.py
+        ).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace has no regular verification.k: {verification}"
+        ) from error
+    if not stat.S_ISREG(verification_mode):
+        raise KRuleInventoryError(
+            f"workspace has no regular verification.k: {verification}"
+        )
+    try:
+        verification_bytes = verification.read_bytes()
+        text = verification_bytes.decode()
+    except (OSError, UnicodeError) as error:
+        raise KRuleInventoryError(
+            f"cannot read verification.k: {verification}"
+        ) from error
+    masked_text = _mask_non_code(text)
+    modules = _modules(masked_text)
+    module = _verification_module(
+        modules, _last_verification_main_module(workspace)
+    )
+    closure = _verification_closure(modules, module)
+    rule_documents = _rule_documents(text, closure)
+    return {
+        "schema_version": 2,
+        "verification_file": "verification.k",
+        "verification_sha256": hashlib.sha256(verification_bytes).hexdigest(),
+        "verification_module": module.name,
+        "verification_modules": [module.name for module in closure],
+        "rules": rule_documents,
+        "inventory_sha256": canonical_json_sha256(rule_documents),
+    }
+$ sed -n 265,315p /reference/tools/klean_audit_contract.py
+            )
+        observed_names = {
+            path.relative_to(bundle).as_posix()
+            for path in pipeline_contract._walk_regular_files(
+                bundle, "Stage 4 producer source bundle"
+            )
+        }
+        if observed_names != {
+            "source-manifest.json",
+            "klean_export.py",
+            "klean.py",
+        }:
+            raise KleanAuditContractError(
+                "Stage 4 producer source bundle has unexpected files"
+            )
+        for name, expected in expected_files.items():
+            digest = _validate_sha256(
+                expected, f"Stage 4 producer source {name} SHA-256"
+            )
+            source = pipeline_contract.require_regular_file(
+                bundle / name, f"Stage 4 producer source {name}"
+            )
+            if pipeline_contract.sha256_file(source) != digest:
+                raise KleanAuditContractError(
+                    f"Stage 4 producer source {name} SHA-256 differs "
+                    "from generator provenance"
+                )
+        return bundle, pipeline_contract.sha256_tree(bundle)
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def resolve_stage6_audit(
+    repo: Path, run_id: str, problem: str
+) -> dict[str, Any]:
+    """Resolve and re-hash every frozen input to the Stage 6 audit."""
+
+    try:
+        task, _state, run = pipeline_contract._resolve_task_state(
+            repo, run_id, problem
+        )
+        pipeline_contract.require_task_unblocked(task, "Stage 6")
+        k_stage = pipeline_contract.require_real_directory(
+            task / "01-k-proof", "Stage 1"
+        )
+        k_workspace = pipeline_contract.require_real_directory(
+            k_stage / "workspace", "Stage 1 K workspace"
+        )
+        k_result = pipeline_contract._read_regular_json(
+            k_stage / "result.json", "Stage 1 result"
+        )
+$ rg -n "def tree_digest|def _tree_entries" /reference/tools/klean_export.py
+1476:def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+1499:def tree_digest(root: Path) -> str:
+$ sed -n 410,510p /reference/tools/klean_export.py
+        )
+    required_by: dict[Path, set[Path]] = {
+        path: set() for path in reached_files
+    }
+    for parent in reached_files:
+        for dependency in file_requires.get(parent, ()):
+            if dependency in reached_files:
+                required_by[dependency].add(parent)
+    entry_files = tuple(
+        sorted(
+            (
+                path
+                for path in reached_files
+                if not required_by[path]
+            ),
+            key=str,
+        )
+    )
+    if not entry_files:
+        entry_files = (verification_file,)
+    return DefinitionResolution(
+        verification_file=verification_file,
+        verification_module=verification_module,
+        syntax_module=syntax_module,
+        required_files=tuple(sorted(reached_files, key=str)),
+        entry_files=entry_files,
+    )
+
+
+def stage_definition_driver(
+    scratch: Path,
+    workspace: Path,
+    resolution: DefinitionResolution,
+    transformed_verification: str,
+    export_module_text: str,
+) -> Path:
+    """Mirror the frozen K closure and require each root exactly once."""
+
+    scratch = Path(scratch)
+    workspace = Path(workspace).resolve()
+    source_root = scratch / "definition-source"
+    source_root.mkdir()
+    staged: dict[Path, Path] = {}
+    for source in resolution.required_files:
+        relative = source.relative_to(workspace)
+        destination = source_root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        staged[source] = destination
+    staged_verification = staged.get(resolution.verification_file)
+    if staged_verification is None:
+        raise KleanExportError("definition closure omitted verification.k")
+    staged_verification.write_text(transformed_verification)
+    entry_files: list[Path] = []
+    for source in resolution.entry_files:
+        entry = staged.get(source)
+        if entry is None:
+            raise KleanExportError("definition entry file is outside closure")
+        entry_files.append(entry)
+    driver = scratch / "export.k"
+    driver.write_text(
+        "".join(f'requires "{path}"\n' for path in entry_files)
+        + export_module_text
+    )
+    return driver
+
+
+def lib_name(package: str) -> str:
+    return "".join(word.capitalize() for word in package.split("-"))
+
+
+def sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def lean_trust_declarations(path: Path) -> list[dict[str, str]]:
+    """Inventory one-line Lean trust declarations with qualified identities."""
+
+    namespaces: list[str] = []
+    declarations: list[dict[str, str]] = []
+    for line_number, line in enumerate(Path(path).read_text().splitlines(), 1):
+        namespace = _LEAN_NAMESPACE_RE.match(line)
+        if namespace is not None:
+            namespaces.append(namespace.group(1))
+            continue
+        ending = _LEAN_END_RE.match(line)
+        if ending is not None and namespaces:
+            explicit = ending.group(1)
+            current = namespaces[-1]
+            if explicit is None or explicit == current:
+                namespaces.pop()
+            continue
+        declaration = _LEAN_TRUST_DECL_RE.match(line)
+        if declaration is None:
+            continue
+        kind, name, signature = declaration.groups()
+        lean_type = signature.strip()
+        if lean_type.startswith(":"):
+            lean_type = lean_type[1:].strip()
+        qualified_name = ".".join((*namespaces, name))
+        declarations.append(
+    )
+    if build_setting in text and stack_setting in text:
+        return
+    setting = ""
+    if build_setting not in text:
+        setting += build_setting
+    if stack_setting not in text:
+        setting += stack_setting
+    marker = "[[lean_lib]]"
+    if marker in text:
+        text = text.replace(marker, setting + "\n" + marker, 1)
+    else:
+        text = text.rstrip() + "\n" + setting
+    lakefile.write_text(text)
+
+
+def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+    if not root.is_dir() or root.is_symlink():
+        raise KleanExportError(f"tree root must be a real directory: {root}")
+    entries: list[tuple[str, str, Path]] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        for child in os.scandir(directory):
+            path = Path(child.path)
+            mode = child.stat(follow_symlinks=False).st_mode
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise KleanExportError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    return sorted(entries)
+
+
+def tree_digest(root: Path) -> str:
+    digest = hashlib.sha256()
+    for relative, kind, path in _tree_entries(Path(root)):
+        digest.update(relative.encode() + b"\0" + kind.encode() + b"\0")
+        if kind == "file":
+            digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def _regular_json(path: Path) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise KleanExportError(f"required JSON is not a regular file: {path}")
+    try:
+        document = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise KleanExportError(f"malformed JSON: {path}") from error
+    if not isinstance(document, dict):
+        raise KleanExportError(f"JSON must be an object: {path}")
+    return document
+
+
+def _run_command(
+    command: list[str] | str,
+    *,
+    cwd: Path | None,
+    timeout: int,
+    env: dict[str, str],
+    shell: bool = False,
+) -> tuple[int, str]:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            timeout=timeout,
+            shell=shell,
+            env=env,
+            text=True,

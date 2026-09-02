@@ -1,0 +1,709 @@
+#!/usr/bin/env python3
+"""Hard, model-free sanity gate for a deterministic Klean generation."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
+
+REPO = Path(__file__).resolve().parent.parent
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from tools import klean_export
+from tools import lemma_discovery_contract
+
+
+class KleanPreflightError(RuntimeError):
+    pass
+
+
+_SIDECAR_NAMES = (
+    "input-manifest.json",
+    "generator-manifest.json",
+    "trust-inventory.json",
+    "export-result.json",
+)
+
+
+@dataclass(frozen=True)
+class PreflightSnapshot:
+    stage1_workspace_sha256: str
+    stage3_discovery_manifest_sha256: str
+    generated_tree_sha256: str
+    sidecar_sha256: tuple[tuple[str, str], ...]
+
+
+def _preflight_snapshot(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+) -> PreflightSnapshot:
+    generated = generation / "generated"
+    try:
+        sidecars = tuple(
+            (
+                name,
+                hashlib.sha256(
+                    pipeline_path.read_bytes()
+                ).hexdigest(),
+            )
+            for name in _SIDECAR_NAMES
+            if (
+                pipeline_path := generation / name
+            ).is_file()
+            and not pipeline_path.is_symlink()
+        )
+        if len(sidecars) != len(_SIDECAR_NAMES):
+            raise KleanPreflightError(
+                "preflight sidecar set is incomplete or unsafe"
+            )
+        return PreflightSnapshot(
+            stage1_workspace_sha256=klean_export.tree_digest(
+                frozen_input
+            ),
+            stage3_discovery_manifest_sha256=hashlib.sha256(
+                discovery_manifest.read_bytes()
+            ).hexdigest(),
+            generated_tree_sha256=klean_export.tree_digest(generated),
+            sidecar_sha256=sidecars,
+        )
+    except (OSError, klean_export.KleanExportError) as error:
+        raise KleanPreflightError(
+            "cannot snapshot immutable preflight inputs"
+        ) from error
+
+
+def _require_unchanged_snapshot(
+    expected: PreflightSnapshot,
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+) -> None:
+    current = _preflight_snapshot(
+        frozen_input, discovery_manifest, generation
+    )
+    if current.stage1_workspace_sha256 != (
+        expected.stage1_workspace_sha256
+    ):
+        raise KleanPreflightError(
+            "frozen Stage 1 input changed during preflight"
+        )
+    if current.stage3_discovery_manifest_sha256 != (
+        expected.stage3_discovery_manifest_sha256
+    ):
+        raise KleanPreflightError(
+            "validated Stage 3 discovery manifest changed during preflight"
+        )
+    if current.generated_tree_sha256 != expected.generated_tree_sha256:
+        raise KleanPreflightError(
+            "generated project changed during preflight"
+        )
+    if current.sidecar_sha256 != expected.sidecar_sha256:
+        raise KleanPreflightError(
+            "generation sidecar changed during preflight"
+        )
+
+
+def _regular_json(path: Path, label: str) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise KleanPreflightError(f"{label} must be a regular file: {path}")
+    try:
+        document = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise KleanPreflightError(f"{label} is malformed: {path}") from error
+    if not isinstance(document, dict):
+        raise KleanPreflightError(f"{label} must be a JSON object")
+    return document
+
+
+def _run(
+    command: list[str],
+    *,
+    cwd: Path,
+    timeout: int,
+) -> tuple[int, str]:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            timeout=timeout,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        return result.returncode, result.stdout
+    except subprocess.TimeoutExpired:
+        return 124, f"TIMEOUT after {timeout}s"
+
+
+def _lean_sources(generated: Path) -> list[Path]:
+    return [
+        path
+        for _relative, kind, path in klean_export._tree_entries(generated)
+        if kind == "file" and path.suffix == ".lean"
+    ]
+
+
+def _trust_declarations(sources: list[Path]) -> dict[str, tuple[str, str]]:
+    declarations: dict[str, tuple[str, str]] = {}
+    for source in sources:
+        for declaration in klean_export.lean_trust_declarations(source):
+            name = declaration["name"]
+            if name in declarations:
+                raise KleanPreflightError(
+                    f"duplicate trust declaration: {name}"
+                )
+            declarations[name] = (
+                declaration["kind"],
+                declaration["type"],
+            )
+    return declarations
+
+
+def _reject_proposition_trust(
+    generated: Path,
+    sources: list[Path],
+    declarations: dict[str, tuple[str, str]],
+) -> None:
+    """Apply a policy that is independent of the generator's allowlist.
+
+    Generated executable constants may remain opaque at the Klean boundary,
+    but generated propositions/proofs may never be assumed.  In particular,
+    the immutable target module must contain only a proposition definition,
+    never an axiom or opaque proof.
+    """
+
+    for source in sources:
+        relative = source.relative_to(generated).as_posix()
+        if source.name == "Lemmas.lean" and re.search(
+            r"(?m)^\s*(?:axiom|opaque)\s+", source.read_text()
+        ):
+            raise KleanPreflightError(
+                f"proposition trust is forbidden in {relative}"
+            )
+    for name, (_kind, lean_type) in declarations.items():
+        normalized = " ".join(lean_type.split())
+        proposition_like = (
+            normalized in {"Prop", "True", "False"}
+            or " Prop" in f" {normalized}"
+            or re.search(r":\s*Prop(?:\s|$)", normalized) is not None
+            or normalized.startswith(("∀ ", "∃ "))
+            or re.search(r"(^|[ (])(?:True|False)(?:$|[ )])", normalized)
+            is not None
+            or re.search(r"(?:^| )[^ ]+\s*=\s*[^ ]+", normalized) is not None
+        )
+        if proposition_like:
+            raise KleanPreflightError(
+                f"proposition trust is forbidden for {name}: {lean_type}"
+            )
+
+
+def _source_and_obligation_gate(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generated: Path,
+    input_manifest: dict[str, Any],
+    generator_manifest: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    verification = frozen_input / "verification.k"
+    if not verification.is_file() or verification.is_symlink():
+        raise KleanPreflightError("frozen input is missing regular verification.k")
+    try:
+        validated = lemma_discovery_contract.validate_trust_boundary(
+            frozen_input, discovery_manifest
+        )
+    except lemma_discovery_contract.LemmaDiscoveryContractError as error:
+        raise KleanPreflightError(str(error)) from error
+    discovery_hash = hashlib.sha256(discovery_manifest.read_bytes()).hexdigest()
+    if input_manifest.get("inventory_sha256") != validated[
+        "inventory_sha256"
+    ]:
+        raise KleanPreflightError(
+            "Stage 1/Stage 3 inventory hash changed after deterministic export"
+        )
+    source_rules = klean_export._domain_source_rules(
+        validated, discovery_hash
+    )
+    if input_manifest.get("source_rules") != source_rules:
+        raise KleanPreflightError(
+            "Stage 3 DOMAIN_LEMMA inventory changed after deterministic export"
+        )
+    if input_manifest.get("verification_sha256") != hashlib.sha256(
+        verification.read_bytes()
+    ).hexdigest():
+        raise KleanPreflightError("verification.k hash changed after export")
+
+    mapping_path = generated / "obligation-map.json"
+    obligation_map = _regular_json(mapping_path, "obligation map")
+    if obligation_map.get("source_rules") != source_rules:
+        raise KleanPreflightError(
+            "source rules and generated obligations are not bijective"
+        )
+    obligations = obligation_map.get("obligations")
+    if not isinstance(obligations, list):
+        raise KleanPreflightError("generated obligation list is malformed")
+    eligible = source_rules
+    expected_ids = [rule["source_rule_id"] for rule in eligible]
+    observed_ids: list[str] = []
+    for obligation in obligations:
+        if not isinstance(obligation, dict):
+            raise KleanPreflightError("generated obligation is malformed")
+        source_rule_id = obligation.get("source_rule_id")
+        if not isinstance(source_rule_id, str):
+            raise KleanPreflightError("generated obligation ID is malformed")
+        observed_ids.append(source_rule_id)
+        lean_conjunct = obligation.get("lean_conjunct")
+        if not isinstance(lean_conjunct, str) or not lean_conjunct:
+            raise KleanPreflightError("generated Lean conjunct is malformed")
+        if obligation.get("lean_conjunct_sha256") != klean_export.sha256_text(
+            lean_conjunct
+        ):
+            raise KleanPreflightError("generated Lean conjunct hash changed")
+        source_rule = eligible[len(observed_ids) - 1] if len(
+            observed_ids
+        ) <= len(eligible) else None
+        if source_rule is None or obligation.get("source_span") != {
+            "start_line": source_rule["start_line"],
+            "end_line": source_rule["end_line"],
+        }:
+            raise KleanPreflightError(
+                "source rules and generated obligations are not bijective"
+            )
+        for key in (
+            "normalized_sha256",
+            "inventory_sha256",
+            "discovery_manifest_sha256",
+        ):
+            if obligation.get(key) != source_rule[key]:
+                raise KleanPreflightError(
+                    "generated obligation provenance differs from "
+                    f"Stage 1/Stage 3: {key}"
+                )
+    if observed_ids != expected_ids or len(set(observed_ids)) != len(
+        observed_ids
+    ):
+        raise KleanPreflightError(
+            "source rules and generated obligations are not bijective"
+        )
+    parameters = obligation_map.get("trust_parameters")
+    if not isinstance(parameters, list):
+        raise KleanPreflightError("generated trust-parameter list is malformed")
+    validate_trust_parameter_links(expected_ids, parameters)
+    if generator_manifest.get("obligation_count") != len(obligations):
+        raise KleanPreflightError("generator obligation count changed")
+    if generator_manifest.get("obligation_map_sha256") != hashlib.sha256(
+        mapping_path.read_bytes()
+    ).hexdigest():
+        raise KleanPreflightError("generated obligation map hash changed")
+    expected_definition = klean_export.expected_target_definition(
+        obligation_map
+    )
+    try:
+        target = klean_export.target_statement(generated)
+    except klean_export.KleanExportError as error:
+        raise KleanPreflightError(str(error)) from error
+    if expected_definition is None:
+        if target is not None:
+            raise KleanPreflightError(
+                "zero obligations unexpectedly generated a target proposition"
+            )
+    elif (
+        target is None
+        or target.get("definition_sha256")
+        != klean_export.sha256_text(expected_definition)
+    ):
+        raise KleanPreflightError(
+            "generated target is not the exact conjunction of mapped obligations"
+        )
+    return source_rules, obligations
+
+
+def validate_trust_parameter_links(
+    expected_ids: list[str], parameters: list[object]
+) -> set[str]:
+    """Validate every opaque parameter without requiring one per theorem."""
+
+    bound_rule_ids: set[str] = set()
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanPreflightError("generated trust parameter is malformed")
+        source_rule_ids = parameter.get("source_rule_ids")
+        if (
+            not isinstance(source_rule_ids, list)
+            or not source_rule_ids
+            or not all(
+                isinstance(source_rule_id, str)
+                and source_rule_id in expected_ids
+                for source_rule_id in source_rule_ids
+            )
+        ):
+            raise KleanPreflightError(
+                "trust parameter is not bound to source obligations"
+            )
+        bound_rule_ids.update(source_rule_ids)
+    return bound_rule_ids
+
+
+def _check_imports(generated: Path, sources: list[Path]) -> None:
+    for source in sources:
+        for line in source.read_text().splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("import "):
+                continue
+            imported = stripped.removeprefix("import ").strip()
+            if (
+                not imported
+                or imported.startswith(("/", "."))
+                or ".." in imported
+                or '"' in imported
+                or "\\" in imported
+            ):
+                raise KleanPreflightError(
+                    f"untrusted Lean import in {source}: {imported!r}"
+                )
+    for name in ("lakefile.toml", "lakefile.lean", "lean-toolchain"):
+        path = generated / name
+        if path.exists() and (not path.is_file() or path.is_symlink()):
+            raise KleanPreflightError(
+                f"generated dependency metadata is not regular: {path}"
+            )
+        if path.is_file():
+            text = path.read_text()
+            if re.search(r"(?m)^\s*(?:path|dir)\s*=\s*\"/", text):
+                raise KleanPreflightError(
+                    f"absolute dependency path in generated {name}"
+                )
+
+
+def check_generation(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    *,
+    toolchain_lock: Path,
+    run_command: Callable[..., tuple[int, str]] = _run,
+) -> dict[str, Any]:
+    frozen_input = Path(frozen_input)
+    discovery_manifest = Path(discovery_manifest)
+    generation = Path(generation)
+    generated = generation / "generated"
+    if not frozen_input.is_dir() or frozen_input.is_symlink():
+        raise KleanPreflightError("frozen K input must be a real directory")
+    if not discovery_manifest.is_file() or discovery_manifest.is_symlink():
+        raise KleanPreflightError(
+            "validated Stage 3 discovery manifest must be a regular file"
+        )
+    if not generation.is_dir() or generation.is_symlink():
+        raise KleanPreflightError("generation must be a real directory")
+    if not generated.is_dir() or generated.is_symlink():
+        raise KleanPreflightError("generated project must be a real directory")
+    # Traversing every entry rejects symlinks/FIFOs before any build command.
+    klean_export._tree_entries(generated)
+    snapshot = _preflight_snapshot(
+        frozen_input, discovery_manifest, generation
+    )
+    input_manifest = _regular_json(
+        generation / "input-manifest.json", "input manifest"
+    )
+    generator_manifest = _regular_json(
+        generation / "generator-manifest.json", "generator manifest"
+    )
+    inventory = _regular_json(
+        generation / "trust-inventory.json", "trust inventory"
+    )
+    export_result = _regular_json(
+        generation / "export-result.json", "export result"
+    )
+    lock = _regular_json(Path(toolchain_lock), "toolchain lock")
+    export_status = export_result.get("status")
+    if export_result.get("schema_version") != 3:
+        raise KleanPreflightError("export result schema version is not 3")
+    if export_status not in {"OK", "KLEAN_NO_OBLIGATIONS"}:
+        raise KleanPreflightError("export result status is invalid")
+    input_hash = snapshot.stage1_workspace_sha256
+    discovery_hash = snapshot.stage3_discovery_manifest_sha256
+    generated_hash = snapshot.generated_tree_sha256
+    sidecar_hashes = dict(snapshot.sidecar_sha256)
+    if input_manifest.get("schema_version") != 3:
+        raise KleanPreflightError("input manifest schema version is not 3")
+    if generator_manifest.get("schema_version") != 3:
+        raise KleanPreflightError("generator manifest schema version is not 3")
+    if input_manifest.get("frozen_input_sha256") != input_hash:
+        raise KleanPreflightError("frozen Stage 1 input hash changed")
+    if input_manifest.get("stage1_workspace_sha256") != input_hash:
+        raise KleanPreflightError("Stage 1 workspace hash changed")
+    if (
+        input_manifest.get("stage3_discovery_manifest_sha256")
+        != discovery_hash
+    ):
+        raise KleanPreflightError(
+            "validated Stage 3 discovery manifest hash changed"
+        )
+    if generator_manifest.get("generated_tree_sha256") != generated_hash:
+        raise KleanPreflightError("generated project hash changed")
+    if generator_manifest.get("toolchain") != lock:
+        raise KleanPreflightError("generator toolchain differs from pinned lock")
+    provenance = generator_manifest.get("provenance")
+    if not isinstance(provenance, dict):
+        raise KleanPreflightError("generator provenance is malformed")
+    if provenance.get("stage1_workspace_sha256") != input_hash:
+        raise KleanPreflightError(
+            "Stage 1 provenance differs between generation manifests"
+        )
+    if provenance.get("stage3_discovery_manifest_sha256") != discovery_hash:
+        raise KleanPreflightError(
+            "Stage 3 provenance differs between generation manifests"
+        )
+    if provenance.get("inventory_sha256") != input_manifest.get(
+        "inventory_sha256"
+    ):
+        raise KleanPreflightError(
+            "Stage 1/Stage 3 inventory provenance differs"
+        )
+    _source_rules, obligations = _source_and_obligation_gate(
+        frozen_input,
+        discovery_manifest,
+        generated,
+        input_manifest,
+        generator_manifest,
+    )
+    expected_export_status = "OK" if obligations else "KLEAN_NO_OBLIGATIONS"
+    if export_status != expected_export_status:
+        raise KleanPreflightError(
+            "export status disagrees with generated obligation count"
+        )
+    if export_result.get("obligation_count") != len(obligations):
+        raise KleanPreflightError(
+            "export result obligation_count does not match generated obligations"
+        )
+
+    try:
+        target = klean_export.target_statement(generated)
+    except klean_export.KleanExportError as error:
+        raise KleanPreflightError(str(error)) from error
+    expected_target = generator_manifest.get("target")
+    if target != expected_target:
+        raise KleanPreflightError("target theorem statement or location changed")
+    if bool(obligations) != bool(target):
+        raise KleanPreflightError(
+            "target proposition and obligation inventory disagree"
+        )
+    sources = _lean_sources(generated)
+    sorry_locations: list[str] = []
+    for source in sources:
+        text = source.read_text()
+        for forbidden in (r"\badmit\b", r"\bunsafe\b"):
+            if re.search(forbidden, text):
+                raise KleanPreflightError(
+                    f"forbidden Lean token in {source.relative_to(generated)}"
+                )
+        for match in re.finditer(r"\bsorry\b", text):
+            sorry_locations.append(source.relative_to(generated).as_posix())
+    if sorry_locations:
+        raise KleanPreflightError("generated immutable project contains sorry")
+    if inventory.get("designated_sorries") != 0 or inventory.get(
+        "other_sorries"
+    ) != 0:
+        raise KleanPreflightError("trust inventory has unexpected proof-hole counts")
+
+    declared = _trust_declarations(sources)
+    _reject_proposition_trust(generated, sources, declared)
+    allowlist = inventory.get("allowlist")
+    if not isinstance(allowlist, list):
+        raise KleanPreflightError("trust inventory allowlist is malformed")
+    expected: dict[str, tuple[str, str]] = {}
+    for entry in allowlist:
+        if not isinstance(entry, dict):
+            raise KleanPreflightError("trust allowlist entry is malformed")
+        name = entry.get("name")
+        kind = entry.get("kind")
+        lean_type = entry.get("type")
+        reason = entry.get("reason")
+        if not all(
+            isinstance(value, str) and value
+            for value in (name, kind, lean_type, reason)
+        ):
+            raise KleanPreflightError("trust allowlist entry is incomplete")
+        if name in expected:
+            raise KleanPreflightError(
+                f"duplicate trust allowlist entry: {name}"
+            )
+        expected[name] = (kind, lean_type)
+    if declared != expected:
+        raise KleanPreflightError(
+            "generated axiom/opaque declarations differ from trust allowlist"
+        )
+    _check_imports(generated, sources)
+    export_bindings = {
+        "frozen_input_sha256": input_hash,
+        "stage3_discovery_manifest_sha256": discovery_hash,
+        "generated_tree_sha256": generated_hash,
+        "trust_inventory_sha256": sidecar_hashes[
+            "trust-inventory.json"
+        ],
+    }
+    for field, expected_hash in export_bindings.items():
+        if export_result.get(field) != expected_hash:
+            label = (
+                "trust inventory hash"
+                if field == "trust_inventory_sha256"
+                else field
+            )
+            raise KleanPreflightError(
+                f"export result {label} does not match immutable inputs"
+            )
+
+    with tempfile.TemporaryDirectory(prefix="klean-preflight-") as temporary:
+        clean = Path(temporary) / "project"
+        shutil.copytree(generated, clean)
+        diagnostics: list[dict[str, Any]] = []
+        for command in (["lake", "clean"], ["lake", "build"]):
+            code, output = run_command(command, cwd=clean, timeout=600)
+            diagnostics.append(
+                {
+                    "command": command,
+                    "exit_code": code,
+                    "output_sha256": hashlib.sha256(output.encode()).hexdigest(),
+                    "output_tail": output[-4000:],
+                }
+            )
+            if code != 0:
+                raise KleanPreflightError(
+                    f"{' '.join(command)} failed ({code}): {output[-600:]}"
+                )
+    _require_unchanged_snapshot(
+        snapshot, frozen_input, discovery_manifest, generation
+    )
+    return {
+        "schema_version": 3,
+        "status": "PASS" if obligations else "KLEAN_NO_OBLIGATIONS",
+        "frozen_input_sha256": input_hash,
+        "stage1_workspace_sha256": input_hash,
+        "stage3_discovery_manifest_sha256": discovery_hash,
+        "generated_tree_sha256": generated_hash,
+        "target": target,
+        "obligation_count": len(obligations),
+        "trust_declaration_count": len(declared),
+        "designated_sorry_count": 0,
+        "diagnostics": diagnostics,
+    }
+
+
+def run_preflight(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    *,
+    toolchain_lock: Path,
+    run_command: Callable[..., tuple[int, str]] = _run,
+) -> dict[str, Any]:
+    frozen_input = Path(frozen_input)
+    discovery_manifest = Path(discovery_manifest)
+    generation = Path(generation)
+    output = generation / "preflight.json"
+    if output.exists() or output.is_symlink():
+        raise KleanPreflightError(f"preflight result already exists: {output}")
+
+    def error_document(error: KleanPreflightError) -> dict[str, Any]:
+        try:
+            stage1_hash = klean_export.tree_digest(frozen_input)
+        except (OSError, klean_export.KleanExportError):
+            stage1_hash = None
+        try:
+            stage3_hash = hashlib.sha256(
+                discovery_manifest.read_bytes()
+            ).hexdigest()
+        except OSError:
+            stage3_hash = None
+        return {
+            "schema_version": 3,
+            "status": "KLEAN_PREFLIGHT_ERROR",
+            "error": str(error),
+            "stage1_workspace_sha256": stage1_hash,
+            "stage3_discovery_manifest_sha256": stage3_hash,
+        }
+
+    publication_snapshot: PreflightSnapshot | None = None
+    try:
+        publication_snapshot = _preflight_snapshot(
+            frozen_input, discovery_manifest, generation
+        )
+        document = check_generation(
+            frozen_input,
+            discovery_manifest,
+            generation,
+            toolchain_lock=toolchain_lock,
+            run_command=run_command,
+        )
+        _require_unchanged_snapshot(
+            publication_snapshot,
+            frozen_input,
+            discovery_manifest,
+            generation,
+        )
+    except KleanPreflightError as error:
+        document = error_document(error)
+    temporary = output.with_name(f".{output.name}.tmp")
+    temporary.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+    if (
+        document.get("status") in {"PASS", "KLEAN_NO_OBLIGATIONS"}
+        and publication_snapshot is not None
+    ):
+        try:
+            _require_unchanged_snapshot(
+                publication_snapshot,
+                frozen_input,
+                discovery_manifest,
+                generation,
+            )
+        except KleanPreflightError as error:
+            document = error_document(error)
+            temporary.write_text(
+                json.dumps(document, indent=2, sort_keys=True) + "\n"
+            )
+    os.replace(temporary, output)
+    return document
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", required=True, type=Path)
+    parser.add_argument("--discovery-manifest", required=True, type=Path)
+    parser.add_argument("--generation", required=True, type=Path)
+    parser.add_argument(
+        "--toolchain-lock",
+        type=Path,
+        default=REPO / "data/klean-toolchain.lock.json",
+    )
+    arguments = parser.parse_args(argv)
+    try:
+        result = run_preflight(
+            arguments.input,
+            arguments.discovery_manifest,
+            arguments.generation,
+            toolchain_lock=arguments.toolchain_lock,
+        )
+    except KleanPreflightError as error:
+        print(f"Klean preflight failed: {error}", file=sys.stderr)
+        return 2
+    print(json.dumps(result, sort_keys=True))
+    return (
+        0
+        if result["status"] in {"PASS", "KLEAN_NO_OBLIGATIONS"}
+        else 1
+    )
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

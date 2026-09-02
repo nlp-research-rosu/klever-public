@@ -1,0 +1,935 @@
+Script started on 2026-07-27 23:29:56-05:00 [<not executed on terminal>]
++ sed -n 500,720p /reference/tools/k_rule_inventory.py
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character in "\r\n":
+                output.append(character)
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output.append(" ")
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output.append(" ")
+            state = "block-comment"
+            block_depth = 1
+            index += 2
+            continue
+        output.append(character)
+        if character == '"':
+            state = "string"
+        index += 1
+    return "".join(output)
+
+
+def _attribute_tokens(text: str, masked_text: str) -> list[str]:
+    tokens: list[str] = []
+    start = 0
+    depth = 0
+    for index, character in enumerate(masked_text):
+        if character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth = max(depth - 1, 0)
+        elif character == "," and depth == 0:
+            token = _without_comments(text[start:index]).strip()
+            if token:
+                tokens.append(token)
+            start = index + 1
+    final = _without_comments(text[start:]).strip()
+    if final:
+        tokens.append(final)
+    return tokens
+
+
+def _rule_spans(text: str, module: _Module) -> list[_RuleSpan]:
+    masked_text = _mask_non_code(text)
+    sentences = module.sentences
+    rules: list[_RuleSpan] = []
+    seen_hashes: set[str] = set()
+    for index, sentence in enumerate(sentences):
+        if sentence.keyword != "rule":
+            continue
+        end_offset = (
+            sentences[index + 1].start
+            if index + 1 < len(sentences)
+            else module.content_end
+        )
+        start_offset = sentence.start
+        raw_segment = text[start_offset:end_offset]
+        masked_segment = masked_text[start_offset:end_offset]
+        logical_length = len(masked_segment.rstrip(" \t\r\n"))
+        if logical_length == 0:
+            continue
+        rule_text = raw_segment[:logical_length].rstrip(" \t\r\n")
+        masked_rule = _mask_non_code(rule_text)
+        attribute_match = _TRAILING_ATTRIBUTES_RE.search(masked_rule)
+        attribute_start = None
+        attribute_end = None
+        attributes: list[str] = []
+        if attribute_match is not None:
+            attribute_start = attribute_match.start("attributes")
+            attribute_end = attribute_match.end("attributes")
+            attributes = _attribute_tokens(
+                rule_text[attribute_start:attribute_end],
+                masked_rule[attribute_start:attribute_end],
+            )
+        normalized = " ".join(rule_text.split())
+        digest = hashlib.sha256(normalized.encode()).hexdigest()
+        if digest in seen_hashes:
+            raise KRuleInventoryError(
+                f"duplicate normalized simplification rule hash: {digest}"
+            )
+        seen_hashes.add(digest)
+        start_line = text.count("\n", 0, start_offset) + 1
+        end_line = start_line + rule_text.count("\n")
+        rule = KRule(
+            source_rule_id=f"rule-{digest}",
+            module=module.name,
+            start_line=start_line,
+            end_line=end_line,
+            normalized_sha256=digest,
+            attributes=attributes,
+            text=rule_text,
+        )
+        rules.append(
+            _RuleSpan(
+                rule=rule,
+                start_offset=start_offset,
+                end_offset=start_offset + len(rule_text),
+                attribute_start=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.start()
+                ),
+                attribute_end=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.end()
+                ),
+            )
+        )
+    return rules
+
+
+def _rule_documents(
+    text: str, modules: tuple[_Module, ...]
+) -> list[dict[str, Any]]:
+    spans = [span for module in modules for span in _rule_spans(text, module)]
+    spans.sort(key=lambda span: span.start_offset)
+    return [dataclasses.asdict(span.rule) for span in spans]
+
+
+def _attribute_token_spans(
+    text: str,
+    masked_text: str,
+) -> list[tuple[int, int, str]]:
+    spans: list[tuple[int, int, str]] = []
+    start = 0
+    depth = 0
+    for index, character in enumerate(masked_text):
+        if character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth = max(depth - 1, 0)
+        elif character == "," and depth == 0:
+            spans.append(
+                (
+                    start,
+                    index,
+                    _without_comments(text[start:index]).strip(),
+                )
+            )
+            start = index + 1
+    spans.append(
+        (
+            start,
+            len(text),
+            _without_comments(text[start:]).strip(),
+        )
+    )
+    return spans
+
+
+def _blank_non_newlines(text: str) -> str:
+    return "".join(
+        character if character in "\r\n" else " "
+        for character in text
+    )
+
+
+def desimplify_rule_ids(
+    text: str,
+    source_rule_ids: list[str],
+) -> str:
+    """Remove simplification from exactly the selected canonical rule IDs."""
+
+    if len(source_rule_ids) != len(set(source_rule_ids)):
+        raise KRuleInventoryError(
+            "exact rule transformation contains a duplicate source rule ID"
+        )
+    selected = set(source_rule_ids)
+    modules = _modules(_mask_non_code(text))
+    spans = [
+        span
+        for local_module in modules
+        for span in _rule_spans(text, local_module)
+    ]
+    by_id = {span.rule.source_rule_id: span for span in spans}
+    unknown = sorted(selected - set(by_id))
+    if unknown:
+        raise KRuleInventoryError(
+            "exact rule transformation names an unknown source rule ID: "
+            + ", ".join(unknown)
+        )
+
+    edits: list[tuple[int, int]] = []
+    for source_rule_id in source_rule_ids:
+        span = by_id[source_rule_id]
+        if span.attribute_start is None or span.attribute_end is None:
+            raise KRuleInventoryError(
+                "selected source rule has no simplification attribute: "
+                f"{source_rule_id}"
+            )
+        attribute_text = text[
+            span.attribute_start + 1 : span.attribute_end - 1
+        ]
+        masked_attributes = _mask_non_code(attribute_text)
+        tokens = _attribute_token_spans(
+            attribute_text,
+            masked_attributes,
+        )
+        matches = [
+            index
+            for index, (_start, _end, token) in enumerate(tokens)
+            if token == "simplification"
+        ]
+        if len(matches) != 1:
+            raise KRuleInventoryError(
+                "selected source rule has ambiguous simplification "
+                f"attributes: {source_rule_id}"
+            )
+        token_index = matches[0]
+        if len(tokens) == 1:
+            edit_start = span.attribute_start
+            edit_end = span.attribute_end
+        elif token_index < len(tokens) - 1:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index][0]
++ sed -n 420,700p /reference/tools/klean_preflight.py
+        generation / "generator-manifest.json", "generator manifest"
+    )
+    inventory = _regular_json(
+        generation / "trust-inventory.json", "trust inventory"
+    )
+    export_result = _regular_json(
+        generation / "export-result.json", "export result"
+    )
+    lock = _regular_json(Path(toolchain_lock), "toolchain lock")
+    export_status = export_result.get("status")
+    if export_result.get("schema_version") != 3:
+        raise KleanPreflightError("export result schema version is not 3")
+    if export_status not in {"OK", "KLEAN_NO_OBLIGATIONS"}:
+        raise KleanPreflightError("export result status is invalid")
+    input_hash = snapshot.stage1_workspace_sha256
+    discovery_hash = snapshot.stage3_discovery_manifest_sha256
+    generated_hash = snapshot.generated_tree_sha256
+    sidecar_hashes = dict(snapshot.sidecar_sha256)
+    if input_manifest.get("schema_version") != 3:
+        raise KleanPreflightError("input manifest schema version is not 3")
+    if generator_manifest.get("schema_version") != 3:
+        raise KleanPreflightError("generator manifest schema version is not 3")
+    if input_manifest.get("frozen_input_sha256") != input_hash:
+        raise KleanPreflightError("frozen Stage 1 input hash changed")
+    if input_manifest.get("stage1_workspace_sha256") != input_hash:
+        raise KleanPreflightError("Stage 1 workspace hash changed")
+    if (
+        input_manifest.get("stage3_discovery_manifest_sha256")
+        != discovery_hash
+    ):
+        raise KleanPreflightError(
+            "validated Stage 3 discovery manifest hash changed"
+        )
+    if generator_manifest.get("generated_tree_sha256") != generated_hash:
+        raise KleanPreflightError("generated project hash changed")
+    if generator_manifest.get("toolchain") != lock:
+        raise KleanPreflightError("generator toolchain differs from pinned lock")
+    provenance = generator_manifest.get("provenance")
+    if not isinstance(provenance, dict):
+        raise KleanPreflightError("generator provenance is malformed")
+    if provenance.get("stage1_workspace_sha256") != input_hash:
+        raise KleanPreflightError(
+            "Stage 1 provenance differs between generation manifests"
+        )
+    if provenance.get("stage3_discovery_manifest_sha256") != discovery_hash:
+        raise KleanPreflightError(
+            "Stage 3 provenance differs between generation manifests"
+        )
+    if provenance.get("inventory_sha256") != input_manifest.get(
+        "inventory_sha256"
+    ):
+        raise KleanPreflightError(
+            "Stage 1/Stage 3 inventory provenance differs"
+        )
+    _source_rules, obligations = _source_and_obligation_gate(
+        frozen_input,
+        discovery_manifest,
+        generated,
+        input_manifest,
+        generator_manifest,
+    )
+    expected_export_status = "OK" if obligations else "KLEAN_NO_OBLIGATIONS"
+    if export_status != expected_export_status:
+        raise KleanPreflightError(
+            "export status disagrees with generated obligation count"
+        )
+    if export_result.get("obligation_count") != len(obligations):
+        raise KleanPreflightError(
+            "export result obligation_count does not match generated obligations"
+        )
+
+    try:
+        target = klean_export.target_statement(generated)
+    except klean_export.KleanExportError as error:
+        raise KleanPreflightError(str(error)) from error
+    expected_target = generator_manifest.get("target")
+    if target != expected_target:
+        raise KleanPreflightError("target theorem statement or location changed")
+    if bool(obligations) != bool(target):
+        raise KleanPreflightError(
+            "target proposition and obligation inventory disagree"
+        )
+    sources = _lean_sources(generated)
+    sorry_locations: list[str] = []
+    for source in sources:
+        text = source.read_text()
+        for forbidden in (r"\badmit\b", r"\bunsafe\b"):
+            if re.search(forbidden, text):
+                raise KleanPreflightError(
+                    f"forbidden Lean token in {source.relative_to(generated)}"
+                )
+        for match in re.finditer(r"\bsorry\b", text):
+            sorry_locations.append(source.relative_to(generated).as_posix())
+    if sorry_locations:
+        raise KleanPreflightError("generated immutable project contains sorry")
+    if inventory.get("designated_sorries") != 0 or inventory.get(
+        "other_sorries"
+    ) != 0:
+        raise KleanPreflightError("trust inventory has unexpected proof-hole counts")
+
+    declared = _trust_declarations(sources)
+    _reject_proposition_trust(generated, sources, declared)
+    allowlist = inventory.get("allowlist")
+    if not isinstance(allowlist, list):
+        raise KleanPreflightError("trust inventory allowlist is malformed")
+    expected: dict[str, tuple[str, str]] = {}
+    for entry in allowlist:
+        if not isinstance(entry, dict):
+            raise KleanPreflightError("trust allowlist entry is malformed")
+        name = entry.get("name")
+        kind = entry.get("kind")
+        lean_type = entry.get("type")
+        reason = entry.get("reason")
+        if not all(
+            isinstance(value, str) and value
+            for value in (name, kind, lean_type, reason)
+        ):
+            raise KleanPreflightError("trust allowlist entry is incomplete")
+        if name in expected:
+            raise KleanPreflightError(
+                f"duplicate trust allowlist entry: {name}"
+            )
+        expected[name] = (kind, lean_type)
+    if declared != expected:
+        raise KleanPreflightError(
+            "generated axiom/opaque declarations differ from trust allowlist"
+        )
+    _check_imports(generated, sources)
+    export_bindings = {
+        "frozen_input_sha256": input_hash,
+        "stage3_discovery_manifest_sha256": discovery_hash,
+        "generated_tree_sha256": generated_hash,
+        "trust_inventory_sha256": sidecar_hashes[
+            "trust-inventory.json"
+        ],
+    }
+    for field, expected_hash in export_bindings.items():
+        if export_result.get(field) != expected_hash:
+            label = (
+                "trust inventory hash"
+                if field == "trust_inventory_sha256"
+                else field
+            )
+            raise KleanPreflightError(
+                f"export result {label} does not match immutable inputs"
+            )
+
+    with tempfile.TemporaryDirectory(prefix="klean-preflight-") as temporary:
+        clean = Path(temporary) / "project"
+        shutil.copytree(generated, clean)
+        diagnostics: list[dict[str, Any]] = []
+        for command in (["lake", "clean"], ["lake", "build"]):
+            code, output = run_command(command, cwd=clean, timeout=600)
+            diagnostics.append(
+                {
+                    "command": command,
+                    "exit_code": code,
+                    "output_sha256": hashlib.sha256(output.encode()).hexdigest(),
+                    "output_tail": output[-4000:],
+                }
+            )
+            if code != 0:
+                raise KleanPreflightError(
+                    f"{' '.join(command)} failed ({code}): {output[-600:]}"
+                )
+    _require_unchanged_snapshot(
+        snapshot, frozen_input, discovery_manifest, generation
+    )
+    return {
+        "schema_version": 3,
+        "status": "PASS" if obligations else "KLEAN_NO_OBLIGATIONS",
+        "frozen_input_sha256": input_hash,
+        "stage1_workspace_sha256": input_hash,
+        "stage3_discovery_manifest_sha256": discovery_hash,
+        "generated_tree_sha256": generated_hash,
+        "target": target,
+        "obligation_count": len(obligations),
+        "trust_declaration_count": len(declared),
+        "designated_sorry_count": 0,
+        "diagnostics": diagnostics,
+    }
+
+
+def run_preflight(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    *,
+    toolchain_lock: Path,
+    run_command: Callable[..., tuple[int, str]] = _run,
+) -> dict[str, Any]:
+    frozen_input = Path(frozen_input)
+    discovery_manifest = Path(discovery_manifest)
+    generation = Path(generation)
+    output = generation / "preflight.json"
+    if output.exists() or output.is_symlink():
+        raise KleanPreflightError(f"preflight result already exists: {output}")
+
+    def error_document(error: KleanPreflightError) -> dict[str, Any]:
+        try:
+            stage1_hash = klean_export.tree_digest(frozen_input)
+        except (OSError, klean_export.KleanExportError):
+            stage1_hash = None
+        try:
+            stage3_hash = hashlib.sha256(
+                discovery_manifest.read_bytes()
+            ).hexdigest()
+        except OSError:
+            stage3_hash = None
+        return {
+            "schema_version": 3,
+            "status": "KLEAN_PREFLIGHT_ERROR",
+            "error": str(error),
+            "stage1_workspace_sha256": stage1_hash,
+            "stage3_discovery_manifest_sha256": stage3_hash,
+        }
+
+    publication_snapshot: PreflightSnapshot | None = None
+    try:
+        publication_snapshot = _preflight_snapshot(
+            frozen_input, discovery_manifest, generation
+        )
+        document = check_generation(
+            frozen_input,
+            discovery_manifest,
+            generation,
+            toolchain_lock=toolchain_lock,
+            run_command=run_command,
+        )
+        _require_unchanged_snapshot(
+            publication_snapshot,
+            frozen_input,
+            discovery_manifest,
+            generation,
+        )
+    except KleanPreflightError as error:
+        document = error_document(error)
+    temporary = output.with_name(f".{output.name}.tmp")
+    temporary.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+    if (
+        document.get("status") in {"PASS", "KLEAN_NO_OBLIGATIONS"}
+        and publication_snapshot is not None
+    ):
+        try:
+            _require_unchanged_snapshot(
+                publication_snapshot,
+                frozen_input,
+                discovery_manifest,
+                generation,
+            )
+        except KleanPreflightError as error:
+            document = error_document(error)
+            temporary.write_text(
+                json.dumps(document, indent=2, sort_keys=True) + "\n"
+            )
+    os.replace(temporary, output)
+    return document
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", required=True, type=Path)
+    parser.add_argument("--discovery-manifest", required=True, type=Path)
+    parser.add_argument("--generation", required=True, type=Path)
+    parser.add_argument(
+        "--toolchain-lock",
+        type=Path,
+        default=REPO / "data/klean-toolchain.lock.json",
+    )
+    arguments = parser.parse_args(argv)
+    try:
+        result = run_preflight(
+            arguments.input,
+            arguments.discovery_manifest,
+            arguments.generation,
+            toolchain_lock=arguments.toolchain_lock,
+        )
+    except KleanPreflightError as error:
+        print(f"Klean preflight failed: {error}", file=sys.stderr)
+        return 2
+    print(json.dumps(result, sort_keys=True))
++ rg -n 'def (_domain_source_rules|expected_target_definition|target_statement|tree_digest|_tree_entries)' /reference/tools/klean_export.py
+647:def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+670:def tree_digest(root: Path) -> str:
+770:def target_statement(generated: Path) -> dict[str, Any] | None:
+855:def expected_target_definition(obligation_map: dict[str, Any]) -> str | None:
+887:def _domain_source_rules(
++ sed -n 700,1120p /reference/tools/klean_export.py
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            timeout=timeout,
+            shell=shell,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        return result.returncode, result.stdout
+    except subprocess.TimeoutExpired:
+        return 124, f"TIMEOUT after {timeout}s"
+
+
+def _trust_inventory(
+    package: Path,
+    *,
+    axiomatized: set[str],
+    noncomputable_repair: bool,
+) -> dict[str, Any]:
+    axioms: set[str] = set()
+    allowlist: dict[str, dict[str, str]] = {}
+    noncomputable: set[str] = set()
+    designated_sorries = 0
+    other_sorries = 0
+    for _relative, kind, path in _tree_entries(package):
+        if kind != "file" or path.suffix != ".lean":
+            continue
+        text = path.read_text()
+        for declaration in lean_trust_declarations(path):
+            name = declaration["name"]
+            declaration_name = declaration["declaration_name"]
+            kind = declaration["kind"]
+            if kind == "axiom":
+                axioms.add(name)
+            allowlist[name] = {
+                "name": name,
+                "declaration_name": declaration_name,
+                "kind": kind,
+                "type": declaration["type"],
+                "source": path.relative_to(package).as_posix(),
+                "line": declaration["line"],
+                "reason": (
+                    "deterministic Klean definition repair"
+                    if declaration_name in axiomatized
+                    else (
+                        "Klean-generated opaque definition"
+                        if kind == "opaque"
+                        else "Klean-generated trust boundary"
+                    )
+                ),
+            }
+        noncomputable.update(_NONCOMPUTABLE_RE.findall(text))
+        count = len(re.findall(r"\bsorry\b", text))
+        if path.name == "Lemmas.lean":
+            designated_sorries += count
+        else:
+            other_sorries += count
+    return {
+        "axioms": sorted(axioms),
+        "automatic_axiomatization": sorted(axiomatized),
+        "noncomputable_definitions": sorted(noncomputable),
+        "automatic_noncomputable_repair": noncomputable_repair,
+        "designated_sorries": designated_sorries,
+        "other_sorries": other_sorries,
+        "allowlist": [allowlist[name] for name in sorted(allowlist)],
+    }
+
+
+def target_statement(generated: Path) -> dict[str, Any] | None:
+    obligation_map = _regular_json(generated / "obligation-map.json")
+    obligations = obligation_map.get("obligations")
+    parameters = obligation_map.get("trust_parameters")
+    if not isinstance(obligations, list) or not isinstance(parameters, list):
+        raise KleanExportError("generated obligation map is malformed")
+    candidates: list[tuple[Path, str]] = []
+    raw_count = 0
+    for relative, kind, path in _tree_entries(generated):
+        if kind != "file" or path.suffix != ".lean":
+            continue
+        text = path.read_text()
+        raw_count += len(
+            re.findall(r"(?m)^\s*def\s+targetStatement\b", text)
+        )
+        for match in re.finditer(
+            r"(?ms)^\s*def\s+targetStatement\b.*?"
+            r"(?=^\s*end\s+\S+\s*$)",
+            text,
+        ):
+            candidates.append((path, match.group(0).strip()))
+    if not obligations:
+        if raw_count != 0:
+            raise KleanExportError(
+                "zero obligations must not generate a target proposition"
+            )
+        return None
+    if raw_count != 1 or len(candidates) != 1:
+        raise KleanExportError(
+            "generated project must contain exactly one target proposition; "
+            f"found {raw_count}"
+        )
+    path, definition = candidates[0]
+    names: list[str] = []
+    normalized_parameters: list[dict[str, Any]] = []
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanExportError("target parameter is malformed")
+        name = parameter.get("name")
+        lean_type = parameter.get("type")
+        kore_symbol = parameter.get("kore_symbol")
+        source_rule_ids = parameter.get("source_rule_ids")
+        binding_sha256 = parameter.get("binding_sha256")
+        if not isinstance(name, str) or not name:
+            raise KleanExportError("target parameter name is malformed")
+        if not isinstance(lean_type, str) or not lean_type:
+            raise KleanExportError("target parameter type is malformed")
+        if not isinstance(kore_symbol, str) or not kore_symbol:
+            raise KleanExportError("target KORE symbol binding is malformed")
+        if (
+            not isinstance(source_rule_ids, list)
+            or not source_rule_ids
+            or not all(
+                isinstance(source_rule_id, str) and source_rule_id
+                for source_rule_id in source_rule_ids
+            )
+        ):
+            raise KleanExportError("target source-rule binding is malformed")
+        binding = {
+            "kore_symbol": kore_symbol,
+            "name": name,
+            "type": lean_type,
+            "source_rule_ids": source_rule_ids,
+        }
+        expected_binding_sha256 = sha256_text(
+            json.dumps(binding, sort_keys=True, separators=(",", ":"))
+        )
+        if binding_sha256 != expected_binding_sha256:
+            raise KleanExportError("target parameter binding hash changed")
+        names.append(name)
+        normalized_parameters.append(
+            {**binding, "binding_sha256": binding_sha256}
+        )
+    declaration = f"{path.parent.name}.Lemmas.targetStatement"
+    statement = " ".join((declaration, *names))
+    return {
+        "declaration": declaration,
+        "file": path.relative_to(generated).as_posix(),
+        "statement": statement,
+        "statement_sha256": sha256_text(statement),
+        "definition_sha256": sha256_text(definition),
+        "parameters": normalized_parameters,
+    }
+
+
+def expected_target_definition(obligation_map: dict[str, Any]) -> str | None:
+    obligations = obligation_map.get("obligations")
+    parameters = obligation_map.get("trust_parameters")
+    if not isinstance(obligations, list) or not isinstance(parameters, list):
+        raise KleanExportError("generated obligation map is malformed")
+    if not obligations:
+        return None
+    lines = ["def targetStatement"]
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanExportError("target parameter is malformed")
+        name = parameter.get("name")
+        lean_type = parameter.get("type")
+        if not isinstance(name, str) or not isinstance(lean_type, str):
+            raise KleanExportError("target parameter is malformed")
+        lines.append(f"    ({name} : {lean_type})")
+    conjuncts: list[str] = []
+    for obligation in obligations:
+        if not isinstance(obligation, dict):
+            raise KleanExportError("generated obligation is malformed")
+        conjunct = obligation.get("lean_conjunct")
+        if not isinstance(conjunct, str) or not conjunct:
+            raise KleanExportError("generated Lean conjunct is malformed")
+        conjuncts.append(f"({conjunct})")
+    lines.extend(("    : Prop :=", "    " + "\n    ∧ ".join(conjuncts)))
+    return "\n".join(lines)
+
+
+def _write_json(path: Path, document: dict[str, Any]) -> None:
+    path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+
+
+def _domain_source_rules(
+    validated: dict[str, Any],
+    discovery_manifest_sha256: str,
+) -> list[dict[str, Any]]:
+    inventory_sha256 = validated["inventory_sha256"]
+    return [
+        {
+            **rule,
+            "inventory_sha256": inventory_sha256,
+            "discovery_manifest_sha256": discovery_manifest_sha256,
+        }
+        for rule in validated["domain_lemmas"]
+    ]
+
+
+def _klean_source_rules(
+    domain_rules: list[dict[str, Any]],
+    line_offset: int,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "source_rule_id": rule["source_rule_id"],
+            "start_line": rule["start_line"] + line_offset,
+            "end_line": rule["end_line"] + line_offset,
+            "normalized_sha256": rule["normalized_sha256"],
+            "classification": "TRUST_OBLIGATION",
+        }
+        for rule in domain_rules
+    ]
+
+
+def _bind_obligation_provenance(
+    package: Path,
+    domain_rules: list[dict[str, Any]],
+    klean_rules: list[dict[str, Any]],
+) -> dict[str, Any]:
+    path = package / "obligation-map.json"
+    document = _regular_json(path)
+    obligations = document.get("obligations")
+    parameters = document.get("trust_parameters")
+    if not isinstance(obligations, list) or not isinstance(parameters, list):
+        raise KleanExportError("generated obligation map is malformed")
+    expected_ids = [rule["source_rule_id"] for rule in domain_rules]
+    observed_ids = [
+        obligation.get("source_rule_id")
+        if isinstance(obligation, dict)
+        else None
+        for obligation in obligations
+    ]
+    if observed_ids != expected_ids:
+        raise KleanExportError(
+            "validated DOMAIN_LEMMA records and generated obligations "
+            "are not bijective"
+        )
+    enriched: list[dict[str, Any]] = []
+    for obligation, rule, klean_rule in zip(
+        obligations, domain_rules, klean_rules, strict=True
+    ):
+        if obligation.get("source_span") != {
+            "start_line": klean_rule["start_line"],
+            "end_line": klean_rule["end_line"],
+        }:
+            raise KleanExportError(
+                "generated obligation source span differs from Stage 1"
+            )
+        enriched.append(
+            {
+                **obligation,
+                "source_span": {
+                    "start_line": rule["start_line"],
+                    "end_line": rule["end_line"],
+                },
+                "normalized_sha256": rule["normalized_sha256"],
+                "inventory_sha256": rule["inventory_sha256"],
+                "discovery_manifest_sha256": rule[
+                    "discovery_manifest_sha256"
+                ],
+            }
+        )
+    document = {
+        **document,
+        "schema_version": 3,
+        "source_rules": domain_rules,
+        "obligations": enriched,
+    }
+    _write_json(path, document)
+    return document
+
+
+def export_frozen(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    output: Path,
+    *,
+    run_command: Callable[..., tuple[int, str]] = _run_command,
+    problem: str | None = None,
+    toolchain_lock: Path | None = None,
+    generator_image_id: str | None = None,
+) -> dict[str, Any]:
+    frozen_input = Path(frozen_input)
+    discovery_manifest = Path(discovery_manifest)
+    destination = Path(output)
+    problem = problem or os.environ.get("PROBLEM_ID") or destination.name
+    toolchain_lock = (
+        REPO / "data/klean-toolchain.lock.json"
+        if toolchain_lock is None
+        else Path(toolchain_lock)
+    )
+    if re.fullmatch(r"[A-Za-z0-9_-]+", problem) is None:
+        raise KleanExportError("problem ID is malformed")
+    if not frozen_input.is_dir() or frozen_input.is_symlink():
+        raise KleanExportError("frozen input must be a real directory")
+    before_hash = tree_digest(frozen_input)
+    if not discovery_manifest.is_file() or discovery_manifest.is_symlink():
+        raise KleanExportError(
+            "validated Stage 3 discovery manifest must be a regular file"
+        )
+    discovery_bytes = discovery_manifest.read_bytes()
+    try:
+        validated = lemma_discovery_contract.validate_trust_boundary(
+            frozen_input, discovery_manifest
+        )
+    except lemma_discovery_contract.LemmaDiscoveryContractError as error:
+        raise KleanExportError(str(error)) from error
+    if discovery_manifest.read_bytes() != discovery_bytes:
+        raise KleanExportError(
+            "validated Stage 3 discovery manifest changed during validation"
+        )
+    if tree_digest(frozen_input) != before_hash:
+        raise KleanExportError(
+            "frozen input changed during discovery validation"
+        )
+    discovery_manifest_sha256 = hashlib.sha256(discovery_bytes).hexdigest()
+    if destination.exists() or destination.is_symlink():
+        raise KleanExportError(f"destination already exists: {destination}")
+    if not destination.parent.is_dir() or destination.parent.is_symlink():
+        raise KleanExportError("destination parent must be a real directory")
+    verification = frozen_input / "verification.k"
+    if not verification.is_file() or verification.is_symlink():
+        raise KleanExportError("frozen input is missing regular verification.k")
+    lock = _regular_json(toolchain_lock)
+    for key in (
+        "runtimeverification_k_commit",
+        "pyk_project",
+        "lean_toolchain",
+    ):
+        if not isinstance(lock.get(key), str) or not lock[key]:
+            raise KleanExportError(f"toolchain lock is missing {key}")
+    verification_text = verification.read_text()
+    canonical_inventory = validated
+    resolution = resolve_definition_closure(frozen_input)
+    module = resolution.verification_module
+    if module != canonical_inventory["verification_module"]:
+        raise KleanExportError(
+            "Stage 1 inventory and K definition resolution disagree"
+        )
+    _parsed_module, functions = parse_verification(verification_text)
+    domain_rules = _domain_source_rules(
+        validated, discovery_manifest_sha256
+    )
+    # Preserve the exact accepted Stage 1 K definition.  Eligibility is now
+    # driven by the Stage 3 source-rule inventory, so stripping
+    # [simplification] from non-obligation rules is both unnecessary and can
+    # make otherwise valid K structurally illegal.
+    transformed = verification_text
+    source_rules = _klean_source_rules(domain_rules, 0)
+    export_module_name = f"{module.rsplit('-', 1)[0]}-KLEAN-EXPORT"
+    package_name = f"klean-{problem.lower()}"
+    library_name = lib_name(package_name)
+    environment = dict(os.environ)
+
+    publish_staging = Path(
+        tempfile.mkdtemp(prefix=f".{destination.name}.", dir=destination.parent)
+    )
+    try:
+        with tempfile.TemporaryDirectory(prefix=f"klean-{problem}-") as temporary:
+            scratch = Path(temporary)
+            export_k = stage_definition_driver(
+                scratch,
+                frozen_input,
+                resolution,
+                transformed,
+                export_module(module, functions),
+            )
+            source_inventory_path = scratch / "source-rule-inventory.json"
+            _write_json(
+                source_inventory_path,
+                {"schema_version": 1, "source_rules": source_rules},
+            )
+            definition = scratch / "kompiled"
+            command = [
+                "kompile",
+                str(export_k),
+                "--backend",
+                "haskell",
+                "--main-module",
+                export_module_name,
+                "--syntax-module",
+                resolution.syntax_module,
+                "--output-definition",
+                str(definition),
+            ]
+            code, output = run_command(
+                command,
+                cwd=scratch,
+                timeout=KOMPILE_TIMEOUT,
+                env=environment,
+            )
+            if code != 0:
+                raise KleanExportError(f"kompile failed ({code}): {output[-600:]}")
+            lean_output = scratch / "lean-output"
+            lean_output.mkdir()
+            command = [
+                sys.executable,
+                str(KLEAN),
+                str(definition),
+                package_name,
+                "-o",
+                str(lean_output),
+                "-r",
+                "kxExport",
+                "--lemmas",
+                "--lemma-source",
+                verification.name,
+                "--source-rule-inventory",
+                str(source_inventory_path),
+            ]
+            for function in functions:
+                command.extend(("--spec-func", function.name))
+            code, output = run_command(
+                command,
+                cwd=scratch,
+                timeout=KLEAN_TIMEOUT,
+                env=environment,
+
+Script done on 2026-07-27 23:29:56-05:00 [COMMAND_EXIT_CODE="0"]

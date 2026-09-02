@@ -1,0 +1,45 @@
+requires "verification.k"
+
+module BODY-SENSITIVITY
+  imports ROMAN-VERIFICATION
+
+  // This is the actual program constructor term with the number-nine entry in
+  // the ones table materially changed from "ix" to "wrong".
+  syntax Pgm ::= "bodyMutatedProgram" [macro]
+  rule bodyMutatedProgram =>
+    Module(
+      FuncDef("int_to_mini_roman", Params("number"),
+        Assign(Name("thousands"), TupleExpr(Str(""), Str("m")))
+        Assign(Name("hundreds"),
+          TupleExpr(
+            Str(""), Str("c"), Str("cc"), Str("ccc"), Str("cd"),
+            Str("d"), Str("dc"), Str("dcc"), Str("dccc"), Str("cm")))
+        Assign(Name("tens"),
+          TupleExpr(
+            Str(""), Str("x"), Str("xx"), Str("xxx"), Str("xl"),
+            Str("l"), Str("lx"), Str("lxx"), Str("lxxx"), Str("xc")))
+        Assign(Name("ones"),
+          TupleExpr(
+            Str(""), Str("i"), Str("ii"), Str("iii"), Str("iv"),
+            Str("v"), Str("vi"), Str("vii"), Str("viii"), Str("wrong")))
+        Return(
+          BinOp("+",
+            BinOp("+",
+              BinOp("+",
+                Subscript(
+                  Name("thousands"),
+                  BinOp("//", Name("number"), Int(1000))),
+                Subscript(
+                  Name("hundreds"),
+                  BinOp("//",
+                    BinOp("%", Name("number"), Int(1000)),
+                    Int(100)))),
+              Subscript(
+                Name("tens"),
+                BinOp("//",
+                  BinOp("%", Name("number"), Int(100)),
+                  Int(10)))),
+            Subscript(
+              Name("ones"),
+              BinOp("%", Name("number"), Int(10)))))))
+endmodule

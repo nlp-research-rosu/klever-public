@@ -1,0 +1,189 @@
+Script started on 2026-07-31 03:21:16-05:00 [<not executed on terminal>]
+/reference/k-proof/solution.py
+4-def remove_duplicates(numbers: List[int]) -> List[int]:
+5-    result = []
+6-    number = 0
+7-    for number in numbers:
+8:        if numbers.count(number) == 1:
+9-            result.append(number)
+10-    return result
+
+/reference/k-proof/verification.k
+5-
+6-  // The HumanEval type annotation restricts the input elements to integers.
+7-  syntax Bool ::= allInts(ValSeq) [function, total]
+8-  rule allInts(.ValSeq)                => true
+9:  rule allInts(vCons(V:Val, R:ValSeq)) => isInt(V) andBool allInts(R)
+10-
+11-  // Mathematical result of processing REST while preserving the already-built
+12:  // prefix ACC.  ALL is the complete original input used by list.count.
+13-  syntax ValSeq ::= rdAcc(ValSeq, ValSeq, ValSeq) [function, total]
+14-  rule rdAcc(ACC:ValSeq, .ValSeq, _ALL:ValSeq) => ACC
+15-  rule rdAcc(ACC:ValSeq, vCons(V:Val, R:ValSeq), ALL:ValSeq)
+16:    => #if 1 ==Int cntOccVS(ALL, V)
+17:       #then rdAcc(valSeqConcat(ACC, vCons(V, .ValSeq)), R, ALL)
+18-       #else rdAcc(ACC, R, ALL)
+19-       #fi
+20-endmodule
+
+/reference/k-proof/reference-semantics/semantics/list.k
+14-  rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>
+15-  rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>
+16-
+17-  // ==== list ops: + / == / != ===============================================
+18:  syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]
+19:  rule valSeqConcat(.ValSeq, T:ValSeq)                => T
+20:  rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))
+21-
+22-  // list + list constructs a NEW object (k-cell — it allocates; operands land here
+23-  // already deref'd). priority(45) beats the generic BinOp dispatch.
+24:  rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k>
+25-       [priority(45)]
+26-
+27-  rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B
+28-  rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B)
+--
+50-  rule deepEqV(A:Val, B:Val, _:Map) => A ==K B [owise]
+51-
+52-  // ==== mutator: xs.append(v) — an in-place heap write ======================
+53-  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "append")), (V:Val, .Vals)) => noneV ... </k>
+54:       <heap> ... H |-> list(VS:ValSeq => valSeqConcat(VS, vCons(V, .ValSeq))) ... </heap>
+55-       [priority(40)]
+56-
+57-  // ==== `x in list` — a <k>-cell fold over #iterNext ========================
+58-  syntax KItem ::= #memberAcc(Val, Iterable) | #memberCont(Val) | "#notB"
+
+/reference/k-proof/reference-semantics/semantics/float.k
+234-  rule <k> F:Float ~> #mathSqrt => sqrtF(F) ... </k>
+235-  rule <k> I:Int ~> #mathSqrt => sqrtF(intToF(I)) ... </k>
+236-
+237-  // ---- min / max over a FLOAT list — FLOAT branch of the shared #minCont0/#maxCont0 folds (which
+238:  // seed/step with `requires isInt(V)`, so they are STUCK on floats). These add the `requires
+239-  // isFloat(V)` seed + a Float-accumulator fold via K's minFloat/maxFloat — concrete for krun. A proof
+240-  // over a SYMBOLIC float list intercepts min/max problem-locally to an opaque minVF/maxVF (at
+241-  // #applyK, priority 40, in its verification.k) BEFORE #minAcc0, so this fold is krun-only. Additive:
+242-  // the isFloat guard is disjoint from the existing isInt one.
+--
+256-
+257-  // ---- sum over a float list (krun; mirrors the min/max float paths). The Int-only shared
+258-  // #sumCont sticks on a Float yield; switch to a Float-headed fold via addF (concrete twin).
+259-  // The switch guard carries the SYNTACTIC negation of the Int rule's guard so a symbolic proof
+260:  // with isInt(V) in its path condition refutes this branch without sort reasoning.
+261-  syntax KItem ::= #sumAccF(Iterable, Float) | #sumContF(Float)
+262-  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int)
+263-        => #sumAccF(R, addF(intToF(ACC), {V}:>Float)) ... </k>
+264:       requires isFloat(V) andBool notBool (isInt(V) orBool isBool(V))
+265-  rule <k> #sumAccF(IT:Iterable, ACC:Float) => #iterNext(IT) ~> #sumContF(ACC) ... </k>
+266-  rule <k> #iterDone ~> #sumContF(ACC:Float) => ACC ... </k>
+267-  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float)
+268-        => #sumAccF(R, addF(ACC, {V}:>Float)) ... </k>
+269-       requires isFloat(V)
+270-  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float)
+271-        => #sumAccF(R, addF(ACC, intToF(intOf(V)))) ... </k>
+272:       requires isInt(V) orBool isBool(V)
+273-endmodule
+
+/reference/k-proof/reference-semantics/semantics/dict.k
+41-
+42-  // dPutK: KS unchanged if K already present, else append K (keep-first-position).
+43-  syntax ValSeq ::= dPutK(ValSeq, Val) [function, total]
+44-  rule dPutK(KS:ValSeq, K:Val) => KS                                  requires dHasKey(KS, K)
+45:  rule dPutK(KS:ValSeq, K:Val) => valSeqConcat(KS, vCons(K, .ValSeq)) requires notBool dHasKey(KS, K)
+46-
+47-  // dPutV: parallel to KS — set the value at K's position if present, else append V at the end. The
+48-  // [owise] catch-all covers the degenerate mismatched-length case (never reached for a well-formed dict).
+49-  syntax ValSeq ::= dPutV(ValSeq, ValSeq, Val, Val) [function, total]
+50-  rule dPutV(vCons(A:Val, _:ValSeq), vCons(_:Val, VR:ValSeq), K:Val, V:Val)  => vCons(V, VR)
+51-       requires A ==K K
+52-  rule dPutV(vCons(A:Val, KR:ValSeq), vCons(B:Val, VR:ValSeq), K:Val, V:Val) => vCons(B, dPutV(KR, VR, K, V))
+53-       requires notBool (A ==K K)
+54:  rule dPutV(_KS:ValSeq, VS:ValSeq, _K:Val, V:Val) => valSeqConcat(VS, vCons(V, .ValSeq)) [owise]
+55-
+56-  // ==== dict methods ========================================================
+57-  // d.keys() -> a FRESH list object of the ordered keys (k-cell: it allocates).
+58-  rule <k> #applyK(toCall(boundMethodV(dictV(KS:ValSeq, _:ValSeq), "keys")), .Vals)
+
+/reference/k-proof/reference-semantics/semantics/builtins.k
+48-  rule <k> #sumAcc(IT:Iterable, ACC:Int) => #iterNext(IT) ~> #sumCont(ACC) ... </k>
+49-  rule <k> #iterDone ~> #sumCont(ACC:Int) => ACC ... </k>
+50-  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int)
+51-        => #sumAcc(R, ACC +Int intOf(V)) ... </k>
+52:       requires isInt(V) orBool isBool(V)
+53-
+54-  syntax Int ::= intOf(Val) [function]
+55-  rule intOf(I:Int)  => I
+56-  rule intOf(B:Bool) => #if B #then 1 #else 0 #fi
+--
+75-  // ==== max / min over an iterable (#iterNext folds; first element seeds) ====
+76-  syntax KItem ::= #maxAcc0(Iterable) | "#maxCont0" | #maxAcc(Iterable, Int) | #maxCont(Int)
+77-  rule <k> #maxAcc0(IT:Iterable) => #iterNext(IT) ~> #maxCont0 ... </k>
+78-  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAcc(R, {V}:>Int) ... </k>
+79:       requires isInt(V)
+80-  rule <k> #maxAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #maxCont(M) ... </k>
+81-  rule <k> #iterDone ~> #maxCont(M:Int) => M ... </k>
+82-  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont(M:Int)
+83-        => #maxAcc(R, maxInt(M, {V}:>Int)) ... </k>
+84:       requires isInt(V)
+85-
+86-  syntax KItem ::= #minAcc0(Iterable) | "#minCont0" | #minAcc(Iterable, Int) | #minCont(Int)
+87-  rule <k> #minAcc0(IT:Iterable) => #iterNext(IT) ~> #minCont0 ... </k>
+88-  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAcc(R, {V}:>Int) ... </k>
+89:       requires isInt(V)
+90-  rule <k> #minAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #minCont(M) ... </k>
+91-  rule <k> #iterDone ~> #minCont(M:Int) => M ... </k>
+92-  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont(M:Int)
+93-        => #minAcc(R, minInt(M, {V}:>Int)) ... </k>
+94:       requires isInt(V)
+95-
+96-  // ==== variadic max / min (a Vals fold) ====================================
+97-  syntax Int ::= maxVals(Int, Vals) [function]
+98-  rule applyBuiltin("max", I:Int, REST:Vals) => maxVals(I, REST)
+--
+289-  // typeV (see core.k's config); no Call-level special case. isIntV/isStrV mirror the old
+290-  // owise-on-Val test (concrete-sort args decide; a symbolic Val stays owise, as before).
+291-  rule applyBuiltin("isinstance", V:Val, typeV("int"), .Vals) => isIntV(V)
+292-  rule applyBuiltin("isinstance", V:Val, typeV("str"), .Vals) => isStrV(V)
+293:  syntax Bool ::= isIntV(Val) [function] | isStrV(Val) [function]
+294:  rule isIntV(_:Int)         => true
+295:  rule isIntV(_:Val)         => false [owise]
+296-  rule isStrV(str(_:IntSeq)) => true
+297-  rule isStrV(_:Val)         => false [owise]
+298-endmodule
+
+/reference/k-proof/reference-semantics/semantics/methods.k
+29-  rule joinCodes(_:IntSeq, vCons(str(CS:IntSeq), .ValSeq)) => CS
+30-  rule joinCodes(SEP:IntSeq, vCons(str(CS:IntSeq), vCons(V:Val, R:ValSeq)))
+31-    => seqConcat(CS, seqConcat(SEP, joinCodes(SEP, vCons(V, R))))
+32-
+33:  // S.count(sub): non-overlapping window scan (Python str.count)
+34-  rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)
+35-  syntax Int ::= cntSub(IntSeq, IntSeq) [function]
+36-  rule cntSub(.IntSeq, _:IntSeq) => 0
+37-  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC)
+--
+59-
+60-  // ==== prefix ===============================================================
+61-  rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)
+62-
+63:  // ==== list.count(v) — number of occurrences of v in the list (concrete for krun) ==========
+64:  rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)
+65:  syntax Int ::= cntOccVS(ValSeq, Val) [function, total]
+66:  rule cntOccVS(.ValSeq, _:Val)                => 0
+67:  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V
+68:  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => cntOccVS(R, V)        requires notBool (A ==K V)
+69-
+70-  // ==== split (no-arg: on whitespace runs, dropping empty tokens) + replace (single char) ==========
+71-  // Concrete string ops for krun. A proof over a symbolic string intercepts the split problem-locally.
+72-  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals)
+--
+80-       requires notBool isWSC(C)
+81-  // flush the current token to the result list iff non-empty.
+82-  syntax ValSeq ::= flushTok(ValSeq, IntSeq) [function]
+83-  rule flushTok(ACC:ValSeq, .IntSeq)            => ACC
+84:  rule flushTok(ACC:ValSeq, iCons(C:Int, T:IntSeq)) => valSeqConcat(ACC, vCons(str(iCons(C, T)), .ValSeq))
+85-  syntax Bool ::= isWSC(Int) [function, total]
+86-  rule isWSC(C:Int) => C ==Int 32 orBool C ==Int 9 orBool C ==Int 10 orBool C ==Int 13
+87-
+88-  // split(sep='x') keyword form delegates to the positional k-cell rule
+
+Script done on 2026-07-31 03:21:16-05:00 [COMMAND_EXIT_CODE="0"]

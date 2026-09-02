@@ -1,0 +1,58 @@
+INITIAL COMMAND
+PYTHONPATH=/reference python3 - <<'PY'
+from pathlib import Path
+from tools.klean_preflight import check_generation
+check_generation(
+    Path('/reference/k-proof'),
+    Path('/reference/lemma-discovery.json'),
+    Path('/reference/klean-generation'),
+    toolchain_lock=Path('/reference/klean-toolchain.lock.json'),
+)
+PY
+
+INITIAL RESULT (exit 1)
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "/reference/tools/klean_preflight.py", line 582, in check_generation
+    raise KleanPreflightError(
+tools.klean_preflight.KleanPreflightError: lake clean failed (1): error: could not detect the configuration of the Lake installation
+
+DIAGNOSIS COMMAND
+python3 - <<'PY'
+import os, subprocess
+p = subprocess.Popen(
+  ['/opt/elan/toolchains/leanprover--lean4---v4.22.0/bin/lean', '--version'],
+  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+print('pid', p.pid)
+try: print('exe', os.readlink(f'/proc/{p.pid}/exe'))
+except Exception as e: print('readlink failed', repr(e))
+out, err = p.communicate()
+print('exit', p.returncode, 'out', out, 'err', err)
+PY
+
+DIAGNOSIS RESULT (exit 0; nested Lean exit 1)
+pid 7
+readlink failed PermissionError(13, 'Permission denied')
+exit 1 out  err error: failed to locate application
+
+The audit sandbox denies `/proc/<pid>/exe`, which Lean 4.22 uses for
+self-location. `audit_selfexe.c` in this directory is a narrow LD_PRELOAD
+compatibility shim: it intercepts only `/proc/<own-pid>/exe` and supplies the
+process's own resolved invocation path. It does not inspect or change Lean
+source, project files, theorem statements, or proof terms.
+
+SHIM BUILD/TOOLCHAIN TEST COMMAND
+gcc -shared -fPIC -Wall -Wextra -Werror -O2 \
+  -o /tmp/audit-work/libaudit_selfexe.so \
+  /tmp/audit-work/audit_selfexe.c -ldl
+export PATH=/opt/elan/toolchains/leanprover--lean4---v4.22.0/bin:$PATH
+export LD_PRELOAD=/tmp/audit-work/libaudit_selfexe.so
+lean --version
+lake --version
+sha256sum /tmp/audit-work/audit_selfexe.c /tmp/audit-work/libaudit_selfexe.so
+
+SHIM BUILD/TOOLCHAIN TEST RESULT (exit 0)
+Lean (version 4.22.0, x86_64-unknown-linux-gnu, commit ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05, Release)
+Lake version 5.0.0-src+ba2cbbf (Lean version 4.22.0)
+1864a78461443f0f18936bfd69ce8b527d9ac3aa010260f75d6228dcee3da65d  /tmp/audit-work/audit_selfexe.c
+a601c339f59a5f96487cef2cf71786adf8efb6f02569fe171180cf023a98827f  /tmp/audit-work/libaudit_selfexe.so

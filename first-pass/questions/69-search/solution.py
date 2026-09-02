@@ -1,0 +1,14 @@
+def search(lst):
+    n = len(lst)
+    ans = -1
+    v = 0
+    j = 0
+    cnt = 0
+    for v in range(1, n + 1):
+        cnt = 0
+        for j in range(0, n):
+            if lst[j] == v:
+                cnt = cnt + 1
+        if cnt >= v:
+            ans = v
+    return ans

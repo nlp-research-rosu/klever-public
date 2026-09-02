@@ -1,0 +1,231 @@
+68-    proof = candidate / "Proof.lean"
+69-    if not proof.is_file() or proof.is_symlink():
+70-        raise KleanFinalGateError("candidate is missing regular Proof.lean")
+71-    for required in ("lakefile.lean", "lean-toolchain"):
+72-        path = candidate / required
+73-        if not path.is_file() or path.is_symlink():
+74-            raise KleanFinalGateError(f"candidate is missing regular {required}")
+75-    candidate_sources: list[tuple[str, str]] = []
+76-    for relative, kind, path in entries:
+77-        if kind != "file" or path.suffix != ".lean":
+78-            continue
+79-        text = path.read_text()
+80:        if Path(relative).parts[0] != "Base":
+81-            candidate_sources.append((relative, text))
+82:        forbidden = re.search(
+83-            r"\b(?:sorry|admit|unsafe|axiom|opaque)\b", text
+84-        )
+85:        if forbidden is not None:
+86-            raise KleanFinalGateError(
+87:                f"candidate contains forbidden Lean token "
+88:                f"{forbidden.group(0)!r} in {relative}"
+89-            )
+90-    statement = target.get("statement")
+91-    parameters = target.get("parameters")
+92-    if not isinstance(statement, str) or not statement:
+93-        raise KleanFinalGateError("generator target statement is malformed")
+94-    if not isinstance(parameters, list):
+95-        raise KleanFinalGateError("generator target bindings are malformed")
+96-    proof_text = proof.read_text()
+97-    for parameter in parameters:
+98-        if not isinstance(parameter, dict):
+99-            raise KleanFinalGateError("generator target binding is malformed")
+100-        name = parameter.get("name")
+--
+141-        if not isinstance(name, str) or not name:
+142-            raise KleanFinalGateError("trust inventory name is malformed")
+143-        names.add(name)
+144-    return names
+145-
+146-
+147-def _parse_axioms(output: str) -> set[str]:
+148-    matches = list(re.finditer(r"depends on axioms:\s*\[", output))
+149-    axiom_free = re.findall(
+150-        r"does not depend on any axioms", output
+151-    )
+152-    if len(matches) + len(axiom_free) != 1:
+153:        raise KleanFinalGateError("#print axioms output is missing or ambiguous")
+154-    if axiom_free:
+155-        return set()
+156-    tokens: list[str] = []
+157-    token: list[str] = []
+158-    quoted = False
+159-    for character in output[matches[0].end() :]:
+160-        if character == "«" and not quoted:
+161-            quoted = True
+162-            token.append(character)
+163-        elif character == "»" and quoted:
+164-            quoted = False
+165-            token.append(character)
+166-        elif character == "," and not quoted:
+167-            name = "".join(token).strip()
+168-            if not name:
+169-                raise KleanFinalGateError(
+170:                    "#print axioms output contains an empty axiom name"
+171-                )
+172-            tokens.append(name)
+173-            token = []
+174-        elif character == "]" and not quoted:
+175-            name = "".join(token).strip()
+176-            if name:
+177-                tokens.append(name)
+178-            return set(tokens)
+179-        else:
+180-            token.append(character)
+181:    raise KleanFinalGateError("#print axioms output has no closing bracket")
+182-
+183-
+184-def check_proof_candidate(
+185-    generation: Path,
+186-    candidate: Path,
+187-    *,
+188-    run_command: Callable[..., tuple[int, str]] = _run,
+189-) -> dict[str, Any]:
+190-    """Independently build and axiom-check one immutable Stage 5 proof."""
+191-
+192-    generation = Path(generation)
+193-    candidate = Path(candidate)
+--
+203-    inventory = _regular_json(
+204-        generation / "trust-inventory.json", "trust inventory"
+205-    )
+206-    diagnostics: list[dict[str, Any]] = []
+207-    with tempfile.TemporaryDirectory(prefix="klean-proof-check-") as temporary:
+208-        project = Path(temporary) / "project"
+209-        shutil.copytree(candidate, project)
+210-        if klean_export.tree_digest(project) != before_candidate:
+211-            raise KleanFinalGateError(
+212-                "candidate changed while copying for mechanical audit"
+213-            )
+214-        shutil.rmtree(project / ".lake", ignore_errors=True)
+215:        shutil.rmtree(project / "Base", ignore_errors=True)
+216:        shutil.copytree(generation / "generated", project / "Base")
+217-        audit_source = project / "AxiomAudit.lean"
+218-        audit_source.write_text(
+219-            "import Proof\n\n"
+220-            "namespace Proof\n\n"
+221-            f"#check (final : {target['statement']})\n"
+222:            "#print axioms final\n\n"
+223-            "end Proof\n"
+224-        )
+225-        outputs: dict[tuple[str, ...], str] = {}
+226-        commands = (
+227-            ["lake", "clean"],
+228-            ["lake", "build"],
+229-            ["lake", "env", "lean", "AxiomAudit.lean"],
+230-        )
+231-        for command in commands:
+232-            code, output = run_command(command, cwd=project, timeout=600)
+233-            diagnostics.append(
+234-                {
+--
+247-                )
+248-        used_axioms = _parse_axioms(
+249-            outputs[("lake", "env", "lean", "AxiomAudit.lean")]
+250-        )
+251-    if klean_export.tree_digest(generation) != before_generation:
+252-        raise KleanFinalGateError(
+253-            "generation changed during mechanical audit"
+254-        )
+255-    if klean_export.tree_digest(candidate) != before_candidate:
+256-        raise KleanFinalGateError(
+257-            "candidate changed during mechanical audit"
+258-        )
+259:    if "sorryAx" in used_axioms:
+260:        raise KleanFinalGateError("Proof.final depends on forbidden sorryAx")
+261-    allowed = _allowed_axioms(inventory)
+262-    unexpected = sorted(
+263-        axiom for axiom in used_axioms if axiom not in allowed
+264-    )
+265-    if unexpected:
+266-        raise KleanFinalGateError(
+267-            "Proof.final has unrecorded axiom dependencies: "
+268-            + ", ".join(unexpected)
+269-        )
+270-    return {
+271-        "status": "PASS",
+272-        "target": target,
+273-        "generation_sha256": before_generation,
+274-        "candidate_sha256": before_candidate,
+275-        "used_axioms": sorted(used_axioms),
+276-        "diagnostics": diagnostics,
+277-    }
+278-
+279-
+280:def evaluate_proof_candidate(
+281-    generation: Path,
+282-    candidate: Path,
+283-    *,
+284-    run_command: Callable[..., tuple[int, str]] = _run,
+285-) -> dict[str, Any]:
+286-    try:
+287-        return check_proof_candidate(
+288-            generation, candidate, run_command=run_command
+289-        )
+290-    except KleanFinalGateError as error:
+291-        return {"status": "FAIL", "error": str(error)}
+292:    except BaseException as error:
+293-        return {
+294-            "status": "AUDIT_ERROR",
+295-            "error": f"{type(error).__name__}: {error}",
+296-        }
+297-
+298-
+299-def _audit_input_binding(path: Path) -> dict[str, Any]:
+300-    document = _regular_json(path, "Stage 6 audit input")
+301-    try:
+302-        resolution, digest = (
+303-            stage6_resolution_contract.verify_audit_input(document)
+304-        )
+--
+552-            discovery_manifest,
+553-            generation,
+554-            candidate,
+555-            toolchain_lock=toolchain_lock,
+556-            audit_input=audit_input,
+557-        )
+558-    except KleanFinalGateError as error:
+559-        document = {
+560-            "status": "FAIL",
+561-            "error": str(error),
+562-            **_result_binding(audit_input),
+563-        }
+564:    except BaseException as error:
+565-        document = {
+566-            "status": "AUDIT_ERROR",
+567-            "error": f"{type(error).__name__}: {error}",
+568-            **_result_binding(audit_input),
+569-        }
+570-    temporary = output.with_name(f".{output.name}.tmp")
+571-    temporary.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+572-    os.replace(temporary, output)
+573-    return document
+574-
+575-
+576-def evaluate_gate(
+--
+588-            discovery_manifest,
+589-            generation,
+590-            candidate,
+591-            toolchain_lock=toolchain_lock,
+592-            audit_input=audit_input,
+593-        )
+594-    except KleanFinalGateError as error:
+595-        return {
+596-            "status": "FAIL",
+597-            "error": str(error),
+598-            **_result_binding(audit_input),
+599-        }
+600:    except BaseException as error:
+601-        return {
+602-            "status": "AUDIT_ERROR",
+603-            "error": f"{type(error).__name__}: {error}",
+604-            **_result_binding(audit_input),
+605-        }
+606-
+607-
+608-def main(argv: list[str] | None = None) -> int:
+609-    parser = argparse.ArgumentParser(description=__doc__)
+610-    parser.add_argument("--frozen-k", required=True, type=Path)
+611-    parser.add_argument(
+612-        "--discovery-manifest", required=True, type=Path

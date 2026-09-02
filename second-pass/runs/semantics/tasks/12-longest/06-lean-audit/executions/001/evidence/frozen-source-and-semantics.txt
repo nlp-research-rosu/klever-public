@@ -1,0 +1,206 @@
++ nl -ba /reference/k-proof/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // A proof-domain sequence containing only strings.  stringVals embeds it
+     7	  // into the ValSeq used by the supplied Python semantics.
+     8	  syntax StringSeq ::= ".StringSeq"
+     9	                     | sCons(IntSeq, StringSeq)
+    10	
+    11	  syntax ValSeq ::= stringVals(StringSeq)
+    12	  rule stringVals(.StringSeq) => .ValSeq
+    13	  rule stringVals(sCons(CS:IntSeq, REST:StringSeq))
+    14	    => vCons(str(CS), stringVals(REST))
+    15	
+    16	  // Symbolic iterator equations for the embedded sequence.  They are the two
+    17	  // MPY-LIST iterator rules composed with the stringVals equations above.
+    18	  rule <k> #iterNext(list(stringVals(.StringSeq))) => #iterDone ... </k>
+    19	       [priority(40)]
+    20	  rule <k> #iterNext(list(stringVals(sCons(CS:IntSeq, REST:StringSeq))))
+    21	        => #iterYield(str(CS), list(stringVals(REST))) ... </k>
+    22	       [priority(40)]
+    23	
+    24	  // Mathematical left fold for the contract.  Strict comparison is
+    25	  // deliberate: on a tie the existing (earlier) result is retained.
+    26	  syntax Val ::= longestAcc(Val, StringSeq) [function, total]
+    27	  rule longestAcc(BEST:Val, .StringSeq) => BEST
+    28	  rule longestAcc(noneV, sCons(CS:IntSeq, REST:StringSeq))
+    29	    => longestAcc(str(CS), REST)
+    30	  rule longestAcc(str(BEST:IntSeq), sCons(CS:IntSeq, REST:StringSeq))
+    31	    => longestAcc(str(CS), REST)
+    32	    requires isLen(CS) >Int isLen(BEST)
+    33	  rule longestAcc(str(BEST:IntSeq), sCons(CS:IntSeq, REST:StringSeq))
+    34	    => longestAcc(str(BEST), REST)
+    35	    requires isLen(CS) <=Int isLen(BEST)
+    36	
+    37	  // Exact closure produced by loading solution.mpy; used to keep the call
+    38	  // theorems compact while still tying them to the translated program.
+    39	  syntax Val ::= "longestSolution" [macro]
+    40	  rule longestSolution
+    41	    => closureVal("strings",
+    42	         Assign(Name("result"), NoneVal)
+    43	         Assign(Name("string"), NoneVal)
+    44	         For(Name("string"), Name("strings"),
+    45	           If(Compare(Name("result"), CmpOp("is", NoneVal)),
+    46	             Assign(Name("result"), Name("string")),
+    47	             If(Compare(
+    48	               Call(Name("len"), Name("string")),
+    49	               CmpOp("<=", Call(Name("len"), Name("result")))),
+    50	               Assign(Name("result"), Name("result")),
+    51	               If(Compare(
+    52	                 Call(Name("len"), Name("string")),
+    53	                 CmpOp(">", Call(Name("len"), Name("result")))),
+    54	                 Assign(Name("result"), Name("string")),
+    55	                 .Stmts))))
+    56	         Return(Name("result")),
+    57	         0)
+    58	endmodule
++ nl -ba /reference/k-proof/reference-semantics/semantics/list.k
++ sed -n 1,20p
+     1	// reference/src/semantics/list.k — MPY-LIST
+     2	
+     3	module MPY-LIST
+     4	  imports MPY-CORE
+     5	  imports MPY-ITER
+     6	  imports MPY-OPERATORS
+     7	
+     8	  // ==== iteration (the iterator protocol's list case) =======================
+     9	  rule <k> #iterNext(list(.ValSeq))                => #iterDone ... </k>
+    10	  rule <k> #iterNext(list(vCons(V:Val, R:ValSeq))) => #iterYield(V, list(R)) ... </k>
+    11	
+    12	  // ==== ListExpr: [...] literal -> a fresh heap object =======================
+    13	  syntax ApplyK ::= "toList"
+    14	  rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>
+    15	  rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>
+    16	
+    17	  // ==== list ops: + / == / != ===============================================
+    18	  syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]
+    19	  rule valSeqConcat(.ValSeq, T:ValSeq)                => T
+    20	  rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))
++ nl -ba /reference/k-proof/reference-semantics/semantics/core.k
++ sed -n '12,42p;217,232p'
+    12	  // ==== values, the algebraic lists, and the scope heap =====================
+    13	  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+    14	  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+    15	  syntax Str    ::= str(IntSeq)
+    16	
+    17	  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+    18	  syntax Iterable ::= list(ValSeq)
+    19	                    | tuple(ValSeq)
+    20	                    | Str
+    21	                    | rangeObj(Int, Int, Int)
+    22	                    | zipObj(ValSeq, ValSeq)
+    23	                    | zipObjS(IntSeq, IntSeq)
+    24	
+    25	  syntax Val      ::= Int
+    26	                    | Bool
+    27	                    | "noneV"
+    28	                    | Iterable
+    29	                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+    30	                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+    31	                    | closureVal(ParamNames, Stmts, Int)
+    32	                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+    33	                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+    34	                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+    35	
+    36	  syntax Parent   ::= "root" | parent(Int)
+    37	  syntax Scope    ::= scope(Map, Parent)
+    38	  syntax KResult  ::= Val
+    39	  syntax Expr     ::= Val   // cooling puts results back into expression holes
+    40	  syntax Vals     ::= List{Val, ","}
+    41	  syntax Exc      ::= "NoExc" | "AssertionError"
+    42	  syntax RetState ::= "noRet" | retV(Val)
+   217	  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+   218	  rule vals2valSeq(.Vals)            => .ValSeq
+   219	  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+   220	
+   221	  // ==== shared sequence length (len / summaries across many modules) ========
+   222	  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+   223	  syntax Int ::= vsLen(ValSeq) [function, total]
+   224	  rule vsLen(.ValSeq)                => 0
+   225	  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+   226	
+   227	  syntax Int ::= isLen(IntSeq) [function, total]
+   228	  rule isLen(.IntSeq)                => 0
+   229	  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+   230	
+   231	  // in-bounds positional write (list subscript-assign); OOB leaves the seq unchanged
+   232	  // (valid programs write in-bounds — mirrors valSeqAt's total-but-underspecified stance)
++ sed -n 62,76p
++ nl -ba /reference/k-proof/reference-semantics/semantics/controls.k
+    62	  // ==== For: one loop, in-cell continuation, over #iterNext =================
+    63	  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+    64	  // circularities anchor on #loop and narrowing substitutes the structure)
+    65	  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+    66	                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+    67	                 | #loopLbl(K) | "#cont" | "#brk"
+    68	
+    69	  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+    70	
+    71	  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+    72	  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+    73	  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+    74	        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+    75	
+    76	  // ==== While ==============================================================
++ nl -ba /reference/k-proof/solution.py
+     1	from typing import List, Optional
+     2	
+     3	
+     4	def longest(strings: List[str]) -> Optional[str]:
+     5	    result = None
+     6	    string = None
+     7	    for string in strings:
+     8	        if result is None:
+     9	            result = string
+    10	        elif len(string) <= len(result):
+    11	            result = result
+    12	        elif len(string) > len(result):
+    13	            result = string
+    14	    return result
++ nl -ba /reference/k-proof/prompt.py
+     1	from typing import List, Optional
+     2	
+     3	
+     4	def longest(strings: List[str]) -> Optional[str]:
+     5	    """ Out of list of strings, return the longest one. Return the first one in case of multiple
+     6	    strings of the same length. Return None in case the input list is empty.
+     7	    >>> longest([])
+     8	
+     9	    >>> longest(['a', 'b', 'c'])
+    10	    'a'
+    11	    >>> longest(['a', 'bb', 'ccc'])
+    12	    'ccc'
+    13	    """
++ nl -ba /reference/k-proof/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py concrete_tests.py > concrete_tests.mpy
+     6	python3 concrete_tests.py
+     7	
+     8	kompile reference-semantics/semantics.k \
+     9	  --backend llvm \
+    10	  --main-module MPY-KRUN \
+    11	  --syntax-module MPY-SYNTAX \
+    12	  --output-definition runtime-kompiled
+    13	
+    14	krun concrete_tests.mpy --definition runtime-kompiled
+    15	
+    16	kompile verification.k \
+    17	  --backend haskell \
+    18	  --main-module VERIFICATION \
+    19	  --syntax-module MPY-SYNTAX \
+    20	  --output-definition verification-kompiled
+    21	
+    22	kprove spec.k \
+    23	  --definition verification-kompiled \
+    24	  --claims loop-init-empty,loop-init-cons,loop-empty,loop-longer,loop-retain
+    25	
+    26	kprove spec.k \
+    27	  --definition verification-kompiled \
+    28	  --claims load-solution,call-empty,call-cons-dispatch
++ rg -n simplification /reference/k-proof/verification.k /reference/lemma-discovery.json

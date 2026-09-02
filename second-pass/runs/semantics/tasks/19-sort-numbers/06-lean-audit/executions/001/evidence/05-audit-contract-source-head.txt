@@ -1,0 +1,260 @@
+#!/usr/bin/env python3
+"""Resolve immutable audit inputs and normalize reviewer verdicts."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import stat
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any
+
+MODULE_REPO = Path(__file__).resolve().parent.parent
+if str(MODULE_REPO) not in sys.path:
+    sys.path.insert(0, str(MODULE_REPO))
+
+
+CONDITIONS = {
+    "bare": False,
+    "kit": False,
+    "semantics": True,
+    "kit-semantics": True,
+}
+
+VALID_PAIRS = {
+    ("PASS", "LEGIT"),
+    ("CONCERNS", "LEGIT"),
+    ("FAIL", "NOT_LEGIT"),
+}
+
+TRUSTED_CANONICAL_FILENAME = "canonical" + ".py"
+
+_VERDICT_MARKER = re.compile(r"VERDICT: (PASS|CONCERNS|FAIL)")
+_LEGITIMACY_MARKER = re.compile(r"LEGITIMACY: (LEGIT|NOT_LEGIT)")
+_HASH_CHUNK_SIZE = 1024 * 1024
+
+
+class AuditContractError(RuntimeError):
+    """Raised when an audit input violates the host-side safety contract."""
+
+
+def validate_safe_component(
+    value: object, label: str, *, allow_hidden: bool
+) -> None:
+    if not isinstance(value, str):
+        raise AuditContractError(f"{label} must be a string path component")
+    path = Path(value)
+    unsafe = (
+        not value
+        or value in {".", ".."}
+        or (not allow_hidden and value.startswith("."))
+        or path.is_absolute()
+        or len(path.parts) != 1
+        or "/" in value
+        or "\\" in value
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+    )
+    if unsafe:
+        visibility = "nonhidden " if not allow_hidden else ""
+        raise AuditContractError(
+            f"{label} must be one safe {visibility}path component: {value!r}"
+        )
+
+
+def _lstat(path: Path, label: str) -> os.stat_result:
+    try:
+        return path.lstat()
+    except OSError as error:
+        raise AuditContractError(f"{label} is missing or cannot be inspected: {path}") from error
+
+
+def require_real_directory(path: Path, label: str) -> Path:
+    mode = _lstat(path, label).st_mode
+    if not stat.S_ISDIR(mode):
+        raise AuditContractError(f"{label} must be a real directory: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise AuditContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def require_regular_file(path: Path, label: str | None = None) -> Path:
+    description = label or str(path)
+    mode = _lstat(path, description).st_mode
+    if not stat.S_ISREG(mode):
+        raise AuditContractError(
+            f"{description} must be a real regular file: {path}"
+        )
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise AuditContractError(f"{description} cannot be resolved: {path}") from error
+
+
+def require_direct_child(parent: Path, name: str, label: str) -> Path:
+    parent = require_real_directory(parent, f"parent of {label}")
+    child = parent / name
+    resolved = require_real_directory(child, label)
+    if resolved.parent != parent:
+        raise AuditContractError(f"{label} must resolve directly below {parent}: {name!r}")
+    return resolved
+
+
+def read_regular_json(path: Path) -> dict[str, Any]:
+    regular = require_regular_file(path)
+    try:
+        document = json.loads(regular.read_text())
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise AuditContractError(f"{path}: malformed JSON: {error}") from error
+    if not isinstance(document, dict):
+        raise AuditContractError(f"{path}: JSON document must be an object")
+    return document
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise AuditContractError(f"cannot hash regular file {path}: {error}") from error
+    return digest.hexdigest()
+
+
+def _optional_regular_file_hash(path: Path) -> str | None:
+    try:
+        mode = path.lstat().st_mode
+    except OSError:
+        return None
+    if not stat.S_ISREG(mode):
+        return None
+    try:
+        return sha256_file(path)
+    except AuditContractError:
+        return None
+
+
+def _tree_entry_type(mode: int) -> str:
+    if stat.S_ISDIR(mode):
+        return "directory"
+    if stat.S_ISREG(mode):
+        return "file"
+    if stat.S_ISLNK(mode):
+        return "symlink"
+    if stat.S_ISFIFO(mode):
+        return "fifo"
+    if stat.S_ISSOCK(mode):
+        return "socket"
+    if stat.S_ISBLK(mode):
+        return "block-device"
+    if stat.S_ISCHR(mode):
+        return "character-device"
+    return "unknown"
+
+
+def _framed_update(digest: Any, value: bytes) -> None:
+    digest.update(len(value).to_bytes(8, "big"))
+    digest.update(value)
+
+
+def _framed_file_update(
+    digest: Any, path: Path, expected_size: int
+) -> None:
+    digest.update(expected_size.to_bytes(8, "big"))
+    bytes_read = 0
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        with os.fdopen(os.open(path, flags), "rb") as stream:
+            for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                bytes_read += len(chunk)
+                digest.update(chunk)
+    except OSError as error:
+        raise AuditContractError(f"cannot read tree file {path}: {error}") from error
+    if bytes_read != expected_size:
+        raise AuditContractError(
+            f"tree file changed size while hashing: {path} "
+            f"(expected {expected_size}, read {bytes_read})"
+        )
+
+
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, f"tree root {root}")
+    entries: list[tuple[str, str, Path, int]] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as iterator:
+                children = list(iterator)
+        except OSError as error:
+            raise AuditContractError(f"cannot scan tree {directory}: {error}") from error
+        for entry in children:
+            path = Path(entry.path)
+            try:
+                entry_stat = entry.stat(follow_symlinks=False)
+            except OSError as error:
+                raise AuditContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            mode = entry_stat.st_mode
+            entry_type = _tree_entry_type(mode)
+            relative = path.relative_to(root).as_posix()
+            entries.append((relative, entry_type, path, entry_stat.st_size))
+            if entry_type == "directory":
+                pending.append(path)
+
+    digest = hashlib.sha256()
+    for relative, entry_type, path, size in sorted(
+        entries, key=lambda item: item[0]
+    ):
+        _framed_update(digest, os.fsencode(relative))
+        _framed_update(digest, entry_type.encode())
+        if entry_type == "file":
+            _framed_file_update(digest, path, size)
+        elif entry_type == "symlink":
+            try:
+                target = os.readlink(path)
+            except OSError as error:
+                raise AuditContractError(
+                    f"cannot read tree symlink {path}: {error}"
+                ) from error
+            _framed_update(digest, os.fsencode(target))
+        else:
+            _framed_update(digest, b"")
+    return digest.hexdigest()
+
+
+def _optional_tree_hash(root: Path) -> str | None:
+    try:
+        mode = root.lstat().st_mode
+    except OSError:
+        return None
+    if not stat.S_ISDIR(mode):
+        return None
+    try:
+        return sha256_tree(root)
+    except AuditContractError:
+        return None
+
+
+def legacy_content_tree_hash(root: Path) -> str:
+    """Reproduce the schema-v1 seed-tree hash used by imported runs."""
+
+    root = require_real_directory(root, "legacy seed tree")
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        try:
+            metadata = path.lstat()
+        except OSError as error:
+            raise AuditContractError(
+                f"cannot inspect legacy seed tree entry: {path}"
+            ) from error
+        if stat.S_ISDIR(metadata.st_mode):
+            continue
+        if not stat.S_ISREG(metadata.st_mode):

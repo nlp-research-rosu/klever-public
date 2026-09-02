@@ -1,0 +1,277 @@
+$ nl -ba /reference/k-proof/verification.k
+     1	module VERIFICATION
+     2	  imports INT
+     3	  imports BOOL
+     4	
+     5	  // Inductive character sequences make the string traversal explicit.
+     6	  syntax Chars ::= "nil" [constructor]
+     7	                 | "cons" "(" Int "," Chars ")" [constructor]
+     8	
+     9	  // The contract-level decoder is independent of the AST evaluator.
+    10	  syntax Int ::= decodeCode(Int) [function, total]
+    11	  rule decodeCode(C) => ((C -Int 5 -Int 97) modInt 26) +Int 97
+    12	
+    13	  syntax Chars ::= decodeSpec(Chars) [function, total]
+    14	  rule decodeSpec(nil) => nil
+    15	  rule decodeSpec(cons(C, CS)) => cons(decodeCode(C), decodeSpec(CS))
+    16	
+    17	  syntax Int ::= encodeCode(Int) [function, total]
+    18	  rule encodeCode(C) => ((C +Int 5 -Int 97) modInt 26) +Int 97
+    19	
+    20	  syntax Chars ::= encodeSpec(Chars) [function, total]
+    21	  rule encodeSpec(nil) => nil
+    22	  rule encodeSpec(cons(C, CS)) => cons(encodeCode(C), encodeSpec(CS))
+    23	
+    24	  syntax Bool ::= isLowerCode(Int) [function, total]
+    25	  rule isLowerCode(C) => 97 <=Int C andBool C <=Int 122
+    26	
+    27	  syntax Bool ::= allLower(Chars) [function, total]
+    28	  rule allLower(nil) => true
+    29	  rule allLower(cons(C, CS)) => isLowerCode(C) andBool allLower(CS)
+    30	endmodule
+$ nl -ba /reference/k-proof/semantic.k
+     1	requires "verification.k"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports STRING-SYNTAX
+     6	  imports BOOL-SYNTAX
+     7	
+     8	  syntax PyModule ::= "Module" "(" Stmts ")"
+     9	  syntax Stmts ::= List{Stmt, ""}
+    10	
+    11	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    12	                | "Expr" "(" Expr ")"
+    13	                | "Return" "(" Expr ")"
+    14	
+    15	  syntax Params ::= "Params" "(" String ")"
+    16	
+    17	  syntax Expr ::= "Str" "(" String ")"
+    18	                | "Int" "(" Int ")"
+    19	                | "Bool" "(" Bool ")"
+    20	                | "Name" "(" String ")"
+    21	                | "BinOp" "(" String "," Expr "," Expr ")"
+    22	                | "Attribute" "(" Expr "," String ")"
+    23	                | "Call" "(" Expr "," Expr ")"
+    24	                | "ListComp" "(" Expr "," CompFor ")"
+    25	
+    26	  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Expr ")"
+    27	endmodule
+    28	
+    29	module MPY-SEMANTIC
+    30	  imports MPY-SYNTAX
+    31	  imports INT
+    32	  imports STRING
+    33	  imports BOOL
+    34	  imports VERIFICATION
+    35	
+    36	  syntax Value ::= VInt(Int) [constructor]
+    37	                 | VBool(Bool) [constructor]
+    38	                 | VText(String) [constructor]
+    39	                 | VChar(Int) [constructor]
+    40	                 | VChars(Chars) [constructor]
+    41	                 | VList(Chars) [constructor]
+    42	
+    43	  syntax KItem ::= exec(Stmts)
+    44	                 | eval(Expr)
+    45	                 | "discard"
+    46	                 | "finish"
+    47	                 | binLeft(String, Expr)
+    48	                 | binRight(String, Value)
+    49	                 | "doOrd"
+    50	                 | "doChr"
+    51	                 | "doJoin"
+    52	                 | comp(String, Expr, Chars)
+    53	                 | compTail(String, Expr, Chars, Int)
+    54	                 | prepend(Int)
+    55	
+    56	  configuration
+    57	    <m>
+    58	      <k> $PGM:PyModule </k>
+    59	      <s> nil </s>
+    60	      <ch> 0 </ch>
+    61	      <input> $INPUT:Chars </input>
+    62	      <result> .K </result>
+    63	    </m>
+    64	
+    65	  // Loading the translated definition also invokes its required entry point.
+    66	  rule <k> Module(FuncDef("decode_shift", Params("s"), BODY)) => exec(BODY) </k>
+    67	       <s> _ => CS </s>
+    68	       <input> CS </input>
+    69	
+    70	  rule <k> exec(.Stmts) => .K </k>
+    71	  rule exec(Expr(E) REST) => eval(E) ~> discard ~> exec(REST)
+    72	  rule exec(Return(E) _REST) => eval(E) ~> finish
+    73	
+    74	  rule _V:Value ~> discard => .K
+    75	  rule <k> V:Value ~> finish => .K </k>
+    76	       <result> .K => V </result>
+    77	
+    78	  rule eval(Int(I)) => VInt(I)
+    79	  rule eval(Bool(B)) => VBool(B)
+    80	  rule eval(Str("")) => VChars(nil)
+    81	  rule eval(Str(S)) => VText(S) requires S =/=String ""
+    82	  rule <k> eval(Name("s")) => VChars(CS) ...</k>
+    83	       <s> CS </s>
+    84	  rule <k> eval(Name("ch")) => VChar(C) ...</k>
+    85	       <ch> C </ch>
+    86	
+    87	  rule eval(BinOp(OP, LEFT, RIGHT))
+    88	    => eval(LEFT) ~> binLeft(OP, RIGHT)
+    89	  rule V:Value ~> binLeft(OP, RIGHT)
+    90	    => eval(RIGHT) ~> binRight(OP, V)
+    91	  rule VInt(J) ~> binRight("+", VInt(I)) => VInt(I +Int J)
+    92	  rule VInt(J) ~> binRight("-", VInt(I)) => VInt(I -Int J)
+    93	  rule VInt(J) ~> binRight("%", VInt(I)) => VInt(I modInt J)
+    94	
+    95	  rule eval(Call(Name("ord"), ARG)) => eval(ARG) ~> doOrd
+    96	  rule VChar(C) ~> doOrd => VInt(C)
+    97	  rule VText(S) ~> doOrd => VInt(ordChar(S))
+    98	
+    99	  rule eval(Call(Name("chr"), ARG)) => eval(ARG) ~> doChr
+   100	  rule VInt(C) ~> doChr => VChar(C)
+   101	
+   102	  rule eval(Call(Attribute(Str(""), "join"), ARG))
+   103	    => eval(ARG) ~> doJoin
+   104	  rule VList(CS) ~> doJoin => VChars(CS)
+   105	
+   106	  // A single-generator, unfiltered comprehension over a character sequence.
+   107	  // The translator supplies Bool(true) when the Python comprehension has no ifs.
+   108	  rule <k> eval(ListComp(E, CompFor(Name(X), Name(Y), Bool(true))))
+   109	          => comp(X, E, CS) ...</k>
+   110	       <s> CS </s>
+   111	    requires Y ==String "s"
+   112	
+   113	  rule comp(_X, _E, nil) => VList(nil)
+   114	  rule <k> comp(X, E, cons(C, CS))
+   115	          => eval(E) ~> compTail(X, E, CS, OLD) ...</k>
+   116	       <ch> OLD => C </ch>
+   117	    requires X ==String "ch"
+   118	  rule <k> VChar(D) ~> compTail(X, E, CS, SAVED)
+   119	          => comp(X, E, CS) ~> prepend(D) ...</k>
+   120	       <ch> _CURRENT => SAVED </ch>
+   121	  rule VList(DS) ~> prepend(D) => VList(cons(D, DS))
+   122	endmodule
+   123	
+   124	module SEMANTIC
+   125	  imports MPY-SEMANTIC
+   126	endmodule
+$ nl -ba /reference/k-proof/spec.k
+     1	requires "semantic.k"
+     2	
+     3	module SPEC
+     4	  imports SEMANTIC
+     5	
+     6	  // The arithmetic used by decode_shift is the inverse of the prompt's
+     7	  // encode_shift arithmetic for every lowercase character code.
+     8	  claim <k> decodeCode(encodeCode(C:Int)) => C ...</k>
+     9	    requires isLowerCode(C)
+    10	  [label(code-inverse)]
+    11	
+    12	  // Loop invariant for the translated comprehension. The environment is
+    13	  // restored after each character, so the invariant composes inductively.
+    14	  claim
+    15	    <k>
+    16	      comp("ch",
+    17	        Call(
+    18	          Name("chr"),
+    19	          BinOp(
+    20	            "+",
+    21	            BinOp(
+    22	              "%",
+    23	              BinOp(
+    24	                "-",
+    25	                BinOp("-", Call(Name("ord"), Name("ch")), Int(5)),
+    26	                Call(Name("ord"), Str("a"))),
+    27	              Int(26)),
+    28	            Call(Name("ord"), Str("a")))),
+    29	        CS:Chars) ~> KONT:K
+    30	      => VList(decodeSpec(CS)) ~> KONT
+    31	    </k>
+    32	    <ch> OLD:Int => OLD </ch>
+    33	  requires allLower(CS)
+    34	  [label(loop-correct)]
+    35	
+    36	  // For every lowercase input string, execution of the translated solution
+    37	  // returns the independently specified per-character Caesar decoding.
+    38	  claim
+    39	      <k>
+    40	        Module(
+    41	          FuncDef("decode_shift", Params("s"),
+    42	            Return(
+    43	              Call(
+    44	                Attribute(Str(""), "join"),
+    45	                ListComp(Call(
+    46	                  Name("chr"),
+    47	                  BinOp(
+    48	                    "+",
+    49	                    BinOp(
+    50	                      "%",
+    51	                      BinOp(
+    52	                        "-",
+    53	                        BinOp("-", Call(Name("ord"), Name("ch")), Int(5)),
+    54	                        Call(Name("ord"), Str("a"))),
+    55	                      Int(26)),
+    56	                    Call(Name("ord"), Str("a")))),
+    57	                  CompFor(Name("ch"), Name("s"), Bool(true)))))))
+    58	        => .K
+    59	      </k>
+    60	      <s> nil => CS </s>
+    61	      <ch> 0 => 0 </ch>
+    62	      <input> CS:Chars => CS </input>
+    63	      <result> .K => VChars(decodeSpec(CS)) </result>
+    64	  requires allLower(CS)
+    65	  [label(program-correct)]
+    66	endmodule
+$ nl -ba /reference/k-proof/solution.mpy
+     1	Module(
+     2	  FuncDef("decode_shift", Params("s"),
+     3	    Return(
+     4	      Call(
+     5	        Attribute(Str(""), "join"),
+     6	        ListComp(Call(
+     7	          Name("chr"),
+     8	          BinOp(
+     9	            "+",
+    10	            BinOp(
+    11	              "%",
+    12	              BinOp(
+    13	                "-",
+    14	                BinOp("-", Call(Name("ord"), Name("ch")), Int(5)),
+    15	                Call(Name("ord"), Str("a"))),
+    16	              Int(26)),
+    17	            Call(Name("ord"), Str("a")))),
+    18	          CompFor(Name("ch"), Name("s"), Bool(true)))))))
+$ nl -ba /reference/k-proof/solution.py
+     1	def decode_shift(s: str):
+     2	    return "".join([chr(((ord(ch) - 5 - ord("a")) % 26) + ord("a")) for ch in s])
+$ nl -ba /reference/k-proof/prove.sh
+     1	#!/bin/sh
+     2	set -eu
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	PYTHONDONTWRITEBYTECODE=1 python3 -c 'compile(open("solution.py", encoding="utf-8").read(), "solution.py", "exec")'
+     6	PYTHONDONTWRITEBYTECODE=1 python3 -c 'from prompt import encode_shift; from solution import decode_shift; samples = ["", "abc", "xyz", "helloworld", "abcdefghijklmnopqrstuvwxyz"]; assert all(decode_shift(encode_shift(s)) == s for s in samples)'
+     7	python3 -c 'from pathlib import Path; mpy = "".join(Path("solution.mpy").read_text().split()); spec = "".join(Path("spec.k").read_text().split()); assert mpy in spec, "spec.k does not contain the translated solution term"'
+     8	
+     9	kompile semantic.k --backend haskell --syntax-module MPY-SYNTAX --main-module SEMANTIC
+    10	
+    11	krun solution.mpy -cINPUT='nil'
+    12	krun solution.mpy -cINPUT='cons(102, cons(103, cons(104, nil)))'
+    13	krun solution.mpy -cINPUT='cons(101, cons(97, cons(98, cons(122, nil))))'
+    14	
+    15	kprove spec.k --definition semantic-kompiled --spec-module SPEC
+$ nl -ba /reference/k-proof/prompt.py
+     1	
+     2	
+     3	def encode_shift(s: str):
+     4	    """
+     5	    returns encoded string by shifting every character by 5 in the alphabet.
+     6	    """
+     7	    return "".join([chr(((ord(ch) + 5 - ord("a")) % 26) + ord("a")) for ch in s])
+     8	
+     9	
+    10	def decode_shift(s: str):
+    11	    """
+    12	    takes as input string encoded with encode_shift function. Returns decoded string.
+    13	    """

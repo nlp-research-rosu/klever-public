@@ -1,0 +1,333 @@
+COMMAND: bash -lc sed\ -n\ \'120\,340p\'\ /candidate/PROOF.md\;\ echo\ SPEC_VACUITY\;\ nl\ -ba\ /candidate/spec-vacuity.k\;\ echo\ SPEC_BODY\;\ nl\ -ba\ /candidate/spec-body-mutation.k\;\ echo\ BODY_SOURCE\;\ nl\ -ba\ /candidate/body_mutation.py\;\ echo\ DIFF_SOURCE\;\ nl\ -ba\ /candidate/differential_test.py
+EXIT_STATUS: 0
+OUTPUT:
+  --backend llvm \
+  --main-module MPY-KRUN \
+  --syntax-module MPY-SYNTAX \
+  --output-definition runtime-kompiled
+krun smoke.mpy --definition runtime-kompiled
+krun body_mutation.mpy --definition runtime-kompiled
+python3 differential_test.py
+```
+
+All exited `0`. Both `krun` runs ended with `.K`, `NoExc`, and exit code `0`.
+The differential output was:
+
+```text
+cases=208 python_mismatches=0 krun_assertion_failures=0 krun_exit=0
+```
+
+Symbolic Haskell build and required positive target proof:
+
+```bash
+kompile verification.k \
+  --backend haskell \
+  --main-module VERIFICATION \
+  --syntax-module MPY-SYNTAX \
+  --output-definition verification-kompiled
+kprove spec.k \
+  --definition verification-kompiled \
+  --spec-module SPEC
+```
+
+Both exited `0`. The complete positive proof output recorded in
+`proof-positive.log` is:
+
+```text
+#Top
+```
+
+The compilers also printed warnings originating in supplied, unrelated
+reference-semantics functions and unused variables; none was an error or a
+stuck target path.
+
+False-postcondition probe:
+
+```bash
+kprove spec-vacuity.k \
+  --definition verification-kompiled \
+  --spec-module SPEC-VACUITY
+```
+
+This exited `1` as required. For the satisfiable empty-string witness, the
+mutated claim expected `digitSumIS(.IntSeq) + 1`; the residual contained
+`<k> 0 ~> .K </k>` and `WarnStuckClaimState`.
+
+Body-sensitivity probe:
+
+```bash
+kprove spec-body-mutation.k \
+  --definition verification-kompiled \
+  --spec-module SPEC-BODY-MUTATION
+```
+
+This exited `1` as required. The exact loop-body contribution was changed from
+`ord(char)` to `0`; on the ground input `"A"` the unchanged theorem expects
+`65`, while the residual contained `<k> 0 ~> .K </k>`.
+
+## Gate results
+
+### Gate A — PASS
+
+- A1: the exact translated closure body executes. No program-defined operation
+  is summarized by an ordinary rule. The material body mutation invalidates the
+  unchanged result claim.
+- A2: no operational bridge exists. Every active configuration cell is stated,
+  and the loop claim includes the real frame-pop transition.
+- A3: the module binding, builtin `ord` lookup, argument order, receiver method
+  call, loop continuation, return, and caller restoration are exact.
+- A4: `digitSumIS` has disjoint, exhaustive constructor equations and strict
+  structural descent.
+- A5: empty string and `"A"` are realizable witnesses. The off-by-one
+  postcondition mutation is rejected.
+
+### Gate B — PASS
+
+- B1: the formal entry domain is every finite `IntSeq` carried by the supplied
+  string value, not fixed examples or bounded lengths. This covers the full
+  material string domain represented by the reference semantics.
+- B2: the reference semantics uses an ASCII character model for literals and
+  case classification. CPython Unicode case behavior is a fixed-model boundary,
+  not a candidate-added restriction. The theorem covers every code sequence the
+  symbolic model represents.
+- B3: the recursive summary directly states the sum of exactly those codes for
+  which the fixed one-character `isupper()` is true, and the loop claim formally
+  connects it to execution.
+- B4: the implementation matches the prompt examples and the independent ASCII
+  contract oracle.
+
+### Gate C — PASS
+
+All assumptions, commands, artifacts, input scopes, outputs, and negative
+results are recorded here and in the logs produced by `prove.sh`. Formal,
+conditional, empirical, and excluded conclusions are separated below.
+
+## Trust boundary
+
+| Component | Effect and dependents | Evidence |
+|---|---|---|
+| Supplied, unmodified `reference-semantics/` | Defines all value, binding, control, state, and partial-correctness behavior used by both claims | Required LLVM/Haskell builds, six prompt examples, symbolic `#Top`, and concrete differentials |
+| Fixed `py2mpy.py` | Establishes the Python-AST-to-constructor representation used by `solution.mpy` | Successful translation, direct body identity in the formal closure, and concrete execution |
+| K v7.1.293, Haskell backend, LLVM backend, and their solver/runtime | Trusted proof and execution infrastructure for every reported command | Clean command exits and recorded outputs |
+| ASCII string/case model in the supplied semantics | Determines that uppercase means codes `65..90`; affects the result theorem | Exact imported rules, all-printable-ASCII coverage, and explicit model-boundary disclosure |
+
+No unproved program-local value oracle or control rule is trusted.
+
+## Empirically supported facts
+
+- `smoke.py` checks all six prompt examples through the LLVM semantics.
+- `differential_test.py` uses an independent oracle
+  `sum(code for code if 65 <= code <= 90)`. It checks the examples, all 95
+  printable ASCII characters in one boundary string, a boundary-focused
+  string, and 200 deterministic random printable-ASCII strings of lengths
+  `0..64`. CPython and LLVM-semantic execution had zero mismatches.
+- `body_mutation.py` concretely confirms that the mutated program returns `0`
+  for `"A"` before the symbolic body-sensitivity proof rejects the unchanged
+  result property.
+
+These finite tests support validation; the universal result comes from the
+symbolic claims, not from testing.
+
+## Excluded behavior
+
+- Non-string arguments are outside the prompt's stated input type and the entry
+  claim.
+- CPython Unicode-specific `str.isupper()` classification is outside the
+  supplied semantics' ASCII model. `solution.py` will use CPython's Unicode
+  behavior when run directly, but that behavior is not the K theorem.
+- Total termination and resource bounds are not claimed separately from the
+  partial-correctness reachability proof.
+SPEC_VACUITY
+     1	requires "spec.k"
+     2	
+     3	module SPEC-VACUITY
+     4	  imports SPEC
+     5	
+     6	  // Deliberately false on the realizable input CODES == .IntSeq.
+     7	  claim [digitSum-entry-off-by-one]:
+     8	    <k>
+     9	      Call(Name("digitSum"), str(CODES:IntSeq))
+    10	      => digitSumIS(CODES) +Int 1
+    11	    </k>
+    12	    <env> 0 </env>
+    13	    <scopes>
+    14	      -1 |-> builtinsScope
+    15	      0 |-> scope(
+    16	        "digitSum" |-> closureVal(
+    17	          ("s", .ParamNames),
+    18	          Assign(Name("total"), Int(0))
+    19	          Assign(Name("char"), Str(""))
+    20	          For(
+    21	            Name("char"),
+    22	            Name("s"),
+    23	            If(
+    24	              Call(Attribute(Name("char"), "isupper"), .Exprs),
+    25	              AugAssign(
+    26	                Name("total"),
+    27	                "+",
+    28	                Call(Name("ord"), Name("char"), .Exprs)
+    29	              ) .Stmts,
+    30	              .Stmts
+    31	            ) .Stmts
+    32	          )
+    33	          Return(Name("total"))
+    34	          .Stmts,
+    35	          0
+    36	        ),
+    37	        parent(-1)
+    38	      )
+    39	    </scopes>
+    40	    <scopeLoc> 1 </scopeLoc>
+    41	    <heap> .Map </heap>
+    42	    <heapLoc> 0 </heapLoc>
+    43	    <stack> .List </stack>
+    44	    <ret> noRet </ret>
+    45	    <exc> NoExc </exc>
+    46	    <exit-code> 0 </exit-code>
+    47	    requires CODES ==K .IntSeq
+    48	endmodule
+SPEC_BODY
+     1	requires "verification.k"
+     2	
+     3	module SPEC-BODY-MUTATION
+     4	  imports VERIFICATION
+     5	
+     6	  // The real body is materially changed: an uppercase character contributes 0.
+     7	  // The unchanged expected result for "A" is 65, so this claim must fail.
+     8	  claim [digitSum-mutated-body]:
+     9	    <k>
+    10	      Call(
+    11	        Name("digitSum"),
+    12	        str(iCons(65, .IntSeq))
+    13	      )
+    14	      => digitSumIS(iCons(65, .IntSeq))
+    15	    </k>
+    16	    <env> 0 </env>
+    17	    <scopes>
+    18	      -1 |-> builtinsScope
+    19	      0 |-> scope(
+    20	        "digitSum" |-> closureVal(
+    21	          ("s", .ParamNames),
+    22	          Assign(Name("total"), Int(0))
+    23	          Assign(Name("char"), Str(""))
+    24	          For(
+    25	            Name("char"),
+    26	            Name("s"),
+    27	            If(
+    28	              Call(Attribute(Name("char"), "isupper"), .Exprs),
+    29	              AugAssign(Name("total"), "+", Int(0)) .Stmts,
+    30	              .Stmts
+    31	            ) .Stmts
+    32	          )
+    33	          Return(Name("total"))
+    34	          .Stmts,
+    35	          0
+    36	        ),
+    37	        parent(-1)
+    38	      )
+    39	    </scopes>
+    40	    <scopeLoc> 1 </scopeLoc>
+    41	    <heap> .Map </heap>
+    42	    <heapLoc> 0 </heapLoc>
+    43	    <stack> .List </stack>
+    44	    <ret> noRet </ret>
+    45	    <exc> NoExc </exc>
+    46	    <exit-code> 0 </exit-code>
+    47	endmodule
+BODY_SOURCE
+     1	def digitSum(s):
+     2	    total = 0
+     3	    char = ""
+     4	    for char in s:
+     5	        if char.isupper():
+     6	            total += 0
+     7	    return total
+     8	
+     9	
+    10	assert digitSum("A") == 0
+DIFF_SOURCE
+     1	#!/usr/bin/env python3
+     2	import random
+     3	import subprocess
+     4	import tempfile
+     5	from pathlib import Path
+     6	
+     7	from solution import digitSum
+     8	
+     9	
+    10	def ascii_contract_oracle(text):
+    11	    codes = map(ord, text)
+    12	    return sum(code for code in codes if 65 <= code <= 90)
+    13	
+    14	
+    15	def cases():
+    16	    fixed = [
+    17	        "",
+    18	        "abAB",
+    19	        "abcCd",
+    20	        "helloE",
+    21	        "woArBld",
+    22	        "aAaaaXa",
+    23	        "".join(chr(code) for code in range(32, 127)),
+    24	        "AZ@[`az",
+    25	    ]
+    26	    rng = random.Random(108)
+    27	    alphabet = [chr(code) for code in range(32, 127)]
+    28	    random_cases = [
+    29	        "".join(rng.choice(alphabet) for _ in range(rng.randrange(0, 65)))
+    30	        for _ in range(200)
+    31	    ]
+    32	    return fixed + random_cases
+    33	
+    34	
+    35	def main():
+    36	    samples = cases()
+    37	    mismatches = [
+    38	        (sample, digitSum(sample), ascii_contract_oracle(sample))
+    39	        for sample in samples
+    40	        if digitSum(sample) != ascii_contract_oracle(sample)
+    41	    ]
+    42	    if mismatches:
+    43	        raise AssertionError(f"CPython mismatches: {mismatches[:3]!r}")
+    44	
+    45	    source = Path("solution.py").read_text(encoding="utf-8")
+    46	    assertions = "\n".join(
+    47	        f"assert digitSum({sample!r}) == {ascii_contract_oracle(sample)}"
+    48	        for sample in samples
+    49	    )
+    50	
+    51	    with tempfile.TemporaryDirectory(prefix="digit-sum-diff-") as temp_dir:
+    52	        temp = Path(temp_dir)
+    53	        py_path = temp / "differential_smoke.py"
+    54	        mpy_path = temp / "differential_smoke.mpy"
+    55	        py_path.write_text(source + "\n\n" + assertions + "\n", encoding="utf-8")
+    56	
+    57	        with mpy_path.open("w", encoding="utf-8") as output:
+    58	            subprocess.run(
+    59	                ["python3", "py2mpy.py", str(py_path)],
+    60	                check=True,
+    61	                stdout=output,
+    62	            )
+    63	        result = subprocess.run(
+    64	            ["krun", str(mpy_path), "--definition", "runtime-kompiled"],
+    65	            stdout=subprocess.PIPE,
+    66	            stderr=subprocess.STDOUT,
+    67	            text=True,
+    68	        )
+    69	        if result.returncode != 0:
+    70	            raise AssertionError(
+    71	                f"krun exited {result.returncode}:\n{result.stdout[-4000:]}"
+    72	            )
+    73	        if "<k>\n    .K\n  </k>" not in result.stdout:
+    74	            raise AssertionError("krun did not terminate with an empty <k> cell")
+    75	
+    76	    print(
+    77	        f"cases={len(samples)} "
+    78	        "python_mismatches=0 "
+    79	        "krun_assertion_failures=0 "
+    80	        "krun_exit=0"
+    81	    )
+    82	
+    83	
+    84	if __name__ == "__main__":
+    85	    main()

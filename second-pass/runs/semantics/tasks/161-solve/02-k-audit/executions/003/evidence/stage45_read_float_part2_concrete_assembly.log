@@ -1,0 +1,190 @@
+WORKDIR: /tmp/audit-work/161-solve
+COMMAND: bash -lc printf\ \"=====\ float\ 241-273\ =====\\n\"\;\ nl\ -ba\ reference-semantics/semantics/float.k\ \|\ sed\ -n\ \"241\,320p\"\;\ for\ f\ in\ reference-semantics/semantics/concrete.k\ reference-semantics/semantics.k\;\ do\ printf\ \"=====\ %s\ =====\\n\"\ \"\$f\"\;\ nl\ -ba\ \"\$f\"\;\ done
+===== float 241-273 =====
+   241	  // #applyK, priority 40, in its verification.k) BEFORE #minAcc0, so this fold is krun-only. Additive:
+   242	  // the isFloat guard is disjoint from the existing isInt one.
+   243	  syntax KItem ::= #maxAccF(Iterable, Float) | #maxContF(Float)
+   244	  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAccF(R, {V}:>Float) ... </k> requires isFloat(V)
+   245	  rule <k> #maxAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #maxContF(M) ... </k>
+   246	  rule <k> #iterDone ~> #maxContF(M:Float) => M ... </k>
+   247	  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxContF(M:Float) => #maxAccF(R, maxFloat(M, {V}:>Float)) ... </k>
+   248	       requires isFloat(V)
+   249	
+   250	  syntax KItem ::= #minAccF(Iterable, Float) | #minContF(Float)
+   251	  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAccF(R, {V}:>Float) ... </k> requires isFloat(V)
+   252	  rule <k> #minAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #minContF(M) ... </k>
+   253	  rule <k> #iterDone ~> #minContF(M:Float) => M ... </k>
+   254	  rule <k> #iterYield(V:Val, R:Iterable) ~> #minContF(M:Float) => #minAccF(R, minFloat(M, {V}:>Float)) ... </k>
+   255	       requires isFloat(V)
+   256	
+   257	  // ---- sum over a float list (krun; mirrors the min/max float paths). The Int-only shared
+   258	  // #sumCont sticks on a Float yield; switch to a Float-headed fold via addF (concrete twin).
+   259	  // The switch guard carries the SYNTACTIC negation of the Int rule's guard so a symbolic proof
+   260	  // with isInt(V) in its path condition refutes this branch without sort reasoning.
+   261	  syntax KItem ::= #sumAccF(Iterable, Float) | #sumContF(Float)
+   262	  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int)
+   263	        => #sumAccF(R, addF(intToF(ACC), {V}:>Float)) ... </k>
+   264	       requires isFloat(V) andBool notBool (isInt(V) orBool isBool(V))
+   265	  rule <k> #sumAccF(IT:Iterable, ACC:Float) => #iterNext(IT) ~> #sumContF(ACC) ... </k>
+   266	  rule <k> #iterDone ~> #sumContF(ACC:Float) => ACC ... </k>
+   267	  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float)
+   268	        => #sumAccF(R, addF(ACC, {V}:>Float)) ... </k>
+   269	       requires isFloat(V)
+   270	  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float)
+   271	        => #sumAccF(R, addF(ACC, intToF(intOf(V)))) ... </k>
+   272	       requires isInt(V) orBool isBool(V)
+   273	endmodule
+===== reference-semantics/semantics/concrete.k =====
+     1	// reference/src/semantics/concrete.k — MPY-CONCRETE
+     2	// Concrete-execution-only rules, visible ONLY to the llvm build (run.sh kompiles
+     3	// MPY-CONCRETE; verification builds import MPY and never see these). Rationale:
+     4	// a k-cell rule matching value constructors NARROWS abstract Vals in the haskell
+     5	// backend ([concrete] is not respected on rewrite rules) — probed on
+     6	// 26-remove-duplicates, where element compares branched into deepEqVS.
+     7	
+     8	module MPY-CONCRETE
+     9	  imports MPY
+    10	
+    11	  // deep equality for list compares whose elements are heap objects
+    12	  // (list-of-lists): Python == is structural at every depth.
+    13	  rule <k> Compare(list(A:ValSeq), CmpOp("==", list(B:ValSeq))) => deepEqVS(A, B, HP) ... </k>
+    14	       <heap> HP:Map </heap>
+    15	       requires hasRefVS(A) orBool hasRefVS(B)
+    16	  rule <k> Compare(list(A:ValSeq), CmpOp("!=", list(B:ValSeq))) => notBool deepEqVS(A, B, HP) ... </k>
+    17	       <heap> HP:Map </heap>
+    18	       requires hasRefVS(A) orBool hasRefVS(B)
+    19	
+    20	  // ==== keyed sort, concrete leg ============================================
+    21	  // Computes each key by a REAL call through the uniform #callee machinery
+    22	  // (closures, len, type objects all work), stable-inserts on the key, and
+    23	  // allocates the result. priority(40) beats sort.k's opaque rules, so krun
+    24	  // runs this and proofs (which never see MPY-CONCRETE) keep sortKeyVS.
+    25	  syntax Val ::= kvP(Val, Val)
+    26	  syntax KItem ::= #ksort(ValSeq, Val, ValSeq, Bool)
+    27	                 | #ksIns(Val, ValSeq, Val, ValSeq, Bool)
+    28	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals))
+    29	        => #ksort(VS, KV, .ValSeq, false) ... </k>
+    30	       [priority(40)]
+    31	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals))
+    32	        => #ksort(VS, KV, .ValSeq, RB) ... </k>
+    33	       [priority(40)]
+    34	  rule <k> #ksort(.ValSeq, _:Val, ACC:ValSeq, RB:Bool)
+    35	        => #alloc(list(condRev(unpairVS(ACC), RB))) ... </k>
+    36	  rule <k> #ksort(vCons(V:Val, R:ValSeq), KV:Val, ACC:ValSeq, RB:Bool)
+    37	        => KV ~> #callee((V, .Exprs)) ~> #ksIns(V, R, KV, ACC, RB) ... </k>
+    38	  rule <k> K:Val ~> #ksIns(V:Val, R:ValSeq, KV:Val, ACC:ValSeq, RB:Bool)
+    39	        => #ksort(R, KV, insPair(ACC, K, V), RB) ... </k>
+    40	       requires notBool isKwV(K)
+    41	
+    42	  syntax ValSeq ::= insPair(ValSeq, Val, Val) [function]
+    43	  rule insPair(.ValSeq, K:Val, V:Val) => vCons(kvP(K, V), .ValSeq)
+    44	  rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val)
+    45	    => vCons(kvP(K, V), vCons(kvP(K2, V2), R))
+    46	       requires kLt(K, K2)
+    47	  rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val)
+    48	    => vCons(kvP(K2, V2), insPair(R, K, V))
+    49	       requires notBool kLt(K, K2)
+    50	
+    51	  syntax Bool ::= kLt(Val, Val) [function]
+    52	  rule kLt(I1:Int, I2:Int)             => I1 <Int I2
+    53	  rule kLt(F1:Float, F2:Float)         => F1 <Float F2
+    54	  rule kLt(str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+    55	
+    56	  syntax ValSeq ::= unpairVS(ValSeq) [function, total]
+    57	  rule unpairVS(.ValSeq) => .ValSeq
+    58	  rule unpairVS(vCons(kvP(_:Val, V:Val), R:ValSeq)) => vCons(V, unpairVS(R))
+    59	  rule unpairVS(vCons(V:Val, R:ValSeq)) => vCons(V, unpairVS(R)) [owise]
+    60	endmodule
+===== reference-semantics/semantics.k =====
+     1	// reference/src/semantics.k — the supplied `.mpy` semantics, ASSEMBLED.
+     2	//
+     3	//   kompile reference-semantics/semantics.k --backend llvm \
+     4	//     --main-module MPY-KRUN --syntax-module MPY-SYNTAX \
+     5	//     --output-definition runtime-kompiled
+     6	//
+     7	// Concrete-only legs are included through MPY-KRUN. Proof definitions import
+     8	// MPY and any explicit proof extensions supplied by the task author.
+     9	//
+    10	// Files (dependency order — everything imports MPY-CORE):
+    11	//   semantics/syntax.k         MPY-SYNTAX       AST productions
+    12	//   semantics/core.k           MPY-CORE         values, config, load, lookup, shared helpers   [required]
+    13	//   semantics/iter.k           MPY-ITER         the iterator protocol (#iterNext/#iterYield/#iterDone) decl
+    14	//   semantics/range.k          MPY-RANGE        rangeObj: inRange / rangeLen / its #iterNext
+    15	//   semantics/operators.k      MPY-OPERATORS    operator DISPATCH (UnaryOp/BinOp/Compare/BoolOp) — domain files own the cases
+    16	//   semantics/int.k            MPY-INT          Int operator cases; floored // and % (pyMod)
+    17	//   semantics/bool.k           MPY-BOOL         Bool operator cases + truthy not/and/or (BoolOp)
+    18	//   semantics/float.k          MPY-FLOAT        Float Val: literal + opaque float ops ([concrete] for krun)
+    19	//   semantics/str.k            MPY-STR          str(IntSeq): literal, +, ==, in
+    20	//   semantics/set.k            MPY-SET          set(str): distinct char codes (len / membership)
+    21	//   semantics/list.k           MPY-LIST         ListExpr, list(ValSeq): +, ==, in
+    22	//   semantics/tuple.k          MPY-TUPLE        TupleExpr, tuple ==, target-binding + unpacking
+    23	//   semantics/subscript.k      MPY-SUBSCRIPT    Subscript indexing + Slice
+    24	//   semantics/comprehension.k  MPY-COMPREHENSION  list comprehensions [ELT for T in ITER if COND]
+    25	//   semantics/methods.k        MPY-METHODS      pure str methods: is*/lower/upper/swapcase/startswith
+    26	//   semantics/controls.k       MPY-CONTROLS     Assign/AugAssign, If, IfExp, For, While, break/continue
+    27	//   semantics/functions.k      MPY-FUNCTIONS    def / call / return (frame stack)
+    28	//   semantics/builtins.k       MPY-BUILTINS     builtins as calls: len/sum/abs/min/max/ord/chr/str
+    29	//   semantics/call.k           MPY-CALL         ALL Call routing + argument evaluation
+    30	//   semantics/sort.k           MPY-SORT         trusted sorted(): opaque sortVS + concrete insertion sort
+    31	//   semantics/assert.k         MPY-ASSERT       Assert oracle (smoke programs only)
+    32	//   semantics/dict.k           MPY-DICT         order-preserving dictV(KS,VS) + .keys() + list()
+    33	
+    34	requires "semantics/syntax.k"
+    35	requires "semantics/core.k"
+    36	requires "semantics/iter.k"
+    37	requires "semantics/range.k"
+    38	requires "semantics/operators.k"
+    39	requires "semantics/int.k"
+    40	requires "semantics/bool.k"
+    41	requires "semantics/float.k"
+    42	requires "semantics/str.k"
+    43	requires "semantics/set.k"
+    44	requires "semantics/list.k"
+    45	requires "semantics/tuple.k"
+    46	requires "semantics/subscript.k"
+    47	requires "semantics/comprehension.k"
+    48	requires "semantics/methods.k"
+    49	requires "semantics/controls.k"
+    50	requires "semantics/functions.k"
+    51	requires "semantics/builtins.k"
+    52	requires "semantics/call.k"
+    53	requires "semantics/sort.k"
+    54	requires "semantics/assert.k"
+    55	requires "semantics/dict.k"
+    56	requires "semantics/concrete.k"
+    57	
+    58	module MPY
+    59	  imports MPY-CORE
+    60	  imports MPY-ITER
+    61	  imports MPY-RANGE
+    62	  imports MPY-OPERATORS
+    63	  imports MPY-INT
+    64	  imports MPY-BOOL
+    65	  imports MPY-FLOAT
+    66	  imports MPY-STR
+    67	  imports MPY-SET
+    68	  imports MPY-LIST
+    69	  imports MPY-TUPLE
+    70	  imports MPY-SUBSCRIPT
+    71	  imports MPY-COMPREHENSION
+    72	  imports MPY-METHODS
+    73	  imports MPY-CONTROLS
+    74	  imports MPY-FUNCTIONS
+    75	  imports MPY-BUILTINS
+    76	  imports MPY-CALL
+    77	  imports MPY-SORT
+    78	  imports MPY-ASSERT
+    79	  imports MPY-DICT
+    80	endmodule
+    81	
+    82	// The krun (llvm) main module: MPY plus the concrete-only legs (keyed sort's
+    83	// real key calls, deep list equality). Verification builds import MPY and
+    84	// never see MPY-CONCRETE. The llvm kompile MUST use --main-module MPY-KRUN —
+    85	// with plain MPY the concrete legs are silently absent (this was live for a
+    86	// while: sorted-key stuck and comprehension asserted wrong under krun).
+    87	module MPY-KRUN
+    88	  imports MPY
+    89	  imports MPY-CONCRETE
+    90	endmodule
+
+EXIT_STATUS: 0

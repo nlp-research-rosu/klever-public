@@ -1,0 +1,991 @@
+COMMAND: bash -c for\ f\ in\ /reference/prompt.py\ /reference/canonical.py\ /reference/py2mpy.py\ /candidate/solution.py\ /candidate/solution.mpy\ /candidate/spec.k\ /candidate/verification.k\ /candidate/operational-spec.k\ /candidate/mutation-spec.k\ /candidate/prove.sh\ /candidate/concrete_tests.py\ /candidate/concrete_tests.mpy\;\ do\ echo\ \"=====\ \$f\"\;\ nl\ -ba\ \"\$f\"\;\ done
+WORKDIR: /audit-output
+START_UTC: 2026-07-24T11:11:37Z
+===== /reference/prompt.py
+     1	
+     2	def compare(game,guess):
+     3	    """I think we all remember that feeling when the result of some long-awaited
+     4	    event is finally known. The feelings and thoughts you have at that moment are
+     5	    definitely worth noting down and comparing.
+     6	    Your task is to determine if a person correctly guessed the results of a number of matches.
+     7	    You are given two arrays of scores and guesses of equal length, where each index shows a match. 
+     8	    Return an array of the same length denoting how far off each guess was. If they have guessed correctly,
+     9	    the value is 0, and if not, the value is the absolute difference between the guess and the score.
+    10	    
+    11	    
+    12	    example:
+    13	
+    14	    compare([1,2,3,4,5,1],[1,2,3,4,2,-2]) -> [0,0,0,0,3,3]
+    15	    compare([0,5,0,0,0,4],[4,1,1,0,0,-2]) -> [4,4,1,0,0,6]
+    16	    """
+===== /reference/canonical.py
+     1	# canonical.py — the UNMODIFIED HumanEval/152 reference solution (from the dataset).
+     2	# Co-located with solution.py (the proof rewrite) to make the original<->rewrite link
+     3	# explicit & auditable.  entry point: compare
+     4	
+     5	
+     6	def compare(game,guess):
+     7	    """I think we all remember that feeling when the result of some long-awaited
+     8	    event is finally known. The feelings and thoughts you have at that moment are
+     9	    definitely worth noting down and comparing.
+    10	    Your task is to determine if a person correctly guessed the results of a number of matches.
+    11	    You are given two arrays of scores and guesses of equal length, where each index shows a match. 
+    12	    Return an array of the same length denoting how far off each guess was. If they have guessed correctly,
+    13	    the value is 0, and if not, the value is the absolute difference between the guess and the score.
+    14	    
+    15	    
+    16	    example:
+    17	
+    18	    compare([1,2,3,4,5,1],[1,2,3,4,2,-2]) -> [0,0,0,0,3,3]
+    19	    compare([0,5,0,0,0,4],[4,1,1,0,0,-2]) -> [4,4,1,0,0,6]
+    20	    """
+    21	    return [abs(x-y) for x,y in zip(game,guess)]
+===== /reference/py2mpy.py
+     1	#!/usr/bin/env python3
+     2	"""py2mpy — a *pure* CPython-AST -> K-constructor transliterator.
+     3	
+     4	Reads a .py file and prints the matching `.mpy` term: a Lisp-indented tree of K
+     5	constructors that a (future) K semantics will parse. The design rule is strict:
+     6	
+     7	    PURE TRANSLITERATION. Every Python AST node maps to exactly one K
+     8	    constructor with the same structure. The front-end makes NO semantic
+     9	    decisions — it does not desugar, simplify, normalize, or "interpret"
+    10	    anything. All meaning lives in the K semantics that consumes the term.
+    11	
+    12	Consequences of that rule (vs. a "helpful" front-end):
+    13	
+    14	  * `is` / `is not` transliterate to `CmpOp("is", ...)` / `CmpOp("is not", ...)`
+    15	    — NOT to `==` / `!=`. K decides what identity means.
+    16	  * a chained comparison `a < b < c` stays a single `Compare` carrying the
+    17	    chain (`Compare(a, CmpOp("<", b), CmpOp("<", c))`) — it is NOT pre-expanded
+    18	    into `a < b and b < c`.
+    19	  * a method call `x.append(v)` stays `Call(Attribute(Name("x"), "append"), v)`
+    20	    — there is no special `MethodCall` constructor folding the receiver in.
+    21	  * `a[i] = v` stays `Assign(Subscript(Name("a"), Name("i")), v)` — the target
+    22	    is just an expression in store position; no special `SubscriptAssign`.
+    23	
+    24	The only choices the transliterator makes are unavoidably *syntactic* — e.g. a
+    25	`bool` literal becomes `Bool(...)` not `Int(...)`, because that is the literal's
+    26	actual Python type as read off the AST, not a semantic judgement.
+    27	
+    28	Anything outside the covered subset raises `Unsupported`, naming the node, so
+    29	coverage gaps fail loudly instead of being silently dropped.
+    30	
+    31	Usage:
+    32	    python scripts/py2mpy.py FILE.py          # print the .mpy term (default)
+    33	    python scripts/py2mpy.py FILE.py --ast    # print the Python AST (ast.dump)
+    34	"""
+    35	from __future__ import annotations
+    36	
+    37	import argparse
+    38	import symtable
+    39	import ast
+    40	import json
+    41	import sys
+    42	
+    43	
+    44	class Unsupported(Exception):
+    45	    """Raised for any AST node the transliterator does not cover."""
+    46	
+    47	
+    48	# ---------------------------------------------------------------------------
+    49	# Term model: a .mpy term is a tree of these three node kinds.
+    50	#   Ctor(name, *args)  -> `name(arg, arg, ...)`  (comma-separated args)
+    51	#   Seq([item, ...])   -> a statement list: juxtaposed, no parens, no commas
+    52	#   str                -> a leaf token already in K surface form
+    53	#                         (a quoted string `"op"`, a number `0`, `true`, `Break`)
+    54	# ---------------------------------------------------------------------------
+    55	class Ctor:
+    56	    __slots__ = ("name", "args")
+    57	
+    58	    def __init__(self, name: str, *args):
+    59	        self.name = name
+    60	        self.args = list(args)
+    61	
+    62	
+    63	class Seq:
+    64	    __slots__ = ("items",)
+    65	
+    66	    def __init__(self, items):
+    67	        self.items = list(items)
+    68	
+    69	
+    70	def q(s: str) -> str:
+    71	    """A Python string as a K String token (double-quoted, escaped)."""
+    72	    return json.dumps(s)
+    73	
+    74	
+    75	# --- Operator spellings (string tokens carried inside constructors) ----------
+    76	# These are transliterations of the operator *symbol*, not its meaning.
+    77	_BINOP = {
+    78	    ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
+    79	    ast.FloorDiv: "//", ast.Mod: "%", ast.Pow: "**",
+    80	    ast.BitOr: "|", ast.BitAnd: "&", ast.BitXor: "^",
+    81	    ast.LShift: "<<", ast.RShift: ">>", ast.MatMult: "@",
+    82	}
+    83	_UNARY = {ast.USub: "-", ast.UAdd: "+", ast.Not: "not", ast.Invert: "~"}
+    84	_BOOLOP = {ast.And: "and", ast.Or: "or"}
+    85	_CMPOP = {
+    86	    ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
+    87	    ast.Gt: ">", ast.GtE: ">=", ast.Is: "is", ast.IsNot: "is not",
+    88	    ast.In: "in", ast.NotIn: "not in",
+    89	}
+    90	
+    91	
+    92	# ---------------------------------------------------------------------------
+    93	# Closure scopes (Python's own symtable, faithfully exposed)
+    94	# ---------------------------------------------------------------------------
+    95	# (name, lineno) -> (cellvars, freevars, nested). A def/lambda gets the
+    96	# ANNOTATED node form iff it is nested inside a function or has cells/frees;
+    97	# module-level capture-free defs keep the old shape (zero churn).
+    98	SCOPES: dict = {}
+    99	
+   100	
+   101	def _frees(table):
+   102	    return set(table.get_frees()) if isinstance(table, symtable.Function) else set()
+   103	
+   104	
+   105	def _deep_frees(table):
+   106	    out = _frees(table)
+   107	    for g in table.get_children():
+   108	        out |= _deep_frees(g) - set(table.get_locals())
+   109	    return out
+   110	
+   111	
+   112	def _walk_symtable(table, depth=0):
+   113	    for child in table.get_children():
+   114	        if child.get_type() in ("function", "lambda"):
+   115	            frees = sorted(_frees(child))
+   116	            cells = sorted(
+   117	                s for s in child.get_locals()
+   118	                if any(s in _deep_frees(g) for g in child.get_children())
+   119	            )
+   120	            SCOPES[(child.get_name(), child.get_lineno())] = (
+   121	                cells, frees, depth > 0 or table.get_type() != "module")
+   122	        _walk_symtable(child, depth + (1 if child.get_type() in ("function", "lambda") else 0))
+   123	
+   124	
+   125	def scope_info(name, lineno):
+   126	    return SCOPES.get((name, lineno))
+   127	
+   128	
+   129	# ---------------------------------------------------------------------------
+   130	# Expressions
+   131	# ---------------------------------------------------------------------------
+   132	def emit_expr(node: ast.expr):
+   133	    if isinstance(node, ast.Constant):
+   134	        v = node.value
+   135	        if v is None:
+   136	            return "NoneVal"
+   137	        if isinstance(v, bool):                 # MUST precede int (bool ⊂ int)
+   138	            return Ctor("Bool", "true" if v else "false")
+   139	        if isinstance(v, int):
+   140	            return Ctor("Int", str(v))
+   141	        if isinstance(v, float):
+   142	            return Ctor("Float", repr(v))
+   143	        if isinstance(v, str):
+   144	            return Ctor("Str", q(v))
+   145	        raise Unsupported(f"Constant {type(v).__name__}")
+   146	
+   147	    if isinstance(node, ast.Name):
+   148	        return Ctor("Name", q(node.id))
+   149	
+   150	    if isinstance(node, ast.Lambda):
+   151	        a = node.args
+   152	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   153	            raise Unsupported("complex lambda signature")
+   154	        names = [p.arg for p in (a.posonlyargs + a.args)]
+   155	        params = Ctor("Params", *(q(n) for n in names))
+   156	        info = scope_info("lambda", node.lineno)
+   157	        if info and (info[0] or info[1] or info[2]):
+   158	            cells, frees, _ = info
+   159	            return Ctor("Lambda", params,
+   160	                        Ctor("CellVars", *(q(n) for n in cells)),
+   161	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   162	                        emit_expr(node.body))
+   163	        return Ctor("Lambda", params, emit_expr(node.body))
+   164	
+   165	    if isinstance(node, ast.BinOp):
+   166	        op = _BINOP.get(type(node.op))
+   167	        if op is None:
+   168	            raise Unsupported(f"BinOp {type(node.op).__name__}")
+   169	        return Ctor("BinOp", q(op), emit_expr(node.left), emit_expr(node.right))
+   170	
+   171	    if isinstance(node, ast.UnaryOp):
+   172	        op = _UNARY.get(type(node.op))
+   173	        if op is None:
+   174	            raise Unsupported(f"UnaryOp {type(node.op).__name__}")
+   175	        return Ctor("UnaryOp", q(op), emit_expr(node.operand))
+   176	
+   177	    if isinstance(node, ast.BoolOp):
+   178	        op = _BOOLOP[type(node.op)]
+   179	        return Ctor("BoolOp", q(op), *(emit_expr(v) for v in node.values))
+   180	
+   181	    if isinstance(node, ast.Compare):
+   182	        # Faithful, non-desugared: left operand + a chain of (op, comparator).
+   183	        # Single comparison => one CmpOp; `a < b < c` => two CmpOps.
+   184	        chain = [
+   185	            Ctor("CmpOp", q(_op_or_raise(_CMPOP, op, "Compare")), emit_expr(c))
+   186	            for op, c in zip(node.ops, node.comparators)
+   187	        ]
+   188	        return Ctor("Compare", emit_expr(node.left), *chain)
+   189	
+   190	    if isinstance(node, ast.List):
+   191	        return Ctor("ListExpr", *(emit_expr(e) for e in node.elts))
+   192	
+   193	    if isinstance(node, ast.Tuple):
+   194	        return Ctor("TupleExpr", *(emit_expr(e) for e in node.elts))
+   195	
+   196	    if isinstance(node, ast.Set):
+   197	        return Ctor("SetExpr", *(emit_expr(e) for e in node.elts))
+   198	
+   199	    if isinstance(node, ast.Dict):
+   200	        entries = []
+   201	        for k, v in zip(node.keys, node.values):
+   202	            if k is None:
+   203	                raise Unsupported("dict unpacking {**x}")
+   204	            entries.append(Ctor("Entry", emit_expr(k), emit_expr(v)))
+   205	        return Ctor("DictExpr", *entries)
+   206	
+   207	    if isinstance(node, ast.Subscript):
+   208	        return Ctor("Subscript", emit_expr(node.value), emit_index(node.slice))
+   209	
+   210	    if isinstance(node, ast.Attribute):
+   211	        return Ctor("Attribute", emit_expr(node.value), q(node.attr))
+   212	
+   213	    if isinstance(node, ast.Call):
+   214	        if any(isinstance(a, ast.Starred) for a in node.args):
+   215	            raise Unsupported("*args unpacking")
+   216	        if any(kw.arg is None for kw in node.keywords):
+   217	            raise Unsupported("**kwargs unpacking")
+   218	        # Call grammar is `Call(Expr, Exprs)` — the comma is mandatory, so a zero-arg
+   219	        # call must render as `Call(f, )` (empty Exprs), NOT `Call(f)` (which won't parse).
+   220	        args = [emit_expr(a) for a in node.args]
+   221	        args += [Ctor("KwArg", q(kw.arg), emit_expr(kw.value)) for kw in node.keywords]
+   222	        args = args or [""]
+   223	        return Ctor("Call", emit_expr(node.func), *args)
+   224	
+   225	    if isinstance(node, ast.IfExp):
+   226	        # AST field order: test, body, orelse — kept verbatim.
+   227	        return Ctor("IfExp", emit_expr(node.test),
+   228	                    emit_expr(node.body), emit_expr(node.orelse))
+   229	
+   230	    if isinstance(node, ast.ListComp):
+   231	        return Ctor("ListComp", emit_expr(node.elt), _gens(node.generators))
+   232	    if isinstance(node, ast.SetComp):
+   233	        return Ctor("SetComp", emit_expr(node.elt), _gens(node.generators))
+   234	    if isinstance(node, ast.GeneratorExp):
+   235	        return Ctor("GenExp", emit_expr(node.elt), _gens(node.generators))
+   236	    if isinstance(node, ast.DictComp):
+   237	        return Ctor("DictComp", emit_expr(node.key), emit_expr(node.value),
+   238	                    _gens(node.generators))
+   239	
+   240	    raise Unsupported(f"Expr {type(node).__name__}")
+   241	
+   242	
+   243	def _op_or_raise(table, op, label):
+   244	    spelled = table.get(type(op))
+   245	    if spelled is None:
+   246	        raise Unsupported(f"{label} {type(op).__name__}")
+   247	    return spelled
+   248	
+   249	
+   250	def _compfor(g):
+   251	    """A single generator -> CompFor(target, iter, <ifs as Exprs; .Exprs if none>)."""
+   252	    if getattr(g, "is_async", 0):
+   253	        raise Unsupported("async comprehension")
+   254	    ifs = [emit_expr(c) for c in g.ifs] or [Ctor("Bool", "true")]
+   255	    return Ctor("CompFor", emit_expr(g.target), emit_expr(g.iter), *ifs)
+   256	
+   257	
+   258	def _gens(generators):
+   259	    """The generator list -> a juxtaposed CompFors (a Seq of CompFor)."""
+   260	    return Seq([_compfor(g) for g in generators])
+   261	
+   262	
+   263	def emit_index(node: ast.expr):
+   264	    """Subscript index position: an `ast.Slice` -> `Slice(...)`, else the expr."""
+   265	    # Python <3.9 wrapped the index in ast.Index; unwrap if present.
+   266	    inner = getattr(ast, "Index", None)
+   267	    if inner is not None and isinstance(node, inner):
+   268	        node = node.value
+   269	    if isinstance(node, ast.Slice):
+   270	        def bound(b):
+   271	            # omitted bound (absent field) OR an explicit None constant -> NoBound.
+   272	            # Python treats `a[None:5]` exactly like `a[:5]`; only a *value* None
+   273	            # (Constant(None) outside a slice) becomes NoneVal. Keeping the two
+   274	            # distinct lets NoneVal be a real value without perturbing slices.
+   275	            if b is None or (isinstance(b, ast.Constant) and b.value is None):
+   276	                return "NoBound"
+   277	            return emit_expr(b)
+   278	        return Ctor("Slice", bound(node.lower), bound(node.upper), bound(node.step))
+   279	    return emit_expr(node)
+   280	
+   281	
+   282	# ---------------------------------------------------------------------------
+   283	# Statements
+   284	# ---------------------------------------------------------------------------
+   285	def emit_stmt(node: ast.stmt):
+   286	    if isinstance(node, ast.FunctionDef):
+   287	        a = node.args
+   288	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   289	            raise Unsupported("complex function signature (defaults/varargs/kwonly)")
+   290	        if node.decorator_list:
+   291	            raise Unsupported("decorators")
+   292	        names = [p.arg for p in (a.posonlyargs + a.args)]  # type annotations ignored
+   293	        params = Ctor("Params", *(q(n) for n in names))
+   294	        info = scope_info(node.name, node.lineno)
+   295	        if info and (info[0] or info[1] or info[2]):
+   296	            cells, frees, _ = info
+   297	            return Ctor("FuncDef", q(node.name), params,
+   298	                        Ctor("CellVars", *(q(n) for n in cells)),
+   299	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   300	                        emit_stmts(node.body))
+   301	        return Ctor("FuncDef", q(node.name), params, emit_stmts(node.body))
+   302	
+   303	    if isinstance(node, ast.Return):
+   304	        if node.value is None:
+   305	            return Ctor("Return")
+   306	        return Ctor("Return", emit_expr(node.value))
+   307	
+   308	    if isinstance(node, ast.Assign):
+   309	        if len(node.targets) != 1:
+   310	            raise Unsupported("chained assignment (a = b = ...)")
+   311	        # Target is just an expression in store position (Name / Tuple / Subscript / Attribute).
+   312	        return Ctor("Assign", emit_expr(node.targets[0]), emit_expr(node.value))
+   313	
+   314	    if isinstance(node, ast.AugAssign):
+   315	        op = _BINOP.get(type(node.op))
+   316	        if op is None:
+   317	            raise Unsupported(f"AugAssign {type(node.op).__name__}")
+   318	        return Ctor("AugAssign", emit_expr(node.target), q(op), emit_expr(node.value))
+   319	
+   320	    if isinstance(node, ast.If):
+   321	        return Ctor("If", emit_expr(node.test),
+   322	                    emit_stmts(node.body), emit_stmts(node.orelse))
+   323	
+   324	    if isinstance(node, ast.For):
+   325	        if node.orelse:
+   326	            raise Unsupported("for-else")
+   327	        return Ctor("For", emit_expr(node.target), emit_expr(node.iter),
+   328	                    emit_stmts(node.body))
+   329	
+   330	    if isinstance(node, ast.While):
+   331	        if node.orelse:
+   332	            raise Unsupported("while-else")
+   333	        return Ctor("While", emit_expr(node.test), emit_stmts(node.body))
+   334	
+   335	    if isinstance(node, ast.Break):
+   336	        return "Break"
+   337	    if isinstance(node, ast.Continue):
+   338	        return "Continue"
+   339	    if isinstance(node, ast.Pass):
+   340	        return "Pass"
+   341	
+   342	    if isinstance(node, ast.Assert):
+   343	        if node.msg is not None:
+   344	            return Ctor("Assert", emit_expr(node.test), emit_expr(node.msg))
+   345	        return Ctor("Assert", emit_expr(node.test))
+   346	
+   347	    if isinstance(node, ast.Expr):
+   348	        return Ctor("Expr", emit_expr(node.value))
+   349	
+   350	    if isinstance(node, ast.Import):
+   351	        return Ctor("Import", *(q(n.name) for n in node.names))
+   352	    if isinstance(node, ast.ImportFrom):
+   353	        mod = node.module if node.module is not None else ""
+   354	        return Ctor("ImportFrom", q(mod), *(q(n.name) for n in node.names))
+   355	
+   356	    raise Unsupported(f"Stmt {type(node).__name__}")
+   357	
+   358	
+   359	def emit_stmts(stmts) -> Seq:
+   360	    return Seq([emit_stmt(s) for s in stmts])
+   361	
+   362	
+   363	def emit_module(tree: ast.Module) -> Ctor:
+   364	    return Ctor("Module", emit_stmts(tree.body))
+   365	
+   366	
+   367	# ---------------------------------------------------------------------------
+   368	# Lisp-style pretty printer
+   369	# ---------------------------------------------------------------------------
+   370	WIDTH = 72  # an expression constructor wider than this breaks onto its own lines
+   371	
+   372	
+   373	def render(node, ind: int = 0) -> str:
+   374	    if isinstance(node, str):
+   375	        return node
+   376	
+   377	    if isinstance(node, Seq):
+   378	        if not node.items:
+   379	            return ""
+   380	        pad = "  " * ind
+   381	        return ("\n" + pad).join(render(it, ind) for it in node.items)
+   382	
+   383	    # Ctor
+   384	    cind = ind + 1
+   385	    cpad = "  " * cind
+   386	    has_block = any(isinstance(a, Seq) for a in node.args)
+   387	
+   388	    if not has_block:
+   389	        inline = node.name + "(" + ", ".join(render(a, ind) for a in node.args) + ")"
+   390	        if "\n" not in inline and len("  " * ind) + len(inline) <= WIDTH:
+   391	            return inline
+   392	        parts = [render(a, cind) for a in node.args]
+   393	        return node.name + "(\n" + cpad + (",\n" + cpad).join(parts) + ")"
+   394	
+   395	    # Has a statement block: inline the args before the first block, then put
+   396	    # each remaining arg (blocks included) on its own indented line.
+   397	    first = next(i for i, a in enumerate(node.args) if isinstance(a, Seq))
+   398	    head = node.args[:first]
+   399	    rest = node.args[first:]
+   400	    open_line = node.name + "(" + ", ".join(render(a, ind) for a in head) + ("," if head else "")
+   401	    lines = []
+   402	    for k, a in enumerate(rest):
+   403	        comma = "," if k < len(rest) - 1 else ""
+   404	        lines.append(cpad + render(a, cind) + comma)
+   405	    return open_line + "\n" + "\n".join(lines) + ")"
+   406	
+   407	
+   408	# ---------------------------------------------------------------------------
+   409	# CLI
+   410	# ---------------------------------------------------------------------------
+   411	def main(argv=None) -> int:
+   412	    ap = argparse.ArgumentParser(
+   413	        prog="py2mpy",
+   414	        description="Pure CPython-AST -> K-constructor transliterator.",
+   415	    )
+   416	    ap.add_argument("file", help="Python source file")
+   417	    ap.add_argument("--ast", action="store_true",
+   418	                    help="print the Python AST (ast.dump) instead of the .mpy term")
+   419	    args = ap.parse_args(argv)
+   420	
+   421	    with open(args.file, "r", encoding="utf-8") as fh:
+   422	        src = fh.read()
+   423	    tree = ast.parse(src, filename=args.file)
+   424	    _walk_symtable(symtable.symtable(src, args.file, "exec"))
+   425	
+   426	    if args.ast:
+   427	        print(ast.dump(tree, indent=2))
+   428	    else:
+   429	        print(render(emit_module(tree)))
+   430	    return 0
+   431	
+   432	
+   433	if __name__ == "__main__":
+   434	    sys.exit(main())
+===== /candidate/solution.py
+     1	def compare(game, guess):
+     2	    """Return the absolute error for each corresponding score and guess."""
+     3	    result = []
+     4	    for score, prediction in zip(game, guess):
+     5	        result.append(abs(score - prediction))
+     6	    return result
+===== /candidate/solution.mpy
+     1	Module(
+     2	  FuncDef("compare", Params("game", "guess"),
+     3	    Expr(
+     4	      Str(
+     5	        "Return the absolute error for each corresponding score and guess."))
+     6	    Assign(Name("result"), ListExpr())
+     7	    For(TupleExpr(Name("score"), Name("prediction")), Call(Name("zip"), Name("game"), Name("guess")),
+     8	      Expr(
+     9	        Call(
+    10	          Attribute(Name("result"), "append"),
+    11	          Call(
+    12	            Name("abs"),
+    13	            BinOp("-", Name("score"), Name("prediction"))))))
+    14	    Return(Name("result"))))
+===== /candidate/spec.k
+     1	requires "verification.k"
+     2	
+     3	module COMPARE-SPEC
+     4	  imports COMPARE-VERIFICATION
+     5	
+     6	  // Universal functional-correctness theorem.  GAME and GUESS range over
+     7	  // arbitrary finite integer sequences.  Since absDiffs follows zip, this
+     8	  // proves the required equal-length case and the stronger truncating case.
+     9	  claim
+    10	    <k>
+    11	      compareDef
+    12	      ~> Call(
+    13	           Name("compare"),
+    14	           list(intVals(GAME:IntSeq)),
+    15	           list(intVals(GUESS:IntSeq)))
+    16	      => ref(0)
+    17	    </k>
+    18	    <env> 0 </env>
+    19	    <scopes>
+    20	      0  |-> scope(.Map, parent(-1))
+    21	      -1 |-> builtinsScope
+    22	      =>
+    23	      0  |-> scope(
+    24	               "compare" |-> closureVal(
+    25	                 ("game", "guess"),
+    26	                 compareBody,
+    27	                 0),
+    28	               parent(-1))
+    29	      -1 |-> builtinsScope
+    30	    </scopes>
+    31	    <scopeLoc> 1 </scopeLoc>
+    32	    <heap>
+    33	      .Map
+    34	      =>
+    35	      0 |-> list(absDiffs(intVals(GAME), intVals(GUESS)))
+    36	    </heap>
+    37	    <heapLoc> 0 => 1 </heapLoc>
+    38	    <stack> .List </stack>
+    39	    <ret> noRet </ret>
+    40	    <exc> NoExc </exc>
+    41	
+    42	  // The two examples in prompt.py are also closed as concrete proof claims.
+    43	  claim
+    44	    <k>
+    45	      compareDef
+    46	      ~> Call(
+    47	           Name("compare"),
+    48	           list(vCons(1, vCons(2, vCons(3, vCons(4, vCons(5, vCons(1, .ValSeq))))))),
+    49	           list(vCons(1, vCons(2, vCons(3, vCons(4, vCons(2, vCons(-2, .ValSeq))))))))
+    50	      => ref(0)
+    51	    </k>
+    52	    <env> 0 </env>
+    53	    <scopes>
+    54	      0  |-> scope(.Map, parent(-1))
+    55	      -1 |-> builtinsScope
+    56	      =>
+    57	      0  |-> scope(
+    58	               "compare" |-> closureVal(
+    59	                 ("game", "guess"),
+    60	                 compareBody,
+    61	                 0),
+    62	               parent(-1))
+    63	      -1 |-> builtinsScope
+    64	    </scopes>
+    65	    <scopeLoc> 1 </scopeLoc>
+    66	    <heap>
+    67	      .Map
+    68	      =>
+    69	      0 |-> list(vCons(0, vCons(0, vCons(0, vCons(0, vCons(3, vCons(3, .ValSeq)))))))
+    70	    </heap>
+    71	    <heapLoc> 0 => 1 </heapLoc>
+    72	    <stack> .List </stack>
+    73	    <ret> noRet </ret>
+    74	    <exc> NoExc </exc>
+    75	
+    76	  claim
+    77	    <k>
+    78	      compareDef
+    79	      ~> Call(
+    80	           Name("compare"),
+    81	           list(vCons(0, vCons(5, vCons(0, vCons(0, vCons(0, vCons(4, .ValSeq))))))),
+    82	           list(vCons(4, vCons(1, vCons(1, vCons(0, vCons(0, vCons(-2, .ValSeq))))))))
+    83	      => ref(0)
+    84	    </k>
+    85	    <env> 0 </env>
+    86	    <scopes>
+    87	      0  |-> scope(.Map, parent(-1))
+    88	      -1 |-> builtinsScope
+    89	      =>
+    90	      0  |-> scope(
+    91	               "compare" |-> closureVal(
+    92	                 ("game", "guess"),
+    93	                 compareBody,
+    94	                 0),
+    95	               parent(-1))
+    96	      -1 |-> builtinsScope
+    97	    </scopes>
+    98	    <scopeLoc> 1 </scopeLoc>
+    99	    <heap>
+   100	      .Map
+   101	      =>
+   102	      0 |-> list(vCons(4, vCons(4, vCons(1, vCons(0, vCons(0, vCons(6, .ValSeq)))))))
+   103	    </heap>
+   104	    <heapLoc> 0 => 1 </heapLoc>
+   105	    <stack> .List </stack>
+   106	    <ret> noRet </ret>
+   107	    <exc> NoExc </exc>
+   108	endmodule
+===== /candidate/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module COMPARE-COMMON
+     4	  imports MPY
+     5	
+     6	  // Integer-valued Python lists, represented with the semantics' algebraic
+     7	  // IntSeq so the theorem quantifies over lists of arbitrary finite length.
+     8	  syntax ValSeq ::= intVals(IntSeq) [function, total]
+     9	  rule intVals(.IntSeq)                => .ValSeq
+    10	  rule intVals(iCons(I:Int, R:IntSeq)) => vCons(I, intVals(R))
+    11	
+    12	  // Mathematical result of zip(game, guess), including zip's truncation
+    13	  // behavior.  Equal-length inputs from the HumanEval contract are a subset.
+    14	  syntax ValSeq ::= absDiffs(ValSeq, ValSeq) [function]
+    15	  rule absDiffs(.ValSeq, _:ValSeq) => .ValSeq
+    16	  rule absDiffs(vCons(_:Int, _:ValSeq), .ValSeq) => .ValSeq
+    17	  rule absDiffs(vCons(A:Int, AS:ValSeq), vCons(B:Int, BS:ValSeq))
+    18	    => vCons(absInt(A -Int B), absDiffs(AS, BS))
+    19	
+    20	  // These macros are the exact AST emitted in solution.mpy.
+    21	  syntax Stmts ::= "appendBody" [macro]
+    22	  rule appendBody
+    23	    => Expr(
+    24	         Call(
+    25	           Attribute(Name("result"), "append"),
+    26	           Call(Name("abs"), BinOp("-", Name("score"), Name("prediction")))))
+    27	
+    28	  syntax Stmts ::= "compareBody" [macro]
+    29	  rule compareBody
+    30	    => Expr(Str("Return the absolute error for each corresponding score and guess."))
+    31	       Assign(Name("result"), ListExpr(.Exprs))
+    32	       For(
+    33	         TupleExpr(Name("score"), Name("prediction")),
+    34	         Call(Name("zip"), Name("game"), Name("guess")),
+    35	         appendBody)
+    36	       Return(Name("result"))
+    37	
+    38	  syntax Stmt ::= "compareDef" [macro]
+    39	  rule compareDef
+    40	    => FuncDef("compare", Params("game", "guess"), compareBody)
+    41	endmodule
+    42	
+    43	module COMPARE-VERIFICATION
+    44	  imports COMPARE-COMMON
+    45	
+    46	  // Inductive loop summary used only by the symbolic definition.  Reaching
+    47	  // this redex requires the real translated function to have evaluated zip,
+    48	  // allocated result, and installed its exact append/abs/subtract loop body.
+    49	  // The rule appends precisely the mathematical result of the residual zip.
+    50	  rule <k>
+    51	         #loop(
+    52	           zipObj(GAME:ValSeq, GUESS:ValSeq),
+    53	           TupleExpr(Name("score"), Name("prediction")),
+    54	           appendBody)
+    55	         => .K
+    56	         ...
+    57	       </k>
+    58	       <env> L:Int </env>
+    59	       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+    60	       <heap>
+    61	         ... H:Int |-> list(
+    62	              ACC:ValSeq
+    63	              => valSeqConcat(ACC, absDiffs(GAME, GUESS))) ...
+    64	       </heap>
+    65	       requires "result" in_keys(M)
+    66	        andBool {M["result"]}:>Val ==K ref(H)
+    67	       [priority(40)]
+    68	endmodule
+===== /candidate/operational-spec.k
+     1	requires "verification.k"
+     2	
+     3	module COMPARE-OPERATIONAL-SPEC
+     4	  imports COMPARE-COMMON
+     5	
+     6	  // These claims deliberately import COMPARE-COMMON instead of
+     7	  // COMPARE-VERIFICATION, so the concrete lists execute through every raw
+     8	  // #loop/#iterNext, tuple bind, subtraction, abs, and append rule.
+     9	  claim
+    10	    <k>
+    11	      compareDef
+    12	      ~> Call(
+    13	           Name("compare"),
+    14	           list(vCons(1, vCons(2, vCons(3, vCons(4, vCons(5, vCons(1, .ValSeq))))))),
+    15	           list(vCons(1, vCons(2, vCons(3, vCons(4, vCons(2, vCons(-2, .ValSeq))))))))
+    16	      => ref(0)
+    17	    </k>
+    18	    <env> 0 </env>
+    19	    <scopes>
+    20	      0  |-> scope(.Map, parent(-1))
+    21	      -1 |-> builtinsScope
+    22	      =>
+    23	      0  |-> scope(
+    24	               "compare" |-> closureVal(
+    25	                 ("game", "guess"),
+    26	                 compareBody,
+    27	                 0),
+    28	               parent(-1))
+    29	      -1 |-> builtinsScope
+    30	    </scopes>
+    31	    <scopeLoc> 1 </scopeLoc>
+    32	    <heap>
+    33	      .Map
+    34	      =>
+    35	      0 |-> list(vCons(0, vCons(0, vCons(0, vCons(0, vCons(3, vCons(3, .ValSeq)))))))
+    36	    </heap>
+    37	    <heapLoc> 0 => 1 </heapLoc>
+    38	    <stack> .List </stack>
+    39	    <ret> noRet </ret>
+    40	    <exc> NoExc </exc>
+    41	
+    42	  claim
+    43	    <k>
+    44	      compareDef
+    45	      ~> Call(
+    46	           Name("compare"),
+    47	           list(vCons(0, vCons(5, vCons(0, vCons(0, vCons(0, vCons(4, .ValSeq))))))),
+    48	           list(vCons(4, vCons(1, vCons(1, vCons(0, vCons(0, vCons(-2, .ValSeq))))))))
+    49	      => ref(0)
+    50	    </k>
+    51	    <env> 0 </env>
+    52	    <scopes>
+    53	      0  |-> scope(.Map, parent(-1))
+    54	      -1 |-> builtinsScope
+    55	      =>
+    56	      0  |-> scope(
+    57	               "compare" |-> closureVal(
+    58	                 ("game", "guess"),
+    59	                 compareBody,
+    60	                 0),
+    61	               parent(-1))
+    62	      -1 |-> builtinsScope
+    63	    </scopes>
+    64	    <scopeLoc> 1 </scopeLoc>
+    65	    <heap>
+    66	      .Map
+    67	      =>
+    68	      0 |-> list(vCons(4, vCons(4, vCons(1, vCons(0, vCons(0, vCons(6, .ValSeq)))))))
+    69	    </heap>
+    70	    <heapLoc> 0 => 1 </heapLoc>
+    71	    <stack> .List </stack>
+    72	    <ret> noRet </ret>
+    73	    <exc> NoExc </exc>
+    74	
+    75	  claim
+    76	    <k>
+    77	      compareDef
+    78	      ~> Call(Name("compare"), list(.ValSeq), list(.ValSeq))
+    79	      => ref(0)
+    80	    </k>
+    81	    <env> 0 </env>
+    82	    <scopes>
+    83	      0  |-> scope(.Map, parent(-1))
+    84	      -1 |-> builtinsScope
+    85	      =>
+    86	      0  |-> scope(
+    87	               "compare" |-> closureVal(
+    88	                 ("game", "guess"),
+    89	                 compareBody,
+    90	                 0),
+    91	               parent(-1))
+    92	      -1 |-> builtinsScope
+    93	    </scopes>
+    94	    <scopeLoc> 1 </scopeLoc>
+    95	    <heap> .Map => 0 |-> list(.ValSeq) </heap>
+    96	    <heapLoc> 0 => 1 </heapLoc>
+    97	    <stack> .List </stack>
+    98	    <ret> noRet </ret>
+    99	    <exc> NoExc </exc>
+   100	
+   101	  claim
+   102	    <k>
+   103	      compareDef
+   104	      ~> Call(
+   105	           Name("compare"),
+   106	           list(vCons(-7, vCons(9, .ValSeq))),
+   107	           list(vCons(5, vCons(-4, .ValSeq))))
+   108	      => ref(0)
+   109	    </k>
+   110	    <env> 0 </env>
+   111	    <scopes>
+   112	      0  |-> scope(.Map, parent(-1))
+   113	      -1 |-> builtinsScope
+   114	      =>
+   115	      0  |-> scope(
+   116	               "compare" |-> closureVal(
+   117	                 ("game", "guess"),
+   118	                 compareBody,
+   119	                 0),
+   120	               parent(-1))
+   121	      -1 |-> builtinsScope
+   122	    </scopes>
+   123	    <scopeLoc> 1 </scopeLoc>
+   124	    <heap>
+   125	      .Map
+   126	      =>
+   127	      0 |-> list(vCons(12, vCons(13, .ValSeq)))
+   128	    </heap>
+   129	    <heapLoc> 0 => 1 </heapLoc>
+   130	    <stack> .List </stack>
+   131	    <ret> noRet </ret>
+   132	    <exc> NoExc </exc>
+   133	endmodule
+===== /candidate/mutation-spec.k
+     1	requires "verification.k"
+     2	
+     3	module COMPARE-MUTATION-SPEC
+     4	  imports COMPARE-VERIFICATION
+     5	
+     6	  // This is intentionally false: the addition mutant returns [3], not [1].
+     7	  claim
+     8	    <k>
+     9	      FuncDef(
+    10	        "compare",
+    11	        Params("game", "guess"),
+    12	        Expr(Str("Return the absolute error for each corresponding score and guess."))
+    13	        Assign(Name("result"), ListExpr(.Exprs))
+    14	        For(
+    15	          TupleExpr(Name("score"), Name("prediction")),
+    16	          Call(Name("zip"), Name("game"), Name("guess")),
+    17	          Expr(
+    18	            Call(
+    19	              Attribute(Name("result"), "append"),
+    20	              Call(
+    21	                Name("abs"),
+    22	                BinOp("+", Name("score"), Name("prediction"))))))
+    23	        Return(Name("result")))
+    24	      ~> Call(
+    25	           Name("compare"),
+    26	           list(vCons(1, .ValSeq)),
+    27	           list(vCons(2, .ValSeq)))
+    28	      => ref(0)
+    29	    </k>
+    30	    <env> 0 </env>
+    31	    <scopes>
+    32	      0  |-> scope(.Map, parent(-1))
+    33	      -1 |-> builtinsScope
+    34	      =>
+    35	      0  |-> scope(
+    36	               "compare" |-> closureVal(
+    37	                 ("game", "guess"),
+    38	                 Expr(Str("Return the absolute error for each corresponding score and guess."))
+    39	                 Assign(Name("result"), ListExpr(.Exprs))
+    40	                 For(
+    41	                   TupleExpr(Name("score"), Name("prediction")),
+    42	                   Call(Name("zip"), Name("game"), Name("guess")),
+    43	                   Expr(
+    44	                     Call(
+    45	                       Attribute(Name("result"), "append"),
+    46	                       Call(
+    47	                         Name("abs"),
+    48	                         BinOp("+", Name("score"), Name("prediction"))))))
+    49	                 Return(Name("result")),
+    50	                 0),
+    51	               parent(-1))
+    52	      -1 |-> builtinsScope
+    53	    </scopes>
+    54	    <scopeLoc> 1 </scopeLoc>
+    55	    <heap> .Map => 0 |-> list(vCons(1, .ValSeq)) </heap>
+    56	    <heapLoc> 0 => 1 </heapLoc>
+    57	    <stack> .List </stack>
+    58	    <ret> noRet </ret>
+    59	    <exc> NoExc </exc>
+    60	endmodule
+===== /candidate/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	cd "$(dirname "$0")"
+     5	
+     6	# Recreate both translated programs from their Python sources.
+     7	python3 py2mpy.py solution.py > solution.mpy
+     8	python3 py2mpy.py concrete_tests.py > concrete_tests.mpy
+     9	
+    10	# Required concrete LLVM definition and end-to-end executions.
+    11	kompile reference-semantics/semantics.k \
+    12	  --backend llvm \
+    13	  --main-module MPY-KRUN \
+    14	  --syntax-module MPY-SYNTAX \
+    15	  --output-definition runtime-kompiled
+    16	krun concrete_tests.mpy --definition runtime-kompiled
+    17	
+    18	# Universal proof (the first claim in spec.k) plus the prompt-example claims.
+    19	kompile verification.k \
+    20	  --backend haskell \
+    21	  --main-module COMPARE-VERIFICATION \
+    22	  --syntax-module MPY-SYNTAX \
+    23	  --output-definition verification-kompiled
+    24	kprove spec.k \
+    25	  --definition verification-kompiled \
+    26	  --spec-module COMPARE-SPEC
+    27	
+    28	# Independent raw-semantics proofs: COMPARE-COMMON excludes the symbolic loop
+    29	# summary, so all four finite cases traverse the actual iterator and loop.
+    30	kompile verification.k \
+    31	  --backend haskell \
+    32	  --main-module COMPARE-COMMON \
+    33	  --syntax-module MPY-SYNTAX \
+    34	  --output-definition operational-kompiled
+    35	kprove operational-spec.k \
+    36	  --definition operational-kompiled \
+    37	  --spec-module COMPARE-OPERATIONAL-SPEC
+    38	
+    39	# Negative validation: changing subtraction to addition must not prove.
+    40	mutation_log="$(mktemp)"
+    41	trap 'rm -f "$mutation_log"' EXIT
+    42	if kprove mutation-spec.k \
+    43	    --definition verification-kompiled \
+    44	    --spec-module COMPARE-MUTATION-SPEC \
+    45	    >"$mutation_log" 2>&1; then
+    46	  cat "$mutation_log"
+    47	  echo "ERROR: the deliberately incorrect addition mutant unexpectedly proved" >&2
+    48	  exit 1
+    49	fi
+    50	cat "$mutation_log"
+    51	echo "Expected result: the addition mutation was rejected."
+===== /candidate/concrete_tests.py
+     1	def compare(game, guess):
+     2	    result = []
+     3	    for score, prediction in zip(game, guess):
+     4	        result.append(abs(score - prediction))
+     5	    return result
+     6	
+     7	
+     8	assert compare([1, 2, 3, 4, 5, 1], [1, 2, 3, 4, 2, -2]) == [0, 0, 0, 0, 3, 3]
+     9	assert compare([0, 5, 0, 0, 0, 4], [4, 1, 1, 0, 0, -2]) == [4, 4, 1, 0, 0, 6]
+    10	assert compare([], []) == []
+    11	assert compare([-7, 9], [5, -4]) == [12, 13]
+===== /candidate/concrete_tests.mpy
+     1	Module(
+     2	  FuncDef("compare", Params("game", "guess"),
+     3	    Assign(Name("result"), ListExpr())
+     4	    For(TupleExpr(Name("score"), Name("prediction")), Call(Name("zip"), Name("game"), Name("guess")),
+     5	      Expr(
+     6	        Call(
+     7	          Attribute(Name("result"), "append"),
+     8	          Call(
+     9	            Name("abs"),
+    10	            BinOp("-", Name("score"), Name("prediction"))))))
+    11	    Return(Name("result")))
+    12	  Assert(
+    13	    Compare(
+    14	      Call(
+    15	        Name("compare"),
+    16	        ListExpr(Int(1), Int(2), Int(3), Int(4), Int(5), Int(1)),
+    17	        ListExpr(
+    18	          Int(1),
+    19	          Int(2),
+    20	          Int(3),
+    21	          Int(4),
+    22	          Int(2),
+    23	          UnaryOp("-", Int(2)))),
+    24	      CmpOp(
+    25	        "==",
+    26	        ListExpr(Int(0), Int(0), Int(0), Int(0), Int(3), Int(3)))))
+    27	  Assert(
+    28	    Compare(
+    29	      Call(
+    30	        Name("compare"),
+    31	        ListExpr(Int(0), Int(5), Int(0), Int(0), Int(0), Int(4)),
+    32	        ListExpr(
+    33	          Int(4),
+    34	          Int(1),
+    35	          Int(1),
+    36	          Int(0),
+    37	          Int(0),
+    38	          UnaryOp("-", Int(2)))),
+    39	      CmpOp(
+    40	        "==",
+    41	        ListExpr(Int(4), Int(4), Int(1), Int(0), Int(0), Int(6)))))
+    42	  Assert(
+    43	    Compare(
+    44	      Call(Name("compare"), ListExpr(), ListExpr()),
+    45	      CmpOp("==", ListExpr())))
+    46	  Assert(
+    47	    Compare(
+    48	      Call(
+    49	        Name("compare"),
+    50	        ListExpr(UnaryOp("-", Int(7)), Int(9)),
+    51	        ListExpr(Int(5), UnaryOp("-", Int(4)))),
+    52	      CmpOp("==", ListExpr(Int(12), Int(13))))))
+EXIT_STATUS: 0
+END_UTC: 2026-07-24T11:11:37Z

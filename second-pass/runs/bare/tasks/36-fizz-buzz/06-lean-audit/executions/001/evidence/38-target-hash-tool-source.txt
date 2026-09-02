@@ -1,0 +1,152 @@
++ rg -n -C 12 'def target_statement|def expected_target_definition|definition_sha256|statement_sha256|binding_sha256|trust_parameters|def sha256_text' /reference/tools/klean_export.py
+380-    driver = scratch / "export.k"
+381-    driver.write_text(
+382-        "".join(f'requires "{path}"\n' for path in entry_files)
+383-        + export_module_text
+384-    )
+385-    return driver
+386-
+387-
+388-def lib_name(package: str) -> str:
+389-    return "".join(word.capitalize() for word in package.split("-"))
+390-
+391-
+392:def sha256_text(text: str) -> str:
+393-    return hashlib.sha256(text.encode()).hexdigest()
+394-
+395-
+396-def lean_trust_declarations(path: Path) -> list[dict[str, str]]:
+397-    """Inventory one-line Lean trust declarations with qualified identities."""
+398-
+399-    namespaces: list[str] = []
+400-    declarations: list[dict[str, str]] = []
+401-    for line_number, line in enumerate(Path(path).read_text().splitlines(), 1):
+402-        namespace = _LEAN_NAMESPACE_RE.match(line)
+403-        if namespace is not None:
+404-            namespaces.append(namespace.group(1))
+--
+758-            other_sorries += count
+759-    return {
+760-        "axioms": sorted(axioms),
+761-        "automatic_axiomatization": sorted(axiomatized),
+762-        "noncomputable_definitions": sorted(noncomputable),
+763-        "automatic_noncomputable_repair": noncomputable_repair,
+764-        "designated_sorries": designated_sorries,
+765-        "other_sorries": other_sorries,
+766-        "allowlist": [allowlist[name] for name in sorted(allowlist)],
+767-    }
+768-
+769-
+770:def target_statement(generated: Path) -> dict[str, Any] | None:
+771-    obligation_map = _regular_json(generated / "obligation-map.json")
+772-    obligations = obligation_map.get("obligations")
+773:    parameters = obligation_map.get("trust_parameters")
+774-    if not isinstance(obligations, list) or not isinstance(parameters, list):
+775-        raise KleanExportError("generated obligation map is malformed")
+776-    candidates: list[tuple[Path, str]] = []
+777-    raw_count = 0
+778-    for relative, kind, path in _tree_entries(generated):
+779-        if kind != "file" or path.suffix != ".lean":
+780-            continue
+781-        text = path.read_text()
+782-        raw_count += len(
+783-            re.findall(r"(?m)^\s*def\s+targetStatement\b", text)
+784-        )
+785-        for match in re.finditer(
+--
+800-            f"found {raw_count}"
+801-        )
+802-    path, definition = candidates[0]
+803-    names: list[str] = []
+804-    normalized_parameters: list[dict[str, Any]] = []
+805-    for parameter in parameters:
+806-        if not isinstance(parameter, dict):
+807-            raise KleanExportError("target parameter is malformed")
+808-        name = parameter.get("name")
+809-        lean_type = parameter.get("type")
+810-        kore_symbol = parameter.get("kore_symbol")
+811-        source_rule_ids = parameter.get("source_rule_ids")
+812:        binding_sha256 = parameter.get("binding_sha256")
+813-        if not isinstance(name, str) or not name:
+814-            raise KleanExportError("target parameter name is malformed")
+815-        if not isinstance(lean_type, str) or not lean_type:
+816-            raise KleanExportError("target parameter type is malformed")
+817-        if not isinstance(kore_symbol, str) or not kore_symbol:
+818-            raise KleanExportError("target KORE symbol binding is malformed")
+819-        if (
+820-            not isinstance(source_rule_ids, list)
+821-            or not source_rule_ids
+822-            or not all(
+823-                isinstance(source_rule_id, str) and source_rule_id
+824-                for source_rule_id in source_rule_ids
+825-            )
+826-        ):
+827-            raise KleanExportError("target source-rule binding is malformed")
+828-        binding = {
+829-            "kore_symbol": kore_symbol,
+830-            "name": name,
+831-            "type": lean_type,
+832-            "source_rule_ids": source_rule_ids,
+833-        }
+834:        expected_binding_sha256 = sha256_text(
+835-            json.dumps(binding, sort_keys=True, separators=(",", ":"))
+836-        )
+837:        if binding_sha256 != expected_binding_sha256:
+838-            raise KleanExportError("target parameter binding hash changed")
+839-        names.append(name)
+840-        normalized_parameters.append(
+841:            {**binding, "binding_sha256": binding_sha256}
+842-        )
+843-    declaration = f"{path.parent.name}.Lemmas.targetStatement"
+844-    statement = " ".join((declaration, *names))
+845-    return {
+846-        "declaration": declaration,
+847-        "file": path.relative_to(generated).as_posix(),
+848-        "statement": statement,
+849:        "statement_sha256": sha256_text(statement),
+850:        "definition_sha256": sha256_text(definition),
+851-        "parameters": normalized_parameters,
+852-    }
+853-
+854-
+855:def expected_target_definition(obligation_map: dict[str, Any]) -> str | None:
+856-    obligations = obligation_map.get("obligations")
+857:    parameters = obligation_map.get("trust_parameters")
+858-    if not isinstance(obligations, list) or not isinstance(parameters, list):
+859-        raise KleanExportError("generated obligation map is malformed")
+860-    if not obligations:
+861-        return None
+862-    lines = ["def targetStatement"]
+863-    for parameter in parameters:
+864-        if not isinstance(parameter, dict):
+865-            raise KleanExportError("target parameter is malformed")
+866-        name = parameter.get("name")
+867-        lean_type = parameter.get("type")
+868-        if not isinstance(name, str) or not isinstance(lean_type, str):
+869-            raise KleanExportError("target parameter is malformed")
+--
+914-        for rule in domain_rules
+915-    ]
+916-
+917-
+918-def _bind_obligation_provenance(
+919-    package: Path,
+920-    domain_rules: list[dict[str, Any]],
+921-    klean_rules: list[dict[str, Any]],
+922-) -> dict[str, Any]:
+923-    path = package / "obligation-map.json"
+924-    document = _regular_json(path)
+925-    obligations = document.get("obligations")
+926:    parameters = document.get("trust_parameters")
+927-    if not isinstance(obligations, list) or not isinstance(parameters, list):
+928-        raise KleanExportError("generated obligation map is malformed")
+929-    expected_ids = [rule["source_rule_id"] for rule in domain_rules]
+930-    observed_ids = [
+931-        obligation.get("source_rule_id")
+932-        if isinstance(obligation, dict)
+933-        else None
+934-        for obligation in obligations
+935-    ]
+936-    if observed_ids != expected_ids:
+937-        raise KleanExportError(
+938-            "validated DOMAIN_LEMMA records and generated obligations "

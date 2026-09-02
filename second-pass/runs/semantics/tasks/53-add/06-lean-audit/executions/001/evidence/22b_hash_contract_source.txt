@@ -1,0 +1,244 @@
+Script started on 2026-07-28 17:38:18-05:00 [<not executed on terminal>]
+#!/usr/bin/env python3
+"""Dependency-light signed-resolution contract for Stage 6 audit inputs."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from typing import Any
+
+
+SCHEMA_VERSION = 4
+RESOLUTION_KEYS = frozenset(
+    {
+        "schema_version",
+        "run_id",
+        "problem_id",
+        "condition",
+        "mode",
+        "semantics_mode",
+        "k_workspace",
+        "k_audit",
+        "discovery_manifest",
+        "klean_generation",
+        "generation_producer_sources",
+        "lean_workspace",
+        "lean_invocation",
+        "target",
+        "stage1_source_hashes",
+        "trust_inventory",
+        "hashes",
+        "selections",
+        "stage4_preflight",
+        "stage5_result",
+    }
+)
+
+
+class Stage6ResolutionContractError(RuntimeError):
+    """Raised when a Stage 6 signed resolution is malformed."""
+
+
+def canonical_json_sha256(document: Any) -> str:
+    encoded = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def validate_sha256(value: object, label: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(
+        r"[0-9a-f]{64}", value
+    ) is None:
+        raise Stage6ResolutionContractError(f"{label} is malformed")
+    return value
+
+
+def build_audit_input(
+    resolution: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "resolution": resolution,
+        "resolved_input_sha256": canonical_json_sha256(resolution),
+    }
+
+
+def verify_audit_input(
+    document: dict[str, Any],
+) -> tuple[dict[str, Any], str]:
+    required = {
+        "schema_version",
+        "resolution",
+        "resolved_input_sha256",
+    }
+    keys = set(document)
+    if (
+        (keys != required and keys != required | {"audit"})
+        or document.get("schema_version") != SCHEMA_VERSION
+    ):
+        raise Stage6ResolutionContractError(
+            "Stage 6 audit input envelope is malformed"
+        )
+    audit = document.get("audit")
+    if "audit" in document and not isinstance(audit, dict):
+        raise Stage6ResolutionContractError(
+            "Stage 6 audit metadata is malformed"
+        )
+    resolution = document.get("resolution")
+    if (
+        not isinstance(resolution, dict)
+        or set(resolution) != RESOLUTION_KEYS
+        or resolution.get("schema_version") != SCHEMA_VERSION
+    ):
+        raise Stage6ResolutionContractError(
+            "Stage 6 signed resolution is malformed"
+        )
+    digest = validate_sha256(
+        document.get("resolved_input_sha256"),
+        "Stage 6 resolved-input digest",
+    )
+    if canonical_json_sha256(resolution) != digest:
+        raise Stage6ResolutionContractError(
+            "Stage 6 audit input digest does not match signed resolution"
+        )
+    return resolution, digest
+    document = _regular_json(path, "Stage 6 audit input")
+    try:
+        resolution, digest = (
+            stage6_resolution_contract.verify_audit_input(document)
+        )
+    except (
+        stage6_resolution_contract.Stage6ResolutionContractError
+    ) as error:
+        raise KleanFinalGateError(str(error)) from error
+    mode = resolution.get("mode")
+    hashes = resolution.get("hashes")
+    if (
+        mode not in {
+            "CLASSIFICATION_ONLY",
+            "CLASSIFICATION_AND_PROOF",
+        }
+        or not isinstance(hashes, dict)
+    ):
+        raise KleanFinalGateError(
+            "Stage 6 audit input binding is malformed"
+        )
+    return {
+        "resolution": resolution,
+        "resolved_input_sha256": digest,
+    }
+
+
+def _input_hashes(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    candidate: Path | None,
+) -> dict[str, Any]:
+    try:
+        return {
+            "k_workspace_sha256": pipeline_contract.sha256_tree(
+                frozen_input
+            ),
+            "stage1_export_sha256": klean_export.tree_digest(
+                frozen_input
+            ),
+            "discovery_manifest_sha256": (
+                pipeline_contract.sha256_file(discovery_manifest)
+            ),
+            "klean_generation_sha256": (
+                pipeline_contract.sha256_tree(generation)
+            ),
+            "lean_workspace_sha256": (
+                pipeline_contract.sha256_tree(candidate)
+                if candidate is not None
+                else None
+            ),
+        }
+    except (
+        OSError,
+        klean_export.KleanExportError,
+        pipeline_contract.PipelineContractError,
+    ) as error:
+        raise KleanFinalGateError(
+            "cannot hash Stage 6 mechanical inputs"
+        ) from error
+
+
+def _require_bound_inputs(
+    audit_input: dict[str, Any],
+    observed: dict[str, Any],
+        condition = run.get("condition")
+        if not isinstance(condition, dict):
+            raise KleanAuditContractError("run condition is malformed")
+        resolved = {
+            "schema_version": stage6_resolution_contract.SCHEMA_VERSION,
+            "run_id": run_id,
+            "problem_id": problem,
+            "condition": condition.get("name"),
+            "mode": mode,
+            "semantics_mode": (
+                "SUPPLIED_SEMANTICS"
+                if condition.get("semantics") is True
+                else "GENERATED_SEMANTICS"
+            ),
+            "k_workspace": str(k_workspace),
+            "k_audit": str(k_audit),
+            "discovery_manifest": str(discovery.path),
+            "klean_generation": str(generation),
+            "generation_producer_sources": str(
+                generation_producer_sources
+            ),
+            "lean_workspace": (
+                str(lean_workspace)
+                if lean_workspace is not None
+                else None
+            ),
+            "lean_invocation": (
+                str(lean_invocation)
+                if lean_invocation is not None
+                else None
+            ),
+            "target": target,
+            "stage1_source_hashes": stage1_source_hashes,
+            "trust_inventory": str(
+                pipeline_contract.require_regular_file(
+                    generation / "trust-inventory.json",
+                    "Stage 4 trust inventory",
+                )
+            ),
+            "hashes": {
+                "k_workspace_sha256": k_hash,
+                "stage1_export_sha256": stage1_export_hash,
+                "discovery_manifest_sha256": discovery.sha256,
+                "k_audit_sha256": pipeline_contract.sha256_tree(k_audit),
+                "klean_generation_sha256": pipeline_contract.sha256_tree(
+                    generation
+                ),
+                "generation_producer_sources_sha256": (
+                    producer_sources_hash
+                ),
+                "generated_tree_sha256": generated_hash,
+                "lean_workspace_sha256": (
+                    pipeline_contract.sha256_tree(lean_workspace)
+                    if lean_workspace is not None
+                    else None
+                ),
+                "lean_invocation_sha256": (
+                    pipeline_contract.sha256_tree(lean_invocation)
+                    if lean_invocation is not None
+                    else None
+                ),
+            },
+            "selections": {
+                "k_audit": k_audit_selection,
+                "klean_generation": generation_selection,
+            },
+
+Script done on 2026-07-28 17:38:18-05:00 [COMMAND_EXIT_CODE="0"]

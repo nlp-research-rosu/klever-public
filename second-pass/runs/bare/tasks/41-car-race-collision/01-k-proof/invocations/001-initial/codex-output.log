@@ -1,0 +1,2690 @@
+OpenAI Codex v0.144.6
+--------
+workdir: /work
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019f893b-556c-7e60-b03b-5d11c15b4150
+--------
+user
+# Implement and prove a HumanEval task correct in K — writing your own semantics
+
+You are working entirely inside the current directory. Everything you produce
+must be written here. The K toolchain (`kompile`, `krun`, `kprove`) and
+`python3` are on PATH.
+
+## Inputs
+
+- `prompt.py` — the exact original HumanEval task prompt. It contains the
+  required entry-point signature, natural-language contract, examples, and any
+  helper code intentionally supplied with the task. It contains no completed
+  implementation of the target function. Do not modify it.
+- `py2mpy.py` — the fixed CPython-AST to K-constructor translator. Do not
+  modify it.
+
+There is no supplied K semantics in this condition.
+
+## Required work
+
+1. Read `prompt.py`, then create `solution.py` and implement the requested
+   entry point yourself. Preserve the signature. You may reuse helper or setup
+   code that the prompt intentionally supplies.
+2. Keep `solution.py` within the subset accepted by `py2mpy.py` and generate
+   `solution.mpy` with `python3 py2mpy.py solution.py > solution.mpy`.
+3. Write `semantic.k`, `verification.k`, and `spec.k`.
+4. Exercise the program with `krun`, prove every claim in `spec.k` with
+   `kprove`, and record exact commands in `prove.sh`.
+
+## Deliverables
+
+`solution.py`, `solution.mpy`, `semantic.k` and any helper K files,
+`verification.k`, `spec.k`, and `prove.sh`.
+
+The container has 8 GB of memory. Keep working while a concrete path remains;
+if the proof cannot close, preserve the best artifacts and explain the blocker
+in `NOTES.md`.
+
+End your final message with exactly one line and nothing after it:
+RESULT: <KPROVE_PASSED|PARTIAL|BLOCKED> — <one sentence>
+
+Choose exactly one marker using this ordered decision; stop at the first
+matching case.
+
+1. `KPROVE_PASSED` iff every required positive target-proof command (commands
+   intended to close the task's proof claims) printed `#Top` and exited 0.
+   Expected-failure mutation probes and other negative validation probes are
+   judged by their expected non-zero result and do not disqualify this marker.
+2. Otherwise, `BLOCKED` iff a concrete hard blocker—such as a missing required
+   input, capability, tool, or semantic support—prevented completion. Name it.
+3. Otherwise, `PARTIAL`: the positive proof condition was not met; preserve and
+   report the best artifacts or progress available.
+
+This ordered precedence is total and mutually exclusive. Incomplete
+deliverables or a later Gate status do not create a second marker. This runner
+marker reports positive proof execution only, not a `VALIDATED` judgment.
+codex
+I’ll inspect the task prompt and translator first, then implement within the accepted syntax and build the smallest K semantics needed to execute and prove the contract. I’ll keep the proof script reproducible and validate both `krun` behavior and every positive `kprove` command.
+  → Inspect prompt.py and py2mpy.py; identify contract and accepted AST subset
+  • Implement solution.py and generate solution.mpy
+  • Develop semantic.k and verification.k
+  • Write spec.k and prove all claims
+  • Create prove.sh and rerun complete validation
+exec
+/bin/bash -lc "pwd && rg --files -g 'prompt.py' -g 'py2mpy.py' -g 'AGENTS.md' -g '"'!**/.git/**'"' && sed -n '1,240p' prompt.py && sed -n '1,280p' py2mpy.py" in /work
+ succeeded in 0ms:
+/work
+prompt.py
+py2mpy.py
+
+
+def car_race_collision(n: int):
+    """
+    Imagine a road that's a perfectly straight infinitely long line.
+    n cars are driving left to right;  simultaneously, a different set of n cars
+    are driving right to left.   The two sets of cars start out being very far from
+    each other.  All cars move in the same speed.  Two cars are said to collide
+    when a car that's moving left to right hits a car that's moving right to left.
+    However, the cars are infinitely sturdy and strong; as a result, they continue moving
+    in their trajectory as if they did not collide.
+
+    This function outputs the number of such collisions.
+    """
+#!/usr/bin/env python3
+"""py2mpy — a *pure* CPython-AST -> K-constructor transliterator.
+
+Reads a .py file and prints the matching `.mpy` term: a Lisp-indented tree of K
+constructors that a (future) K semantics will parse. The design rule is strict:
+
+    PURE TRANSLITERATION. Every Python AST node maps to exactly one K
+    constructor with the same structure. The front-end makes NO semantic
+    decisions — it does not desugar, simplify, normalize, or "interpret"
+    anything. All meaning lives in the K semantics that consumes the term.
+
+Consequences of that rule (vs. a "helpful" front-end):
+
+  * `is` / `is not` transliterate to `CmpOp("is", ...)` / `CmpOp("is not", ...)`
+    — NOT to `==` / `!=`. K decides what identity means.
+  * a chained comparison `a < b < c` stays a single `Compare` carrying the
+    chain (`Compare(a, CmpOp("<", b), CmpOp("<", c))`) — it is NOT pre-expanded
+    into `a < b and b < c`.
+  * a method call `x.append(v)` stays `Call(Attribute(Name("x"), "append"), v)`
+    — there is no special `MethodCall` constructor folding the receiver in.
+  * `a[i] = v` stays `Assign(Subscript(Name("a"), Name("i")), v)` — the target
+    is just an expression in store position; no special `SubscriptAssign`.
+
+The only choices the transliterator makes are unavoidably *syntactic* — e.g. a
+`bool` literal becomes `Bool(...)` not `Int(...)`, because that is the literal's
+actual Python type as read off the AST, not a semantic judgement.
+
+Anything outside the covered subset raises `Unsupported`, naming the node, so
+coverage gaps fail loudly instead of being silently dropped.
+
+Usage:
+    python scripts/py2mpy.py FILE.py          # print the .mpy term (default)
+    python scripts/py2mpy.py FILE.py --ast    # print the Python AST (ast.dump)
+"""
+from __future__ import annotations
+
+import argparse
+import symtable
+import ast
+import json
+import sys
+
+
+class Unsupported(Exception):
+    """Raised for any AST node the transliterator does not cover."""
+
+
+# ---------------------------------------------------------------------------
+# Term model: a .mpy term is a tree of these three node kinds.
+#   Ctor(name, *args)  -> `name(arg, arg, ...)`  (comma-separated args)
+#   Seq([item, ...])   -> a statement list: juxtaposed, no parens, no commas
+#   str                -> a leaf token already in K surface form
+#                         (a quoted string `"op"`, a number `0`, `true`, `Break`)
+# ---------------------------------------------------------------------------
+class Ctor:
+    __slots__ = ("name", "args")
+
+    def __init__(self, name: str, *args):
+        self.name = name
+        self.args = list(args)
+
+
+class Seq:
+    __slots__ = ("items",)
+
+    def __init__(self, items):
+        self.items = list(items)
+
+
+def q(s: str) -> str:
+    """A Python string as a K String token (double-quoted, escaped)."""
+    return json.dumps(s)
+
+
+# --- Operator spellings (string tokens carried inside constructors) ----------
+# These are transliterations of the operator *symbol*, not its meaning.
+_BINOP = {
+    ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
+    ast.FloorDiv: "//", ast.Mod: "%", ast.Pow: "**",
+    ast.BitOr: "|", ast.BitAnd: "&", ast.BitXor: "^",
+    ast.LShift: "<<", ast.RShift: ">>", ast.MatMult: "@",
+}
+_UNARY = {ast.USub: "-", ast.UAdd: "+", ast.Not: "not", ast.Invert: "~"}
+_BOOLOP = {ast.And: "and", ast.Or: "or"}
+_CMPOP = {
+    ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
+    ast.Gt: ">", ast.GtE: ">=", ast.Is: "is", ast.IsNot: "is not",
+    ast.In: "in", ast.NotIn: "not in",
+}
+
+
+# ---------------------------------------------------------------------------
+# Closure scopes (Python's own symtable, faithfully exposed)
+# ---------------------------------------------------------------------------
+# (name, lineno) -> (cellvars, freevars, nested). A def/lambda gets the
+# ANNOTATED node form iff it is nested inside a function or has cells/frees;
+# module-level capture-free defs keep the old shape (zero churn).
+SCOPES: dict = {}
+
+
+def _frees(table):
+    return set(table.get_frees()) if isinstance(table, symtable.Function) else set()
+
+
+def _deep_frees(table):
+    out = _frees(table)
+    for g in table.get_children():
+        out |= _deep_frees(g) - set(table.get_locals())
+    return out
+
+
+def _walk_symtable(table, depth=0):
+    for child in table.get_children():
+        if child.get_type() in ("function", "lambda"):
+            frees = sorted(_frees(child))
+            cells = sorted(
+                s for s in child.get_locals()
+                if any(s in _deep_frees(g) for g in child.get_children())
+            )
+            SCOPES[(child.get_name(), child.get_lineno())] = (
+                cells, frees, depth > 0 or table.get_type() != "module")
+        _walk_symtable(child, depth + (1 if child.get_type() in ("function", "lambda") else 0))
+
+
+def scope_info(name, lineno):
+    return SCOPES.get((name, lineno))
+
+
+# ---------------------------------------------------------------------------
+# Expressions
+# ---------------------------------------------------------------------------
+def emit_expr(node: ast.expr):
+    if isinstance(node, ast.Constant):
+        v = node.value
+        if v is None:
+            return "NoneVal"
+        if isinstance(v, bool):                 # MUST precede int (bool ⊂ int)
+            return Ctor("Bool", "true" if v else "false")
+        if isinstance(v, int):
+            return Ctor("Int", str(v))
+        if isinstance(v, float):
+            return Ctor("Float", repr(v))
+        if isinstance(v, str):
+            return Ctor("Str", q(v))
+        raise Unsupported(f"Constant {type(v).__name__}")
+
+    if isinstance(node, ast.Name):
+        return Ctor("Name", q(node.id))
+
+    if isinstance(node, ast.Lambda):
+        a = node.args
+        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+            raise Unsupported("complex lambda signature")
+        names = [p.arg for p in (a.posonlyargs + a.args)]
+        params = Ctor("Params", *(q(n) for n in names))
+        info = scope_info("lambda", node.lineno)
+        if info and (info[0] or info[1] or info[2]):
+            cells, frees, _ = info
+            return Ctor("Lambda", params,
+                        Ctor("CellVars", *(q(n) for n in cells)),
+                        Ctor("FreeVars", *(q(n) for n in frees)),
+                        emit_expr(node.body))
+        return Ctor("Lambda", params, emit_expr(node.body))
+
+    if isinstance(node, ast.BinOp):
+        op = _BINOP.get(type(node.op))
+        if op is None:
+            raise Unsupported(f"BinOp {type(node.op).__name__}")
+        return Ctor("BinOp", q(op), emit_expr(node.left), emit_expr(node.right))
+
+    if isinstance(node, ast.UnaryOp):
+        op = _UNARY.get(type(node.op))
+        if op is None:
+            raise Unsupported(f"UnaryOp {type(node.op).__name__}")
+        return Ctor("UnaryOp", q(op), emit_expr(node.operand))
+
+    if isinstance(node, ast.BoolOp):
+        op = _BOOLOP[type(node.op)]
+        return Ctor("BoolOp", q(op), *(emit_expr(v) for v in node.values))
+
+    if isinstance(node, ast.Compare):
+        # Faithful, non-desugared: left operand + a chain of (op, comparator).
+        # Single comparison => one CmpOp; `a < b < c` => two CmpOps.
+        chain = [
+            Ctor("CmpOp", q(_op_or_raise(_CMPOP, op, "Compare")), emit_expr(c))
+            for op, c in zip(node.ops, node.comparators)
+        ]
+        return Ctor("Compare", emit_expr(node.left), *chain)
+
+    if isinstance(node, ast.List):
+        return Ctor("ListExpr", *(emit_expr(e) for e in node.elts))
+
+    if isinstance(node, ast.Tuple):
+        return Ctor("TupleExpr", *(emit_expr(e) for e in node.elts))
+
+    if isinstance(node, ast.Set):
+        return Ctor("SetExpr", *(emit_expr(e) for e in node.elts))
+
+    if isinstance(node, ast.Dict):
+        entries = []
+        for k, v in zip(node.keys, node.values):
+            if k is None:
+                raise Unsupported("dict unpacking {**x}")
+            entries.append(Ctor("Entry", emit_expr(k), emit_expr(v)))
+        return Ctor("DictExpr", *entries)
+
+    if isinstance(node, ast.Subscript):
+        return Ctor("Subscript", emit_expr(node.value), emit_index(node.slice))
+
+    if isinstance(node, ast.Attribute):
+        return Ctor("Attribute", emit_expr(node.value), q(node.attr))
+
+    if isinstance(node, ast.Call):
+        if any(isinstance(a, ast.Starred) for a in node.args):
+            raise Unsupported("*args unpacking")
+        if any(kw.arg is None for kw in node.keywords):
+            raise Unsupported("**kwargs unpacking")
+        # Call grammar is `Call(Expr, Exprs)` — the comma is mandatory, so a zero-arg
+        # call must render as `Call(f, )` (empty Exprs), NOT `Call(f)` (which won't parse).
+        args = [emit_expr(a) for a in node.args]
+        args += [Ctor("KwArg", q(kw.arg), emit_expr(kw.value)) for kw in node.keywords]
+        args = args or [""]
+        return Ctor("Call", emit_expr(node.func), *args)
+
+    if isinstance(node, ast.IfExp):
+        # AST field order: test, body, orelse — kept verbatim.
+        return Ctor("IfExp", emit_expr(node.test),
+                    emit_expr(node.body), emit_expr(node.orelse))
+
+    if isinstance(node, ast.ListComp):
+        return Ctor("ListComp", emit_expr(node.elt), _gens(node.generators))
+    if isinstance(node, ast.SetComp):
+        return Ctor("SetComp", emit_expr(node.elt), _gens(node.generators))
+    if isinstance(node, ast.GeneratorExp):
+        return Ctor("GenExp", emit_expr(node.elt), _gens(node.generators))
+    if isinstance(node, ast.DictComp):
+        return Ctor("DictComp", emit_expr(node.key), emit_expr(node.value),
+                    _gens(node.generators))
+
+    raise Unsupported(f"Expr {type(node).__name__}")
+
+
+def _op_or_raise(table, op, label):
+    spelled = table.get(type(op))
+    if spelled is None:
+        raise Unsupported(f"{label} {type(op).__name__}")
+    return spelled
+
+
+def _compfor(g):
+    """A single generator -> CompFor(target, iter, <ifs as Exprs; .Exprs if none>)."""
+    if getattr(g, "is_async", 0):
+        raise Unsupported("async comprehension")
+    ifs = [emit_expr(c) for c in g.ifs] or [Ctor("Bool", "true")]
+    return Ctor("CompFor", emit_expr(g.target), emit_expr(g.iter), *ifs)
+
+
+def _gens(generators):
+    """The generator list -> a juxtaposed CompFors (a Seq of CompFor)."""
+    return Seq([_compfor(g) for g in generators])
+
+
+def emit_index(node: ast.expr):
+    """Subscript index position: an `ast.Slice` -> `Slice(...)`, else the expr."""
+    # Python <3.9 wrapped the index in ast.Index; unwrap if present.
+    inner = getattr(ast, "Index", None)
+    if inner is not None and isinstance(node, inner):
+        node = node.value
+    if isinstance(node, ast.Slice):
+        def bound(b):
+            # omitted bound (absent field) OR an explicit None constant -> NoBound.
+            # Python treats `a[None:5]` exactly like `a[:5]`; only a *value* None
+            # (Constant(None) outside a slice) becomes NoneVal. Keeping the two
+            # distinct lets NoneVal be a real value without perturbing slices.
+            if b is None or (isinstance(b, ast.Constant) and b.value is None):
+                return "NoBound"
+            return emit_expr(b)
+        return Ctor("Slice", bound(node.lower), bound(node.upper), bound(node.step))
+    return emit_expr(node)
+
+
+exec
+/bin/bash -lc "sed -n '281,680p' py2mpy.py && kompil --version 2>/dev/null || true && kompile --version && krun --version && kprove --version" in /work
+ succeeded in 0ms:
+
+# ---------------------------------------------------------------------------
+# Statements
+# ---------------------------------------------------------------------------
+def emit_stmt(node: ast.stmt):
+    if isinstance(node, ast.FunctionDef):
+        a = node.args
+        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+            raise Unsupported("complex function signature (defaults/varargs/kwonly)")
+        if node.decorator_list:
+            raise Unsupported("decorators")
+        names = [p.arg for p in (a.posonlyargs + a.args)]  # type annotations ignored
+        params = Ctor("Params", *(q(n) for n in names))
+        info = scope_info(node.name, node.lineno)
+        if info and (info[0] or info[1] or info[2]):
+            cells, frees, _ = info
+            return Ctor("FuncDef", q(node.name), params,
+                        Ctor("CellVars", *(q(n) for n in cells)),
+                        Ctor("FreeVars", *(q(n) for n in frees)),
+                        emit_stmts(node.body))
+        return Ctor("FuncDef", q(node.name), params, emit_stmts(node.body))
+
+    if isinstance(node, ast.Return):
+        if node.value is None:
+            return Ctor("Return")
+        return Ctor("Return", emit_expr(node.value))
+
+    if isinstance(node, ast.Assign):
+        if len(node.targets) != 1:
+            raise Unsupported("chained assignment (a = b = ...)")
+        # Target is just an expression in store position (Name / Tuple / Subscript / Attribute).
+        return Ctor("Assign", emit_expr(node.targets[0]), emit_expr(node.value))
+
+    if isinstance(node, ast.AugAssign):
+        op = _BINOP.get(type(node.op))
+        if op is None:
+            raise Unsupported(f"AugAssign {type(node.op).__name__}")
+        return Ctor("AugAssign", emit_expr(node.target), q(op), emit_expr(node.value))
+
+    if isinstance(node, ast.If):
+        return Ctor("If", emit_expr(node.test),
+                    emit_stmts(node.body), emit_stmts(node.orelse))
+
+    if isinstance(node, ast.For):
+        if node.orelse:
+            raise Unsupported("for-else")
+        return Ctor("For", emit_expr(node.target), emit_expr(node.iter),
+                    emit_stmts(node.body))
+
+    if isinstance(node, ast.While):
+        if node.orelse:
+            raise Unsupported("while-else")
+        return Ctor("While", emit_expr(node.test), emit_stmts(node.body))
+
+    if isinstance(node, ast.Break):
+        return "Break"
+    if isinstance(node, ast.Continue):
+        return "Continue"
+    if isinstance(node, ast.Pass):
+        return "Pass"
+
+    if isinstance(node, ast.Assert):
+        if node.msg is not None:
+            return Ctor("Assert", emit_expr(node.test), emit_expr(node.msg))
+        return Ctor("Assert", emit_expr(node.test))
+
+    if isinstance(node, ast.Expr):
+        return Ctor("Expr", emit_expr(node.value))
+
+    if isinstance(node, ast.Import):
+        return Ctor("Import", *(q(n.name) for n in node.names))
+    if isinstance(node, ast.ImportFrom):
+        mod = node.module if node.module is not None else ""
+        return Ctor("ImportFrom", q(mod), *(q(n.name) for n in node.names))
+
+    raise Unsupported(f"Stmt {type(node).__name__}")
+
+
+def emit_stmts(stmts) -> Seq:
+    return Seq([emit_stmt(s) for s in stmts])
+
+
+def emit_module(tree: ast.Module) -> Ctor:
+    return Ctor("Module", emit_stmts(tree.body))
+
+
+# ---------------------------------------------------------------------------
+# Lisp-style pretty printer
+# ---------------------------------------------------------------------------
+WIDTH = 72  # an expression constructor wider than this breaks onto its own lines
+
+
+def render(node, ind: int = 0) -> str:
+    if isinstance(node, str):
+        return node
+
+    if isinstance(node, Seq):
+        if not node.items:
+            return ""
+        pad = "  " * ind
+        return ("\n" + pad).join(render(it, ind) for it in node.items)
+
+    # Ctor
+    cind = ind + 1
+    cpad = "  " * cind
+    has_block = any(isinstance(a, Seq) for a in node.args)
+
+    if not has_block:
+        inline = node.name + "(" + ", ".join(render(a, ind) for a in node.args) + ")"
+        if "\n" not in inline and len("  " * ind) + len(inline) <= WIDTH:
+            return inline
+        parts = [render(a, cind) for a in node.args]
+        return node.name + "(\n" + cpad + (",\n" + cpad).join(parts) + ")"
+
+    # Has a statement block: inline the args before the first block, then put
+    # each remaining arg (blocks included) on its own indented line.
+    first = next(i for i, a in enumerate(node.args) if isinstance(a, Seq))
+    head = node.args[:first]
+    rest = node.args[first:]
+    open_line = node.name + "(" + ", ".join(render(a, ind) for a in head) + ("," if head else "")
+    lines = []
+    for k, a in enumerate(rest):
+        comma = "," if k < len(rest) - 1 else ""
+        lines.append(cpad + render(a, cind) + comma)
+    return open_line + "\n" + "\n".join(lines) + ")"
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(
+        prog="py2mpy",
+        description="Pure CPython-AST -> K-constructor transliterator.",
+    )
+    ap.add_argument("file", help="Python source file")
+    ap.add_argument("--ast", action="store_true",
+                    help="print the Python AST (ast.dump) instead of the .mpy term")
+    args = ap.parse_args(argv)
+
+    with open(args.file, "r", encoding="utf-8") as fh:
+        src = fh.read()
+    tree = ast.parse(src, filename=args.file)
+    _walk_symtable(symtable.symtable(src, args.file, "exec"))
+
+    if args.ast:
+        print(ast.dump(tree, indent=2))
+    else:
+        print(render(emit_module(tree)))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+K version:    v7.1.293
+Build date:   Fri Oct 03 13:32:35 CDT 2025
+K version:    v7.1.293
+Build date:   Fri Oct 03 13:32:35 CDT 2025
+K version:    v7.1.293
+Build date:   Fri Oct 03 13:32:35 CDT 2025
+
+codex
+The task’s mathematical content is compact: each of the `n` left-to-right cars meets each of the `n` right-to-left cars exactly once, so the implementation is `n * n`. I’m now encoding that implementation as the translator’s raw AST constructors and giving those constructors executable call/return, environment, name lookup, and multiplication rules in K.
+apply patch
+patch: completed
+/work/semantic.k
+/work/solution.py
+/work/spec.k
+/work/verification.k
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+The prompt requires only integer multiplication, and the implementation is now written in the translator-supported subset.
+  ✓ Inspect prompt.py and py2mpy.py; identify contract and accepted AST subset
+  → Implement solution.py and generate solution.mpy
+  • Develop semantic.k and verification.k
+  • Write spec.k and prove all claims
+  • Create prove.sh and rerun complete validation
+exec
+/bin/bash -lc "python3 py2mpy.py solution.py > solution.mpy && sed -n '1,80p' solution.py && sed -n '1,120p' solution.mpy && sed -n '1,260p' semantic.k && sed -n '1,220p' spec.k" in /work
+ succeeded in 0ms:
+def car_race_collision(n: int):
+    return n * n
+Module(
+  FuncDef("car_race_collision", Params("n"),
+    Return(BinOp("*", Name("n"), Name("n")))))
+module SEMANTIC-SYNTAX
+  imports INT-SYNTAX
+  imports STRING-SYNTAX
+
+  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
+
+  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
+                                                               [symbol(FuncDef)]
+                | "Return" "(" Expr ")"                     [symbol(Return)]
+
+  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
+
+  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
+                | "Name" "(" String ")"                    [symbol(Name)]
+                | "BinOp" "(" String "," Expr "," Expr ")"
+                                                               [symbol(BinOp)]
+endmodule
+
+module SEMANTIC
+  imports SEMANTIC-SYNTAX
+  imports INT
+  imports MAP
+
+  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
+                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
+                 | "execute" "(" Stmt ")"                  [symbol(execute)]
+                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
+                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
+                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
+                 | "finishReturn"                             [symbol(finishReturn)]
+
+  configuration
+    <state>
+      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
+      <functions> .Map </functions>
+      <environment> .Map </environment>
+      <result> 0 </result>
+    </state>
+
+  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
+       <functions> .Map => F |-> definition(P, BODY) </functions>
+
+  rule <k> run(F, I) => execute(BODY) ... </k>
+       <functions>... F |-> definition(P, BODY) ...</functions>
+       <environment> _ => P |-> I </environment>
+
+  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
+
+  rule <k> evaluate(Int(I)) => I ... </k>
+
+  rule <k> evaluate(Name(X)) => I ... </k>
+       <environment>... X |-> I ...</environment>
+
+  rule <k> evaluate(BinOp("*", L, R))
+        => evaluate(L) ~> multiplyRight(R) ... </k>
+
+  rule <k> I:Int ~> multiplyRight(R)
+        => evaluate(R) ~> multiplyBy(I) ... </k>
+
+  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
+
+  rule <k> I:Int ~> finishReturn => .K ... </k>
+       <result> _ => I </result>
+endmodule
+requires "verification.k"
+
+module SPEC
+  imports VERIFICATION
+
+  claim
+    <k>
+      Module(
+        FuncDef(
+          "car_race_collision",
+          Params("n"),
+          Return(BinOp("*", Name("n"), Name("n")))
+        )
+      ) ~> run("car_race_collision", N)
+      => .K
+    </k>
+    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
+    <environment> .Map => "n" |-> N </environment>
+    <result> 0 => N *Int N </result>
+    requires N >=Int 0
+endmodule
+
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+exec
+/bin/bash -lc 'kompile verification.k --backend haskell --main-module VERIFICATION --syntax-module SEMANTIC-SYNTAX' in /work
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+ succeeded in 1799ms:
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+exec
+/bin/bash -lc 'ls -ld verification-kompiled && test -f verification-kompiled/definition.kore && echo COMPILED' in /work
+ succeeded in 0ms:
+drwxr-xr-x 2 agent agent 4096 Jul 22 04:51 verification-kompiled
+COMPILED
+
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+exec
+/bin/bash -lc 'krun solution.mpy --definition verification-kompiled -cN=3' in /work
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+ succeeded in 1297ms:
+<state>
+  <k>
+    .K
+  </k>
+  <functions>
+    "car_race_collision" |-> definition ( "n" , Return ( BinOp ( "*" , Name ( "n" ) , Name ( "n" ) ) ) )
+  </functions>
+  <environment>
+    "n" |-> 3
+  </environment>
+  <result>
+    9
+  </result>
+</state>
+
+codex
+The generated `solution.mpy` matches the intended AST exactly, and the semantics compiles. A concrete execution with `n = 3` terminates with an empty computation and `<result> 9</result>`; next I’m checking the universally quantified reachability claim and will adjust only the proof boundary if K exposes normalization details.
+exec
+/bin/bash -lc 'kprove spec.k --definition verification-kompiled' in /work
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+ succeeded in 1269ms:
+#Top
+
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+apply patch
+patch: completed
+/work/prove.sh
+diff --git a/prove.sh b/prove.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef9182f07650a1a2433c0d3b10c166b2c6d204e2
+--- /dev/null
++++ b/prove.sh
+@@ -0,0 +1,15 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++python3 py2mpy.py solution.py > solution.mpy
++
++kompile verification.k \
++  --backend haskell \
++  --main-module VERIFICATION \
++  --syntax-module SEMANTIC-SYNTAX
++
++krun solution.mpy --definition verification-kompiled -cN=0
++krun solution.mpy --definition verification-kompiled -cN=3
++krun solution.mpy --definition verification-kompiled -cN=10
++
++kprove spec.k --definition verification-kompiled
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+exec
+/bin/bash -lc 'chmod +x prove.sh && bash -n prove.sh && ./prove.sh' in /work
+diff --git a/prove.sh b/prove.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef9182f07650a1a2433c0d3b10c166b2c6d204e2
+--- /dev/null
++++ b/prove.sh
+@@ -0,0 +1,15 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++python3 py2mpy.py solution.py > solution.mpy
++
++kompile verification.k \
++  --backend haskell \
++  --main-module VERIFICATION \
++  --syntax-module SEMANTIC-SYNTAX
++
++krun solution.mpy --definition verification-kompiled -cN=0
++krun solution.mpy --definition verification-kompiled -cN=3
++krun solution.mpy --definition verification-kompiled -cN=10
++
++kprove spec.k --definition verification-kompiled
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+diff --git a/prove.sh b/prove.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef9182f07650a1a2433c0d3b10c166b2c6d204e2
+--- /dev/null
++++ b/prove.sh
+@@ -0,0 +1,15 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++python3 py2mpy.py solution.py > solution.mpy
++
++kompile verification.k \
++  --backend haskell \
++  --main-module VERIFICATION \
++  --syntax-module SEMANTIC-SYNTAX
++
++krun solution.mpy --definition verification-kompiled -cN=0
++krun solution.mpy --definition verification-kompiled -cN=3
++krun solution.mpy --definition verification-kompiled -cN=10
++
++kprove spec.k --definition verification-kompiled
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+ succeeded in 7184ms:
+<state>
+  <k>
+    .K
+  </k>
+  <functions>
+    "car_race_collision" |-> definition ( "n" , Return ( BinOp ( "*" , Name ( "n" ) , Name ( "n" ) ) ) )
+  </functions>
+  <environment>
+    "n" |-> 0
+  </environment>
+  <result>
+    0
+  </result>
+</state>
+<state>
+  <k>
+    .K
+  </k>
+  <functions>
+    "car_race_collision" |-> definition ( "n" , Return ( BinOp ( "*" , Name ( "n" ) , Name ( "n" ) ) ) )
+  </functions>
+  <environment>
+    "n" |-> 3
+  </environment>
+  <result>
+    9
+  </result>
+</state>
+<state>
+  <k>
+    .K
+  </k>
+  <functions>
+    "car_race_collision" |-> definition ( "n" , Return ( BinOp ( "*" , Name ( "n" ) , Name ( "n" ) ) ) )
+  </functions>
+  <environment>
+    "n" |-> 10
+  </environment>
+  <result>
+    100
+  </result>
+</state>
+#Top
+
+codex
+The symbolic proof closed cleanly. The full reproducibility script now recompiles the semantics, executes `n = 0, 3, 10` to results `0, 9, 100`, and runs the universal proof; its final command printed `#Top` and the script exited 0. I’m doing one last artifact/integrity check before handing it over.
+The implementation, generated AST, executable semantics, symbolic specification, and reproducible proof script are complete; the full script exits 0 with kprove output #Top.
+  ✓ Inspect prompt.py and py2mpy.py; identify contract and accepted AST subset
+  ✓ Implement solution.py and generate solution.mpy
+  ✓ Develop semantic.k and verification.k
+  ✓ Write spec.k and prove all claims
+  ✓ Create prove.sh and rerun complete validation
+exec
+/bin/bash -lc "test -x prove.sh && test -s solution.py && test -s solution.mpy && test -s semantic.k && test -s verification.k && test -s spec.k && cmp solution.mpy <(python3 py2mpy.py solution.py) && rg -n '"'^module |''^  claim|''^kprove |''^krun |''^kompile |''^python3 '"' semantic.k verification.k spec.k prove.sh && find . -maxdepth 1 -type f -printf '%f\\n' | sort" in /work
+ succeeded in 0ms:
+prove.sh:4:python3 py2mpy.py solution.py > solution.mpy
+prove.sh:6:kompile verification.k \
+prove.sh:11:krun solution.mpy --definition verification-kompiled -cN=0
+prove.sh:12:krun solution.mpy --definition verification-kompiled -cN=3
+prove.sh:13:krun solution.mpy --definition verification-kompiled -cN=10
+prove.sh:15:kprove spec.k --definition verification-kompiled
+spec.k:3:module SPEC
+spec.k:6:  claim
+verification.k:3:module VERIFICATION
+semantic.k:1:module SEMANTIC-SYNTAX
+semantic.k:19:module SEMANTIC
+prompt.py
+prove.sh
+py2mpy.py
+run-input.json
+semantic.k
+solution.mpy
+solution.py
+spec.k
+verification.k
+
+diff --git a/prove.sh b/prove.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef9182f07650a1a2433c0d3b10c166b2c6d204e2
+--- /dev/null
++++ b/prove.sh
+@@ -0,0 +1,15 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++python3 py2mpy.py solution.py > solution.mpy
++
++kompile verification.k \
++  --backend haskell \
++  --main-module VERIFICATION \
++  --syntax-module SEMANTIC-SYNTAX
++
++krun solution.mpy --definition verification-kompiled -cN=0
++krun solution.mpy --definition verification-kompiled -cN=3
++krun solution.mpy --definition verification-kompiled -cN=10
++
++kprove spec.k --definition verification-kompiled
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+exec
+/bin/bash -lc "ls -l run-input.json && sed -n '1,80p' run-input.json" in /work
+ succeeded in 0ms:
+-rw-r--r-- 1 agent agent 540 Jul 22 03:47 run-input.json
+{
+  "condition": {
+    "kit": false,
+    "name": "bare",
+    "semantics": false
+  },
+  "config": "codex-gpt-5.6-sol-xhigh-bare",
+  "inputs": {
+    "instruction_prompt": "bare.md",
+    "instruction_prompt_sha256": "4fbd8d83152646045c82c9b1c86a3c0c9bf686de949fcbf8c3eff6755a261d9e",
+    "problem_prompt_sha256": "d4a9a6f17e6f65f8fa63bffa89d863ca691859fab85fff3f60f378d9340cc489",
+    "translator_sha256": "406485eac118431c08ef59f30f79dfa6aa9d5825408917fc5ce7c806e664db16"
+  },
+  "problem_id": "41-car-race-collision",
+  "schema_version": 1
+}
+
+diff --git a/prove.sh b/prove.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef9182f07650a1a2433c0d3b10c166b2c6d204e2
+--- /dev/null
++++ b/prove.sh
+@@ -0,0 +1,15 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++python3 py2mpy.py solution.py > solution.mpy
++
++kompile verification.k \
++  --backend haskell \
++  --main-module VERIFICATION \
++  --syntax-module SEMANTIC-SYNTAX
++
++krun solution.mpy --definition verification-kompiled -cN=0
++krun solution.mpy --definition verification-kompiled -cN=3
++krun solution.mpy --definition verification-kompiled -cN=10
++
++kprove spec.k --definition verification-kompiled
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+codex
+Implemented all required artifacts:
+
+- [solution.py](/work/solution.py) and generated [solution.mpy](/work/solution.mpy)
+- [semantic.k](/work/semantic.k) with executable function, environment, expression, and return semantics
+- [verification.k](/work/verification.k)
+- [spec.k](/work/spec.k), proving `car_race_collision(N) = N * N` for `N >= 0`
+- [prove.sh](/work/prove.sh) with exact compilation, execution, and proof commands
+
+`./prove.sh` exited 0. Concrete K executions returned `0`, `9`, and `100`; `kprove` printed `#Top`.
+
+RESULT: KPROVE_PASSED — Every required positive proof command completed successfully with `#Top` and exit code 0.
+diff --git a/prove.sh b/prove.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef9182f07650a1a2433c0d3b10c166b2c6d204e2
+--- /dev/null
++++ b/prove.sh
+@@ -0,0 +1,15 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++python3 py2mpy.py solution.py > solution.mpy
++
++kompile verification.k \
++  --backend haskell \
++  --main-module VERIFICATION \
++  --syntax-module SEMANTIC-SYNTAX
++
++krun solution.mpy --definition verification-kompiled -cN=0
++krun solution.mpy --definition verification-kompiled -cN=3
++krun solution.mpy --definition verification-kompiled -cN=10
++
++kprove spec.k --definition verification-kompiled
+diff --git a/semantic.k b/semantic.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3b5518795942bfb5aa67c921baf8a9ef3179091
+--- /dev/null
++++ b/semantic.k
+@@ -0,0 +1,64 @@
++module SEMANTIC-SYNTAX
++  imports INT-SYNTAX
++  imports STRING-SYNTAX
++
++  syntax Pgm ::= "Module" "(" Stmt ")"                  [symbol(Module)]
++
++  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
++                                                               [symbol(FuncDef)]
++                | "Return" "(" Expr ")"                     [symbol(Return)]
++
++  syntax Params ::= "Params" "(" String ")"                [symbol(Params)]
++
++  syntax Expr ::= "Int" "(" Int ")"                        [symbol(Int)]
++                | "Name" "(" String ")"                    [symbol(Name)]
++                | "BinOp" "(" String "," Expr "," Expr ")"
++                                                               [symbol(BinOp)]
++endmodule
++
++module SEMANTIC
++  imports SEMANTIC-SYNTAX
++  imports INT
++  imports MAP
++
++  syntax KItem ::= "run" "(" String "," Int ")"           [symbol(run)]
++                 | "definition" "(" String "," Stmt ")"   [symbol(definition)]
++                 | "execute" "(" Stmt ")"                  [symbol(execute)]
++                 | "evaluate" "(" Expr ")"                 [symbol(evaluate)]
++                 | "multiplyRight" "(" Expr ")"            [symbol(multiplyRight)]
++                 | "multiplyBy" "(" Int ")"                [symbol(multiplyBy)]
++                 | "finishReturn"                             [symbol(finishReturn)]
++
++  configuration
++    <state>
++      <k> $PGM:Pgm ~> run("car_race_collision", $N:Int) </k>
++      <functions> .Map </functions>
++      <environment> .Map </environment>
++      <result> 0 </result>
++    </state>
++
++  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
++       <functions> .Map => F |-> definition(P, BODY) </functions>
++
++  rule <k> run(F, I) => execute(BODY) ... </k>
++       <functions>... F |-> definition(P, BODY) ...</functions>
++       <environment> _ => P |-> I </environment>
++
++  rule <k> execute(Return(E)) => evaluate(E) ~> finishReturn ... </k>
++
++  rule <k> evaluate(Int(I)) => I ... </k>
++
++  rule <k> evaluate(Name(X)) => I ... </k>
++       <environment>... X |-> I ...</environment>
++
++  rule <k> evaluate(BinOp("*", L, R))
++        => evaluate(L) ~> multiplyRight(R) ... </k>
++
++  rule <k> I:Int ~> multiplyRight(R)
++        => evaluate(R) ~> multiplyBy(I) ... </k>
++
++  rule <k> J:Int ~> multiplyBy(I) => I *Int J ... </k>
++
++  rule <k> I:Int ~> finishReturn => .K ... </k>
++       <result> _ => I </result>
++endmodule
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ec4c5a61f36aa89bb282a8f4a3aeaa0433d0f15f
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def car_race_collision(n: int):
++    return n * n
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..d81372d74b4bbac4e09a4e7be979510c57b14abc
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,21 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  claim
++    <k>
++      Module(
++        FuncDef(
++          "car_race_collision",
++          Params("n"),
++          Return(BinOp("*", Name("n"), Name("n")))
++        )
++      ) ~> run("car_race_collision", N)
++      => .K
++    </k>
++    <functions> .Map => "car_race_collision" |-> definition("n", Return(BinOp("*", Name("n"), Name("n")))) </functions>
++    <environment> .Map => "n" |-> N </environment>
++    <result> 0 => N *Int N </result>
++    requires N >=Int 0
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2c92b3313b20e312997d626359f177888bee1624
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,5 @@
++requires "semantic.k"
++
++module VERIFICATION
++  imports SEMANTIC
++endmodule
+
+tokens used
+31,311
+Implemented all required artifacts:
+
+- [solution.py](/work/solution.py) and generated [solution.mpy](/work/solution.mpy)
+- [semantic.k](/work/semantic.k) with executable function, environment, expression, and return semantics
+- [verification.k](/work/verification.k)
+- [spec.k](/work/spec.k), proving `car_race_collision(N) = N * N` for `N >= 0`
+- [prove.sh](/work/prove.sh) with exact compilation, execution, and proof commands
+
+`./prove.sh` exited 0. Concrete K executions returned `0`, `9`, and `100`; `kprove` printed `#Top`.
+
+RESULT: KPROVE_PASSED — Every required positive proof command completed successfully with `#Top` and exit code 0.

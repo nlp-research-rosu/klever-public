@@ -1,0 +1,291 @@
+Script started on 2026-07-26 12:54:59-05:00 [<not executed on terminal>]
+Full source inventory with line numbers:
++ nl -ba /tmp/audit-work/k-proof/semantic.k
+     1	// A deliberately small Python semantics for the constructor subset emitted by
+     2	// solution.py.  Python strings are represented as lists of Unicode code points;
+     3	// the case operations below cover the ASCII letters used by the HumanEval task.
+     4	
+     5	module MPY-SYNTAX
+     6	  imports BOOL-SYNTAX
+     7	  imports INT-SYNTAX
+     8	  imports STRING-SYNTAX
+     9	
+    10	  syntax Exprs ::= List{Expr, ","}
+    11	  syntax Params ::= "Params" "(" String ")"
+    12	
+    13	  syntax Expr ::= "Name"       "(" String ")"
+    14	                | "Str"        "(" String ")"
+    15	                | "Bool"       "(" Bool ")"
+    16	                | "Int"        "(" Int ")"
+    17	                | "UnaryOp"    "(" String "," Expr ")"
+    18	                | "Attribute"  "(" Expr "," String ")"
+    19	                | "Call"       "(" Expr "," Exprs ")"
+    20	                | "IfExp"      "(" Expr "," Expr "," Expr ")"
+    21	                | "GenExp"     "(" Expr "," CompFor ")"
+    22	                | "Subscript"  "(" Expr "," SliceSpec ")"
+    23	
+    24	  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+    25	  syntax SliceBound ::= "NoBound" | Expr
+    26	  syntax SliceSpec ::= "Slice" "(" SliceBound "," SliceBound "," SliceBound ")"
+    27	
+    28	  syntax Stmt ::= "Return"  "(" Expr ")"
+    29	                | "FuncDef" "(" String "," Params "," Stmts ")"
+    30	  syntax Stmts ::= List{Stmt, ""}
+    31	  syntax Program ::= "Module" "(" Stmts ")"
+    32	endmodule
+    33	
+    34	module SEMANTIC
+    35	  imports MPY-SYNTAX
+    36	  imports BOOL
+    37	  imports INT
+    38	  imports STRING
+    39	
+    40	  // Inductive Python-string values.  pstr is a concrete-input convenience;
+    41	  // symbolic proofs quantify directly over PString.
+    42	  syntax PString ::= ".PString"
+    43	                   | Int "::" PString
+    44	                   | "pstr" "(" String ")" [function]
+    45	  syntax PString ::= "pstrAt" "(" String "," Int ")" [function]
+    46	
+    47	  rule pstr(S) => pstrAt(S, 0)
+    48	  rule pstrAt(S, I) => .PString
+    49	    requires I >=Int lengthString(S)
+    50	  rule pstrAt(S, I) => ordChar(substrString(S, I, I +Int 1)) :: pstrAt(S, I +Int 1)
+    51	    requires I <Int lengthString(S)
+    52	
+    53	  // Character classification and case reversal.
+    54	  syntax Bool ::= "isAlpha" "(" Int ")" [function, total]
+    55	  rule isAlpha(C) => (C >=Int 65 andBool C <=Int 90)
+    56	                     orBool (C >=Int 97 andBool C <=Int 122)
+    57	
+    58	  syntax Int ::= "toggle" "(" Int ")" [function, total]
+    59	  rule toggle(C) => C +Int 32
+    60	    requires C >=Int 65 andBool C <=Int 90
+    61	  rule toggle(C) => C -Int 32
+    62	    requires C >=Int 97 andBool C <=Int 122
+    63	  rule toggle(C) => C
+    64	    requires notBool isAlpha(C)
+    65	
+    66	  syntax Bool ::= "hasAlpha" "(" PString ")" [function, total]
+    67	  rule hasAlpha(.PString) => false
+    68	  rule hasAlpha(C :: S) => isAlpha(C) orBool hasAlpha(S)
+    69	
+    70	  syntax PString ::= "swapCase" "(" PString ")" [function, total]
+    71	  rule swapCase(.PString) => .PString
+    72	  rule swapCase(C :: S) => toggle(C) :: swapCase(S)
+    73	
+    74	  syntax PString ::= "reverse" "(" PString ")" [function, total]
+    75	                   | "reverseAcc" "(" PString "," PString ")" [function, total]
+    76	  rule reverse(S) => reverseAcc(S, .PString)
+    77	  rule reverseAcc(.PString, ACC) => ACC
+    78	  rule reverseAcc(C :: S, ACC) => reverseAcc(S, C :: ACC)
+    79	
+    80	  syntax PString ::= "ifPString" "(" Bool "," PString "," PString ")" [function, total]
+    81	  rule ifPString(true, THEN, _) => THEN
+    82	  rule ifPString(false, _, ELSE) => ELSE
+    83	
+    84	  // Expression evaluation for the pure expression used by solve.  This keeps
+    85	  // the AST visible: any/isalpha supplies the test, swapcase the then arm, and
+    86	  // the [::-1] slice the else arm.
+    87	  syntax Bool ::= "evalBool" "(" Expr "," PString ")" [function]
+    88	  syntax PString ::= "evalString" "(" Expr "," PString ")" [function]
+    89	
+    90	  rule evalBool(
+    91	         Call(Name("any"),
+    92	           GenExp(Call(Attribute(Name(C), "isalpha"), _ARGS),
+    93	             CompFor(Name(C), Name("s"), _IFS))),
+    94	         S) => hasAlpha(S)
+    95	
+    96	  rule evalString(IfExp(TEST, THEN, ELSE), S) =>
+    97	    ifPString(evalBool(TEST, S), evalString(THEN, S), evalString(ELSE, S))
+    98	  rule evalString(Call(Attribute(Name("s"), "swapcase"), _ARGS), S) => swapCase(S)
+    99	  rule evalString(
+   100	         Subscript(Name("s"),
+   101	           Slice(NoBound, NoBound, UnaryOp("-", Int(1)))),
+   102	         S) => reverse(S)
+   103	
+   104	  syntax Result ::= "noResult" | PString
+   105	
+   106	  configuration
+   107	    <humanEval>
+   108	      <k> $PGM:Program </k>
+   109	      <input> $INPUT:PString </input>
+   110	      <result> noResult </result>
+   111	    </humanEval>
+   112	
+   113	  rule <k> Module(FuncDef("solve", Params("s"), Return(E))) => .K </k>
+   114	       <input> S </input>
+   115	       <result> noResult => evalString(E, S) </result>
+   116	endmodule
+[exit 0]
++ nl -ba /tmp/audit-work/k-proof/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // Independent statement of the prompt's result, expressed with the string
+     7	  // primitives defined by the semantics.
+     8	  syntax PString ::= "expected" "(" PString ")" [function, total]
+     9	  rule expected(S) => ifPString(hasAlpha(S), swapCase(S), reverse(S))
+    10	endmodule
+[exit 0]
++ nl -ba /tmp/audit-work/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // For every input string, executing the translated solution reaches exactly
+     7	  // the result required by the prompt.
+     8	  claim
+     9	    <humanEval>
+    10	      <k>
+    11	        Module(
+    12	          FuncDef("solve", Params("s"),
+    13	            Return(
+    14	              IfExp(
+    15	                Call(
+    16	                  Name("any"),
+    17	                  GenExp(Call(Attribute(Name("c"), "isalpha"), _ISALPHA_ARGS:Exprs),
+    18	                    CompFor(Name("c"), Name("s"), Bool(true)))),
+    19	                Call(Attribute(Name("s"), "swapcase"), _SWAPCASE_ARGS:Exprs),
+    20	                Subscript(
+    21	                  Name("s"),
+    22	                  Slice(NoBound, NoBound, UnaryOp("-", Int(1))))))))
+    23	        => .K
+    24	      </k>
+    25	      <input> S:PString </input>
+    26	      <result> noResult => expected(S) </result>
+    27	    </humanEval>
+    28	endmodule
+[exit 0]
+
+All local declaration/rule/claim headers:
++ rg -n \^\[\[:space:\]\]\*\(module\|endmodule\|imports\|syntax\|configuration\|rule\|claim\) /tmp/audit-work/k-proof/semantic.k /tmp/audit-work/k-proof/verification.k /tmp/audit-work/k-proof/spec.k
+/tmp/audit-work/k-proof/spec.k
+3:module SPEC
+4:  imports VERIFICATION
+8:  claim
+28:endmodule
+
+/tmp/audit-work/k-proof/verification.k
+3:module VERIFICATION
+4:  imports SEMANTIC
+8:  syntax PString ::= "expected" "(" PString ")" [function, total]
+9:  rule expected(S) => ifPString(hasAlpha(S), swapCase(S), reverse(S))
+10:endmodule
+
+/tmp/audit-work/k-proof/semantic.k
+5:module MPY-SYNTAX
+6:  imports BOOL-SYNTAX
+7:  imports INT-SYNTAX
+8:  imports STRING-SYNTAX
+10:  syntax Exprs ::= List{Expr, ","}
+11:  syntax Params ::= "Params" "(" String ")"
+13:  syntax Expr ::= "Name"       "(" String ")"
+24:  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+25:  syntax SliceBound ::= "NoBound" | Expr
+26:  syntax SliceSpec ::= "Slice" "(" SliceBound "," SliceBound "," SliceBound ")"
+28:  syntax Stmt ::= "Return"  "(" Expr ")"
+30:  syntax Stmts ::= List{Stmt, ""}
+31:  syntax Program ::= "Module" "(" Stmts ")"
+32:endmodule
+34:module SEMANTIC
+35:  imports MPY-SYNTAX
+36:  imports BOOL
+37:  imports INT
+38:  imports STRING
+42:  syntax PString ::= ".PString"
+45:  syntax PString ::= "pstrAt" "(" String "," Int ")" [function]
+47:  rule pstr(S) => pstrAt(S, 0)
+48:  rule pstrAt(S, I) => .PString
+50:  rule pstrAt(S, I) => ordChar(substrString(S, I, I +Int 1)) :: pstrAt(S, I +Int 1)
+54:  syntax Bool ::= "isAlpha" "(" Int ")" [function, total]
+55:  rule isAlpha(C) => (C >=Int 65 andBool C <=Int 90)
+58:  syntax Int ::= "toggle" "(" Int ")" [function, total]
+59:  rule toggle(C) => C +Int 32
+61:  rule toggle(C) => C -Int 32
+63:  rule toggle(C) => C
+66:  syntax Bool ::= "hasAlpha" "(" PString ")" [function, total]
+67:  rule hasAlpha(.PString) => false
+68:  rule hasAlpha(C :: S) => isAlpha(C) orBool hasAlpha(S)
+70:  syntax PString ::= "swapCase" "(" PString ")" [function, total]
+71:  rule swapCase(.PString) => .PString
+72:  rule swapCase(C :: S) => toggle(C) :: swapCase(S)
+74:  syntax PString ::= "reverse" "(" PString ")" [function, total]
+76:  rule reverse(S) => reverseAcc(S, .PString)
+77:  rule reverseAcc(.PString, ACC) => ACC
+78:  rule reverseAcc(C :: S, ACC) => reverseAcc(S, C :: ACC)
+80:  syntax PString ::= "ifPString" "(" Bool "," PString "," PString ")" [function, total]
+81:  rule ifPString(true, THEN, _) => THEN
+82:  rule ifPString(false, _, ELSE) => ELSE
+87:  syntax Bool ::= "evalBool" "(" Expr "," PString ")" [function]
+88:  syntax PString ::= "evalString" "(" Expr "," PString ")" [function]
+90:  rule evalBool(
+96:  rule evalString(IfExp(TEST, THEN, ELSE), S) =>
+98:  rule evalString(Call(Attribute(Name("s"), "swapcase"), _ARGS), S) => swapCase(S)
+99:  rule evalString(
+104:  syntax Result ::= "noResult" | PString
+106:  configuration
+113:  rule <k> Module(FuncDef("solve", Params("s"), Return(E))) => .K </k>
+116:endmodule
+[exit 0]
+
+Copy reviewer witness terms and body mutation into scratch:
++ cp /audit-output/evidence/05_witness-filter-false.mpy /audit-output/evidence/05_witness-swapcase-arg.mpy /audit-output/evidence/spec-body-mutation.k /tmp/audit-work/k-proof/
+[exit 0]
+
+Independent Python source-language outcomes:
++ python3 /audit-output/evidence/05_semantics_witnesses.py
+filter_false input='a' python_result= 'a'
+swapcase_arg input='a' python_exception= TypeError str.swapcase() takes no arguments (1 given)
+unicode input='éa' python_result= 'ÉA'
+unicode input='éa' python_codepoints= [201, 65]
+unicode input='ß1' python_result= 'SS1'
+unicode input='ß1' python_codepoints= [83, 83, 49]
+[exit 0]
+
+False semantic conclusion witness 1: ignored generator filter.
+The K rule returns swapCase("a") = "A"; Python returns "a".
++ (cd /tmp/audit-work/k-proof && krun 05_witness-filter-false.mpy --definition fresh-semantic-kompiled -cINPUT=pstr\(\"a\"\))
+[0m[0m<humanEval>[0m
+  <k>[0m
+    .K
+  </k>[0m
+  <input>[0m
+    97 ::[0m .PString[0m
+  </input>[0m
+  <result>[0m
+    65 ::[0m .PString[0m
+  </result>[0m
+</humanEval>[0m
+[exit 0]
+
+False semantic conclusion witness 2: ignored swapcase argument.
+The K rule returns "A"; Python raises TypeError.
++ (cd /tmp/audit-work/k-proof && krun 05_witness-swapcase-arg.mpy --definition fresh-semantic-kompiled -cINPUT=pstr\(\"a\"\))
+[0m[0m<humanEval>[0m
+  <k>[0m
+    .K
+  </k>[0m
+  <input>[0m
+    97 ::[0m .PString[0m
+  </input>[0m
+  <result>[0m
+    65 ::[0m .PString[0m
+  </result>[0m
+</humanEval>[0m
+[exit 0]
+
+Material body-sensitivity mutation parses successfully:
++ (cd /tmp/audit-work/k-proof && kprove spec-body-mutation.k --definition fresh-verification-kompiled --spec-module SPEC-BODY-MUTATION --dry-run)
+kore-exec /tmp/audit-work/k-proof/./fresh-verification-kompiled/definition.kore --module VERIFICATION --prove /tmp/.kprove-2026-07-26-12-55-02-750-c5a06b34-0f91-4146-9520-1a8beaf75e1c/spec.kore --spec-module SPEC-BODY-MUTATION --output /tmp/.kprove-2026-07-26-12-55-02-750-c5a06b34-0f91-4146-9520-1a8beaf75e1c/result.kore
+[0m[0m[exit 0]
+
+Material false source theorem under candidate semantics:
++ (cd /tmp/audit-work/k-proof && kprove spec-body-mutation.k --definition fresh-verification-kompiled --spec-module SPEC-BODY-MUTATION)
+#Top
+[0m[0m[exit 0]
+
+Script done on 2026-07-26 12:55:05-05:00 [COMMAND_EXIT_CODE="0"]

@@ -1,0 +1,1 @@
+bash -c python3\ /tmp/audit-work/py2mpy.py\ /tmp/audit-work/auditor_concrete_probe.py\ \>\ /tmp/audit-work/auditor_concrete_probe.mpy\ \&\&\ sha256sum\ /tmp/audit-work/auditor_concrete_probe.py\ /tmp/audit-work/auditor_concrete_probe.mpy 

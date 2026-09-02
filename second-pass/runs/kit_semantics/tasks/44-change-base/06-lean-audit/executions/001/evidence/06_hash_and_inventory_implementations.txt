@@ -1,0 +1,177 @@
++ sed -n 760,930p /reference/tools/k_rule_inventory.py
+        ).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace has no regular verification.k: {verification}"
+        ) from error
+    if not stat.S_ISREG(verification_mode):
+        raise KRuleInventoryError(
+            f"workspace has no regular verification.k: {verification}"
+        )
+    try:
+        verification_bytes = verification.read_bytes()
+        text = verification_bytes.decode()
+    except (OSError, UnicodeError) as error:
+        raise KRuleInventoryError(
+            f"cannot read verification.k: {verification}"
+        ) from error
+    masked_text = _mask_non_code(text)
+    modules = _modules(masked_text)
+    module = _verification_module(
+        modules, _last_verification_main_module(workspace)
+    )
+    closure = _verification_closure(modules, module)
+    rule_documents = _rule_documents(text, closure)
+    return {
+        "schema_version": 2,
+        "verification_file": "verification.k",
+        "verification_sha256": hashlib.sha256(verification_bytes).hexdigest(),
+        "verification_module": module.name,
+        "verification_modules": [module.name for module in closure],
+        "rules": rule_documents,
+        "inventory_sha256": canonical_json_sha256(rule_documents),
+    }
++ sed -n 160,225p /reference/tools/pipeline_contract.py
+
+def require_real_directory(path: Path, label: str) -> Path:
+    if not stat.S_ISDIR(_lstat(path, label).st_mode):
+        raise PipelineContractError(f"{label} must be a real directory: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise PipelineContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def require_regular_file(path: Path, label: str) -> Path:
+    if not stat.S_ISREG(_lstat(path, label).st_mode):
+        raise PipelineContractError(f"{label} must be a real regular file: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise PipelineContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise PipelineContractError(f"cannot hash file {path}: {error}") from error
+    return digest.hexdigest()
+
+
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, "tree root")
+    digest = hashlib.sha256()
+    pending = [root]
+    entries: list[tuple[str, str, Path]] = []
+    while pending:
+        directory = pending.pop()
+        try:
+            children = list(os.scandir(directory))
+        except OSError as error:
+            raise PipelineContractError(f"cannot scan tree {directory}: {error}") from error
+        for child in children:
+            path = Path(child.path)
+            try:
+                mode = child.stat(follow_symlinks=False).st_mode
+            except OSError as error:
+                raise PipelineContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise PipelineContractError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    for relative, kind, path in sorted(entries):
+        encoded = relative.encode()
+        digest.update(len(encoded).to_bytes(4, "big"))
+        digest.update(encoded)
+        digest.update(kind.encode() + b"\0")
+        if kind == "file":
+            try:
++ sed -n 1450,1525p /reference/tools/klean_export.py
+
+
+def _patch_lake_build_directory(package: Path) -> None:
+    lakefile = package / "lakefile.toml"
+    if not lakefile.is_file() or lakefile.is_symlink():
+        raise KleanExportError("generated package is missing regular lakefile.toml")
+    text = lakefile.read_text()
+    build_setting = 'buildDir = "/tmp/klean-generated-build"\n'
+    stack_setting = (
+        'moreLeanArgs = ["-D maxRecDepth=100000", "-s", "65536"]\n'
+    )
+    if build_setting in text and stack_setting in text:
+        return
+    setting = ""
+    if build_setting not in text:
+        setting += build_setting
+    if stack_setting not in text:
+        setting += stack_setting
+    marker = "[[lean_lib]]"
+    if marker in text:
+        text = text.replace(marker, setting + "\n" + marker, 1)
+    else:
+        text = text.rstrip() + "\n" + setting
+    lakefile.write_text(text)
+
+
+def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+    if not root.is_dir() or root.is_symlink():
+        raise KleanExportError(f"tree root must be a real directory: {root}")
+    entries: list[tuple[str, str, Path]] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        for child in os.scandir(directory):
+            path = Path(child.path)
+            mode = child.stat(follow_symlinks=False).st_mode
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise KleanExportError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    return sorted(entries)
+
+
+def tree_digest(root: Path) -> str:
+    digest = hashlib.sha256()
+    for relative, kind, path in _tree_entries(Path(root)):
+        digest.update(relative.encode() + b"\0" + kind.encode() + b"\0")
+        if kind == "file":
+            digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def _regular_json(path: Path) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise KleanExportError(f"required JSON is not a regular file: {path}")
+    try:
+        document = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise KleanExportError(f"malformed JSON: {path}") from error
+    if not isinstance(document, dict):
+        raise KleanExportError(f"JSON must be an object: {path}")
+    return document
+
+
+def _run_command(
+    command: list[str] | str,
+    *,
+    cwd: Path | None,
+    timeout: int,
+    env: dict[str, str],

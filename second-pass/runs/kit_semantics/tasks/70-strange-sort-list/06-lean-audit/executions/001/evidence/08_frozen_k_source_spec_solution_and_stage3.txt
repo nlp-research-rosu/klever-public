@@ -1,0 +1,255 @@
++ nl -ba /reference/k-proof/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // True exactly when every element of the modeled Python list is an integer.
+     7	  syntax Bool ::= allInts(ValSeq) [function, total]
+     8	  rule allInts(.ValSeq)                => true
+     9	  rule allInts(vCons(V:Val, R:ValSeq)) => isInt(V) andBool allInts(R)
+    10	
+    11	  // Append the alternating leftmost/rightmost elements from S[L..R] to A.
+    12	  // The three guards partition all integer bounds, and recursive calls shrink
+    13	  // R - L by two.
+    14	  syntax ValSeq ::= strangeAcc(ValSeq, ValSeq, Int, Int) [function, total]
+    15	  rule strangeAcc(A:ValSeq, _:ValSeq, L:Int, R:Int) => A
+    16	    requires L >Int R
+    17	  rule strangeAcc(A:ValSeq, S:ValSeq, L:Int, R:Int)
+    18	    => valSeqConcat(A, vCons(valSeqAt(S, L), .ValSeq))
+    19	    requires L ==Int R
+    20	  rule strangeAcc(A:ValSeq, S:ValSeq, L:Int, R:Int)
+    21	    => strangeAcc(
+    22	         valSeqConcat(
+    23	           valSeqConcat(A, vCons(valSeqAt(S, L), .ValSeq)),
+    24	           vCons(valSeqAt(S, R), .ValSeq)),
+    25	         S, L +Int 1, R -Int 1)
+    26	    requires L <Int R
+    27	
+    28	  // Removing a known-present integer key from a disjoint Map fragment leaves
+    29	  // exactly that fragment. This only canonicalizes the Map update emitted by
+    30	  // the fixed #pop rule.
+    31	  rule (M:Map K:Int |-> _V:Scope) [K <- undef] => M
+    32	    requires notBool K in_keys(M)
+    33	    [simplification]
+    34	endmodule
++ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [loop-invariant]:
+     7	    <k>
+     8	      #while(
+     9	        Compare(Name("left"), CmpOp("<", Name("right"))),
+    10	        Expr(
+    11	          Call(
+    12	            Attribute(Name("result"), "append"),
+    13	            Subscript(Name("ordered"), Name("left"))))
+    14	        Expr(
+    15	          Call(
+    16	            Attribute(Name("result"), "append"),
+    17	            Subscript(Name("ordered"), Name("right"))))
+    18	        AugAssign(Name("left"), "+", Int(1))
+    19	        AugAssign(Name("right"), "-", Int(1)))
+    20	      ~> (
+    21	           If(
+    22	             Compare(Name("left"), CmpOp("==", Name("right"))),
+    23	             Expr(
+    24	               Call(
+    25	                 Attribute(Name("result"), "append"),
+    26	                 Subscript(Name("ordered"), Name("left")))),
+    27	             .Stmts)
+    28	           Return(Name("result"))
+    29	           .Stmts
+    30	         )
+    31	      ~> #endcall
+    32	      => ref(HR)
+    33	    </k>
+    34	    <env> 1 => 0 </env>
+    35	    <scopes>
+    36	      (SC:Map
+    37	       1 |-> scope(
+    38	         "lst"       |-> list(VS)
+    39	         "ordered"   |-> ref(HO)
+    40	         "result"    |-> ref(HR)
+    41	         "left"      |-> L
+    42	         "right"     |-> R,
+    43	         parent(0)))
+    44	      => SC
+    45	    </scopes>
+    46	    <scopeLoc> 2 => 1 </scopeLoc>
+    47	    <heap>
+    48	      HO |-> list(S)
+    49	      HR |-> (list(A) => list(strangeAcc(A, S, L, R)))
+    50	    </heap>
+    51	    <heapLoc> HL </heapLoc>
+    52	    <stack> ListItem(frame(.K, 0, 1)) => .List </stack>
+    53	    <ret> noRet </ret>
+    54	    <exc> NoExc </exc>
+    55	    <exit-code> 0 </exit-code>
+    56	    requires L >=Int 0
+    57	
+    58	  claim [entry-point]:
+    59	    <k> Call(Name("strange_sort_list"), list(VS)) => ref(1) </k>
+    60	    <env> 0 </env>
+    61	    <scopes>
+    62	      -1 |-> builtinsScope
+    63	      0  |-> scope(
+    64	        "strange_sort_list" |->
+    65	          closureVal(
+    66	            "lst",
+    67	            Assign(Name("ordered"), Call(Name("sorted"), Name("lst")))
+    68	            Assign(Name("result"), ListExpr(.Exprs))
+    69	            Assign(Name("left"), Int(0))
+    70	            Assign(
+    71	              Name("right"),
+    72	              BinOp("-", Call(Name("len"), Name("ordered")), Int(1)))
+    73	            While(
+    74	              Compare(Name("left"), CmpOp("<", Name("right"))),
+    75	              Expr(
+    76	                Call(
+    77	                  Attribute(Name("result"), "append"),
+    78	                  Subscript(Name("ordered"), Name("left"))))
+    79	              Expr(
+    80	                Call(
+    81	                  Attribute(Name("result"), "append"),
+    82	                  Subscript(Name("ordered"), Name("right"))))
+    83	              AugAssign(Name("left"), "+", Int(1))
+    84	              AugAssign(Name("right"), "-", Int(1)))
+    85	            If(
+    86	              Compare(Name("left"), CmpOp("==", Name("right"))),
+    87	              Expr(
+    88	                Call(
+    89	                  Attribute(Name("result"), "append"),
+    90	                  Subscript(Name("ordered"), Name("left")))),
+    91	              .Stmts)
+    92	            Return(Name("result")),
+    93	            0),
+    94	        parent(-1))
+    95	    </scopes>
+    96	    <scopeLoc> 1 </scopeLoc>
+    97	    <heap>
+    98	      .Map
+    99	      =>
+   100	      0 |-> list(sortVS(VS))
+   101	      1 |-> list(
+   102	        strangeAcc(
+   103	          .ValSeq,
+   104	          sortVS(VS),
+   105	          0,
+   106	          vsLen(sortVS(VS)) -Int 1))
+   107	    </heap>
+   108	    <heapLoc> 0 => 2 </heapLoc>
+   109	    <stack> .List </stack>
+   110	    <ret> noRet </ret>
+   111	    <exc> NoExc </exc>
+   112	    <exit-code> 0 </exit-code>
+   113	    requires allInts(VS)
+   114	endmodule
++ nl -ba /reference/k-proof/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	export PATH="$HOME/.nix-profile/bin:$PATH"
+     5	
+     6	python3 py2mpy.py solution.py > solution.mpy
+     7	
+     8	kompile --backend llvm reference-semantics/semantics.k \
+     9	  --main-module MPY-KRUN \
+    10	  --syntax-module MPY-SYNTAX \
+    11	  --output-definition runtime-kompiled
+    12	
+    13	python3 py2mpy.py smoke.py > smoke.mpy
+    14	krun smoke.mpy --definition runtime-kompiled
+    15	python3 differential_test.py
+    16	
+    17	kompile --backend haskell verification.k \
+    18	  --main-module VERIFICATION \
+    19	  --syntax-module MPY-SYNTAX \
+    20	  --output-definition verification-kompiled
+    21	
+    22	# Prove the exact loop-tail connection theorem without assuming it.
+    23	kprove spec.k \
+    24	  --definition verification-kompiled \
+    25	  --spec-module SPEC \
+    26	  --claims SPEC.loop-invariant
+    27	
+    28	# Use that separately proved connection theorem as a trusted circularity while
+    29	# proving the entry-point claim. Both positive commands must print #Top.
+    30	kprove spec.k \
+    31	  --definition verification-kompiled \
+    32	  --spec-module SPEC \
+    33	  --trusted SPEC.loop-invariant
+    34	
+    35	# Gate A5: the deliberately false [] -> [0] result must be rejected.
+    36	if kprove spec-vacuity.k \
+    37	  --definition verification-kompiled \
+    38	  --spec-module SPEC-VACUITY 2>&1 | tee vacuity.log; then
+    39	  echo "UNEXPECTED SUCCESS: false-result mutation proved"
+    40	  exit 1
+    41	else
+    42	  echo "EXPECTED FAILURE: false-result mutation rejected"
+    43	fi
+    44	
+    45	# Gate A1: the changed second append must invalidate the original result.
+    46	if kprove spec-body-mutation.k \
+    47	  --definition verification-kompiled \
+    48	  --spec-module SPEC-BODY-MUTATION 2>&1 | tee body-mutation.log; then
+    49	  echo "UNEXPECTED SUCCESS: changed-body mutation proved"
+    50	  exit 1
+    51	else
+    52	  echo "EXPECTED FAILURE: changed-body mutation rejected"
+    53	fi
++ nl -ba /reference/k-proof/solution.py
+     1	def strange_sort_list(lst):
+     2	    ordered = sorted(lst)
+     3	    result = []
+     4	    left = 0
+     5	    right = len(ordered) - 1
+     6	    while left < right:
+     7	        result.append(ordered[left])
+     8	        result.append(ordered[right])
+     9	        left += 1
+    10	        right -= 1
+    11	    if left == right:
+    12	        result.append(ordered[left])
+    13	    return result
++ python3 -m json.tool /reference/lemma-discovery.json
+{
+    "schema_version": 2,
+    "inventory_sha256": "da706790352d45b069c499d73417d4bd7022226e9a5a51632c2825c9366b3364",
+    "rules": [
+        {
+            "source_rule_id": "rule-8277b118773512287e2b2b20da4dbf45607f85956623bafa9028b50596471d08",
+            "classification": "DEFINITION",
+            "rationale": "Base equation of the total structural predicate allInts; it defines the predicate on the empty ValSeq and adds no independent mathematical fact."
+        },
+        {
+            "source_rule_id": "rule-bb65aed9f318cb650e6f3aaeb61b929864859d3dc05404f2b4a53b0d1f2058d0",
+            "classification": "DEFINITION",
+            "rationale": "Recursive equation defining allInts on a nonempty ValSeq by testing the head and recurring on the strict tail."
+        },
+        {
+            "source_rule_id": "rule-7e05d593a11ac1688b57228d1e3402caa7bde6bf8a21122047627bf83e3662d2",
+            "classification": "DEFINITION",
+            "rationale": "Guarded base case of the strangeAcc mathematical summary: once the left bound has crossed the right bound, the named accumulator result is A."
+        },
+        {
+            "source_rule_id": "rule-e5cf5fe356747eca4563d29d41d439e5617c1c39a5f5f46120ed36322a8c30f3",
+            "classification": "DEFINITION",
+            "rationale": "Guarded singleton case defining strangeAcc when the bounds coincide by appending the sole remaining indexed value."
+        },
+        {
+            "source_rule_id": "rule-ec00b8b164e1c0f6d16eef935ec05c2166e772018597863b95e7d0f0326eada7",
+            "classification": "DEFINITION",
+            "rationale": "Guarded recursive case defining strangeAcc by appending the left and right values and recurring on the strictly smaller interval."
+        },
+        {
+            "source_rule_id": "rule-565182bf10d31fb24d96318e023c71c80005ab90c1b99978f05bb734ef394503",
+            "classification": "DOMAIN_LEMMA",
+            "rationale": "This simplification rule asserts a Map-deletion identity rather than defining a named summary. Stage 1 compiles VERIFICATION with the rule before every kprove run and contains no prior proof of this exact rule in a module that omits it, so it is an additional trusted mathematical fact."
+        }
+    ]
+}

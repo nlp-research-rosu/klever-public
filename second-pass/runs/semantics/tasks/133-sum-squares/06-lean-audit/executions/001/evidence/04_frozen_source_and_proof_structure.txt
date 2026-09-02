@@ -1,0 +1,219 @@
+$ command -v kompile; kompile --version; command -v kprove; kprove --version
+/usr/bin/kompile
+K version:    v7.1.293
+Build date:   Fri Oct 03 13:32:35 CDT 2025
+/usr/bin/kprove
+K version:    v7.1.293
+Build date:   Fri Oct 03 13:32:35 CDT 2025
+$ nl -ba /reference/k-proof/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module SUM-SQUARES-VERIFICATION-BASE
+     4	  imports MPY
+     5	
+     6	  // Mathematical summary of the implementation's left-to-right accumulator.
+     7	  syntax Int ::= sumSquaresFrom(Int, ValSeq) [function, total]
+     8	  rule sumSquaresFrom(ACC:Int, .ValSeq) => ACC
+     9	  rule sumSquaresFrom(ACC:Int, vCons(V:Val, REST:ValSeq))
+    10	    => sumSquaresFrom(ACC +Int (ceilF(V) ^Int 2), REST)
+    11	
+    12	  // Final value of the loop target; needed only to state the complete scope
+    13	  // update without hiding the target variable behind an existential.
+    14	  syntax Val ::= lastFrom(Val, ValSeq) [function, total]
+    15	  rule lastFrom(CURRENT:Val, .ValSeq) => CURRENT
+    16	  rule lastFrom(_:Val, vCons(V:Val, REST:ValSeq))
+    17	    => lastFrom(V, REST)
+    18	endmodule
+    19	
+    20	// Downstream proof definition.  The rule below is textually the loop theorem
+    21	// proved as SUM-SQUARES-LOOP-SPEC.loop-correct against the BASE module.  It is
+    22	// compiled only after that proof command succeeds (see prove.sh), allowing the
+    23	// end-to-end function theorem to use the established loop lemma.
+    24	module SUM-SQUARES-VERIFICATION
+    25	  imports SUM-SQUARES-VERIFICATION-BASE
+    26	
+    27	  rule
+    28	    <k>
+    29	      #loop(
+    30	        list(VS:ValSeq),
+    31	        Name("number"),
+    32	        AugAssign(
+    33	          Name("result"),
+    34	          "+",
+    35	          BinOp(
+    36	            "**",
+    37	            Call(Attribute(Name("math"), "ceil"), Name("number")),
+    38	            Int(2)))
+    39	      )
+    40	      ~> CONT:K
+    41	      =>
+    42	      CONT
+    43	    </k>
+    44	    <env> L:Int </env>
+    45	    <scopes>
+    46	      (L |->
+    47	        scope(
+    48	          "lst" |-> INPUT:Val
+    49	          "number" |-> (CURRENT:Val => lastFrom(CURRENT, VS))
+    50	          "result" |-> (ACC:Int => sumSquaresFrom(ACC, VS)),
+    51	          PARENT:Parent))
+    52	      GLOBAL:Map
+    53	    </scopes>
+    54	    requires notBool (L in_keys(GLOBAL))
+    55	    [priority(40)]
+    56	endmodule
+$ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SUM-SQUARES-LOOP-SPEC
+     4	  imports SUM-SQUARES-VERIFICATION-BASE
+     5	
+     6	  // The exact loop generated from solution.py.
+     7	  claim [loop-correct]:
+     8	    <k>
+     9	      #loop(
+    10	        list(VS:ValSeq),
+    11	        Name("number"),
+    12	        AugAssign(
+    13	          Name("result"),
+    14	          "+",
+    15	          BinOp(
+    16	            "**",
+    17	            Call(Attribute(Name("math"), "ceil"), Name("number")),
+    18	            Int(2)))
+    19	      )
+    20	      ~> CONT:K
+    21	      =>
+    22	      CONT
+    23	    </k>
+    24	    <env> L:Int </env>
+    25	    <scopes>
+    26	      (L |->
+    27	        scope(
+    28	          "lst" |-> INPUT:Val
+    29	          "number" |-> (CURRENT:Val => lastFrom(CURRENT, VS))
+    30	          "result" |-> (ACC:Int => sumSquaresFrom(ACC, VS)),
+    31	          PARENT:Parent))
+    32	      GLOBAL:Map
+    33	    </scopes>
+    34	    requires notBool (L in_keys(GLOBAL))
+    35	
+    36	endmodule
+    37	
+    38	module SUM-SQUARES-SPEC
+    39	  imports SUM-SQUARES-VERIFICATION
+    40	
+    41	  // End-to-end call theorem for the closure body translated from solution.py.
+    42	  claim [function-correct]:
+    43	    <k>
+    44	      Call(
+    45	        closureVal(
+    46	          ("lst", .ParamNames),
+    47	          Assign(Name("result"), Int(0))
+    48	          For(
+    49	            Name("number"),
+    50	            Name("lst"),
+    51	            AugAssign(
+    52	              Name("result"),
+    53	              "+",
+    54	              BinOp(
+    55	                "**",
+    56	                Call(Attribute(Name("math"), "ceil"), Name("number")),
+    57	                Int(2))))
+    58	          Return(Name("result")),
+    59	          0),
+    60	        list(VS:ValSeq))
+    61	      ~> CONT:K
+    62	      =>
+    63	      sumSquaresFrom(0, VS)
+    64	      ~> CONT
+    65	    </k>
+    66	    <env> 0 </env>
+    67	    <scopes>
+    68	      0 |-> scope(.Map, parent(-1))
+    69	      -1 |-> builtinsScope
+    70	    </scopes>
+    71	    <scopeLoc> 1 </scopeLoc>
+    72	    <stack> .List </stack>
+    73	    <ret> noRet </ret>
+    74	endmodule
+$ nl -ba /reference/k-proof/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Translate the submitted implementation and the concrete smoke program.
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	python3 py2mpy.py concrete_tests.py > concrete_tests.mpy
+     7	
+     8	# Concrete execution uses the required LLVM main and syntax modules.
+     9	kompile reference-semantics/semantics.k \
+    10	  --backend llvm \
+    11	  --main-module MPY-KRUN \
+    12	  --syntax-module MPY-SYNTAX \
+    13	  --output-definition runtime-kompiled
+    14	krun concrete_tests.mpy \
+    15	  --definition runtime-kompiled \
+    16	  --output pretty
+    17	
+    18	# First prove the inductive loop lemma without assuming its promoted rule.
+    19	kompile verification.k \
+    20	  --backend haskell \
+    21	  --main-module SUM-SQUARES-VERIFICATION-BASE \
+    22	  --syntax-module MPY-SYNTAX \
+    23	  --output-definition loop-verification-kompiled
+    24	kprove spec.k \
+    25	  --definition loop-verification-kompiled \
+    26	  --spec-module SUM-SQUARES-LOOP-SPEC \
+    27	  --claims SUM-SQUARES-LOOP-SPEC.loop-correct \
+    28	  --output pretty
+    29	
+    30	# Then make the proved loop lemma available to the end-to-end call proof.
+    31	kompile verification.k \
+    32	  --backend haskell \
+    33	  --main-module SUM-SQUARES-VERIFICATION \
+    34	  --syntax-module MPY-SYNTAX \
+    35	  --output-definition verification-kompiled
+    36	kprove spec.k \
+    37	  --definition verification-kompiled \
+    38	  --spec-module SUM-SQUARES-SPEC \
+    39	  --claims SUM-SQUARES-SPEC.function-correct \
+    40	  --output pretty
+$ nl -ba /reference/k-proof/solution.py
+     1	import math
+     2	
+     3	
+     4	def sum_squares(lst):
+     5	    result = 0
+     6	    for number in lst:
+     7	        result += math.ceil(number) ** 2
+     8	    return result
+$ nl -ba /reference/k-proof/solution.mpy
+     1	Module(
+     2	  Import("math")
+     3	  FuncDef("sum_squares", Params("lst"),
+     4	    Assign(Name("result"), Int(0))
+     5	    For(Name("number"), Name("lst"),
+     6	      AugAssign(
+     7	        Name("result"),
+     8	        "+",
+     9	        BinOp(
+    10	          "**",
+    11	          Call(Attribute(Name("math"), "ceil"), Name("number")),
+    12	          Int(2))))
+    13	    Return(Name("result"))))
+$ nl -ba /reference/k-proof/prompt.py
+     1	
+     2	
+     3	def sum_squares(lst):
+     4	    """You are given a list of numbers.
+     5	    You need to return the sum of squared numbers in the given list,
+     6	    round each element in the list to the upper int(Ceiling) first.
+     7	    Examples:
+     8	    For lst = [1,2,3] the output should be 14
+     9	    For lst = [1,4,9] the output should be 98
+    10	    For lst = [1,3,5,7] the output should be 84
+    11	    For lst = [1.4,4.2,0] the output should be 29
+    12	    For lst = [-2.4,1,1] the output should be 6
+    13	    
+    14	
+    15	    """

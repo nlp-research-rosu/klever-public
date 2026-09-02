@@ -1,0 +1,455 @@
+COMMAND: sed -n 1,320p /reference/k-proof/verification.k
+requires "reference-semantics/semantics.k"
+
+module VERIFICATION
+  imports MPY
+  imports INT
+  imports BOOL
+  imports MAP
+  imports LIST
+
+  // A bijective representation of arbitrary finite Python lists of integers.
+  syntax ValSeq ::= intVals(IntSeq) [function, total]
+  rule intVals(.IntSeq)                => .ValSeq
+  rule intVals(iCons(I:Int, R:IntSeq)) => vCons(I, intVals(R))
+
+  // Inert proof ghost used only to keep the symbolic IntSeq name stable when
+  // a circularity rematches the extensionally equal embedded heap value.
+  syntax Val ::= intSeqGhost(IntSeq)
+
+  // Total mathematical indexing.  Out-of-bounds cases are totalized to zero;
+  // the only connection to source indexing below is guarded in-bounds.
+  syntax Int ::= intAt(IntSeq, Int) [function, total, no-evaluators]
+  rule intAt(.IntSeq, _:Int) => 0
+  rule intAt(iCons(I:Int, _:IntSeq), 0) => I
+  rule intAt(iCons(_:Int, R:IntSeq), N:Int) => intAt(R, N -Int 1)
+    requires N >Int 0
+  rule intAt(iCons(_:Int, _:IntSeq), N:Int) => 0
+    requires N <Int 0
+
+  // Derived structural equations connecting that representation to the
+  // frozen semantics' length and in-bounds indexing functions.
+  rule vsLen(intVals(IS:IntSeq)) => isLen(IS) [simplification]
+  rule valSeqAt(intVals(IS:IntSeq), I:Int) => intAt(IS, I)
+    requires 0 <=Int I andBool I <Int isLen(IS)
+    [simplification]
+
+  // The result specification as three nested bounded existentials over
+  // strictly increasing indices.
+  syntax Bool ::= thirdFrom(IntSeq, Int, Int, Int) [function, total]
+                | pairFrom(IntSeq, Int, Int)       [function, total]
+                | tripleFrom(IntSeq, Int)          [function, total]
+
+  rule thirdFrom(IS:IntSeq, I:Int, J:Int, K:Int) => false
+    requires I <Int 0
+      orBool J <=Int I
+      orBool K <=Int J
+      orBool I >=Int isLen(IS)
+      orBool J >=Int isLen(IS)
+  rule thirdFrom(IS:IntSeq, I:Int, J:Int, K:Int) => false
+    requires 0 <=Int I
+      andBool I <Int J
+      andBool J <Int K
+      andBool J <Int isLen(IS)
+      andBool K >=Int isLen(IS)
+  rule thirdFrom(IS:IntSeq, I:Int, J:Int, K:Int)
+    => ((intAt(IS, I) +Int intAt(IS, J) +Int intAt(IS, K))
+          ==Int 0)
+       orBool thirdFrom(IS, I, J, K +Int 1)
+    requires 0 <=Int I
+      andBool I <Int J
+      andBool J <Int K
+      andBool K <Int isLen(IS)
+
+  rule pairFrom(IS:IntSeq, I:Int, J:Int) => false
+    requires I <Int 0
+      orBool J <=Int I
+      orBool I >=Int isLen(IS)
+  rule pairFrom(IS:IntSeq, I:Int, J:Int) => false
+    requires 0 <=Int I
+      andBool I <Int J
+      andBool J >=Int isLen(IS)
+  rule pairFrom(IS:IntSeq, I:Int, J:Int)
+    => thirdFrom(IS, I, J, J +Int 1)
+       orBool pairFrom(IS, I, J +Int 1)
+    requires 0 <=Int I
+      andBool I <Int J
+      andBool J <Int isLen(IS)
+
+  rule tripleFrom(_:IntSeq, I:Int) => false
+    requires I <Int 0
+  rule tripleFrom(IS:IntSeq, I:Int) => false
+    requires I >=Int isLen(IS)
+  rule tripleFrom(IS:IntSeq, I:Int)
+    => pairFrom(IS, I, I +Int 1)
+       orBool tripleFrom(IS, I +Int 1)
+    requires 0 <=Int I andBool I <Int isLen(IS)
+
+  // Exact syntax-level abbreviations for the source loop terms and body.
+  syntax Expr ::= innerCond()  [function, total]
+                | middleCond() [function, total]
+                | outerCond()  [function, total]
+  syntax Stmts ::= innerBody()   [function, total]
+                 | middleBody()  [function, total]
+                 | outerBody()   [function, total]
+                 | programBody() [function, total]
+
+  rule innerCond() =>
+    Compare(
+      Name("k"),
+      CmpOp("<", Call(Name("len"), (Name("l"), .Exprs))))
+
+  rule innerBody() =>
+    If(
+      Compare(
+        BinOp(
+          "+",
+          BinOp(
+            "+",
+            Subscript(Name("l"), Name("i")),
+            Subscript(Name("l"), Name("j"))),
+          Subscript(Name("l"), Name("k"))),
+        CmpOp("==", Int(0))),
+      Assign(Name("found"), Bool(true)) .Stmts,
+      .Stmts)
+    AugAssign(Name("k"), "+", Int(1))
+    .Stmts
+
+  rule middleCond() =>
+    Compare(
+      Name("j"),
+      CmpOp("<", Call(Name("len"), (Name("l"), .Exprs))))
+
+  rule middleBody() =>
+    Assign(Name("k"), BinOp("+", Name("j"), Int(1)))
+    While(innerCond(), innerBody())
+    Assign(Name("k"), Int(0))
+    AugAssign(Name("j"), "+", Int(1))
+    .Stmts
+
+  rule outerCond() =>
+    Compare(
+      Name("i"),
+      CmpOp("<", Call(Name("len"), (Name("l"), .Exprs))))
+
+  rule outerBody() =>
+    Assign(Name("j"), BinOp("+", Name("i"), Int(1)))
+    While(middleCond(), middleBody())
+    Assign(Name("j"), Int(0))
+    AugAssign(Name("i"), "+", Int(1))
+    .Stmts
+
+  rule programBody() =>
+    Assign(Name("found"), Bool(false))
+    Assign(Name("i"), Int(0))
+    Assign(Name("j"), Int(0))
+    Assign(Name("k"), Int(0))
+    While(outerCond(), outerBody())
+    Return(Name("found"))
+    .Stmts
+
+  syntax Val ::= triplesClosure() [function, total]
+  rule triplesClosure() =>
+    closureVal(("l", .ParamNames), programBody(), 0)
+
+  syntax Map ::= solutionBindings() [function, total]
+  rule solutionBindings() =>
+    "triples_sum_to_zero" |-> triplesClosure()
+endmodule
+COMMAND: sed -n 1,240p /reference/k-proof/spec.k
+requires "verification.k"
+
+module SPEC
+  imports VERIFICATION
+
+  // Innermost loop circularity: all third indices k >= K.
+  claim [inner-loop]:
+    <k>
+      #while(innerCond(), innerBody())
+      => .K
+      ...
+    </k>
+    <env> 1 </env>
+    <scopes>
+        0  |-> scope(solutionBindings(), parent(-1))
+        -1 |-> builtinsScope
+        1  |-> scope(
+          ( "l"     |-> ref(0)
+            "found" |-> (FOUND:Bool =>
+              FOUND orBool thirdFrom(IS, I, J, K))
+            "i"     |-> I:Int
+            "j"     |-> J:Int
+            "k"     |-> (K:Int => isLen(IS))
+          ),
+          parent(0))
+    </scopes>
+    <scopeLoc> 2 </scopeLoc>
+    <heap>
+      -1 |-> intSeqGhost(IS:IntSeq)
+       0 |-> list(intVals(IS))
+    </heap>
+    <heapLoc> 1 </heapLoc>
+    <stack>
+      ListItem(frame(CONT:K, 0, 1))
+    </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    requires 0 <=Int I
+     andBool I <Int J
+     andBool J <Int K
+     andBool K <=Int isLen(IS)
+
+  // Middle loop circularity: all pairs j < k for one fixed first index i.
+  claim [middle-loop]:
+    <k>
+      #while(middleCond(), middleBody())
+      => .K
+      ...
+    </k>
+    <env> 1 </env>
+    <scopes>
+        0  |-> scope(solutionBindings(), parent(-1))
+        -1 |-> builtinsScope
+        1  |-> scope(
+          ( "l"     |-> ref(0)
+            "found" |-> (FOUND:Bool =>
+              FOUND orBool pairFrom(IS, I, J))
+            "i"     |-> I:Int
+            "j"     |-> (J:Int => isLen(IS))
+            "k"     |-> 0
+          ),
+          parent(0))
+    </scopes>
+    <scopeLoc> 2 </scopeLoc>
+    <heap>
+      -1 |-> intSeqGhost(IS:IntSeq)
+       0 |-> list(intVals(IS))
+    </heap>
+    <heapLoc> 1 </heapLoc>
+    <stack>
+      ListItem(frame(CONT:K, 0, 1))
+    </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    requires 0 <=Int I
+     andBool I <Int J
+     andBool J <=Int isLen(IS)
+
+  // Outer loop circularity: all increasing triples beginning at i >= I.
+  claim [outer-loop]:
+    <k>
+      #while(outerCond(), outerBody())
+      => .K
+      ...
+    </k>
+    <env> 1 </env>
+    <scopes>
+        0  |-> scope(solutionBindings(), parent(-1))
+        -1 |-> builtinsScope
+        1  |-> scope(
+          ( "l"     |-> ref(0)
+            "found" |-> (FOUND:Bool =>
+              FOUND orBool tripleFrom(IS, I))
+            "i"     |-> (I:Int => isLen(IS))
+            "j"     |-> 0
+            "k"     |-> 0
+          ),
+          parent(0))
+    </scopes>
+    <scopeLoc> 2 </scopeLoc>
+    <heap>
+      -1 |-> intSeqGhost(IS:IntSeq)
+       0 |-> list(intVals(IS))
+    </heap>
+    <heapLoc> 1 </heapLoc>
+    <stack>
+      ListItem(frame(CONT:K, 0, 1))
+    </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    requires 0 <=Int I andBool I <=Int isLen(IS)
+
+  // Required target theorem: the exact public entry call over an arbitrary
+  // finite integer sequence returns the increasing-index triple predicate.
+  claim [triples-sum-to-zero]:
+    <k>
+      Call(
+        Name("triples_sum_to_zero"),
+        (ref(0), .Exprs))
+      => tripleFrom(IS:IntSeq, 0)
+    </k>
+    <env> 0 </env>
+    <scopes>
+        0  |-> scope(solutionBindings(), parent(-1))
+        -1 |-> builtinsScope
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap>
+      -1 |-> intSeqGhost(IS)
+       0 |-> list(intVals(IS))
+    </heap>
+    <heapLoc> 1 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+endmodule
+COMMAND: sed -n 1,220p /reference/k-proof/solution.py
+def triples_sum_to_zero(l: list):
+    found = False
+    i = 0
+    j = 0
+    k = 0
+    while i < len(l):
+        j = i + 1
+        while j < len(l):
+            k = j + 1
+            while k < len(l):
+                if l[i] + l[j] + l[k] == 0:
+                    found = True
+                k += 1
+            k = 0
+            j += 1
+        j = 0
+        i += 1
+    return found
+COMMAND: sed -n 1,420p /reference/lemma-discovery.json
+{
+  "schema_version": 2,
+  "inventory_sha256": "f14289f2f89f2d52117ca7ad185617a5fe6323e4f4b762382a75f2808399ca6a",
+  "rules": [
+    {
+      "source_rule_id": "rule-61708f547727d7aa918ad6bf8a016e92b25d1ccd0e36098b415347016593af3e",
+      "classification": "DEFINITION",
+      "rationale": "Base equation defining the proof-local intVals embedding on the empty IntSeq constructor."
+    },
+    {
+      "source_rule_id": "rule-7e02eb37b7bdf1eab6f0857a5ba0eea03ae8d443148932837b9044d248811a1f",
+      "classification": "DEFINITION",
+      "rationale": "Recursive constructor equation defining intVals by preserving each integer head and embedding the tail."
+    },
+    {
+      "source_rule_id": "rule-c7de3cc91957966c2e287056766b0332cf6ffdaec28c37531cbba7f11ac07a3e",
+      "classification": "DEFINITION",
+      "rationale": "Totalization equation defining intAt on an empty IntSeq for every index."
+    },
+    {
+      "source_rule_id": "rule-9ef7f75c9d030faf85080705a0465550f676a8729fd89f75a4c89a89f3bef12a",
+      "classification": "DEFINITION",
+      "rationale": "Zero-index equation defining intAt to return the head of a nonempty IntSeq."
+    },
+    {
+      "source_rule_id": "rule-3d31bba42a85cabc815659b58fc221eb876cde2e0d7fc47a65715c7303c3241e",
+      "classification": "DEFINITION",
+      "rationale": "Positive-index recurrence defining intAt by consuming one sequence constructor and decrementing the index."
+    },
+    {
+      "source_rule_id": "rule-d2b38b93f718eb582aeb8e703070db02855786b254179f53ff3ab14e72a536b2",
+      "classification": "DEFINITION",
+      "rationale": "Negative-index totalization equation completing the proof-local definition of intAt."
+    },
+    {
+      "source_rule_id": "rule-041ae6f97e0a64393d4fd3489adb8b7922f6bdd833dd98ec4a40214de3ea0864",
+      "classification": "DOMAIN_LEMMA",
+      "rationale": "Additional simplification fact relating frozen-semantics vsLen to isLen through intVals; Stage 1 contains no prior exact proof in a module omitting this rule."
+    },
+    {
+      "source_rule_id": "rule-02406fd68a82c2913a2b54042cfc3145ed95db3409554a09fc0a8d1b6cf799f4",
+      "classification": "DOMAIN_LEMMA",
+      "rationale": "Additional guarded simplification fact relating frozen-semantics valSeqAt to proof-local intAt; Stage 1 contains no prior exact proof in a module omitting this rule."
+    },
+    {
+      "source_rule_id": "rule-8f1610587bf737bb5c54e86924e2f79f4154ac8465370be0992a66f42cb7a719",
+      "classification": "DEFINITION",
+      "rationale": "Invalid-index base equation defining thirdFrom as false outside strictly increasing in-range index configurations."
+    },
+    {
+      "source_rule_id": "rule-53814ea661857cebfa97d9521b74aa3d0d06bf9a18be90ed9136b73d50641cd7",
+      "classification": "DEFINITION",
+      "rationale": "Search-exhaustion base equation defining thirdFrom as false once the third index reaches the sequence length."
+    },
+    {
+      "source_rule_id": "rule-c40b0ddfed4444541b0c697e601553b83229e5a57efc9520c0a7a60e7e9e598c",
+      "classification": "DEFINITION",
+      "rationale": "Recursive equation defining thirdFrom as the current three-value zero-sum test or the search at the next third index."
+    },
+    {
+      "source_rule_id": "rule-f626c317007e738e3dac4aa639bdbb0a088030a45776e00d26ac958a4eabf70b",
+      "classification": "DEFINITION",
+      "rationale": "Invalid-index base equation defining pairFrom as false outside its increasing-index search domain."
+    },
+    {
+      "source_rule_id": "rule-52c3edb1912d9dd6bc594873c21b975e82d063a40d91fe661425871625b0ccd7",
+      "classification": "DEFINITION",
+      "rationale": "Search-exhaustion base equation defining pairFrom as false after the second index reaches the sequence length."
+    },
+    {
+      "source_rule_id": "rule-269487dea660700294e0df9c985efaac434cad9dd4842aa465dda12446bc0e07",
+      "classification": "DEFINITION",
+      "rationale": "Recursive equation defining pairFrom by searching third indices for the current second index and then advancing that second index."
+    },
+    {
+      "source_rule_id": "rule-e84b342b33053ff679a2bcde5a77bdde8bac77a1efd7f264e2cc1d6b73b4240e",
+      "classification": "DEFINITION",
+      "rationale": "Negative-index base equation defining tripleFrom as false outside its intended starting-index domain."
+    },
+    {
+      "source_rule_id": "rule-7412da7fc80943dd934d7428207728ea3034e9abc66648c8a2e4a629f5a64a17",
+      "classification": "DEFINITION",
+      "rationale": "Search-exhaustion base equation defining tripleFrom as false when the first index reaches the sequence length."
+    },
+    {
+      "source_rule_id": "rule-b0e6db4c2b5c2d64dee44292ac1b60d8017b8066600da7a1de8fd3bb5df362d4",
+      "classification": "DEFINITION",
+      "rationale": "Recursive equation defining tripleFrom by searching later pairs for the current first index and then advancing that index."
+    },
+    {
+      "source_rule_id": "rule-3715cb2d6de855e8f0d56c8731dcd44dcb31e91cf93fe184d935ef3cdbd09d4a",
+      "classification": "DEFINITION",
+      "rationale": "Nullary syntax equation defining the named inner-loop condition term."
+    },
+    {
+      "source_rule_id": "rule-872df4534b8344655a82e1ce75ddbff255f4e95cbd683ef7e5ca4c99a14603db",
+      "classification": "DEFINITION",
+      "rationale": "Nullary syntax equation defining the named inner-loop body as the exact translated statement sequence."
+    },
+    {
+      "source_rule_id": "rule-83f913af19781dfc5d6f23b0cc85d1c4f1e5a172d3b546385471cb4ba6dee8da",
+      "classification": "DEFINITION",
+      "rationale": "Nullary syntax equation defining the named middle-loop condition term."
+    },
+    {
+      "source_rule_id": "rule-e0cb22599bc2f08ab0cfb7a81a256d9e601153f92c4fe0e1ffded66240aa242a",
+      "classification": "DEFINITION",
+      "rationale": "Nullary syntax equation defining the named middle-loop body and its nested inner-loop term."
+    },
+    {
+      "source_rule_id": "rule-c67bd09f1ea5719f1c1892236bebe19987a71a76ed6ee35acabce50477d77d23",
+      "classification": "DEFINITION",
+      "rationale": "Nullary syntax equation defining the named outer-loop condition term."
+    },
+    {
+      "source_rule_id": "rule-c00bad024d03c4fd49146aac0dfb46f478cc8147c36ea7975399490f50973258",
+      "classification": "DEFINITION",
+      "rationale": "Nullary syntax equation defining the named outer-loop body and its nested middle-loop term."
+    },
+    {
+      "source_rule_id": "rule-46f0e67cc5409babed23b00e43574465e039e224789f6567cbe7e9a3b542ee1f",
+      "classification": "DEFINITION",
+      "rationale": "Nullary syntax equation defining the complete translated program body from initialization through return."
+    },
+    {
+      "source_rule_id": "rule-10f2f341850e5b1dba882c01e51fc736628d8ea0e733d0c07c0b4339cf0816ec",
+      "classification": "DEFINITION",
+      "rationale": "Equation defining the named closure value from its parameter list, programBody term, and defining environment."
+    },
+    {
+      "source_rule_id": "rule-5e0fb0ffad7ca37fbc4b92a80ab74a3d7facd687e939787910a1f2e6c53ccf2c",
+      "classification": "DEFINITION",
+      "rationale": "Equation defining the exact global solution binding map for the public entry-point closure."
+    }
+  ]
+}

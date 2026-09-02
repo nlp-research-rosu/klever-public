@@ -1,0 +1,398 @@
+COMMAND: bash -lc $'sed -n "1,360p" verification.k\nsed -n "1,420p" spec.k\nsed -n "1,300p" prove.sh'
+WORKDIR: /tmp/audit-work/160-do-algebra
+START_UTC: 2026-07-27T04:30:54Z
+requires "reference-semantics/semantics.k"
+
+module VERIFICATION
+  imports MPY
+
+  // This macro is the exact constructor translation in solution.mpy.
+  syntax Module ::= "solutionProgram" [macro]
+  rule solutionProgram
+    => Module(
+         FuncDef("_evaluate", Params("operator", "operand", "start", "end", "level"),
+           If(Compare(Name("level"), CmpOp("==", Int(0))),
+             Assign(Name("i"), BinOp("-", Name("end"), Int(1)))
+             While(Compare(Name("i"), CmpOp(">=", Name("start"))),
+               If(Compare(Subscript(Name("operator"), Name("i")), CmpOp("==", Str("+"))),
+                 Return(
+                   BinOp("+",
+                     Call(Name("_evaluate"),
+                       Name("operator"), Name("operand"), Name("start"), Name("i"), Int(0)),
+                     Call(Name("_evaluate"),
+                       Name("operator"), Name("operand"), BinOp("+", Name("i"), Int(1)),
+                       Name("end"), Int(1)))),
+                 .Stmts)
+               If(Compare(Subscript(Name("operator"), Name("i")), CmpOp("==", Str("-"))),
+                 Return(
+                   BinOp("-",
+                     Call(Name("_evaluate"),
+                       Name("operator"), Name("operand"), Name("start"), Name("i"), Int(0)),
+                     Call(Name("_evaluate"),
+                       Name("operator"), Name("operand"), BinOp("+", Name("i"), Int(1)),
+                       Name("end"), Int(1)))),
+                 .Stmts)
+               AugAssign(Name("i"), "-", Int(1)))
+             Return(Call(Name("_evaluate"),
+               Name("operator"), Name("operand"), Name("start"), Name("end"), Int(1))),
+             .Stmts)
+           If(Compare(Name("level"), CmpOp("==", Int(1))),
+             Assign(Name("i"), BinOp("-", Name("end"), Int(1)))
+             While(Compare(Name("i"), CmpOp(">=", Name("start"))),
+               If(Compare(Subscript(Name("operator"), Name("i")), CmpOp("==", Str("*"))),
+                 Return(
+                   BinOp("*",
+                     Call(Name("_evaluate"),
+                       Name("operator"), Name("operand"), Name("start"), Name("i"), Int(1)),
+                     Call(Name("_evaluate"),
+                       Name("operator"), Name("operand"), BinOp("+", Name("i"), Int(1)),
+                       Name("end"), Int(2)))),
+                 .Stmts)
+               If(Compare(Subscript(Name("operator"), Name("i")), CmpOp("==", Str("//"))),
+                 Return(
+                   BinOp("//",
+                     Call(Name("_evaluate"),
+                       Name("operator"), Name("operand"), Name("start"), Name("i"), Int(1)),
+                     Call(Name("_evaluate"),
+                       Name("operator"), Name("operand"), BinOp("+", Name("i"), Int(1)),
+                       Name("end"), Int(2)))),
+                 .Stmts)
+               AugAssign(Name("i"), "-", Int(1)))
+             Return(Call(Name("_evaluate"),
+               Name("operator"), Name("operand"), Name("start"), Name("end"), Int(2))),
+             .Stmts)
+           If(Compare(Name("level"), CmpOp("==", Int(2))),
+             Assign(Name("i"), Name("start"))
+             While(Compare(Name("i"), CmpOp("<", Name("end"))),
+               If(Compare(Subscript(Name("operator"), Name("i")), CmpOp("==", Str("**"))),
+                 Return(
+                   BinOp("**",
+                     Call(Name("_evaluate"),
+                       Name("operator"), Name("operand"), Name("start"), Name("i"), Int(3)),
+                     Call(Name("_evaluate"),
+                       Name("operator"), Name("operand"), BinOp("+", Name("i"), Int(1)),
+                       Name("end"), Int(2)))),
+                 .Stmts)
+               AugAssign(Name("i"), "+", Int(1)))
+             Return(Call(Name("_evaluate"),
+               Name("operator"), Name("operand"), Name("start"), Name("end"), Int(3))),
+             .Stmts)
+           Return(Subscript(Name("operand"), Name("start"))))
+         FuncDef("do_algebra", Params("operator", "operand"),
+           Return(Call(Name("_evaluate"),
+             Name("operator"), Name("operand"), Int(0),
+             Call(Name("len"), Name("operator")), Int(0)))))
+
+  // Values for the five operator tokens. Claims use bare list values as
+  // read-only arguments, which the supplied semantics explicitly supports.
+  syntax Str ::= "plusV" [macro]
+               | "minusV" [macro]
+               | "timesV" [macro]
+               | "floorDivV" [macro]
+               | "powerV" [macro]
+  rule plusV     => str(iCons(43, .IntSeq))
+  rule minusV    => str(iCons(45, .IntSeq))
+  rule timesV    => str(iCons(42, .IntSeq))
+  rule floorDivV => str(iCons(47, iCons(47, .IntSeq)))
+  rule powerV    => str(iCons(42, iCons(42, .IntSeq)))
+
+  // Mathematical floor quotient used only to state expected results.
+  syntax Int ::= floorQuot(Int, Int) [function, total]
+  rule floorQuot(A:Int, B:Int) => (A -Int pyMod(A, B)) /Int B
+
+  syntax KItem ::= runDoAlgebra(ValSeq, ValSeq)
+  rule <k> runDoAlgebra(OPS:ValSeq, NDS:ValSeq)
+        => #loadAll(solutionProgram)
+           ~> Call(Name("do_algebra"), list(OPS), list(NDS))
+        ... </k>
+endmodule
+requires "verification.k"
+
+module SPEC
+  imports VERIFICATION
+
+  // The non-exponential primitive operators are proved for arbitrary
+  // contract-valid operands; exponentiation is ground because the backend's
+  // ^Int hook cannot simplify a symbolic base.
+  claim <k>
+          runDoAlgebra(
+            vCons(plusV, .ValSeq),
+            vCons(A:Int, vCons(B:Int, .ValSeq)))
+          => A +Int B
+        </k>
+        <env> 0 </env>
+        <scopes>
+          (0 |-> scope(.Map, parent(-1)))
+          (-1 |-> builtinsScope)
+          => ?FINAL_SCOPES:Map
+        </scopes>
+        <scopeLoc> 1 </scopeLoc>
+        <heap> .Map </heap>
+        <heapLoc> 0 </heapLoc>
+        <stack> .List </stack>
+        <ret> noRet </ret>
+        <exc> NoExc </exc>
+        <exit-code> 0 </exit-code>
+    requires A >=Int 0 andBool B >=Int 0
+    [label(plus)]
+
+  claim <k>
+          runDoAlgebra(
+            vCons(minusV, .ValSeq),
+            vCons(A:Int, vCons(B:Int, .ValSeq)))
+          => A -Int B
+        </k>
+        <env> 0 </env>
+        <scopes>
+          (0 |-> scope(.Map, parent(-1)))
+          (-1 |-> builtinsScope)
+          => ?FINAL_SCOPES:Map
+        </scopes>
+        <scopeLoc> 1 </scopeLoc>
+        <heap> .Map </heap>
+        <heapLoc> 0 </heapLoc>
+        <stack> .List </stack>
+        <ret> noRet </ret>
+        <exc> NoExc </exc>
+        <exit-code> 0 </exit-code>
+    requires A >=Int 0 andBool B >=Int 0
+    [label(minus)]
+
+  claim <k>
+          runDoAlgebra(
+            vCons(timesV, .ValSeq),
+            vCons(A:Int, vCons(B:Int, .ValSeq)))
+          => A *Int B
+        </k>
+        <env> 0 </env>
+        <scopes>
+          (0 |-> scope(.Map, parent(-1)))
+          (-1 |-> builtinsScope)
+          => ?FINAL_SCOPES:Map
+        </scopes>
+        <scopeLoc> 1 </scopeLoc>
+        <heap> .Map </heap>
+        <heapLoc> 0 </heapLoc>
+        <stack> .List </stack>
+        <ret> noRet </ret>
+        <exc> NoExc </exc>
+        <exit-code> 0 </exit-code>
+    requires A >=Int 0 andBool B >=Int 0
+    [label(times)]
+
+  claim <k>
+          runDoAlgebra(
+            vCons(floorDivV, .ValSeq),
+            vCons(A:Int, vCons(B:Int, .ValSeq)))
+          => floorQuot(A, B)
+        </k>
+        <env> 0 </env>
+        <scopes>
+          (0 |-> scope(.Map, parent(-1)))
+          (-1 |-> builtinsScope)
+          => ?FINAL_SCOPES:Map
+        </scopes>
+        <scopeLoc> 1 </scopeLoc>
+        <heap> .Map </heap>
+        <heapLoc> 0 </heapLoc>
+        <stack> .List </stack>
+        <ret> noRet </ret>
+        <exc> NoExc </exc>
+        <exit-code> 0 </exit-code>
+    requires A >=Int 0 andBool B >Int 0
+    [label(floor)]
+
+  claim <k>
+          runDoAlgebra(
+            vCons(powerV, .ValSeq),
+            vCons(2, vCons(5, .ValSeq)))
+          => 32
+        </k>
+        <env> 0 </env>
+        <scopes>
+          (0 |-> scope(.Map, parent(-1)))
+          (-1 |-> builtinsScope)
+          => ?FINAL_SCOPES:Map
+        </scopes>
+        <scopeLoc> 1 </scopeLoc>
+        <heap> .Map </heap>
+        <heapLoc> 0 </heapLoc>
+        <stack> .List </stack>
+        <ret> noRet </ret>
+        <exc> NoExc </exc>
+        <exit-code> 0 </exit-code>
+    [label(power)]
+
+  // Rightmost splitting makes subtraction left-associative.
+  claim <k>
+          runDoAlgebra(
+            vCons(minusV, vCons(minusV, .ValSeq)),
+            vCons(A:Int, vCons(B:Int, vCons(C:Int, .ValSeq))))
+          => (A -Int B) -Int C
+        </k>
+        <env> 0 </env>
+        <scopes>
+          (0 |-> scope(.Map, parent(-1)))
+          (-1 |-> builtinsScope)
+          => ?FINAL_SCOPES:Map
+        </scopes>
+        <scopeLoc> 1 </scopeLoc>
+        <heap> .Map </heap>
+        <heapLoc> 0 </heapLoc>
+        <stack> .List </stack>
+        <ret> noRet </ret>
+        <exc> NoExc </exc>
+        <exit-code> 0 </exit-code>
+    requires A >=Int 0 andBool B >=Int 0 andBool C >=Int 0
+    [label(minus-assoc)]
+
+  // The same split direction makes floor division left-associative.
+  claim <k>
+          runDoAlgebra(
+            vCons(floorDivV, vCons(floorDivV, .ValSeq)),
+            vCons(20, vCons(3, vCons(2, .ValSeq))))
+          => 3
+        </k>
+        <env> 0 </env>
+        <scopes>
+          (0 |-> scope(.Map, parent(-1)))
+          (-1 |-> builtinsScope)
+          => ?FINAL_SCOPES:Map
+        </scopes>
+        <scopeLoc> 1 </scopeLoc>
+        <heap> .Map </heap>
+        <heapLoc> 0 </heapLoc>
+        <stack> .List </stack>
+        <ret> noRet </ret>
+        <exc> NoExc </exc>
+        <exit-code> 0 </exit-code>
+    [label(floor-assoc)]
+
+  // Leftmost splitting makes exponentiation right-associative.
+  claim <k>
+          runDoAlgebra(
+            vCons(powerV, vCons(powerV, .ValSeq)),
+            vCons(2, vCons(3, vCons(2, .ValSeq))))
+          => 512
+        </k>
+        <env> 0 </env>
+        <scopes>
+          (0 |-> scope(.Map, parent(-1)))
+          (-1 |-> builtinsScope)
+          => ?FINAL_SCOPES:Map
+        </scopes>
+        <scopeLoc> 1 </scopeLoc>
+        <heap> .Map </heap>
+        <heapLoc> 0 </heapLoc>
+        <stack> .List </stack>
+        <ret> noRet </ret>
+        <exc> NoExc </exc>
+        <exit-code> 0 </exit-code>
+    [label(power-assoc)]
+
+  // The prompt's precedence pattern, generalized to arbitrary operands.
+  claim <k>
+          runDoAlgebra(
+            vCons(plusV, vCons(timesV, vCons(minusV, .ValSeq))),
+            vCons(A:Int, vCons(B:Int, vCons(C:Int, vCons(D:Int, .ValSeq)))))
+          => (A +Int (B *Int C)) -Int D
+        </k>
+        <env> 0 </env>
+        <scopes>
+          (0 |-> scope(.Map, parent(-1)))
+          (-1 |-> builtinsScope)
+          => ?FINAL_SCOPES:Map
+        </scopes>
+        <scopeLoc> 1 </scopeLoc>
+        <heap> .Map </heap>
+        <heapLoc> 0 </heapLoc>
+        <stack> .List </stack>
+        <ret> noRet </ret>
+        <exc> NoExc </exc>
+        <exit-code> 0 </exit-code>
+    requires A >=Int 0 andBool B >=Int 0
+      andBool C >=Int 0 andBool D >=Int 0
+    [label(prompt-precedence)]
+
+  // One mixed expression exercises all precedence levels together.
+  claim <k>
+          runDoAlgebra(
+            vCons(plusV,
+              vCons(timesV,
+                vCons(powerV,
+                  vCons(floorDivV, vCons(minusV, .ValSeq))))),
+            vCons(A:Int,
+              vCons(B:Int,
+                vCons(2,
+                  vCons(3, vCons(E:Int, vCons(F:Int, .ValSeq)))))))
+          => (A +Int floorQuot(B *Int 8, E)) -Int F
+        </k>
+        <env> 0 </env>
+        <scopes>
+          (0 |-> scope(.Map, parent(-1)))
+          (-1 |-> builtinsScope)
+          => ?FINAL_SCOPES:Map
+        </scopes>
+        <scopeLoc> 1 </scopeLoc>
+        <heap> .Map </heap>
+        <heapLoc> 0 </heapLoc>
+        <stack> .List </stack>
+        <ret> noRet </ret>
+        <exc> NoExc </exc>
+        <exit-code> 0 </exit-code>
+    requires A >=Int 0 andBool B >=Int 0
+      andBool E >Int 0 andBool F >=Int 0
+    [label(mixed-precedence)]
+endmodule
+#!/usr/bin/env bash
+set -euo pipefail
+
+python3 py2mpy.py solution.py > solution.mpy
+
+python3 - <<'PY'
+from solution import do_algebra
+
+assert do_algebra(["+", "*", "-"], [2, 3, 4, 5]) == 9
+assert do_algebra(["-", "-"], [20, 5, 3]) == 12
+assert do_algebra(["//", "//"], [20, 3, 2]) == 3
+assert do_algebra(["**", "**"], [2, 3, 2]) == 512
+assert do_algebra(["+", "*", "**", "//", "-"], [4, 3, 2, 3, 5, 1]) == 7
+PY
+
+kompile reference-semantics/semantics.k \
+  --backend llvm \
+  --main-module MPY-KRUN \
+  --syntax-module MPY-SYNTAX \
+  --output-definition runtime-kompiled
+
+{
+  sed '$ s/)$//' solution.mpy
+  printf '%s\n' \
+    '  Assert(Compare(Call(Name("do_algebra"), ListExpr(Str("+"), Str("*"), Str("-")), ListExpr(Int(2), Int(3), Int(4), Int(5))), CmpOp("==", Int(9))))' \
+    '  Assert(Compare(Call(Name("do_algebra"), ListExpr(Str("-"), Str("-")), ListExpr(Int(20), Int(5), Int(3))), CmpOp("==", Int(12))))' \
+    '  Assert(Compare(Call(Name("do_algebra"), ListExpr(Str("//"), Str("//")), ListExpr(Int(20), Int(3), Int(2))), CmpOp("==", Int(3))))' \
+    '  Assert(Compare(Call(Name("do_algebra"), ListExpr(Str("**"), Str("**")), ListExpr(Int(2), Int(3), Int(2))), CmpOp("==", Int(512))))' \
+    '  Assert(Compare(Call(Name("do_algebra"), ListExpr(Str("+"), Str("*"), Str("**"), Str("//"), Str("-")), ListExpr(Int(4), Int(3), Int(2), Int(3), Int(5), Int(1))), CmpOp("==", Int(7))))'
+  printf '%s\n' ')'
+} > smoke.mpy
+
+krun smoke.mpy --definition runtime-kompiled --output none
+
+kompile verification.k \
+  --backend haskell \
+  --main-module VERIFICATION \
+  --syntax-module VERIFICATION \
+  --output-definition verification-kompiled
+
+cmp \
+  <(kast --definition verification-kompiled --module VERIFICATION \
+      --sort Module --expand-macros --output kore solution.mpy) \
+  <(kast --definition verification-kompiled --module VERIFICATION \
+      --sort Module --expand-macros --output kore --expression solutionProgram)
+
+kprove spec.k \
+  --definition verification-kompiled \
+  --spec-module SPEC
+
+EXIT_STATUS: 0
+END_UTC: 2026-07-27T04:30:54Z

@@ -1,0 +1,195 @@
+WORKDIR: /tmp/audit-work/candidate-src
+COMMAND: bash -lc sed\ -n\ \"1215\,1275p\"\ /usr/include/kframework/builtin/domains.md\;\ sed\ -n\ \"1330\,1460p\"\ /usr/include/kframework/builtin/domains.md
+  syntax Int ::= r"[\\+\\-]?[0-9]+" [prefer, token, prec(2)]
+endmodule
+
+module INT-COMMON
+  imports INT-SYNTAX
+  imports private BOOL
+```
+
+### Integer arithmetic
+
+You can:
+
+* Compute the bitwise complement `~Int` of an integer value in twos-complement.
+* Compute the exponentiation `^Int` of two integers.
+* Compute the exponentiation of two integers modulo another integer (`^%Int`).
+  `A ^%Int B C` is equal in value to `(A ^Int B) %Int C`, but has a better
+  asymptotic complexity.
+* Compute the product `*Int` of two integers.
+* Compute the quotient `/Int` or modulus `%Int` of two integers using
+  t-division, which rounds towards zero. Division by zero is `#False`.
+* Compute the quotient `divInt` or modulus `modInt` of two integers using
+  Euclidean division, in which the remainder is always non-negative. Division
+  by zero is `#False`.
+* Compute the sum `+Int` or difference `-Int` of two integers.
+* Compute the arithmetic right shift `>>Int` of two integers. Shifting by a
+  negative quantity is `#False`.
+* Compute the left shift of two integers. Shifting by a negative quantity is
+  `#False`.
+* Compute the bitwise and of two integers in twos-complement.
+* Compute the bitwise xor of two integers in twos-complement.
+* Compute the bitwise inclusive-or of two integers in twos-complement.
+
+```k
+  syntax Int ::= "~Int" Int                     [function, symbol(~Int_), total, hook(INT.not), smtlib(notInt)]
+               > left:
+                 Int "^Int" Int                 [function, symbol(_^Int_), left, smt-hook(^), hook(INT.pow)]
+               | Int "^%Int" Int Int            [function, symbol(_^%Int__), left, smt-hook((mod (^ #1 #2) #3)), hook(INT.powmod)]
+               > left:
+                 Int "*Int" Int                 [function, total, symbol(_*Int_), left, comm, smt-hook(*), hook(INT.mul)]
+               /* FIXME: translate /Int and %Int into smtlib */
+               /* /Int and %Int implement t-division, which rounds towards 0. SMT hooks need to convert from Euclidian division operations */
+               | Int "/Int" Int                 [function, symbol(_/Int_), left,
+                                                 smt-hook((ite (or (= 0 (mod #1 #2)) (>= #1 0)) (div #1 #2) (ite (> #2 0) (+ (div #1 #2) 1) (- (div #1 #2) 1)))),
+                                                 hook(INT.tdiv)]
+               | Int "%Int" Int                 [function, symbol(_%Int_), left,
+                                                 smt-hook((ite (or (= 0 (mod #1 #2)) (>= #1 0)) (mod #1 #2) (ite (> #2 0) (- (mod #1 #2) #2) (+ (mod #1 #2) #2)))),
+                                                 hook(INT.tmod)]
+               /* divInt and modInt implement e-division according to the Euclidean division theorem, therefore the remainder is always positive */
+               | Int "divInt" Int               [function, symbol(_divInt_), left, smt-hook(div), hook(INT.ediv)]
+               | Int "modInt" Int               [function, symbol(_modInt_), left, smt-hook(mod), hook(INT.emod)]
+               > left:
+                 Int "+Int" Int                 [function, total, symbol(_+Int_), left, comm, smt-hook(+), hook(INT.add)]
+               | Int "-Int" Int                 [function, total, symbol(_-Int_), left, smt-hook(-), hook(INT.sub)]
+               > left:
+                 Int ">>Int" Int                [function, symbol(_>>Int_), left, hook(INT.shr), smtlib(shrInt)]
+               | Int "<<Int" Int                [function, symbol(_<<Int_), left, hook(INT.shl), smtlib(shlInt)]
+               > left:
+                 Int "&Int" Int                 [function, total, symbol(_&Int_), left, comm, hook(INT.and), smtlib(andInt)]
+               > left:
+                 Int "xorInt" Int               [function, total, symbol(_xorInt_), left, comm, hook(INT.xor), smtlib(xorInt)]
+               > left:
+                | Int ">=Int" Int         [function, total, symbol(_>=Int_), smt-hook(>=), hook(INT.ge)]
+                | Int ">Int" Int          [function, total, symbol(_>Int_), smt-hook(>), hook(INT.gt)]
+                | Int "==Int" Int         [function, total, symbol(_==Int_), comm, smt-hook(=), hook(INT.eq)]
+                | Int "=/=Int" Int        [function, total, symbol(_=/=Int_), comm, smt-hook(distinct), hook(INT.ne)]
+```
+
+### Divides
+
+You can compute whether one integer evenly divides another. This is the
+case when the second integer modulo the first integer is equal to zero.
+
+```k
+  syntax Bool ::= Int "dividesInt" Int    [function]
+```
+
+### Random integers
+
+You can, on concrete backends, compute a pseudorandom integer, or seed the
+pseudorandom number generator. These operations are represented as
+uninterpreted functions on symbolic backends.
+
+```k
+  syntax Int ::= randInt(Int) [function, hook(INT.rand), impure]
+  syntax K ::= srandInt(Int) [function, hook(INT.srand), impure]
+```
+
+### Implementation of Integers
+
+The remainder of this section consists of an implementation in K of some
+of the operators above, as well as lemmas used  by the Java and Haskell backend
+to simplify expressions of sort `Int`. They do not affect the semantics of
+integers, merely describing additional rules that the backend can use to
+simplify terms.
+
+```k
+endmodule
+
+module INT-SYMBOLIC [symbolic]
+  imports INT-COMMON
+  imports INT-SYMBOLIC-KORE
+  imports private BOOL
+
+  // Arithmetic Normalization
+  rule I +Int 0 => I [simplification]
+  rule I -Int 0 => I [simplification]
+
+  rule X modInt N => X requires 0 <=Int X andBool X <Int N [simplification]
+  rule X   %Int N => X requires 0 <=Int X andBool X <Int N [simplification]
+
+  // Bit-shifts
+  rule X <<Int 0 => X                    [simplification, preserves-definedness]
+  rule 0 <<Int Y => 0 requires 0 <=Int Y [simplification, preserves-definedness]
+  rule X >>Int 0 => X                    [simplification, preserves-definedness]
+  rule 0 >>Int Y => 0 requires 0 <=Int Y [simplification, preserves-definedness]
+endmodule
+
+module INT-SYMBOLIC-KORE [symbolic, haskell]
+  imports INT-COMMON
+  imports ML-SYNTAX
+  imports private BOOL
+
+  // Definability Conditions
+  rule #Ceil(@I1:Int /Int   @I2:Int) => {(@I2 =/=Int 0) #Equals true} #And #Ceil(@I1) #And #Ceil(@I2) [simplification]
+  rule #Ceil(@I1:Int %Int   @I2:Int) => {(@I2 =/=Int 0) #Equals true} #And #Ceil(@I1) #And #Ceil(@I2) [simplification]
+  rule #Ceil(@I1:Int modInt @I2:Int) => {(@I2 =/=Int 0) #Equals true} #And #Ceil(@I1) #And #Ceil(@I2) [simplification]
+  rule #Ceil(@I1:Int >>Int  @I2:Int) => {(@I2 >=Int 0)  #Equals true} #And #Ceil(@I1) #And #Ceil(@I2) [simplification]
+  rule #Ceil(@I1:Int <<Int  @I2:Int) => {(@I2 >=Int 0)  #Equals true} #And #Ceil(@I1) #And #Ceil(@I2) [simplification]
+endmodule
+
+module INT-KORE [symbolic]
+  imports private K-EQUAL
+  imports private BOOL
+  imports INT-COMMON
+
+  rule [eq-k-to-eq-int]     : I1:Int ==K I2:Int            => I1 ==Int I2           [simplification]
+  rule [eq-int-true-left]   : {K1 ==Int K2 #Equals true}   => {K1 #Equals K2}       [simplification]
+  rule [eq-int-true-rigth]  : {true #Equals K1 ==Int K2}   => {K1 #Equals K2}       [simplification]
+  rule [eq-int-false-left]  : {K1 ==Int K2 #Equals false}  => #Not({K1 #Equals K2}) [simplification]
+  rule [eq-int-false-rigth] : {false #Equals K1 ==Int K2}  => #Not({K1 #Equals K2}) [simplification]
+  rule [neq-int-true-left]  : {K1 =/=Int K2 #Equals true}  => #Not({K1 #Equals K2}) [simplification]
+  rule [neq-int-true-right] : {true #Equals K1 =/=Int K2}  => #Not({K1 #Equals K2}) [simplification]
+  rule [neq-int-false-left] : {K1 =/=Int K2 #Equals false} => {K1 #Equals K2}       [simplification]
+  rule [neq-int-false-right]: {false #Equals K1 =/=Int K2} => {K1 #Equals K2}       [simplification]
+
+  // Arithmetic Normalization
+  rule I +Int B => B +Int I          [concrete(I), symbolic(B), simplification(51)]
+  rule A -Int I => A +Int (0 -Int I) [concrete(I), symbolic(A), simplification(51)]
+
+  rule (A +Int I2) +Int I3 => A +Int (I2 +Int I3) [concrete(I2, I3), symbolic(A), simplification]
+  rule I1 +Int (B +Int I3) => B +Int (I1 +Int I3) [concrete(I1, I3), symbolic(B), simplification]
+  rule I1 -Int (B +Int I3) => (I1 -Int I3) -Int B [concrete(I1, I3), symbolic(B), simplification]
+  rule I1 +Int (I2 +Int C) => (I1 +Int I2) +Int C [concrete(I1, I2), symbolic(C), simplification]
+  rule I1 +Int (I2 -Int C) => (I1 +Int I2) -Int C [concrete(I1, I2), symbolic(C), simplification]
+  rule (I1 -Int B) +Int I3 => (I1 +Int I3) -Int B [concrete(I1, I3), symbolic(B), simplification]
+  rule I1 -Int (I2 +Int C) => (I1 -Int I2) -Int C [concrete(I1, I2), symbolic(C), simplification]
+  rule I1 -Int (I2 -Int C) => (I1 -Int I2) +Int C [concrete(I1, I2), symbolic(C), simplification]
+  rule (C -Int I2) -Int I3 => C -Int (I2 +Int I3) [concrete(I2, I3), symbolic(C), simplification]
+
+  rule I1 &Int (I2 &Int C) => (I1 &Int I2) &Int C [concrete(I1, I2), symbolic(C), simplification]
+endmodule
+
+module INT
+  imports INT-COMMON
+  imports INT-SYMBOLIC
+  imports INT-KORE
+  imports private K-EQUAL
+  imports private BOOL
+
+  rule bitRangeInt(I::Int, IDX::Int, LEN::Int) => (I >>Int IDX) modInt (1 <<Int LEN)
+
+  rule signExtendBitRangeInt(I::Int, IDX::Int, LEN::Int) => (bitRangeInt(I, IDX, LEN) +Int (1 <<Int (LEN -Int 1))) modInt (1 <<Int LEN) -Int (1 <<Int (LEN -Int 1))
+
+  rule I1:Int divInt I2:Int => (I1 -Int (I1 modInt I2)) /Int I2
+  requires I2 =/=Int 0
+  rule
+    I1:Int modInt I2:Int
+  =>
+    ((I1 %Int absInt(I2)) +Int absInt(I2)) %Int absInt(I2)
+  requires I2 =/=Int 0    [concrete, simplification]
+
+  rule minInt(I1:Int, I2:Int) => I1 requires I1 <Int  I2
+  rule minInt(I1:Int, I2:Int) => I2 requires I1 >=Int I2
+
+  rule I1:Int =/=Int I2:Int => notBool (I1 ==Int I2)
+  rule (I1:Int dividesInt I2:Int) => (I2 %Int I1) ==Int 0
+
+  syntax Int ::= freshInt(Int)    [freshGenerator, function, total, private]
+  rule freshInt(I:Int) => I
+endmodule
+```
+
+EXIT_STATUS: 0

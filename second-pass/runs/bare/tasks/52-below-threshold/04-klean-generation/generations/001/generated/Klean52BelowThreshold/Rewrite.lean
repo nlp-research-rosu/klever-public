@@ -1,0 +1,5 @@
+import Klean52BelowThreshold.Func
+
+inductive Rewrites : SortGeneratedTopCell → SortGeneratedTopCell → Prop where
+  | tran {s1 s2 s3 : SortGeneratedTopCell} (t1 : Rewrites s1 s2) (t2 : Rewrites s2 s3) : Rewrites s1 s3
+  | VERIFICATION_KLEAN_EXPORT_kxExport0 {V0 : SortIntSeq} {V1 : SortInt} {_DotVar0 : SortGeneratedCounterCell} {_DotVar2 : SortK} {_Gen0 : SortProgramCell} {_Gen1 : SortInputCell} {_Gen2 : SortThresholdCell} {_Gen3 : SortLCell} {_Gen4 : SortTCell} {_Gen5 : SortXCell} {_Gen6 : SortResultCell} {_Val0 : SortBool} (defn_Val0 : «allBelow(_,_)_VERIFICATION_Bool_IntSeq_Int» V0 V1 = some _Val0) : Rewrites { bt := { k := { val := SortK.kseq (SortKItem.«#kxExport0(_,_)_VERIFICATION-KLEAN-EXPORT_KItem_IntSeq_Int» V0 V1) _DotVar2 }, program := _Gen0, input := _Gen1, threshold := _Gen2, l := _Gen3, t := _Gen4, x := _Gen5, result := _Gen6 }, generatedCounter := _DotVar0 } { bt := { k := { val := SortK.kseq ((@inj SortBool SortKItem) _Val0) _DotVar2 }, program := _Gen0, input := _Gen1, threshold := _Gen2, l := _Gen3, t := _Gen4, x := _Gen5, result := _Gen6 }, generatedCounter := _DotVar0 }

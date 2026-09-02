@@ -1,0 +1,449 @@
+COMMAND: bash -lc nl\ -ba\ /tmp/audit-work/candidate-fresh/semantic.k\;\ nl\ -ba\ /tmp/audit-work/candidate-fresh/verification.k\;\ nl\ -ba\ /tmp/audit-work/candidate-fresh/spec.k\;\ rg\ -n\ \"\(\^\|\[\[:space:\]\]\)\(syntax\|configuration\|rule\|claim\|imports\|requires\|module\|endmodule\)\\b\|\\\[\(function\|total\|functional\|simplification\|concrete\|owise\|priority\)\"\ /tmp/audit-work/candidate-fresh/semantic.k\ /tmp/audit-work/candidate-fresh/verification.k\ /tmp/audit-work/candidate-fresh/spec.k
+WORKDIR: /audit-output
+     1	// A small, executable semantics for exactly the Python-AST constructors used by
+     2	// solution.mpy.  The source translator is purely syntactic; all computation is
+     3	// defined here.
+     4	
+     5	requires "rat.md"
+     6	
+     7	module MPY-SYNTAX
+     8	  imports INT-SYNTAX
+     9	  imports FLOAT-SYNTAX
+    10	  imports RAT-SYNTAX
+    11	  imports BOOL-SYNTAX
+    12	  imports STRING-SYNTAX
+    13	
+    14	  syntax Program ::= Module(Stmts)
+    15	  syntax Stmts  ::= List{Stmt, ""}
+    16	  syntax Stmt   ::= FuncDef(String, Params, Stmts)
+    17	                  | "If" "(" Exp "," Stmts "," ")"
+    18	                  | Assign(Exp, Exp)
+    19	                  | Return(Exp)
+    20	
+    21	  syntax Params  ::= Params(Strings)
+    22	  syntax Strings ::= List{String, ","}
+    23	
+    24	  syntax Exp ::= Int(Int)
+    25	               | Float(Float)
+    26	               | Name(String)
+    27	               | Call(Exp, Exprs)
+    28	  syntax Exp ::= UnaryOp(String, Exp) [strict(2)]
+    29	               | BinOp(String, Exp, Exp) [seqstrict(2, 3)]
+    30	               | Compare(Exp, CmpOp) [strict(1)]
+    31	  syntax CmpOp ::= CmpOp(String, Exp)
+    32	  syntax Exprs ::= List{Exp, ","}
+    33	
+    34	  syntax NumValue ::= VInt(Int) | VRat(Rat)
+    35	  syntax Value  ::= NumValue
+    36	                  | VFloat(Float)
+    37	                  | VSqrt(Rat)
+    38	                  | VRounded(Int)
+    39	                  | VBool(Bool)
+    40	  syntax Values ::= List{Value, ","}
+    41	  syntax Args   ::= Args(Values)
+    42	endmodule
+    43	
+    44	module SEMANTIC
+    45	  imports MPY-SYNTAX
+    46	  imports INT
+    47	  imports RAT
+    48	  imports BOOL
+    49	  imports MAP
+    50	
+    51	  configuration
+    52	    <triangle>
+    53	      <k> launch($PGM:Program, $ARGS:Args) </k>
+    54	      <env> .Map </env>
+    55	      <functions> .Map </functions>
+    56	      <result> NoResult </result>
+    57	    </triangle>
+    58	
+    59	  syntax Result ::= "NoResult" | Value
+    60	  syntax Exp ::= Value
+    61	  syntax KResult ::= Value
+    62	
+    63	  syntax Function ::= function(Strings, Stmts)
+    64	  syntax KItem ::= launch(Program, Args)
+    65	                 | exec(Stmts)
+    66	                 | invoke(String, Values)
+    67	                 | bind(Strings, Values)
+    68	                 | branch(Stmts)
+    69	                 | assignTo(String)
+    70	                 | "returnValue"
+    71	                 | compareLE(Value)
+    72	                 | "round2"
+    73	
+    74	  // Module loading and entry-point invocation.
+    75	  rule launch(Module(SS), Args(VS))
+    76	    => exec(SS) ~> invoke("triangle_area", VS)
+    77	
+    78	  rule exec(.Stmts) => .K
+    79	  rule exec(S:Stmt SS:Stmts) => S ~> exec(SS)
+    80	
+    81	  rule <k> FuncDef(F, Params(PS), BODY) => .K ...</k>
+    82	       <functions> FS => FS [ F <- function(PS, BODY) ] </functions>
+    83	
+    84	  rule <k> invoke(F, VS) => bind(PS, VS) ~> exec(BODY) ...</k>
+    85	       <functions>... F |-> function(PS, BODY) ...</functions>
+    86	
+    87	  rule bind(.Strings, .Values) => .K
+    88	  rule <k> bind((P, PS), (V, VS)) => bind(PS, VS) ...</k>
+    89	       <env> RHO => RHO [ P <- V ] </env>
+    90	
+    91	  // Statements and non-local return from the one active function call.
+    92	  rule If(E, THEN,) => E ~> branch(THEN)
+    93	  rule VBool(true)  ~> branch(THEN) => exec(THEN)
+    94	  rule VBool(false) ~> branch(_) => .K
+    95	
+    96	  rule Assign(Name(X), E) => E ~> assignTo(X)
+    97	  rule <k> V:Value ~> assignTo(X) => .K ...</k>
+    98	       <env> RHO => RHO [ X <- V ] </env>
+    99	
+   100	  rule Return(E) => E ~> returnValue
+   101	  rule <k> V:Value ~> returnValue ~> _REST:K => .K </k>
+   102	       <env> _ => .Map </env>
+   103	       <functions> _ => .Map </functions>
+   104	       <result> NoResult => V </result>
+   105	
+   106	  // Literals, variables, and unary negation.
+   107	  rule Int(I) => VInt(I)
+   108	  rule Float(F) => VFloat(F)
+   109	  rule <k> Name(X) => V ...</k>
+   110	       <env>... X |-> V ...</env>
+   111	
+   112	  rule UnaryOp("-", VInt(I))   => VInt(0 -Int I)
+   113	  rule UnaryOp("-", VRat(R)) => VRat(0 -Rat R)
+   114	
+   115	  // Python numeric promotion for the arithmetic needed by this program.
+   116	  syntax Rat ::= asRat(NumValue) [function, total]
+   117	  rule asRat(VInt(I)) => I
+   118	  rule asRat(VRat(R)) => R
+   119	
+   120	  rule BinOp("+", VInt(I), VInt(J)) => VInt(I +Int J)
+   121	  rule BinOp("+", V:NumValue, W:NumValue)
+   122	    => VRat(asRat(V) +Rat asRat(W))
+   123	    [owise]
+   124	
+   125	  rule BinOp("-", VInt(I), VInt(J)) => VInt(I -Int J)
+   126	  rule BinOp("-", V:NumValue, W:NumValue)
+   127	    => VRat(asRat(V) -Rat asRat(W))
+   128	    [owise]
+   129	
+   130	  rule BinOp("*", VInt(I), VInt(J)) => VInt(I *Int J)
+   131	  rule BinOp("*", V:NumValue, W:NumValue)
+   132	    => VRat(asRat(V) *Rat asRat(W))
+   133	    [owise]
+   134	
+   135	  rule BinOp("/", V:NumValue, W:NumValue)
+   136	    => VRat(asRat(V) /Rat asRat(W))
+   137	  rule BinOp("**", V:NumValue, VFloat(0.5))
+   138	    => VSqrt(asRat(V))
+   139	
+   140	  // The emitted comparisons are single-link chains.  The continuation keeps
+   141	  // Python's left-to-right expression evaluation explicit.
+   142	  rule Compare(V:Value, CmpOp("<=", E)) => E ~> compareLE(V)
+   143	  rule VInt(J) ~> compareLE(VInt(I))
+   144	    => VBool(I <=Int J)
+   145	  rule W:NumValue ~> compareLE(V:NumValue)
+   146	    => VBool(asRat(V) <=Rat asRat(W))
+   147	    [owise]
+   148	
+   149	  // round(sqrt(x), 2), represented exactly as an integer count of hundredths.
+   150	  // The integer/rational algorithm avoids relying on backend floating-point
+   151	  // hooks, so the same semantics is executable and symbolically provable.
+   152	  rule Call(Name("round"), E, Int(2)) => E ~> round2
+   153	  rule VSqrt(R) ~> round2 => VRounded(sqrtHundredths(R))
+   154	  rule VInt(I) ~> round2 => VInt(I)
+   155	
+   156	  syntax Int ::= sqrtHundredths(Rat) [function]
+   157	               | findSqrtUpper(Rat, Int) [function]
+   158	               | bisectSqrt(Rat, Int, Int) [function]
+   159	               | finishSqrtRound(Rat, Int) [function]
+   160	
+   161	  rule sqrtHundredths(R)
+   162	    => findSqrtUpper(R *Rat 10000, 1)
+   163	    [concrete(R), simplification]
+   164	
+   165	  rule findSqrtUpper(R, H)
+   166	    => finishSqrtRound(R, bisectSqrt(R, H /Int 2, H))
+   167	    requires R <Rat (H *Int H)
+   168	  rule findSqrtUpper(R, H)
+   169	    => findSqrtUpper(R, H *Int 2)
+   170	    requires R >=Rat (H *Int H)
+   171	
+   172	  rule bisectSqrt(_, L, H) => L
+   173	    requires H -Int L <=Int 1
+   174	  rule bisectSqrt(R, L, H)
+   175	    => bisectSqrt(R, (L +Int H) /Int 2, H)
+   176	    requires H -Int L >Int 1
+   177	     andBool (((L +Int H) /Int 2) *Int ((L +Int H) /Int 2) <=Rat R)
+   178	  rule bisectSqrt(R, L, H)
+   179	    => bisectSqrt(R, L, (L +Int H) /Int 2)
+   180	    requires H -Int L >Int 1
+   181	     andBool (R <Rat ((L +Int H) /Int 2) *Int ((L +Int H) /Int 2))
+   182	
+   183	  rule finishSqrtRound(R, L) => L +Int 1
+   184	    requires (4 *Rat R) >Rat ((2 *Int L +Int 1) *Int (2 *Int L +Int 1))
+   185	  rule finishSqrtRound(R, L) => L
+   186	    requires (4 *Rat R) <Rat ((2 *Int L +Int 1) *Int (2 *Int L +Int 1))
+   187	  rule finishSqrtRound(R, L) => L
+   188	    requires (4 *Rat R) ==Rat ((2 *Int L +Int 1) *Int (2 *Int L +Int 1))
+   189	     andBool L %Int 2 ==Int 0
+   190	  rule finishSqrtRound(R, L) => L +Int 1
+   191	    requires (4 *Rat R) ==Rat ((2 *Int L +Int 1) *Int (2 *Int L +Int 1))
+   192	     andBool L %Int 2 =/=Int 0
+   193	endmodule
+     1	// Verification harness: this constant is a literal copy of solution.mpy.
+     2	// Keeping the translated AST visible makes the link between source and proof
+     3	// auditable; prove.sh checks that the translator output remains unchanged.
+     4	
+     5	requires "semantic.k"
+     6	
+     7	module VERIFICATION
+     8	  imports SEMANTIC
+     9	
+    10	  syntax Program ::= "solutionProgram" [function]
+    11	  syntax Rat ::= heronRadicand(Int, Int, Int) [function]
+    12	
+    13	  rule heronRadicand(A, B, C) =>
+    14	    (((A +Int B +Int C) /Rat 2)
+    15	      *Rat (((A +Int B +Int C) /Rat 2) -Rat A)
+    16	      *Rat (((A +Int B +Int C) /Rat 2) -Rat B)
+    17	      *Rat (((A +Int B +Int C) /Rat 2) -Rat C))
+    18	
+    19	  rule solutionProgram =>
+    20	    Module(
+    21	      FuncDef("triangle_area", Params("a", "b", "c"),
+    22	        If(Compare(BinOp("+", Name("a"), Name("b")), CmpOp("<=", Name("c"))),
+    23	          Return(UnaryOp("-", Int(1))),
+    24	          )
+    25	        If(Compare(BinOp("+", Name("a"), Name("c")), CmpOp("<=", Name("b"))),
+    26	          Return(UnaryOp("-", Int(1))),
+    27	          )
+    28	        If(Compare(BinOp("+", Name("b"), Name("c")), CmpOp("<=", Name("a"))),
+    29	          Return(UnaryOp("-", Int(1))),
+    30	          )
+    31	        Assign(
+    32	          Name("semiperimeter"),
+    33	          BinOp(
+    34	            "/",
+    35	            BinOp("+", BinOp("+", Name("a"), Name("b")), Name("c")),
+    36	            Int(2)))
+    37	        Assign(
+    38	          Name("area"),
+    39	          BinOp(
+    40	            "**",
+    41	            BinOp(
+    42	              "*",
+    43	              BinOp(
+    44	                "*",
+    45	                BinOp(
+    46	                  "*",
+    47	                  Name("semiperimeter"),
+    48	                  BinOp("-", Name("semiperimeter"), Name("a"))),
+    49	                BinOp("-", Name("semiperimeter"), Name("b"))),
+    50	              BinOp("-", Name("semiperimeter"), Name("c"))),
+    51	            Float(0.5)))
+    52	        Return(Call(Name("round"), Name("area"), Int(2)))))
+    53	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // The prompt's valid example: 6.00 is represented as 600 hundredths.
+     7	  claim
+     8	    <triangle>
+     9	      <k> launch(solutionProgram, Args(VInt(3), VInt(4), VInt(5))) => .K </k>
+    10	      <env> .Map </env>
+    11	      <functions> .Map </functions>
+    12	      <result> NoResult => VRounded(600) </result>
+    13	    </triangle>
+    14	
+    15	  // A second exact Heron case exercises the complete valid path.
+    16	  claim
+    17	    <triangle>
+    18	      <k> launch(solutionProgram, Args(VInt(5), VInt(12), VInt(13))) => .K </k>
+    19	      <env> .Map </env>
+    20	      <functions> .Map </functions>
+    21	      <result> NoResult => VRounded(3000) </result>
+    22	    </triangle>
+    23	
+    24	  // This case exercises square-root approximation and decimal rounding.
+    25	  claim
+    26	    <triangle>
+    27	      <k> launch(solutionProgram, Args(VInt(2), VInt(2), VInt(2))) => .K </k>
+    28	      <env> .Map </env>
+    29	      <functions> .Map </functions>
+    30	      <result> NoResult => VRounded(173) </result>
+    31	    </triangle>
+    32	
+    33	  // For every valid integer triangle, symbolic execution establishes that the
+    34	  // implementation returns the rounded square root of Heron's radicand.
+    35	  claim
+    36	    <triangle>
+    37	      <k> launch(solutionProgram, Args(VInt(A), VInt(B), VInt(C))) => .K </k>
+    38	      <env> .Map </env>
+    39	      <functions> .Map </functions>
+    40	      <result>
+    41	        NoResult => VRounded(sqrtHundredths(heronRadicand(A, B, C)))
+    42	      </result>
+    43	    </triangle>
+    44	    requires A +Int B >Int C
+    45	     andBool A +Int C >Int B
+    46	     andBool B +Int C >Int A
+    47	
+    48	  // Every invalid integer triangle reaches exactly one of these three claims,
+    49	  // according to the source program's left-to-right guard order.
+    50	  claim
+    51	    <triangle>
+    52	      <k> launch(solutionProgram, Args(VInt(A), VInt(B), VInt(C))) => .K </k>
+    53	      <env> .Map </env>
+    54	      <functions> .Map </functions>
+    55	      <result> NoResult => VInt(-1) </result>
+    56	    </triangle>
+    57	    requires A +Int B <=Int C
+    58	
+    59	  claim
+    60	    <triangle>
+    61	      <k> launch(solutionProgram, Args(VInt(A), VInt(B), VInt(C))) => .K </k>
+    62	      <env> .Map </env>
+    63	      <functions> .Map </functions>
+    64	      <result> NoResult => VInt(-1) </result>
+    65	    </triangle>
+    66	    requires A +Int B >Int C
+    67	     andBool A +Int C <=Int B
+    68	
+    69	  claim
+    70	    <triangle>
+    71	      <k> launch(solutionProgram, Args(VInt(A), VInt(B), VInt(C))) => .K </k>
+    72	      <env> .Map </env>
+    73	      <functions> .Map </functions>
+    74	      <result> NoResult => VInt(-1) </result>
+    75	    </triangle>
+    76	    requires A +Int B >Int C
+    77	     andBool A +Int C >Int B
+    78	     andBool B +Int C <=Int A
+    79	endmodule
+/tmp/audit-work/candidate-fresh/spec.k:1:requires "verification.k"
+/tmp/audit-work/candidate-fresh/spec.k:3:module SPEC
+/tmp/audit-work/candidate-fresh/spec.k:4:  imports VERIFICATION
+/tmp/audit-work/candidate-fresh/spec.k:7:  claim
+/tmp/audit-work/candidate-fresh/spec.k:16:  claim
+/tmp/audit-work/candidate-fresh/spec.k:25:  claim
+/tmp/audit-work/candidate-fresh/spec.k:35:  claim
+/tmp/audit-work/candidate-fresh/spec.k:44:    requires A +Int B >Int C
+/tmp/audit-work/candidate-fresh/spec.k:50:  claim
+/tmp/audit-work/candidate-fresh/spec.k:57:    requires A +Int B <=Int C
+/tmp/audit-work/candidate-fresh/spec.k:59:  claim
+/tmp/audit-work/candidate-fresh/spec.k:66:    requires A +Int B >Int C
+/tmp/audit-work/candidate-fresh/spec.k:69:  claim
+/tmp/audit-work/candidate-fresh/spec.k:76:    requires A +Int B >Int C
+/tmp/audit-work/candidate-fresh/spec.k:79:endmodule
+/tmp/audit-work/candidate-fresh/verification.k:5:requires "semantic.k"
+/tmp/audit-work/candidate-fresh/verification.k:7:module VERIFICATION
+/tmp/audit-work/candidate-fresh/verification.k:8:  imports SEMANTIC
+/tmp/audit-work/candidate-fresh/verification.k:10:  syntax Program ::= "solutionProgram" [function]
+/tmp/audit-work/candidate-fresh/verification.k:11:  syntax Rat ::= heronRadicand(Int, Int, Int) [function]
+/tmp/audit-work/candidate-fresh/verification.k:13:  rule heronRadicand(A, B, C) =>
+/tmp/audit-work/candidate-fresh/verification.k:19:  rule solutionProgram =>
+/tmp/audit-work/candidate-fresh/verification.k:53:endmodule
+/tmp/audit-work/candidate-fresh/semantic.k:5:requires "rat.md"
+/tmp/audit-work/candidate-fresh/semantic.k:7:module MPY-SYNTAX
+/tmp/audit-work/candidate-fresh/semantic.k:8:  imports INT-SYNTAX
+/tmp/audit-work/candidate-fresh/semantic.k:9:  imports FLOAT-SYNTAX
+/tmp/audit-work/candidate-fresh/semantic.k:10:  imports RAT-SYNTAX
+/tmp/audit-work/candidate-fresh/semantic.k:11:  imports BOOL-SYNTAX
+/tmp/audit-work/candidate-fresh/semantic.k:12:  imports STRING-SYNTAX
+/tmp/audit-work/candidate-fresh/semantic.k:14:  syntax Program ::= Module(Stmts)
+/tmp/audit-work/candidate-fresh/semantic.k:15:  syntax Stmts  ::= List{Stmt, ""}
+/tmp/audit-work/candidate-fresh/semantic.k:16:  syntax Stmt   ::= FuncDef(String, Params, Stmts)
+/tmp/audit-work/candidate-fresh/semantic.k:21:  syntax Params  ::= Params(Strings)
+/tmp/audit-work/candidate-fresh/semantic.k:22:  syntax Strings ::= List{String, ","}
+/tmp/audit-work/candidate-fresh/semantic.k:24:  syntax Exp ::= Int(Int)
+/tmp/audit-work/candidate-fresh/semantic.k:28:  syntax Exp ::= UnaryOp(String, Exp) [strict(2)]
+/tmp/audit-work/candidate-fresh/semantic.k:31:  syntax CmpOp ::= CmpOp(String, Exp)
+/tmp/audit-work/candidate-fresh/semantic.k:32:  syntax Exprs ::= List{Exp, ","}
+/tmp/audit-work/candidate-fresh/semantic.k:34:  syntax NumValue ::= VInt(Int) | VRat(Rat)
+/tmp/audit-work/candidate-fresh/semantic.k:35:  syntax Value  ::= NumValue
+/tmp/audit-work/candidate-fresh/semantic.k:40:  syntax Values ::= List{Value, ","}
+/tmp/audit-work/candidate-fresh/semantic.k:41:  syntax Args   ::= Args(Values)
+/tmp/audit-work/candidate-fresh/semantic.k:42:endmodule
+/tmp/audit-work/candidate-fresh/semantic.k:44:module SEMANTIC
+/tmp/audit-work/candidate-fresh/semantic.k:45:  imports MPY-SYNTAX
+/tmp/audit-work/candidate-fresh/semantic.k:46:  imports INT
+/tmp/audit-work/candidate-fresh/semantic.k:47:  imports RAT
+/tmp/audit-work/candidate-fresh/semantic.k:48:  imports BOOL
+/tmp/audit-work/candidate-fresh/semantic.k:49:  imports MAP
+/tmp/audit-work/candidate-fresh/semantic.k:51:  configuration
+/tmp/audit-work/candidate-fresh/semantic.k:59:  syntax Result ::= "NoResult" | Value
+/tmp/audit-work/candidate-fresh/semantic.k:60:  syntax Exp ::= Value
+/tmp/audit-work/candidate-fresh/semantic.k:61:  syntax KResult ::= Value
+/tmp/audit-work/candidate-fresh/semantic.k:63:  syntax Function ::= function(Strings, Stmts)
+/tmp/audit-work/candidate-fresh/semantic.k:64:  syntax KItem ::= launch(Program, Args)
+/tmp/audit-work/candidate-fresh/semantic.k:75:  rule launch(Module(SS), Args(VS))
+/tmp/audit-work/candidate-fresh/semantic.k:78:  rule exec(.Stmts) => .K
+/tmp/audit-work/candidate-fresh/semantic.k:79:  rule exec(S:Stmt SS:Stmts) => S ~> exec(SS)
+/tmp/audit-work/candidate-fresh/semantic.k:81:  rule <k> FuncDef(F, Params(PS), BODY) => .K ...</k>
+/tmp/audit-work/candidate-fresh/semantic.k:84:  rule <k> invoke(F, VS) => bind(PS, VS) ~> exec(BODY) ...</k>
+/tmp/audit-work/candidate-fresh/semantic.k:87:  rule bind(.Strings, .Values) => .K
+/tmp/audit-work/candidate-fresh/semantic.k:88:  rule <k> bind((P, PS), (V, VS)) => bind(PS, VS) ...</k>
+/tmp/audit-work/candidate-fresh/semantic.k:92:  rule If(E, THEN,) => E ~> branch(THEN)
+/tmp/audit-work/candidate-fresh/semantic.k:93:  rule VBool(true)  ~> branch(THEN) => exec(THEN)
+/tmp/audit-work/candidate-fresh/semantic.k:94:  rule VBool(false) ~> branch(_) => .K
+/tmp/audit-work/candidate-fresh/semantic.k:96:  rule Assign(Name(X), E) => E ~> assignTo(X)
+/tmp/audit-work/candidate-fresh/semantic.k:97:  rule <k> V:Value ~> assignTo(X) => .K ...</k>
+/tmp/audit-work/candidate-fresh/semantic.k:100:  rule Return(E) => E ~> returnValue
+/tmp/audit-work/candidate-fresh/semantic.k:101:  rule <k> V:Value ~> returnValue ~> _REST:K => .K </k>
+/tmp/audit-work/candidate-fresh/semantic.k:107:  rule Int(I) => VInt(I)
+/tmp/audit-work/candidate-fresh/semantic.k:108:  rule Float(F) => VFloat(F)
+/tmp/audit-work/candidate-fresh/semantic.k:109:  rule <k> Name(X) => V ...</k>
+/tmp/audit-work/candidate-fresh/semantic.k:112:  rule UnaryOp("-", VInt(I))   => VInt(0 -Int I)
+/tmp/audit-work/candidate-fresh/semantic.k:113:  rule UnaryOp("-", VRat(R)) => VRat(0 -Rat R)
+/tmp/audit-work/candidate-fresh/semantic.k:116:  syntax Rat ::= asRat(NumValue) [function, total]
+/tmp/audit-work/candidate-fresh/semantic.k:117:  rule asRat(VInt(I)) => I
+/tmp/audit-work/candidate-fresh/semantic.k:118:  rule asRat(VRat(R)) => R
+/tmp/audit-work/candidate-fresh/semantic.k:120:  rule BinOp("+", VInt(I), VInt(J)) => VInt(I +Int J)
+/tmp/audit-work/candidate-fresh/semantic.k:121:  rule BinOp("+", V:NumValue, W:NumValue)
+/tmp/audit-work/candidate-fresh/semantic.k:123:    [owise]
+/tmp/audit-work/candidate-fresh/semantic.k:125:  rule BinOp("-", VInt(I), VInt(J)) => VInt(I -Int J)
+/tmp/audit-work/candidate-fresh/semantic.k:126:  rule BinOp("-", V:NumValue, W:NumValue)
+/tmp/audit-work/candidate-fresh/semantic.k:128:    [owise]
+/tmp/audit-work/candidate-fresh/semantic.k:130:  rule BinOp("*", VInt(I), VInt(J)) => VInt(I *Int J)
+/tmp/audit-work/candidate-fresh/semantic.k:131:  rule BinOp("*", V:NumValue, W:NumValue)
+/tmp/audit-work/candidate-fresh/semantic.k:133:    [owise]
+/tmp/audit-work/candidate-fresh/semantic.k:135:  rule BinOp("/", V:NumValue, W:NumValue)
+/tmp/audit-work/candidate-fresh/semantic.k:137:  rule BinOp("**", V:NumValue, VFloat(0.5))
+/tmp/audit-work/candidate-fresh/semantic.k:142:  rule Compare(V:Value, CmpOp("<=", E)) => E ~> compareLE(V)
+/tmp/audit-work/candidate-fresh/semantic.k:143:  rule VInt(J) ~> compareLE(VInt(I))
+/tmp/audit-work/candidate-fresh/semantic.k:145:  rule W:NumValue ~> compareLE(V:NumValue)
+/tmp/audit-work/candidate-fresh/semantic.k:147:    [owise]
+/tmp/audit-work/candidate-fresh/semantic.k:152:  rule Call(Name("round"), E, Int(2)) => E ~> round2
+/tmp/audit-work/candidate-fresh/semantic.k:153:  rule VSqrt(R) ~> round2 => VRounded(sqrtHundredths(R))
+/tmp/audit-work/candidate-fresh/semantic.k:154:  rule VInt(I) ~> round2 => VInt(I)
+/tmp/audit-work/candidate-fresh/semantic.k:156:  syntax Int ::= sqrtHundredths(Rat) [function]
+/tmp/audit-work/candidate-fresh/semantic.k:157:               | findSqrtUpper(Rat, Int) [function]
+/tmp/audit-work/candidate-fresh/semantic.k:158:               | bisectSqrt(Rat, Int, Int) [function]
+/tmp/audit-work/candidate-fresh/semantic.k:159:               | finishSqrtRound(Rat, Int) [function]
+/tmp/audit-work/candidate-fresh/semantic.k:161:  rule sqrtHundredths(R)
+/tmp/audit-work/candidate-fresh/semantic.k:163:    [concrete(R), simplification]
+/tmp/audit-work/candidate-fresh/semantic.k:165:  rule findSqrtUpper(R, H)
+/tmp/audit-work/candidate-fresh/semantic.k:167:    requires R <Rat (H *Int H)
+/tmp/audit-work/candidate-fresh/semantic.k:168:  rule findSqrtUpper(R, H)
+/tmp/audit-work/candidate-fresh/semantic.k:170:    requires R >=Rat (H *Int H)
+/tmp/audit-work/candidate-fresh/semantic.k:172:  rule bisectSqrt(_, L, H) => L
+/tmp/audit-work/candidate-fresh/semantic.k:173:    requires H -Int L <=Int 1
+/tmp/audit-work/candidate-fresh/semantic.k:174:  rule bisectSqrt(R, L, H)
+/tmp/audit-work/candidate-fresh/semantic.k:176:    requires H -Int L >Int 1
+/tmp/audit-work/candidate-fresh/semantic.k:178:  rule bisectSqrt(R, L, H)
+/tmp/audit-work/candidate-fresh/semantic.k:180:    requires H -Int L >Int 1
+/tmp/audit-work/candidate-fresh/semantic.k:183:  rule finishSqrtRound(R, L) => L +Int 1
+/tmp/audit-work/candidate-fresh/semantic.k:184:    requires (4 *Rat R) >Rat ((2 *Int L +Int 1) *Int (2 *Int L +Int 1))
+/tmp/audit-work/candidate-fresh/semantic.k:185:  rule finishSqrtRound(R, L) => L
+/tmp/audit-work/candidate-fresh/semantic.k:186:    requires (4 *Rat R) <Rat ((2 *Int L +Int 1) *Int (2 *Int L +Int 1))
+/tmp/audit-work/candidate-fresh/semantic.k:187:  rule finishSqrtRound(R, L) => L
+/tmp/audit-work/candidate-fresh/semantic.k:188:    requires (4 *Rat R) ==Rat ((2 *Int L +Int 1) *Int (2 *Int L +Int 1))
+/tmp/audit-work/candidate-fresh/semantic.k:190:  rule finishSqrtRound(R, L) => L +Int 1
+/tmp/audit-work/candidate-fresh/semantic.k:191:    requires (4 *Rat R) ==Rat ((2 *Int L +Int 1) *Int (2 *Int L +Int 1))
+/tmp/audit-work/candidate-fresh/semantic.k:193:endmodule
+EXIT_STATUS: 0

@@ -1,0 +1,521 @@
++ nl -ba /reference/k-proof/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // This is the exact constructor tree emitted in solution.mpy, factored out
+     7	  // so every claim verifies the same translated program.
+     8	  syntax Stmts ::= "solutionBody" [function]
+     9	  rule solutionBody =>
+    10	    Return(
+    11	      IfExp(
+    12	        Compare(Name("text"), CmpOp("==", Str(""))),
+    13	        NoneVal,
+    14	        Call(
+    15	          Attribute(
+    16	            Call(
+    17	              Attribute(Name("hashlib"), "md5"),
+    18	              Call(Attribute(Name("text"), "encode"), )),
+    19	            "hexdigest"),
+    20	          )))
+    21	    .Stmts
+    22	
+    23	  syntax Program ::= "solutionProgram" [function]
+    24	  rule solutionProgram =>
+    25	    Module(
+    26	      Import("hashlib")
+    27	      FuncDef("string_to_md5", Params("text"), solutionBody))
+    28	
+    29	  // Mathematical result used by the symbolic non-empty contract.
+    30	  syntax PyValue ::= "expectedMd5" "(" String ")" [function]
+    31	  rule expectedMd5(S) => pyString(md5String(S))
+    32	endmodule
++ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [label(empty)]:
+     7	    <py>
+     8	      <k> #load(solutionProgram) => .K </k>
+     9	      <input> "" </input>
+    10	      <functions>
+    11	        .Map => "string_to_md5" |-> fn("text", solutionBody)
+    12	      </functions>
+    13	      <env> .Map => "text" |-> pyString("") </env>
+    14	      <result> noResult => pyNone </result>
+    15	    </py>
+    16	
+    17	  claim [label(nonempty-symbolic)]:
+    18	    <py>
+    19	      <k> #load(solutionProgram) => .K </k>
+    20	      <input> S:String </input>
+    21	      <functions>
+    22	        .Map => "string_to_md5" |-> fn("text", solutionBody)
+    23	      </functions>
+    24	      <env> .Map => "text" |-> pyString(S) </env>
+    25	      <result> noResult => expectedMd5(S) </result>
+    26	    </py>
+    27	    requires S =/=String ""
+    28	
+    29	  claim [label(prompt-example)]:
+    30	    <py>
+    31	      <k> #load(solutionProgram) => .K </k>
+    32	      <input> "Hello world" </input>
+    33	      <functions>
+    34	        .Map => "string_to_md5" |-> fn("text", solutionBody)
+    35	      </functions>
+    36	      <env> .Map => "text" |-> pyString("Hello world") </env>
+    37	      <result>
+    38	        noResult => pyString("3e25960a79dbc69b674cd4ec67a72c62")
+    39	      </result>
+    40	    </py>
+    41	
+    42	  claim [label(unicode-utf8)]:
+    43	    <py>
+    44	      <k> #load(solutionProgram) => .K </k>
+    45	      <input> "π" </input>
+    46	      <functions>
+    47	        .Map => "string_to_md5" |-> fn("text", solutionBody)
+    48	      </functions>
+    49	      <env> .Map => "text" |-> pyString("π") </env>
+    50	      <result>
+    51	        noResult => pyString("31bf0b12546409e15021243132fc7574")
+    52	      </result>
+    53	    </py>
+    54	
+    55	  claim [label(multiblock-padding)]:
+    56	    <py>
+    57	      <k> #load(solutionProgram) => .K </k>
+    58	      <input>
+    59	        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    60	      </input>
+    61	      <functions>
+    62	        .Map => "string_to_md5" |-> fn("text", solutionBody)
+    63	      </functions>
+    64	      <env>
+    65	        .Map => "text" |-> pyString(
+    66	          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+    67	      </env>
+    68	      <result>
+    69	        noResult => pyString("b15af9cdabbaea0516866a33d8fd0f98")
+    70	      </result>
+    71	    </py>
+    72	endmodule
++ nl -ba /reference/k-proof/semantic.k
+     1	module MPY-SYNTAX
+     2	  imports DOMAINS
+     3	  imports BYTES
+     4	
+     5	  syntax Program ::= "Module" "(" Stmts ")"
+     6	
+     7	  syntax Stmts ::= List{Stmt, ""}
+     8	  syntax Stmt  ::= "Import" "(" String ")"
+     9	                 | "FuncDef" "(" String "," Params "," Stmts ")"
+    10	                 | "Return" "(" Expr ")"
+    11	
+    12	  syntax Params ::= "Params" "(" String ")"
+    13	
+    14	  syntax Expr ::= "NoneVal"
+    15	                | "Str" "(" String ")"
+    16	                | "Name" "(" String ")"
+    17	                | "Compare" "(" Expr "," CmpOp ")"
+    18	                | "IfExp" "(" Expr "," Expr "," Expr ")"
+    19	                | "Attribute" "(" Expr "," String ")"
+    20	                | "Call" "(" Expr "," ")"
+    21	                | "Call" "(" Expr "," Expr ")"
+    22	
+    23	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    24	endmodule
+    25	
+    26	module SEMANTIC
+    27	  imports MPY-SYNTAX
+    28	
+    29	  syntax PyValue ::= "pyNone"
+    30	                   | "pyBool" "(" Bool ")"
+    31	                   | "pyString" "(" String ")"
+    32	                   | "pyBytes" "(" Bytes ")"
+    33	                   | "pyModule" "(" String ")"
+    34	                   | "pyBuiltin" "(" String ")"
+    35	                   | "pyMethod" "(" String "," PyValue ")"
+    36	
+    37	  syntax Function ::= "fn" "(" String "," Stmts ")"
+    38	  syntax Result ::= "noResult" | PyValue
+    39	
+    40	  syntax KItem ::= "#load" "(" Program ")"
+    41	                 | "#loadStmts" "(" Stmts ")"
+    42	                 | "#start"
+    43	                 | "#invoke" "(" String "," PyValue ")"
+    44	                 | "#functionEnd"
+    45	                 | "#eval" "(" Expr ")"
+    46	                 | "#compareLeft" "(" String "," Expr ")"
+    47	                 | "#compareRight" "(" String "," PyValue ")"
+    48	                 | "#ifExp" "(" Expr "," Expr ")"
+    49	                 | "#attribute" "(" String ")"
+    50	                 | "#call0"
+    51	                 | "#call1" "(" Expr ")"
+    52	                 | "#apply1" "(" PyValue ")"
+    53	
+    54	  configuration
+    55	    <py>
+    56	      <k> #load($PGM:Program) </k>
+    57	      <input> $TEXT:String </input>
+    58	      <functions> .Map </functions>
+    59	      <env> .Map </env>
+    60	      <result> noResult </result>
+    61	    </py>
+    62	
+    63	  // Module loading records function syntax without executing its body.
+    64	  rule <k> #load(Module(SS)) => #loadStmts(SS) ~> #start ... </k>
+    65	  rule <k> #loadStmts(.Stmts) => .K ... </k>
+    66	  rule <k> #loadStmts(Import(_) REST) => #loadStmts(REST) ... </k>
+    67	  rule <k> #loadStmts(FuncDef(F, Params(P), BODY) REST)
+    68	        => #loadStmts(REST) ... </k>
+    69	       <functions> FS => FS [ F <- fn(P, BODY) ] </functions>
+    70	
+    71	  // The configured input is passed to the HumanEval entry point.
+    72	  rule <k> #start => #invoke("string_to_md5", pyString(S)) ... </k>
+    73	       <input> S </input>
+    74	
+    75	  rule <k> #invoke(F, V) => BODY ~> #functionEnd ... </k>
+    76	       <functions> F |-> fn(P, BODY) </functions>
+    77	       <env> _ => P |-> V </env>
+    78	
+    79	  rule <k> (Return(E) _REST) ~> #functionEnd
+    80	        => #eval(E) ~> #functionEnd ... </k>
+    81	
+    82	  rule <k> V:PyValue ~> #functionEnd => .K ... </k>
+    83	       <result> _ => V </result>
+    84	
+    85	  // Expression evaluation is explicit: the AST translator performs no
+    86	  // desugaring and each constructor gets its meaning here.
+    87	  rule <k> #eval(NoneVal) => pyNone ... </k>
+    88	  rule <k> #eval(Str(S)) => pyString(S) ... </k>
+    89	  rule <k> #eval(Name("hashlib")) => pyModule("hashlib") ... </k>
+    90	  rule <k> #eval(Name(N)) => V ... </k>
+    91	       <env> N |-> V </env>
+    92	
+    93	  rule <k> #eval(Compare(LEFT, CmpOp(OP, RIGHT)))
+    94	        => #eval(LEFT) ~> #compareLeft(OP, RIGHT) ... </k>
+    95	  rule <k> V:PyValue ~> #compareLeft(OP, RIGHT)
+    96	        => #eval(RIGHT) ~> #compareRight(OP, V) ... </k>
+    97	  rule <k> pyString(S2) ~> #compareRight("==", pyString(S1))
+    98	        => pyBool(S1 ==String S2) ... </k>
+    99	
+   100	  rule <k> #eval(IfExp(TEST, YES, NO))
+   101	        => #eval(TEST) ~> #ifExp(YES, NO) ... </k>
+   102	  rule <k> pyBool(true) ~> #ifExp(YES, _NO) => #eval(YES) ... </k>
+   103	  rule <k> pyBool(false) ~> #ifExp(_YES, NO) => #eval(NO) ... </k>
+   104	
+   105	  rule <k> #eval(Attribute(RECEIVER, ATTR))
+   106	        => #eval(RECEIVER) ~> #attribute(ATTR) ... </k>
+   107	  rule <k> pyModule("hashlib") ~> #attribute("md5")
+   108	        => pyBuiltin("hashlib.md5") ... </k>
+   109	  rule <k> pyString(S) ~> #attribute("encode")
+   110	        => pyMethod("str.encode", pyString(S)) ... </k>
+   111	  rule <k> pyBytes(B) ~> #attribute("hexdigest")
+   112	        => pyMethod("md5.hexdigest", pyBytes(B)) ... </k>
+   113	
+   114	  rule <k> #eval(Call(F, )) => #eval(F) ~> #call0 ... </k>
+   115	  rule <k> FUN:PyValue ~> #call0 => #apply0(FUN) ... </k>
+   116	  syntax KItem ::= "#apply0" "(" PyValue ")"
+   117	  rule <k> #apply0(pyMethod("str.encode", pyString(S)))
+   118	        => pyBytes(utf8Bytes(S)) ... </k>
+   119	  rule <k> #apply0(pyMethod("md5.hexdigest", pyBytes(B)))
+   120	        => pyString(md5Bytes(B)) ... </k>
+   121	
+   122	  rule <k> #eval(Call(F, ARG))
+   123	        => #eval(F) ~> #call1(ARG) ... </k>
+   124	  rule <k> FUN:PyValue ~> #call1(ARG)
+   125	        => #eval(ARG) ~> #apply1(FUN) ... </k>
+   126	  rule <k> pyBytes(B) ~> #apply1(pyBuiltin("hashlib.md5"))
+   127	        => pyBytes(B) ... </k>
+   128	
+   129	  // -----------------------------------------------------------------------
+   130	  // A self-contained RFC 1321 MD5 implementation over K's byte primitives.
+   131	  // Python's str.encode() defaults to UTF-8, captured by the rule above.
+   132	  // -----------------------------------------------------------------------
+   133	
+   134	  syntax String ::= "md5String" "(" String ")" [function]
+   135	  syntax String ::= "md5Bytes" "(" Bytes ")" [function]
+   136	  syntax Bytes ::= "utf8Bytes" "(" String ")" [function]
+   137	                 | "utf8CodePoint" "(" Int ")" [function]
+   138	  syntax Bytes ::= "md5Pad" "(" Bytes ")" [function]
+   139	  syntax Md5State ::= "md5State" "(" Int "," Int "," Int "," Int ")"
+   140	  syntax Md5State ::= "md5Blocks" "(" Bytes "," Int "," Md5State ")" [function]
+   141	  syntax Md5State ::= "md5Rounds"
+   142	      "(" Bytes "," Int "," Int "," Md5State "," Md5State ")" [function]
+   143	  syntax Md5State ::= "md5AddState" "(" Md5State "," Md5State ")" [function]
+   144	  syntax String ::= "md5StateHex" "(" Md5State ")" [function]
+   145	                  | "hexWordLE" "(" Int ")" [function]
+   146	                  | "hexByte" "(" Int ")" [function]
+   147	                  | "hexNibble" "(" Int ")" [function]
+   148	  syntax Int ::= "md5F" "(" Int "," Int "," Int "," Int ")" [function]
+   149	               | "md5G" "(" Int ")" [function]
+   150	               | "md5Shift" "(" Int ")" [function]
+   151	               | "md5K" "(" Int ")" [function]
+   152	               | "md5Word" "(" Bytes "," Int "," Int ")" [function]
+   153	               | "add32" "(" Int "," Int ")" [function]
+   154	               | "add32" "(" Int "," Int "," Int "," Int ")" [function]
+   155	               | "rotl32" "(" Int "," Int ")" [function]
+   156	
+   157	  rule md5String(S) => md5Bytes(utf8Bytes(S))
+   158	  rule utf8Bytes("") => .Bytes [simplification]
+   159	  rule utf8Bytes(S) =>
+   160	    utf8CodePoint(ordChar(substrString(S, 0, 1)))
+   161	    +Bytes utf8Bytes(substrString(S, 1, lengthString(S)))
+   162	    requires S =/=String ""
+   163	    [concrete(S), simplification]
+   164	
+   165	  rule utf8CodePoint(C) => Int2Bytes(1, C, BE)
+   166	    requires C >=Int 0 andBool C <=Int 127
+   167	  rule utf8CodePoint(C) =>
+   168	    Int2Bytes(1, 192 |Int (C >>Int 6), BE)
+   169	    +Bytes Int2Bytes(1, 128 |Int (C &Int 63), BE)
+   170	    requires C >=Int 128 andBool C <=Int 2047
+   171	  rule utf8CodePoint(C) =>
+   172	    Int2Bytes(1, 224 |Int (C >>Int 12), BE)
+   173	    +Bytes Int2Bytes(1, 128 |Int ((C >>Int 6) &Int 63), BE)
+   174	    +Bytes Int2Bytes(1, 128 |Int (C &Int 63), BE)
+   175	    requires C >=Int 2048 andBool C <=Int 65535
+   176	  rule utf8CodePoint(C) =>
+   177	    Int2Bytes(1, 240 |Int (C >>Int 18), BE)
+   178	    +Bytes Int2Bytes(1, 128 |Int ((C >>Int 12) &Int 63), BE)
+   179	    +Bytes Int2Bytes(1, 128 |Int ((C >>Int 6) &Int 63), BE)
+   180	    +Bytes Int2Bytes(1, 128 |Int (C &Int 63), BE)
+   181	    requires C >=Int 65536 andBool C <=Int 1114111
+   182	  rule md5Bytes(B) =>
+   183	    md5StateHex(md5Blocks(
+   184	      md5Pad(B),
+   185	      0,
+   186	      md5State(1732584193, 4023233417, 2562383102, 271733878)))
+   187	    [concrete(B), simplification]
+   188	
+   189	  rule md5Pad(B) =>
+   190	    padRightBytes(
+   191	      B +Bytes b"\x80",
+   192	      (((lengthBytes(B) +Int 72) divInt 64) *Int 64) -Int 8,
+   193	      0)
+   194	    +Bytes Int2Bytes(8, lengthBytes(B) *Int 8, LE)
+   195	
+   196	  rule md5Blocks(P, OFFSET, STATE) => STATE
+   197	    requires OFFSET >=Int lengthBytes(P)
+   198	  rule md5Blocks(P, OFFSET, STATE) =>
+   199	    md5Blocks(P, OFFSET +Int 64, md5Rounds(P, OFFSET, 0, STATE, STATE))
+   200	    requires OFFSET <Int lengthBytes(P)
+   201	
+   202	  rule md5Rounds(_P, _OFFSET, 64, STATE, ORIGINAL) =>
+   203	    md5AddState(STATE, ORIGINAL)
+   204	  rule md5Rounds(P, OFFSET, I, md5State(A, B, C, D), ORIGINAL) =>
+   205	    md5Rounds(
+   206	      P,
+   207	      OFFSET,
+   208	      I +Int 1,
+   209	      md5State(
+   210	        D,
+   211	        add32(B,
+   212	          rotl32(
+   213	            add32(A, md5F(I, B, C, D), md5K(I), md5Word(P, OFFSET, md5G(I))),
+   214	            md5Shift(I))),
+   215	        B,
+   216	        C),
+   217	      ORIGINAL)
+   218	    requires I >=Int 0 andBool I <Int 64
+   219	
+   220	  rule md5AddState(
+   221	      md5State(A, B, C, D),
+   222	      md5State(A0, B0, C0, D0)) =>
+   223	    md5State(add32(A, A0), add32(B, B0), add32(C, C0), add32(D, D0))
+   224	
+   225	  rule md5StateHex(md5State(A, B, C, D)) =>
+   226	    hexWordLE(A) +String hexWordLE(B) +String
+   227	    hexWordLE(C) +String hexWordLE(D)
+   228	
+   229	  rule hexWordLE(W) =>
+   230	    hexByte(W &Int 255) +String
+   231	    hexByte((W >>Int 8) &Int 255) +String
+   232	    hexByte((W >>Int 16) &Int 255) +String
+   233	    hexByte((W >>Int 24) &Int 255)
+   234	  rule hexByte(B) =>
+   235	    hexNibble(B divInt 16) +String hexNibble(B modInt 16)
+   236	  rule hexNibble(0)  => "0"
+   237	  rule hexNibble(1)  => "1"
+   238	  rule hexNibble(2)  => "2"
+   239	  rule hexNibble(3)  => "3"
+   240	  rule hexNibble(4)  => "4"
+   241	  rule hexNibble(5)  => "5"
+   242	  rule hexNibble(6)  => "6"
+   243	  rule hexNibble(7)  => "7"
+   244	  rule hexNibble(8)  => "8"
+   245	  rule hexNibble(9)  => "9"
+   246	  rule hexNibble(10) => "a"
+   247	  rule hexNibble(11) => "b"
+   248	  rule hexNibble(12) => "c"
+   249	  rule hexNibble(13) => "d"
+   250	  rule hexNibble(14) => "e"
+   251	  rule hexNibble(15) => "f"
+   252	
+   253	  rule md5Word(P, OFFSET, G) =>
+   254	    Bytes2Int(
+   255	      substrBytes(
+   256	        P,
+   257	        OFFSET +Int (4 *Int G),
+   258	        OFFSET +Int (4 *Int G) +Int 4),
+   259	      LE,
+   260	      Unsigned)
+   261	
+   262	  rule add32(X, Y) => (X +Int Y) modInt 4294967296
+   263	  rule add32(W, X, Y, Z) =>
+   264	    (W +Int X +Int Y +Int Z) modInt 4294967296
+   265	  rule rotl32(X, S) =>
+   266	    ((X <<Int S) |Int (X >>Int (32 -Int S))) &Int 4294967295
+   267	
+   268	  rule md5F(I, B, C, D) => (B &Int C) |Int ((~Int B) &Int D)
+   269	    requires I >=Int 0 andBool I <Int 16
+   270	  rule md5F(I, B, C, D) => (D &Int B) |Int ((~Int D) &Int C)
+   271	    requires I >=Int 16 andBool I <Int 32
+   272	  rule md5F(I, B, C, D) => B xorInt C xorInt D
+   273	    requires I >=Int 32 andBool I <Int 48
+   274	  rule md5F(I, B, C, D) => C xorInt (B |Int (~Int D))
+   275	    requires I >=Int 48 andBool I <Int 64
+   276	
+   277	  rule md5G(I) => I requires I >=Int 0 andBool I <Int 16
+   278	  rule md5G(I) => (5 *Int I +Int 1) modInt 16
+   279	    requires I >=Int 16 andBool I <Int 32
+   280	  rule md5G(I) => (3 *Int I +Int 5) modInt 16
+   281	    requires I >=Int 32 andBool I <Int 48
+   282	  rule md5G(I) => (7 *Int I) modInt 16
+   283	    requires I >=Int 48 andBool I <Int 64
+   284	
+   285	  rule md5Shift(I) => 7  requires I >=Int 0  andBool I <Int 16 andBool I modInt 4 ==Int 0
+   286	  rule md5Shift(I) => 12 requires I >=Int 0  andBool I <Int 16 andBool I modInt 4 ==Int 1
+   287	  rule md5Shift(I) => 17 requires I >=Int 0  andBool I <Int 16 andBool I modInt 4 ==Int 2
+   288	  rule md5Shift(I) => 22 requires I >=Int 0  andBool I <Int 16 andBool I modInt 4 ==Int 3
+   289	  rule md5Shift(I) => 5  requires I >=Int 16 andBool I <Int 32 andBool I modInt 4 ==Int 0
+   290	  rule md5Shift(I) => 9  requires I >=Int 16 andBool I <Int 32 andBool I modInt 4 ==Int 1
+   291	  rule md5Shift(I) => 14 requires I >=Int 16 andBool I <Int 32 andBool I modInt 4 ==Int 2
+   292	  rule md5Shift(I) => 20 requires I >=Int 16 andBool I <Int 32 andBool I modInt 4 ==Int 3
+   293	  rule md5Shift(I) => 4  requires I >=Int 32 andBool I <Int 48 andBool I modInt 4 ==Int 0
+   294	  rule md5Shift(I) => 11 requires I >=Int 32 andBool I <Int 48 andBool I modInt 4 ==Int 1
+   295	  rule md5Shift(I) => 16 requires I >=Int 32 andBool I <Int 48 andBool I modInt 4 ==Int 2
+   296	  rule md5Shift(I) => 23 requires I >=Int 32 andBool I <Int 48 andBool I modInt 4 ==Int 3
+   297	  rule md5Shift(I) => 6  requires I >=Int 48 andBool I <Int 64 andBool I modInt 4 ==Int 0
+   298	  rule md5Shift(I) => 10 requires I >=Int 48 andBool I <Int 64 andBool I modInt 4 ==Int 1
+   299	  rule md5Shift(I) => 15 requires I >=Int 48 andBool I <Int 64 andBool I modInt 4 ==Int 2
+   300	  rule md5Shift(I) => 21 requires I >=Int 48 andBool I <Int 64 andBool I modInt 4 ==Int 3
+   301	
+   302	  rule md5K(0)  => 3614090360
+   303	  rule md5K(1)  => 3905402710
+   304	  rule md5K(2)  => 606105819
+   305	  rule md5K(3)  => 3250441966
+   306	  rule md5K(4)  => 4118548399
+   307	  rule md5K(5)  => 1200080426
+   308	  rule md5K(6)  => 2821735955
+   309	  rule md5K(7)  => 4249261313
+   310	  rule md5K(8)  => 1770035416
+   311	  rule md5K(9)  => 2336552879
+   312	  rule md5K(10) => 4294925233
+   313	  rule md5K(11) => 2304563134
+   314	  rule md5K(12) => 1804603682
+   315	  rule md5K(13) => 4254626195
+   316	  rule md5K(14) => 2792965006
+   317	  rule md5K(15) => 1236535329
+   318	  rule md5K(16) => 4129170786
+   319	  rule md5K(17) => 3225465664
+   320	  rule md5K(18) => 643717713
+   321	  rule md5K(19) => 3921069994
+   322	  rule md5K(20) => 3593408605
+   323	  rule md5K(21) => 38016083
+   324	  rule md5K(22) => 3634488961
+   325	  rule md5K(23) => 3889429448
+   326	  rule md5K(24) => 568446438
+   327	  rule md5K(25) => 3275163606
+   328	  rule md5K(26) => 4107603335
+   329	  rule md5K(27) => 1163531501
+   330	  rule md5K(28) => 2850285829
+   331	  rule md5K(29) => 4243563512
+   332	  rule md5K(30) => 1735328473
+   333	  rule md5K(31) => 2368359562
+   334	  rule md5K(32) => 4294588738
+   335	  rule md5K(33) => 2272392833
+   336	  rule md5K(34) => 1839030562
+   337	  rule md5K(35) => 4259657740
+   338	  rule md5K(36) => 2763975236
+   339	  rule md5K(37) => 1272893353
+   340	  rule md5K(38) => 4139469664
+   341	  rule md5K(39) => 3200236656
+   342	  rule md5K(40) => 681279174
+   343	  rule md5K(41) => 3936430074
+   344	  rule md5K(42) => 3572445317
+   345	  rule md5K(43) => 76029189
+   346	  rule md5K(44) => 3654602809
+   347	  rule md5K(45) => 3873151461
+   348	  rule md5K(46) => 530742520
+   349	  rule md5K(47) => 3299628645
+   350	  rule md5K(48) => 4096336452
+   351	  rule md5K(49) => 1126891415
+   352	  rule md5K(50) => 2878612391
+   353	  rule md5K(51) => 4237533241
+   354	  rule md5K(52) => 1700485571
+   355	  rule md5K(53) => 2399980690
+   356	  rule md5K(54) => 4293915773
+   357	  rule md5K(55) => 2240044497
+   358	  rule md5K(56) => 1873313359
+   359	  rule md5K(57) => 4264355552
+   360	  rule md5K(58) => 2734768916
+   361	  rule md5K(59) => 1309151649
+   362	  rule md5K(60) => 4149444226
+   363	  rule md5K(61) => 3174756917
+   364	  rule md5K(62) => 718787259
+   365	  rule md5K(63) => 3951481745
+   366	endmodule
++ nl -ba /reference/k-proof/solution.py
+     1	import hashlib
+     2	
+     3	
+     4	def string_to_md5(text):
+     5	    return None if text == "" else hashlib.md5(text.encode()).hexdigest()
++ nl -ba /reference/k-proof/solution.mpy
+     1	Module(
+     2	  Import("hashlib")
+     3	  FuncDef("string_to_md5", Params("text"),
+     4	    Return(
+     5	      IfExp(
+     6	        Compare(Name("text"), CmpOp("==", Str(""))),
+     7	        NoneVal,
+     8	        Call(
+     9	          Attribute(
+    10	            Call(
+    11	              Attribute(Name("hashlib"), "md5"),
+    12	              Call(Attribute(Name("text"), "encode"), )),
+    13	            "hexdigest"),
+    14	          )))))
++ nl -ba /reference/k-proof/prompt.py
+     1	
+     2	def string_to_md5(text):
+     3	    """
+     4	    Given a string 'text', return its md5 hash equivalent string.
+     5	    If 'text' is an empty string, return None.
+     6	
+     7	    >>> string_to_md5('Hello world') == '3e25960a79dbc69b674cd4ec67a72c62'
+     8	    """
++ sed -n 1,220p /reference/k-proof/prove.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+python3 py2mpy.py solution.py > solution.mpy
+
+kompile verification.k \
+  --backend haskell \
+  --main-module VERIFICATION \
+  --syntax-module MPY-SYNTAX \
+  --output-definition verification-kompiled
+
+krun solution.mpy --definition verification-kompiled -cTEXT='""'
+krun solution.mpy --definition verification-kompiled -cTEXT='"Hello world"'
+krun solution.mpy --definition verification-kompiled \
+  -cTEXT='"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"'
+
+kprove spec.k --definition verification-kompiled

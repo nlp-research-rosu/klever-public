@@ -1,0 +1,511 @@
+COMMAND: bash -lc for\ p\ in\ /candidate/PROOF.md\ /candidate/differential_test.py\ /candidate/smoke.py\ /candidate/differential-smoke.py\;\ do\ echo\ \"BEGIN\ \$p\"\;\ nl\ -ba\ \"\$p\"\;\ echo\ \"END\ \$p\"\;\ done
+BEGIN /candidate/PROOF.md
+     1	VALIDATED
+     2	
+     3	## What is proven
+     4	
+     5	Under the supplied MPY semantics, `get_positive` is partially correct for every
+     6	arbitrary finite list whose elements are MPY `Int` or `Float` values. It returns
+     7	a fresh list containing exactly the input elements whose MPY comparison with
+     8	`0.0` is true, in their original order and with duplicates preserved.
+     9	
+    10	This is an unbounded symbolic theorem over `VS:ValSeq`; it is not a collection
+    11	of fixed-length claims. The exact translated function definition, lookup,
+    12	argument binding, allocation, loop, `append`, return, frame pop, heap result,
+    13	exception cell, and exit code all execute in the target claim.
+    14	
+    15	This is a partial-correctness result. Termination is not a conclusion of the K
+    16	reachability claims.
+    17	
+    18	## Formal claim and scope
+    19	
+    20	The required entry claim is `SPEC.get-positive` in `spec.k`:
+    21	
+    22	```k
+    23	<k>
+    24	  FuncDef("get_positive", Params("l"), EXACT-BODY)
+    25	  ~> Call(Name("get_positive"), list(VS:ValSeq))
+    26	  => ref(0)
+    27	</k>
+    28	<heap> .Map => 0 |-> list(filterPositive(.ValSeq, VS)) </heap>
+    29	requires numericVals(VS)
+    30	```
+    31	
+    32	The other cells state that the call starts in the module environment with the
+    33	supplied builtins, restores the caller environment and empty stack, leaves
+    34	`NoExc`, and leaves exit code `0`.
+    35	
+    36	Validation scope:
+    37	
+    38	- Program boundary: the exact `FuncDef` and real call through MPY, including
+    39	  every operation defined in `solution.mpy`.
+    40	- Input domain: all finite `ValSeq` values satisfying `numericVals`, i.e. every
+    41	  element is an MPY `Int` or `Float`. Length is symbolic and unbounded.
+    42	- Observable final state: returned reference, referenced list contents, heap
+    43	  allocation counter, caller environment, stack, return state, exception, and
+    44	  exit code.
+    45	- Intended property: stable filtering by strict positivity, preserving values,
+    46	  order, and multiplicity.
+    47	
+    48	`SPEC.filter-loop` is the circular loop invariant. Starting with accumulator
+    49	contents `ACC` and remaining input `VS`, it ends with accumulator contents
+    50	`filterPositive(ACC, VS)`. Its frame pins the exact three local bindings
+    51	`l`, `positive`, and `x`, and the exact loop body.
+    52	
+    53	## Proof-extension inventory
+    54	
+    55	### `numericVal` and `numericVals`
+    56	
+    57	- Class: definitional summaries.
+    58	- Semantic role: describe the input domain; they replace no execution.
+    59	- Domain: all `Val` and `ValSeq` terms.
+    60	- Matched context and justification scope: pure function terms only; no
+    61	  continuation, stack, binding, or cell context.
+    62	- Equations: `numericVal(V)` is `isInt(V) orBool isFloat(V)`;
+    63	  `numericVals` is the usual empty/cons recursion.
+    64	- State footprint: none.
+    65	- Value influence: the entry precondition, loop invariant precondition,
+    66	  `positiveNumeric` default guard, and dynamic dispatch guard.
+    67	- Value justification: built-in sort predicates and exhaustive, disjoint
+    68	  empty/cons equations.
+    69	- Dependents: every target and connection claim.
+    70	- Validation: recursive descent is strict; constructor cases cover all
+    71	  `ValSeq`; concrete Int/Float cases occur in `smoke.py` and the differential
+    72	  corpus.
+    73	
+    74	### `positiveNumeric`
+    75	
+    76	- Class: definitional summary.
+    77	- Semantic role: names the Boolean positivity atom; it replaces no program
+    78	  operation by itself.
+    79	- Domain: all `Val` values.
+    80	- Matched context and justification scope: pure function terms only.
+    81	- Equations: Int maps to `gtF(intToF(I), 0.0)`, Float maps to
+    82	  `gtF(F, 0.0)`, and nonnumeric values map to `false`.
+    83	- Coverage and overlap: Int and Float are disjoint; the third guard is their
+    84	  exact negation, so the total equations are exhaustive and nonoverlapping.
+    85	- State footprint: none.
+    86	- Value influence: selects `append` versus skip and therefore affects the
+    87	  returned list.
+    88	- Value justification: on the formal numeric domain, the bridge-free
+    89	  `compare-*` and `applycmp-*` connection claims establish equality to fixed
+    90	  MPY execution. The underlying `intToF` and `gtF` meanings remain the supplied
+    91	  external float trust boundary.
+    92	- Dependents: `filterPositive`, the dispatch twin, both target claims, and the
+    93	  negative probes.
+    94	- Validation: all connection claims print `#Top`; LLVM/CPython differential
+    95	  evidence has zero mismatches.
+    96	
+    97	### `filterPositive`
+    98	
+    99	- Class: definitional summary.
+   100	- Semantic role: describes the final accumulator; it does not replace the
+   101	  loop or `append`.
+   102	- Domain: all accumulator and remaining `ValSeq` pairs.
+   103	- Matched context and justification scope: pure function terms only.
+   104	- Equations: empty input returns the accumulator; a positive head is appended
+   105	  with the fixed `valSeqConcat`; a nonpositive head is skipped.
+   106	- Coverage and overlap: empty and cons are disjoint; `positiveNumeric(V)` and
+   107	  its negation are exhaustive and disjoint. Every recursive equation consumes
+   108	  one cons cell.
+   109	- State footprint: none.
+   110	- Value influence: fixes the target heap contents.
+   111	- Value justification: its equations are the mathematical stable-filter
+   112	  definition and use the same connected positivity predicate as execution.
+   113	- Dependents: the loop invariant and entry claim.
+   114	- Validation: the loop circularity prints `#Top`; false-result and body
+   115	  mutations are rejected.
+   116	
+   117	### Guarded `applyCmp` dispatch twin
+   118	
+   119	Exact rule:
+   120	
+   121	```k
+   122	rule applyCmp(">", V:Val, 0.0) => positiveNumeric(V)
+   123	  requires numericVal(V)
+   124	  [simplification]
+   125	```
+   126	
+   127	- Class: operational bridge, classified conservatively because it accelerates
+   128	  a fixed semantic function during symbolic execution.
+   129	- Domain: exactly `applyCmp(">", V, 0.0)` with `V` an Int or Float.
+   130	- Matched context: a pure function occurrence in any congruent term. It reads
+   131	  no cells, changes no continuation, introduces no control effect, and has no
+   132	  binding assumptions.
+   133	- Justification scope: the union of universal Int and Float connection claims
+   134	  in `spec-connection.k`, compiled with main module `VERIFICATION-BASE`.
+   135	  That module does not import this twin.
+   136	- Context containment: the connection claims establish the pure `applyCmp`
+   137	  equation for both static sorts; pure equality is congruent in every matched
+   138	  context. End-to-end `Compare` claims also cover evaluation and an arbitrary
+   139	  continuation.
+   140	- State footprint: none read, written, preserved, or abstracted.
+   141	- Value influence: controls the branch and final list.
+   142	- Value justification: bridge-free Int and Float `applyCmp` and `Compare`
+   143	  claims collectively cover the complete `numericVal` guard.
+   144	- Dependents: loop invariant and entry claim.
+   145	- Control validation: end-to-end connection claims preserve arbitrary trailing
+   146	  computation and every framed configuration cell.
+   147	- Value validation: the false-result probe rejects the opposite result for a
+   148	  satisfiable `positiveNumeric(I)` witness; LLVM evidence includes positive,
+   149	  zero, and negative Int/Float values.
+   150	
+   151	### `SPEC.filter-loop`
+   152	
+   153	- Class: derived reachability lemma used coinductively as the loop circularity.
+   154	- Domain: arbitrary numeric `VS`, arbitrary accumulator `ACC`, and the exact
+   155	  reachable plain function frame and heap binding.
+   156	- Matched context: exact `#loop`, target, body, local scope shape, and
+   157	  accumulator heap object; arbitrary trailing continuation and framed
+   158	  unrelated cells are preserved.
+   159	- Justification scope and context containment: the claim itself quantifies over
+   160	  the arbitrary continuation and framed cells. `kprove` checks its empty and
+   161	  cons cases under fixed loop, binding, comparison, method-call, and heap
+   162	  rules.
+   163	- State footprint: reads `x` and `positive`; updates `x` and the list at `H`;
+   164	  preserves `l`, the positive reference, environment, unrelated heap entries,
+   165	  allocation counter, stack, return state, exception, exit code, and
+   166	  continuation.
+   167	- Value influence: fixes the accumulator and final returned list.
+   168	- Dependents: `SPEC.get-positive`.
+   169	- Validation: focused proof prints `#Top`; removing `append` makes the
+   170	  corresponding result claim fail.
+   171	
+   172	No rule intercepts `FuncDef`, `Call`, `For`, `#loop`, `append`, `Return`, or
+   173	frame popping.
+   174	
+   175	## Exact commands and actual outputs
+   176	
+   177	`prove.sh` is the complete reproducible command record. The final audit run was:
+   178	
+   179	```sh
+   180	./prove.sh > proof-run.log 2>&1
+   181	```
+   182	
+   183	Actual exit: `0`.
+   184	
+   185	The script ran these material commands:
+   186	
+   187	```sh
+   188	python3 py2mpy.py solution.py > solution.mpy
+   189	kompile reference-semantics/semantics.k --backend llvm \
+   190	  --main-module MPY-KRUN --syntax-module MPY-SYNTAX \
+   191	  --output-definition runtime-kompiled
+   192	python3 py2mpy.py smoke.py > smoke.mpy
+   193	krun smoke.mpy --definition runtime-kompiled
+   194	python3 differential_test.py
+   195	
+   196	kompile --backend haskell verification.k \
+   197	  --main-module VERIFICATION-BASE --syntax-module MPY-SYNTAX \
+   198	  --output-definition connection-kompiled
+   199	kprove spec-connection.k --definition connection-kompiled \
+   200	  --spec-module SPEC-CONNECTION
+   201	
+   202	kompile --backend haskell verification.k \
+   203	  --main-module VERIFICATION --syntax-module MPY-SYNTAX \
+   204	  --output-definition verification-kompiled
+   205	kprove spec.k --definition verification-kompiled \
+   206	  --spec-module SPEC --claims SPEC.filter-loop
+   207	kprove spec.k --definition verification-kompiled --spec-module SPEC
+   208	```
+   209	
+   210	Actual positive outputs in `proof-run.log`:
+   211	
+   212	- LLVM `krun`: final `<k> .K </k>`, `<exc> NoExc </exc>`, and
+   213	  `<exit-code> 0 </exit-code>`.
+   214	- Differential harness:
+   215	  `cases=60 cpython_mismatches=0 mpy_llvm_mismatches=0`.
+   216	- Bridge-free connection proof: `#Top`, exit `0`.
+   217	- Focused unbounded loop proof: `#Top`, exit `0`.
+   218	- Complete target proof: `#Top`, exit `0`.
+   219	
+   220	The expected-failure commands in `prove.sh` actually exited `1`:
+   221	
+   222	- `SPEC-VACUITY.false-result`: `WarnStuckClaimState`; residual heap contains
+   223	  `list(vCons(I, .ValSeq))` while the mutation demands `list(.ValSeq)`.
+   224	- `SPEC-BODY-MUTATION.removed-append`: `WarnStuckClaimState`; residual heap
+   225	  contains `list(.ValSeq)` while the claim demands the singleton.
+   226	
+   227	The supplied semantics emits compiler warnings unrelated to this proof
+   228	(unused variables and some LLVM non-exhaustive-function warnings). No positive
+   229	proof command failed.
+   230	
+   231	## Gate results
+   232	
+   233	### Gate A — PASS
+   234	
+   235	- A1: the real definition and every program-defined operation execute. The
+   236	  removed-append mutation is rejected.
+   237	- A2: the only execution-accelerating rule is a pure comparison equation with
+   238	  no state footprint and bridge-free universal Int/Float connection proofs.
+   239	  The loop invariant explicitly tracks all changed state.
+   240	- A3: the entry claim executes definition lookup, call evaluation, argument
+   241	  binding, the exact plain local frame, method binding, return, and frame pop.
+   242	  Connection claims use arbitrary continuations.
+   243	- A4: all proof-local equations have disjoint/exhaustive guards and terminating
+   244	  recursion. The dispatch twin is restricted to its proved domain.
+   245	- A5: empty and positive-singleton preconditions are realizable. The false
+   246	  result and body mutations both fail with discriminating residual heaps.
+   247	
+   248	### Gate B — PASS
+   249	
+   250	The source contract's material domain is arbitrary finite lists of numbers.
+   251	The formal domain covers arbitrary, mixed, unbounded finite sequences of both
+   252	numeric value sorts supplied by MPY, Int and Float. The theorem is not bounded
+   253	by length or examples. Comparing to `0.0` is equivalent to strict positivity
+   254	for these Python numeric values.
+   255	
+   256	The summary-to-human-property bridge is conditional on the supplied
+   257	`intToF`/`gtF` contracts and is empirically supported by LLVM/CPython
+   258	differential evidence. That condition is explicit rather than hidden.
+   259	
+   260	### Gate C — PASS
+   261	
+   262	Every proof-local extension, named trust boundary, positive command, negative
+   263	probe, and finite differential is recorded with an existing artifact, exact
+   264	command, scope, oracle, and actual result.
+   265	
+   266	## Trust boundary
+   267	
+   268	- The read-only supplied MPY semantics is fixed and trusted as the Python
+   269	  execution model for this task.
+   270	- `intToF` and `gtF` are supplied opaque Haskell proof primitives with concrete
+   271	  LLVM rules. They influence the positivity branch and therefore the final
+   272	  result. Both target claims depend on them through `positiveNumeric`.
+   273	- K's built-in Int, Float, Bool, Map, and solver theories and the K toolchain
+   274	  are trusted.
+   275	- No program-defined function is trusted or summarized without execution.
+   276	
+   277	The formal fact is closure under this supplied theory. The interpretation that
+   278	opaque float atoms implement Python numeric comparison is conditional on the
+   279	named supplied primitive contracts.
+   280	
+   281	## Empirically supported facts
+   282	
+   283	- `smoke.py` executes both prompt examples plus a mixed Int/Float boundary case
+   284	  through MPY/LLVM with exit code `0`.
+   285	- `differential_test.py` uses an independent CPython list-comprehension oracle.
+   286	  Its 60 cases include empty/singleton lists, zero and negative zero, positive
+   287	  and negative Int/Float values, both prompt examples, large magnitudes, and
+   288	  50 deterministic seeded mixed lists. Actual result: zero CPython or MPY/LLVM
+   289	  mismatches.
+   290	- These finite tests support the float primitive interpretation and language
+   291	  adequacy; they do not replace the universal K claims.
+   292	
+   293	## Excluded behavior
+   294	
+   295	- Lists containing nonnumeric MPY values are outside the natural-language
+   296	  contract and the formal precondition; their possible comparison exceptions
+   297	  are not claimed.
+   298	- Python behaviors not represented by the supplied MPY subset are not claimed.
+   299	- Total termination and resource bounds are not proved; the K result is
+   300	  partial correctness.
+END /candidate/PROOF.md
+BEGIN /candidate/differential_test.py
+     1	#!/usr/bin/env python3
+     2	"""Finite CPython-oracle versus MPY/LLVM differential evidence."""
+     3	
+     4	from __future__ import annotations
+     5	
+     6	import random
+     7	import subprocess
+     8	from pathlib import Path
+     9	
+    10	from solution import get_positive
+    11	
+    12	
+    13	ROOT = Path(__file__).resolve().parent
+    14	
+    15	
+    16	def cases() -> list[list[int | float]]:
+    17	    fixed: list[list[int | float]] = [
+    18	        [],
+    19	        [0],
+    20	        [-1],
+    21	        [1],
+    22	        [-1, 0, 1],
+    23	        [-0.0, 0.0, 0.25, -0.25],
+    24	        [-2.5, 0.0, 1.25, 7],
+    25	        [-1, 2, -4, 5, 6],
+    26	        [5, 3, -5, 2, -3, 3, 9, 0, 123, 1, -10],
+    27	        [-(10**30), 10**30, -1.0e200, 1.0e200],
+    28	    ]
+    29	    rng = random.Random(20260729)
+    30	    pool: list[int | float] = [
+    31	        -1000,
+    32	        -7,
+    33	        -1,
+    34	        0,
+    35	        1,
+    36	        7,
+    37	        1000,
+    38	        -99.75,
+    39	        -0.5,
+    40	        -0.0,
+    41	        0.0,
+    42	        0.5,
+    43	        99.75,
+    44	    ]
+    45	    sampled = [
+    46	        [rng.choice(pool) for _ in range(rng.randrange(0, 9))]
+    47	        for _ in range(50)
+    48	    ]
+    49	    return fixed + sampled
+    50	
+    51	
+    52	def oracle(values: list[int | float]) -> list[int | float]:
+    53	    # Independent implementation form: this does not call get_positive and
+    54	    # shares none of the K summary equations.
+    55	    return [value for value in values if value > 0]
+    56	
+    57	
+    58	def main() -> int:
+    59	    test_cases = cases()
+    60	    mismatches = [
+    61	        (values, get_positive(values), oracle(values))
+    62	        for values in test_cases
+    63	        if get_positive(values) != oracle(values)
+    64	    ]
+    65	    if mismatches:
+    66	        raise AssertionError(f"CPython mismatches: {mismatches!r}")
+    67	
+    68	    solution_source = (ROOT / "solution.py").read_text(encoding="utf-8")
+    69	    assertions = "\n".join(
+    70	        f"assert get_positive({values!r}) == {oracle(values)!r}"
+    71	        for values in test_cases
+    72	    )
+    73	    smoke_source = solution_source + "\n\n" + assertions + "\n"
+    74	    smoke_py = ROOT / "differential-smoke.py"
+    75	    smoke_mpy = ROOT / "differential-smoke.mpy"
+    76	    smoke_py.write_text(smoke_source, encoding="utf-8")
+    77	
+    78	    translated = subprocess.run(
+    79	        ["python3", "py2mpy.py", smoke_py.name],
+    80	        cwd=ROOT,
+    81	        check=True,
+    82	        text=True,
+    83	        stdout=subprocess.PIPE,
+    84	    )
+    85	    smoke_mpy.write_text(translated.stdout, encoding="utf-8")
+    86	
+    87	    executed = subprocess.run(
+    88	        ["krun", smoke_mpy.name, "--definition", "runtime-kompiled"],
+    89	        cwd=ROOT,
+    90	        check=True,
+    91	        text=True,
+    92	        stdout=subprocess.PIPE,
+    93	        stderr=subprocess.PIPE,
+    94	    )
+    95	    if "<exit-code>\n    0\n  </exit-code>" not in executed.stdout:
+    96	        raise AssertionError(
+    97	            "MPY/LLVM assertion failure:\n"
+    98	            + executed.stdout[-4000:]
+    99	            + executed.stderr[-4000:]
+   100	        )
+   101	
+   102	    print(
+   103	        f"cases={len(test_cases)} "
+   104	        "cpython_mismatches=0 mpy_llvm_mismatches=0"
+   105	    )
+   106	    return 0
+   107	
+   108	
+   109	if __name__ == "__main__":
+   110	    raise SystemExit(main())
+END /candidate/differential_test.py
+BEGIN /candidate/smoke.py
+     1	def get_positive(l: list):
+     2	    """Return only positive numbers in the list."""
+     3	    positive = []
+     4	    x = 0
+     5	    for x in l:
+     6	        if x > 0.0:
+     7	            positive.append(x)
+     8	    return positive
+     9	
+    10	
+    11	assert get_positive([-1, 2, -4, 5, 6]) == [2, 5, 6]
+    12	assert get_positive([5, 3, -5, 2, -3, 3, 9, 0, 123, 1, -10]) == [
+    13	    5,
+    14	    3,
+    15	    2,
+    16	    3,
+    17	    9,
+    18	    123,
+    19	    1,
+    20	]
+    21	assert get_positive([-2.5, 0.0, 1.25, 7]) == [1.25, 7]
+END /candidate/smoke.py
+BEGIN /candidate/differential-smoke.py
+     1	def get_positive(l: list):
+     2	    """Return only positive numbers in the list."""
+     3	    positive = []
+     4	    x = 0
+     5	    for x in l:
+     6	        if x > 0.0:
+     7	            positive.append(x)
+     8	    return positive
+     9	
+    10	
+    11	assert get_positive([]) == []
+    12	assert get_positive([0]) == []
+    13	assert get_positive([-1]) == []
+    14	assert get_positive([1]) == [1]
+    15	assert get_positive([-1, 0, 1]) == [1]
+    16	assert get_positive([-0.0, 0.0, 0.25, -0.25]) == [0.25]
+    17	assert get_positive([-2.5, 0.0, 1.25, 7]) == [1.25, 7]
+    18	assert get_positive([-1, 2, -4, 5, 6]) == [2, 5, 6]
+    19	assert get_positive([5, 3, -5, 2, -3, 3, 9, 0, 123, 1, -10]) == [5, 3, 2, 3, 9, 123, 1]
+    20	assert get_positive([-1000000000000000000000000000000, 1000000000000000000000000000000, -1e+200, 1e+200]) == [1000000000000000000000000000000, 1e+200]
+    21	assert get_positive([0.0, -99.75, 1000, 0.5, 0, 1]) == [1000, 0.5, 1]
+    22	assert get_positive([-1, -1, 0]) == []
+    23	assert get_positive([99.75, -0.5, -1, -99.75]) == [99.75]
+    24	assert get_positive([-0.0, 7, 0.5, 0.5, 7]) == [7, 0.5, 0.5, 7]
+    25	assert get_positive([0.5, 1, 0.0]) == [0.5, 1]
+    26	assert get_positive([]) == []
+    27	assert get_positive([1000]) == [1000]
+    28	assert get_positive([]) == []
+    29	assert get_positive([-99.75, 1, 99.75, 0.5, -0.5, 99.75, 99.75, 7]) == [1, 99.75, 0.5, 99.75, 99.75, 7]
+    30	assert get_positive([0, -99.75, -0.0, -0.0, 0.0, -0.5]) == []
+    31	assert get_positive([-0.5, 1, -7, -0.0, -99.75, -1000, -1000]) == [1]
+    32	assert get_positive([]) == []
+    33	assert get_positive([-99.75, 1]) == [1]
+    34	assert get_positive([1, 0.0]) == [1]
+    35	assert get_positive([-0.5, -0.5, 7, -1000, 99.75, 0.5, 1000]) == [7, 99.75, 0.5, 1000]
+    36	assert get_positive([-0.0, 1000, 0.0, 99.75]) == [1000, 99.75]
+    37	assert get_positive([-0.0, 7, -0.5, -1000]) == [7]
+    38	assert get_positive([7, 99.75, 1, -7, 1000, 0.0, 0.5, 0.5]) == [7, 99.75, 1, 1000, 0.5, 0.5]
+    39	assert get_positive([0.0, -1, -1000, -1, -99.75, -0.0, -7, -0.5]) == []
+    40	assert get_positive([-7, -0.5, -0.5, 0, -0.0, -0.0, -99.75]) == []
+    41	assert get_positive([1, -99.75, 1, 0.0, 0.5, 0.0, 0.5, -0.5]) == [1, 1, 0.5, 0.5]
+    42	assert get_positive([0, 7, -1000, 0.5, -1]) == [7, 0.5]
+    43	assert get_positive([-0.5]) == []
+    44	assert get_positive([0.0, 1, -1, -0.0, 7, 0.5, 1000]) == [1, 7, 0.5, 1000]
+    45	assert get_positive([1000, 1, -1000, 7, -1000, 0.5]) == [1000, 1, 7, 0.5]
+    46	assert get_positive([0, 1000, 1000, -0.5, -0.5, 0, 1000]) == [1000, 1000, 1000]
+    47	assert get_positive([0, 99.75, -0.5, 1, -0.5]) == [99.75, 1]
+    48	assert get_positive([-1, -1, 0.5, 99.75, 0.0, -0.5, 1]) == [0.5, 99.75, 1]
+    49	assert get_positive([7, -7]) == [7]
+    50	assert get_positive([0, -1, 0.0]) == []
+    51	assert get_positive([0.5, 0, -0.5, -0.0, 0, -0.5, -7]) == [0.5]
+    52	assert get_positive([]) == []
+    53	assert get_positive([0, 7, 0, -1, 1, 1, 0.0, 99.75]) == [7, 1, 1, 99.75]
+    54	assert get_positive([1000, -0.5, 7, -99.75, -1, -99.75]) == [1000, 7]
+    55	assert get_positive([-1, 1000, 1000, 7, -1000]) == [1000, 1000, 7]
+    56	assert get_positive([-0.5, -7, -7, 7, -1000, 99.75]) == [7, 99.75]
+    57	assert get_positive([-99.75]) == []
+    58	assert get_positive([]) == []
+    59	assert get_positive([]) == []
+    60	assert get_positive([-0.0, 99.75, 0.0, 0]) == [99.75]
+    61	assert get_positive([0, 0.0, 0, -1, 1]) == [1]
+    62	assert get_positive([-0.5, -1, -1000, 0.5, 0, 99.75]) == [0.5, 99.75]
+    63	assert get_positive([1, -99.75, 1000, -1000, -0.0, 0, 0, -0.5]) == [1, 1000]
+    64	assert get_positive([-1000, -7, -1, 99.75, -0.5, 1, 0]) == [99.75, 1]
+    65	assert get_positive([0.0, 7, 1, 1, -1, 7, -99.75, -0.0]) == [7, 1, 1, 7]
+    66	assert get_positive([-1000, -1000, -99.75, -1000, -99.75, 0.5, -0.5]) == [0.5]
+    67	assert get_positive([1]) == [1]
+    68	assert get_positive([-0.0, 1000]) == [1000]
+    69	assert get_positive([]) == []
+    70	assert get_positive([0.0, 99.75, -7, 1]) == [99.75, 1]
+END /candidate/differential-smoke.py
+EXIT_STATUS: 0

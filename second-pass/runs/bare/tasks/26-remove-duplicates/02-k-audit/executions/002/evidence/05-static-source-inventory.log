@@ -1,0 +1,307 @@
+WORKDIR: /tmp/audit-work/rebuild
+COMMAND: bash -lc sha256sum\ semantic.k\ verification.k\ spec.k\ solution.mpy\;\ nl\ -ba\ semantic.k\;\ nl\ -ba\ verification.k\;\ nl\ -ba\ spec.k\;\ rg\ -n\ \"\^\[\[:space:\]\]\*\(module\|imports\|syntax\|configuration\|rule\|claim\)\|\\\[\(function\|total\|functional\|simplification\|concrete\|priority\|owise\)\"\ semantic.k\ verification.k\ spec.k
+fb7a6c299486fdc7ba5b4d8197d27c63158cc560c85a383f64f4ead7ba12041d  semantic.k
+ba9d7784d074a4f06e303a7679dabdaa44e85c0586ec3d2bbc158d13b20107ee  verification.k
+0199b489f24c34239a6fb857d3062667c71809b449fa5219d2b1bc69da9b5d4b  spec.k
+c745517cfe05839db8c2e7141662dd5e1e362a2c688f1a6a1857526d13cd3833  solution.mpy
+     1	module MPY-SYNTAX
+     2	  imports INT
+     3	  imports BOOL
+     4	  imports STRING
+     5	
+     6	  // Concrete syntax emitted by the fixed py2mpy.py transliterator.  This is
+     7	  // intentionally a small Python subset, but the nodes keep their AST shape.
+     8	  syntax Pgm ::= "Module" "(" Stmts ")"
+     9	
+    10	  syntax Stmts ::= List{Stmt, ""}
+    11	  syntax Stmt ::= "ImportFrom" "(" String "," Strings ")"
+    12	                | "FuncDef" "(" String "," Params "," Stmts ")"
+    13	                | "FuncDef" "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"
+    14	                | "Return" "(" Expr ")"
+    15	
+    16	  syntax Strings  ::= List{String, ","}
+    17	  syntax Params   ::= "Params" "(" Strings ")"
+    18	  syntax CellVars ::= "CellVars" "(" Strings ")"
+    19	  syntax FreeVars ::= "FreeVars" "(" Strings ")"
+    20	
+    21	  syntax Exprs ::= List{Expr, ","}
+    22	  syntax Expr ::= "Name" "(" String ")"
+    23	                | "Int" "(" Int ")"
+    24	                | "Attribute" "(" Expr "," String ")"
+    25	                | "Call" "(" Expr "," Exprs ")"
+    26	                | "Compare" "(" Expr "," CmpOps ")"
+    27	                | "ListComp" "(" Expr "," CompFors ")"
+    28	  syntax CmpOps ::= List{CmpOp, ","}
+    29	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    30	  syntax CompFors ::= List{CompFor, ""}
+    31	  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+    32	endmodule
+    33	
+    34	module MPY
+    35	  imports MPY-SYNTAX
+    36	
+    37	  // Runtime values.  Ints is the semantic representation of a Python list of
+    38	  // integers; unlike the source-level AST, it can also be symbolic in claims.
+    39	  syntax Ints ::= List{Int, ","}
+    40	  syntax PyVal ::= "intValue" "(" Int ")"
+    41	                 | "boolValue" "(" Bool ")"
+    42	                 | "listValue" "(" Ints ")"
+    43	
+    44	  syntax Env ::= "emptyEnv"
+    45	               | "bind" "(" String "," PyVal "," Env ")"
+    46	
+    47	  syntax Function ::= "noFunction"
+    48	                    | "closure" "(" String "," Stmts ")"
+    49	
+    50	  configuration
+    51	    <py>
+    52	      <k> $PGM:Pgm </k>
+    53	      <input> $INPUT:PyVal </input>
+    54	      <function> noFunction </function>
+    55	      <env> emptyEnv </env>
+    56	      <output> listValue(.Ints) </output>
+    57	    </py>
+    58	
+    59	  // Module loading registers the entry point.  Imports have no dynamic effect
+    60	  // in this subset because annotations are erased by the supplied translator.
+    61	  syntax KItem ::= "execModule" "(" Stmts ")" | "startEntry"
+    62	  rule <k> Module(SS) => execModule(SS) </k>
+    63	  rule <k> execModule(.Stmts) => startEntry </k>
+    64	  rule <k> execModule(S SS) => S ~> execModule(SS) </k>
+    65	  rule <k> ImportFrom(_, _) => .K ...</k>
+    66	
+    67	  rule <k> FuncDef("remove_duplicates", Params(P), BODY) => .K ...</k>
+    68	       <function> noFunction => closure(P, BODY) </function>
+    69	  rule <k> FuncDef("remove_duplicates", Params(P), _, _, BODY) => .K ...</k>
+    70	       <function> noFunction => closure(P, BODY) </function>
+    71	
+    72	  syntax KItem ::= "execFunction" "(" Stmts ")"
+    73	  rule <k> startEntry => execFunction(BODY) </k>
+    74	       <input> ARG </input>
+    75	       <function> closure(P, BODY) </function>
+    76	       <env> _ => bind(P, ARG, emptyEnv) </env>
+    77	
+    78	  // Returning a comprehension starts an explicit transition system.  Keeping
+    79	  // iteration in <k> (rather than hiding it in a meta-level evaluator) lets
+    80	  // kprove symbolically split an arbitrary list into empty/cons cases.
+    81	  syntax KItem ::= "walkComp" "(" Ints "," String "," Expr "," Expr "," Env ")"
+    82	                 | "emitComputed" "(" Bool "," Int ")"
+    83	  rule <k> execFunction(Return(ListComp(E, CompFor(Name(X), ITER, PRED))) _REST)
+    84	         => walkComp(asInts(eval(ITER, ENV)), X, E, PRED, ENV) </k>
+    85	       <env> ENV </env>
+    86	
+    87	  rule <k> walkComp(.Ints, _, _, _, _) => .K ...</k>
+    88	  rule <k> walkComp((I, IS), X, E, PRED, ENV)
+    89	         => (walkComp(IS, X, E, PRED, ENV)
+    90	             ~> emitComputed(asBool(eval(PRED, bind(X, intValue(I), ENV))),
+    91	                             asInt(eval(E, bind(X, intValue(I), ENV))))) ...</k>
+    92	  rule <k> emitComputed(B, I) => .K ...</k>
+    93	       <output> listValue(IS) => listValue(ifCons(B, I, IS)) </output>
+    94	
+    95	  syntax Ints ::= "ifCons" "(" Bool "," Int "," Ints ")" [function]
+    96	  rule ifCons(true, I, IS) => I, IS
+    97	  rule ifCons(false, _, IS) => IS
+    98	
+    99	  // Pure expression evaluator for the constructs used by solution.mpy.
+   100	  syntax PyVal ::= "eval" "(" Expr "," Env ")" [function]
+   101	  rule eval(Int(I), _) => intValue(I)
+   102	  rule eval(Name(X), bind(X, V, _)) => V
+   103	  rule eval(Name(X), bind(Y, _, ENV)) => eval(Name(X), ENV)
+   104	    requires X =/=String Y
+   105	
+   106	  rule eval(Call(Attribute(E, "count"), A), ENV)
+   107	    => intValue(count(asInt(eval(A, ENV)), asInts(eval(E, ENV))))
+   108	
+   109	  rule eval(Compare(L, CmpOp("==", R)), ENV)
+   110	    => boolValue(asInt(eval(L, ENV)) ==Int asInt(eval(R, ENV)))
+   111	
+   112	  rule eval(ListComp(E, CompFor(Name(X), ITER, PRED)), ENV)
+   113	    => collect(asInts(eval(ITER, ENV)), X, E, PRED, ENV)
+   114	
+   115	  syntax Int ::= "asInt" "(" PyVal ")" [function]
+   116	  syntax Ints ::= "asInts" "(" PyVal ")" [function]
+   117	  syntax Bool ::= "asBool" "(" PyVal ")" [function]
+   118	  rule asInt(intValue(I)) => I
+   119	  rule asInts(listValue(IS)) => IS
+   120	  rule asBool(boolValue(B)) => B
+   121	
+   122	  // Python list.count for integer lists.
+   123	  syntax Int ::= "count" "(" Int "," Ints ")" [function]
+   124	  // Concrete execution unfolds count normally.  During symbolic proof the
+   125	  // call remains an abstract, shared mathematical observation of ORIGINAL;
+   126	  // this avoids needlessly enumerating every possible shape of ORIGINAL.
+   127	  rule count(_, .Ints) => 0 [concrete]
+   128	  rule count(I, (I, IS)) => 1 +Int count(I, IS) [concrete]
+   129	  rule count(I, (J, IS)) => count(I, IS)
+   130	    requires I =/=Int J [concrete]
+   131	
+   132	  // A one-generator list comprehension.  The generator variable is pushed in
+   133	  // front of the captured environment, matching Python lexical shadowing.
+   134	  syntax PyVal ::= "collect" "(" Ints "," String "," Expr "," Expr "," Env ")" [function]
+   135	  rule collect(.Ints, _, _, _, _) => listValue(.Ints)
+   136	  rule collect((I, IS), X, E, PRED, ENV)
+   137	    => prependIf(
+   138	         asBool(eval(PRED, bind(X, intValue(I), ENV))),
+   139	         asInt(eval(E, bind(X, intValue(I), ENV))),
+   140	         collect(IS, X, E, PRED, ENV))
+   141	
+   142	  syntax PyVal ::= "prependIf" "(" Bool "," Int "," PyVal ")" [function]
+   143	  rule prependIf(true, I, listValue(IS)) => listValue(I, IS)
+   144	  rule prependIf(false, _, listValue(IS)) => listValue(IS)
+   145	endmodule
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Executable mathematical contract: traverse the input from left to right
+     7	  // and retain an element exactly when its occurrence count in the *original*
+     8	  // list is one.  Thus the survivors keep their original order.
+     9	  syntax Ints ::= "removeRepeated" "(" Ints "," Ints ")" [function]
+    10	                | "removeRepeatedOnto" "(" Ints "," Ints "," Ints ")" [function]
+    11	  rule removeRepeated(INPUT, ORIGINAL)
+    12	    => removeRepeatedOnto(INPUT, ORIGINAL, .Ints)
+    13	  rule removeRepeatedOnto(.Ints, _, SUFFIX) => SUFFIX
+    14	  rule removeRepeatedOnto((I, IS), ORIGINAL, SUFFIX)
+    15	    => ifCons(count(I, ORIGINAL) ==Int 1,
+    16	              I,
+    17	              removeRepeatedOnto(IS, ORIGINAL, SUFFIX))
+    18	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Inductive bridge between the transition-level comprehension iterator and
+     7	  // the separately stated stable-filter contract.
+     8	  claim
+     9	    <k>
+    10	      walkComp(INPUT,
+    11	               "number",
+    12	               Name("number"),
+    13	               Compare(
+    14	                 Call(Attribute(Name("numbers"), "count"), Name("number")),
+    15	                 CmpOp("==", Int(1))),
+    16	               bind("numbers", listValue(ORIGINAL), emptyEnv))
+    17	      ~> KREST
+    18	      => KREST
+    19	    </k>
+    20	    <output>
+    21	      listValue(SUFFIX)
+    22	      => listValue(removeRepeatedOnto(INPUT, ORIGINAL, SUFFIX))
+    23	    </output>
+    24	    [label(walk-correct)]
+    25	
+    26	  // End-to-end theorem for the exact AST in solution.mpy and an arbitrary
+    27	  // integer list INPUT.  This begins in the generated initial configuration.
+    28	  claim
+    29	    <k>
+    30	      Module(
+    31	        ImportFrom("typing", "List")
+    32	        FuncDef("remove_duplicates",
+    33	          Params("numbers"),
+    34	          CellVars("numbers"),
+    35	          FreeVars(.Strings),
+    36	          Return(
+    37	            ListComp(Name("number"),
+    38	              CompFor(
+    39	                Name("number"),
+    40	                Name("numbers"),
+    41	                Compare(
+    42	                  Call(Attribute(Name("numbers"), "count"), Name("number")),
+    43	                  CmpOp("==", Int(1))))))))
+    44	      => .K
+    45	    </k>
+    46	    <input> listValue(INPUT) </input>
+    47	    <function> noFunction =>
+    48	      closure("numbers",
+    49	        Return(
+    50	          ListComp(Name("number"),
+    51	            CompFor(
+    52	              Name("number"),
+    53	              Name("numbers"),
+    54	              Compare(
+    55	                Call(Attribute(Name("numbers"), "count"), Name("number")),
+    56	                CmpOp("==", Int(1)))))))
+    57	    </function>
+    58	    <env> emptyEnv => bind("numbers", listValue(INPUT), emptyEnv) </env>
+    59	    <output> listValue(.Ints) => listValue(removeRepeated(INPUT, INPUT)) </output>
+    60	    [label(program-correct)]
+    61	endmodule
+spec.k:3:module SPEC
+spec.k:4:  imports VERIFICATION
+spec.k:8:  claim
+spec.k:28:  claim
+verification.k:3:module VERIFICATION
+verification.k:4:  imports MPY
+verification.k:9:  syntax Ints ::= "removeRepeated" "(" Ints "," Ints ")" [function]
+verification.k:10:                | "removeRepeatedOnto" "(" Ints "," Ints "," Ints ")" [function]
+verification.k:11:  rule removeRepeated(INPUT, ORIGINAL)
+verification.k:13:  rule removeRepeatedOnto(.Ints, _, SUFFIX) => SUFFIX
+verification.k:14:  rule removeRepeatedOnto((I, IS), ORIGINAL, SUFFIX)
+semantic.k:1:module MPY-SYNTAX
+semantic.k:2:  imports INT
+semantic.k:3:  imports BOOL
+semantic.k:4:  imports STRING
+semantic.k:8:  syntax Pgm ::= "Module" "(" Stmts ")"
+semantic.k:10:  syntax Stmts ::= List{Stmt, ""}
+semantic.k:11:  syntax Stmt ::= "ImportFrom" "(" String "," Strings ")"
+semantic.k:16:  syntax Strings  ::= List{String, ","}
+semantic.k:17:  syntax Params   ::= "Params" "(" Strings ")"
+semantic.k:18:  syntax CellVars ::= "CellVars" "(" Strings ")"
+semantic.k:19:  syntax FreeVars ::= "FreeVars" "(" Strings ")"
+semantic.k:21:  syntax Exprs ::= List{Expr, ","}
+semantic.k:22:  syntax Expr ::= "Name" "(" String ")"
+semantic.k:28:  syntax CmpOps ::= List{CmpOp, ","}
+semantic.k:29:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+semantic.k:30:  syntax CompFors ::= List{CompFor, ""}
+semantic.k:31:  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+semantic.k:34:module MPY
+semantic.k:35:  imports MPY-SYNTAX
+semantic.k:39:  syntax Ints ::= List{Int, ","}
+semantic.k:40:  syntax PyVal ::= "intValue" "(" Int ")"
+semantic.k:44:  syntax Env ::= "emptyEnv"
+semantic.k:47:  syntax Function ::= "noFunction"
+semantic.k:50:  configuration
+semantic.k:61:  syntax KItem ::= "execModule" "(" Stmts ")" | "startEntry"
+semantic.k:62:  rule <k> Module(SS) => execModule(SS) </k>
+semantic.k:63:  rule <k> execModule(.Stmts) => startEntry </k>
+semantic.k:64:  rule <k> execModule(S SS) => S ~> execModule(SS) </k>
+semantic.k:65:  rule <k> ImportFrom(_, _) => .K ...</k>
+semantic.k:67:  rule <k> FuncDef("remove_duplicates", Params(P), BODY) => .K ...</k>
+semantic.k:69:  rule <k> FuncDef("remove_duplicates", Params(P), _, _, BODY) => .K ...</k>
+semantic.k:72:  syntax KItem ::= "execFunction" "(" Stmts ")"
+semantic.k:73:  rule <k> startEntry => execFunction(BODY) </k>
+semantic.k:81:  syntax KItem ::= "walkComp" "(" Ints "," String "," Expr "," Expr "," Env ")"
+semantic.k:83:  rule <k> execFunction(Return(ListComp(E, CompFor(Name(X), ITER, PRED))) _REST)
+semantic.k:87:  rule <k> walkComp(.Ints, _, _, _, _) => .K ...</k>
+semantic.k:88:  rule <k> walkComp((I, IS), X, E, PRED, ENV)
+semantic.k:92:  rule <k> emitComputed(B, I) => .K ...</k>
+semantic.k:95:  syntax Ints ::= "ifCons" "(" Bool "," Int "," Ints ")" [function]
+semantic.k:96:  rule ifCons(true, I, IS) => I, IS
+semantic.k:97:  rule ifCons(false, _, IS) => IS
+semantic.k:100:  syntax PyVal ::= "eval" "(" Expr "," Env ")" [function]
+semantic.k:101:  rule eval(Int(I), _) => intValue(I)
+semantic.k:102:  rule eval(Name(X), bind(X, V, _)) => V
+semantic.k:103:  rule eval(Name(X), bind(Y, _, ENV)) => eval(Name(X), ENV)
+semantic.k:106:  rule eval(Call(Attribute(E, "count"), A), ENV)
+semantic.k:109:  rule eval(Compare(L, CmpOp("==", R)), ENV)
+semantic.k:112:  rule eval(ListComp(E, CompFor(Name(X), ITER, PRED)), ENV)
+semantic.k:115:  syntax Int ::= "asInt" "(" PyVal ")" [function]
+semantic.k:116:  syntax Ints ::= "asInts" "(" PyVal ")" [function]
+semantic.k:117:  syntax Bool ::= "asBool" "(" PyVal ")" [function]
+semantic.k:118:  rule asInt(intValue(I)) => I
+semantic.k:119:  rule asInts(listValue(IS)) => IS
+semantic.k:120:  rule asBool(boolValue(B)) => B
+semantic.k:123:  syntax Int ::= "count" "(" Int "," Ints ")" [function]
+semantic.k:127:  rule count(_, .Ints) => 0 [concrete]
+semantic.k:128:  rule count(I, (I, IS)) => 1 +Int count(I, IS) [concrete]
+semantic.k:129:  rule count(I, (J, IS)) => count(I, IS)
+semantic.k:130:    requires I =/=Int J [concrete]
+semantic.k:134:  syntax PyVal ::= "collect" "(" Ints "," String "," Expr "," Expr "," Env ")" [function]
+semantic.k:135:  rule collect(.Ints, _, _, _, _) => listValue(.Ints)
+semantic.k:136:  rule collect((I, IS), X, E, PRED, ENV)
+semantic.k:142:  syntax PyVal ::= "prependIf" "(" Bool "," Int "," PyVal ")" [function]
+semantic.k:143:  rule prependIf(true, I, listValue(IS)) => listValue(I, IS)
+semantic.k:144:  rule prependIf(false, _, listValue(IS)) => listValue(IS)
+EXIT_STATUS: 0

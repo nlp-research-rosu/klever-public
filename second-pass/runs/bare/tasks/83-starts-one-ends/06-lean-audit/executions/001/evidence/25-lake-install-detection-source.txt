@@ -1,0 +1,419 @@
+COMMAND: inspect Lean installation detection source
+     1	/-
+     2	Copyright (c) 2021 Mac Malone. All rights reserved.
+     3	Released under Apache 2.0 license as described in the file LICENSE.
+     4	Authors: Mac Malone
+     5	-/
+     6	
+     7	prelude
+     8	import Init.Control.Option
+     9	import Init.Data.Option.Coe
+    10	import Lean.Compiler.FFI
+    11	import Lake.Config.Dynlib
+    12	import Lake.Util.NativeLib
+    13	import Lake.Config.Defaults
+    14	
+    15	open System Lean.Compiler.FFI
+    16	
+    17	namespace Lake
+    18	
+    19	/-- Convert the string value of an environment variable to a boolean. -/
+    20	def envToBool? (o : String) : Option Bool :=
+    21	  if ["y", "yes", "t", "true", "on", "1"].contains o.toLower then true
+    22	  else if ["n", "no", "f", "false", "off", "0"].contains o.toLower then false
+    23	  else none
+    24	
+    25	/-! ## Data Structures -/
+    26	
+    27	/-- Information about the local Elan setup. -/
+    28	structure ElanInstall where
+    29	  home : FilePath
+    30	  elan : FilePath
+    31	  binDir := home / "bin"
+    32	  toolchainsDir := home / "toolchains"
+    33	  deriving Inhabited, Repr
+    34	
+    35	/-- Convert an Elan toolchain name to an Elan toolchain directory name. -/
+    36	@[inline] partial def toolchain2Dir (toolchain : String) : FilePath :=
+    37	  go "" 0
+    38	where
+    39	  go (acc : String) (pos : String.Pos) : FilePath :=
+    40	    if h : toolchain.atEnd pos then
+    41	      FilePath.mk acc
+    42	    else
+    43	      let c := toolchain.get' pos h
+    44	      let pos' := toolchain.next' pos h
+    45	      if c = '/' then
+    46	        go (acc ++ "--") pos'
+    47	      else if c = ':'  then
+    48	        go (acc ++ "---") pos'
+    49	      else
+    50	        go (acc.push c) pos'
+    51	
+    52	@[inline] def ElanInstall.toolchainDir (toolchain : String) (elan : ElanInstall) : FilePath :=
+    53	  elan.toolchainsDir / toolchain2Dir toolchain
+    54	
+    55	/-- Standard path of `lean` in a Lean installation. -/
+    56	def leanExe (sysroot : FilePath) :=
+    57	  sysroot / "bin" / "lean" |>.addExtension FilePath.exeExtension
+    58	
+    59	/-- Standard path of `leanc` in a Lean installation. -/
+    60	def leancExe (sysroot : FilePath) :=
+    61	  sysroot / "bin" / "leanc" |>.addExtension FilePath.exeExtension
+    62	
+    63	/-- Standard path of `llvm-ar` in a Lean installation. -/
+    64	def leanArExe (sysroot : FilePath) :=
+    65	  sysroot / "bin" / "llvm-ar" |>.addExtension FilePath.exeExtension
+    66	
+    67	/-- Standard path of `clang` in a Lean installation. -/
+    68	def leanCcExe (sysroot : FilePath) :=
+    69	  sysroot / "bin" / "clang" |>.addExtension FilePath.exeExtension
+    70	
+    71	/-- Standard path of shared libraries in a Lean installation. -/
+    72	def leanSharedLibDir (sysroot : FilePath) :=
+    73	  if Platform.isWindows then
+    74	    sysroot / "bin"
+    75	  else
+    76	    sysroot / "lib" / "lean"
+    77	
+    78	/-- `libleanshared` file name. -/
+    79	def leanSharedLib  :=
+    80	  FilePath.addExtension "libleanshared" sharedLibExt
+    81	
+    82	/-- `Init` shared library file name. -/
+    83	def initSharedLib : FilePath :=
+    84	  FilePath.addExtension "libInit_shared" sharedLibExt
+    85	
+    86	/-- Path information about the local Lean installation. -/
+    87	structure LeanInstall where
+    88	  sysroot : FilePath
+    89	  githash : String := ""
+    90	  srcDir := sysroot / "src" / "lean"
+    91	  leanLibDir := sysroot / "lib" / "lean"
+    92	  includeDir := sysroot / "include"
+    93	  systemLibDir := sysroot / "lib"
+    94	  binDir := sysroot / "bin"
+    95	  lean := leanExe sysroot
+    96	  leanc := leancExe sysroot
+    97	  sharedLib := leanSharedLibDir sysroot / leanSharedLib
+    98	  initSharedLib := leanSharedLibDir sysroot / initSharedLib
+    99	  ar : FilePath := "ar"
+   100	  cc : FilePath := "cc"
+   101	  customCc : Bool := true
+   102	  cFlags := getCFlags'.push "-Wno-unused-command-line-argument"
+   103	  linkStaticFlags := getLinkerFlags' (linkStatic := true)
+   104	  linkSharedFlags := getLinkerFlags' (linkStatic := false)
+   105	  ccFlags := cFlags
+   106	  ccLinkStaticFlags := linkStaticFlags
+   107	  ccLinkSharedFlags := linkSharedFlags
+   108	  deriving Inhabited, Repr
+   109	
+   110	/--
+   111	A `SearchPath` including the Lean installation's shared library directories
+   112	(i.e., the system library and Lean library directories).
+   113	-/
+   114	def LeanInstall.sharedLibPath (self : LeanInstall) : SearchPath :=
+   115	  if Platform.isWindows then
+   116	    [self.binDir]
+   117	  else
+   118	    [self.leanLibDir, self.systemLibDir]
+   119	
+   120	/-- The `LEAN_CC` of the Lean installation. -/
+   121	def LeanInstall.leanCc? (self : LeanInstall) : Option String :=
+   122	  if self.customCc then self.cc.toString else none
+   123	
+   124	/-- The link-time flags for the C compiler of the Lean installation. -/
+   125	def LeanInstall.ccLinkFlags (shared : Bool) (self : LeanInstall) : Array String :=
+   126	  if shared then self.ccLinkSharedFlags else self.ccLinkStaticFlags
+   127	
+   128	/-- Lake executable file name. -/
+   129	def lakeExe : FilePath :=
+   130	  FilePath.addExtension "lake" FilePath.exeExtension
+   131	
+   132	/-- Path information about the local Lake installation. -/
+   133	structure LakeInstall where
+   134	  home : FilePath
+   135	  srcDir := home
+   136	  binDir := home / defaultBuildDir / defaultBinDir
+   137	  libDir := home / defaultBuildDir / defaultLeanLibDir
+   138	  sharedDynlib : Dynlib := {
+   139	    name := "Lake"
+   140	    path := libDir / nameToSharedLib "Lake"
+   141	  }
+   142	  lake := binDir / lakeExe
+   143	  deriving Inhabited, Repr
+   144	
+   145	@[inline] def LakeInstall.sharedLib (self : LakeInstall) : FilePath :=
+   146	  self.sharedDynlib.path
+   147	
+   148	/-- Construct a Lake installation co-located with the specified Lean installation. -/
+   149	def LakeInstall.ofLean (lean : LeanInstall) : LakeInstall where
+   150	  home := lean.sysroot
+   151	  srcDir := lean.srcDir / "lake"
+   152	  binDir := lean.binDir
+   153	  libDir := lean.leanLibDir
+   154	  sharedDynlib :=
+   155	    let lib := s!"libLake_shared.{sharedLibExt}"
+   156	    let path := if Platform.isWindows then lean.binDir / lib else lean.leanLibDir / lib
+   157	    {name := "Lake_shared", path}
+   158	  lake := lean.binDir / lakeExe
+   159	
+   160	/-! ## Detection Functions -/
+   161	
+   162	/--
+   163	Attempt to detect an Elan installation by checking the `ELAN` and `ELAN_HOME`
+   164	environment variables. If `ELAN` is set but empty, Elan is considered disabled.
+   165	-/
+   166	def findElanInstall? : BaseIO (Option ElanInstall) := do
+   167	  if let some home ← IO.getEnv "ELAN_HOME" then
+   168	    let elan := (← IO.getEnv "ELAN").getD "elan"
+   169	    if elan.trim.isEmpty then
+   170	      return none
+   171	    else
+   172	      return some {elan, home}
+   173	  return none
+   174	
+   175	/--
+   176	Attempt to find the sysroot of the given `lean` command (if it exists)
+   177	by calling `lean --print-prefix` and returning the path it prints.
+   178	Defaults to trying the `lean` in `PATH`.
+   179	-/
+   180	def findLeanSysroot? (lean := "lean") : BaseIO (Option FilePath) := do
+   181	  let act : IO _ := do
+   182	    let out ← IO.Process.output {
+   183	      cmd := lean,
+   184	      args := #["--print-prefix"]
+   185	    }
+   186	    if out.exitCode == 0 then
+   187	      pure <| some <| FilePath.mk <| out.stdout.trim
+   188	    else
+   189	      pure <| none
+   190	  act.catchExceptions fun _ => pure none
+   191	
+   192	/--
+   193	Construct the `LeanInstall` object for the given Lean sysroot.
+   194	
+   195	Does the following:
+   196	1. Find `lean`'s githash.
+   197	2. Finds the  `ar` and `cc` to use with Lean.
+   198	3. Computes the sub-paths of the Lean install.
+   199	
+   200	For (1), If `lake` is not-collocated with `lean`, invoke `lean --githash`;
+   201	otherwise, use Lake's `Lean.githash`. If the invocation fails, `githash` is
+   202	set to the empty string.
+   203	
+   204	For (2), if `LEAN_AR` or `LEAN_CC` are defined, it uses those paths.
+   205	Otherwise, if Lean is packaged with an `llvm-ar` and/or `clang`, use them.
+   206	If not, use the `ar` and/or `cc` from the `AR` / `CC` environment variables
+   207	or the system's `PATH`. This last step is needed because internal builds of
+   208	Lean do not bundle these tools (unlike user-facing releases).
+   209	
+   210	We also track whether `LEAN_CC` was set to determine whether it should
+   211	be set in the future for `lake env`. This is because if `LEAN_CC` was not set,
+   212	it needs to remain not set for `leanc` to work.
+   213	Even setting it to the bundled compiler will break `leanc` -- see
+   214	[leanprover/lean4#1281](https://github.com/leanprover/lean4/issues/1281).
+   215	
+   216	For (3), it assumes that the Lean installation is organized the normal way.
+   217	That is, with its binaries located in `<lean-sysroot>/bin`, its
+   218	Lean libraries in `<lean-sysroot>/lib/lean`, and its system libraries in
+   219	`<lean-sysroot>/lib`.
+   220	-/
+   221	def LeanInstall.get (sysroot : FilePath) (collocated : Bool := false) : BaseIO LeanInstall := do
+   222	  let githash ← do
+   223	    if collocated then
+   224	      pure Lean.githash
+   225	    else
+   226	      -- Remark: This is expensive (at least on Windows), so try to avoid it.
+   227	      getGithash
+   228	  let ar ← findAr
+   229	  setCc {sysroot, githash, ar}
+   230	where
+   231	  getGithash := do
+   232	    EIO.catchExceptions (h := fun _ => pure "") do
+   233	      let out ← IO.Process.output {
+   234	        cmd := leanExe sysroot |>.toString,
+   235	        args := #["--githash"]
+   236	      }
+   237	      return out.stdout.trim
+   238	  findAr := do
+   239	    if let some ar ← IO.getEnv "LEAN_AR" then
+   240	      return FilePath.mk ar
+   241	    else
+   242	      let ar := leanArExe sysroot
+   243	      if (← ar.pathExists) then
+   244	        return ar
+   245	      else if let some ar ← IO.getEnv "AR" then
+   246	        return ar
+   247	      else
+   248	        return "ar"
+   249	  setCc i := do
+   250	    if let some cc ← IO.getEnv "LEAN_CC" then
+   251	      return withCustomCc i cc
+   252	    else
+   253	      let cc := leanCcExe sysroot
+   254	      if (← cc.pathExists) then
+   255	        return withInternalCc i cc
+   256	      else if let some cc ← IO.getEnv "CC" then
+   257	        return withCustomCc i cc
+   258	      else
+   259	        return withCustomCc i "cc"
+   260	  @[inline] withCustomCc (i : LeanInstall) cc :=
+COMMAND: inspect Lake CLI lean detection call
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-23-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-24-namespace Lake
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-25-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-26-/-! ## General options for top-level `lake` -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-27-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-28-structure LakeOptions where
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-29-  args : List String := []
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-30-  rootDir : FilePath := "."
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-31-  configFile : FilePath := defaultConfigFile
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-32-  elanInstall? : Option ElanInstall := none
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:33:  leanInstall? : Option LeanInstall := none
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-34-  lakeInstall? : Option LakeInstall := none
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-35-  configOpts : NameMap String := {}
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-36-  packageOverrides : Array PackageEntry := #[]
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-37-  subArgs : List String := []
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-38-  wantsHelp : Bool := false
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-39-  verbosity : Verbosity := .normal
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-40-  updateDeps : Bool := false
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-41-  updateToolchain : Bool := true
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-42-  reconfigure : Bool := false
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-43-  oldMode : Bool := false
+--
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-46-  noCache : Option Bool := none
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-47-  failLv : LogLevel := .error
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-48-  outLv? : Option LogLevel := .none
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-49-  ansiMode : AnsiMode := .auto
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-50-  outFormat : OutFormat := .text
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-51-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-52-def LakeOptions.outLv (opts : LakeOptions) : LogLevel :=
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-53-  opts.outLv?.getD opts.verbosity.minLogLv
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-54-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-55-/-- Get the Lean installation. Error if missing. -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:56:def LakeOptions.getLeanInstall (opts : LakeOptions) : Except CliError LeanInstall :=
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-57-  match opts.leanInstall? with
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:58:  | none => .error CliError.unknownLeanInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-59-  | some lean => .ok lean
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-60-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-61-/-- Get the Lake installation. Error if missing. -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-62-def LakeOptions.getLakeInstall (opts : LakeOptions) : Except CliError LakeInstall :=
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-63-  match opts.lakeInstall? with
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-64-  | none => .error CliError.unknownLakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-65-  | some lake => .ok lake
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-66-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-67-/-- Get the Lean and Lake installation. Error if either is missing. -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:68:def LakeOptions.getInstall (opts : LakeOptions) : Except CliError (LeanInstall × LakeInstall) := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:69:  return (← opts.getLeanInstall, ← opts.getLakeInstall)
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-70-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-71-/-- Compute the Lake environment based on `opts`. Error if an install is missing. -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-72-def LakeOptions.computeEnv (opts : LakeOptions) : EIO CliError Lake.Env := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:73:  Env.compute (← opts.getLakeInstall) (← opts.getLeanInstall) opts.elanInstall?
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-74-    opts.noCache |>.adaptExcept fun msg => .invalidEnv msg
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-75-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-76-/-- Make a `LoadConfig` from a `LakeOptions`. -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-77-def LakeOptions.mkLoadConfig (opts : LakeOptions) : EIO CliError LoadConfig := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-78-  let some wsDir ← resolvePath? opts.rootDir
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-79-    | throw <| .missingRootDir opts.rootDir
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-80-  return {
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-81-    lakeArgs? := opts.args.toArray
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-82-    lakeEnv := ← opts.computeEnv
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-83-    wsDir
+--
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-225-def lakeOption :=
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-226-  option {
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-227-    short := lakeShortOption
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-228-    long := lakeLongOption
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-229-    longShort := shortOptionWithArg lakeShortOption
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-230-  }
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-231-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-232-/-! ## Actions -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-233-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-234-/-- Verify the Lean version Lake was built with matches that of the give Lean installation. -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:235:def verifyLeanVersion (leanInstall : LeanInstall) : Except CliError PUnit := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-236-  unless leanInstall.githash == Lean.githash do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-237-    throw <| CliError.leanRevMismatch Lean.githash leanInstall.githash
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-238-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean:239:/-- Output the detected installs and verify the Lean version. -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-240-def verifyInstall (opts : LakeOptions) : ExceptT CliError MainM PUnit := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-241-  IO.println s!"Elan:\n{repr <| opts.elanInstall?}"
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-242-  IO.println s!"Lean:\n{repr <| opts.leanInstall?}"
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-243-  IO.println s!"Lake:\n{repr <| opts.lakeInstall?}"
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-244-  let (leanInstall, _) ← opts.getInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-245-  verifyLeanVersion leanInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-246-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-247-def parseScriptSpec (ws : Workspace) (spec : String) : Except CliError Script :=
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-248-  match spec.splitOn "/" with
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/CLI/Main.lean-249-  | [scriptName] =>
+--
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-18-user-specified CLI options and the process environment.
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-19--/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-20-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-21-namespace Lake
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-22-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-23-/-- A Lake environment. -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-24-structure Env where
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-25-  /-- The Lake installation of the environment. -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-26-  lake : LakeInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-27-  /-- The Lean installation of the environment. -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean:28:  lean : LeanInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-29-  /-- The Elan installation (if any) of the environment. -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-30-  elan? : Option ElanInstall
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-31-  /-- The Reservoir API endpoint URL (e.g., `https://reservoir.lean-lang.org/api`). -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-32-  reservoirApiUrl : String
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean:33:  /-- Overrides the detected Lean's githash as the string Lake uses for Lean traces. -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-34-  githashOverride : String
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-35-  /-- A name-to-URL mapping of URL overrides for the named packages. -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-36-  pkgUrlMap : NameMap String
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-37-  /--
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-38-  Whether to disable downloading build caches for packages. Set via `LAKE_NO_CACHE`.
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-39-  Can be overridden on a per-command basis with`--try-cache`.
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-40-  -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-41-  noCache : Bool
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-42-  /-- Whether the Lake artifact cache should be enabled by default (i.e., `LAKE_ARTIFACT_CACHE`). -/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-43-  enableArtifactCache : Bool
+--
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-98-  else if let some cacheHome ← getSystemCacheHome? then
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-99-    return ⟨cacheHome / "lake"⟩
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-100-  else
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-101-    return ⟨""⟩
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-102-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-103-/--
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-104-Compute a `Lake.Env` object from the given installs
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-105-and the set environment variables.
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-106--/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-107-def compute
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean:108:  (lake : LakeInstall) (lean : LeanInstall) (elan? : Option ElanInstall)
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-109-  (noCache : Option Bool := none)
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-110-: EIO String Env := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-111-  let reservoirBaseUrl ← getUrlD "RESERVOIR_API_BASE_URL" "https://reservoir.lean-lang.org/api"
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-112-  let elanToolchain? ← IO.getEnv "ELAN_TOOLCHAIN"
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-113-  let initToolchain := elanToolchain?.getD ""
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-114-  let toolchain := elanToolchain?.getD Lean.toolchain
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-115-  return {
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-116-    lake, lean, elan?,
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-117-    pkgUrlMap := ← computePkgUrlMap
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-118-    reservoirApiUrl := ← getUrlD "RESERVOIR_API_URL" s!"{reservoirBaseUrl}/v1"
+--
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-134-    | .ok urlMap => return urlMap
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-135-    | .error e => throw s!"'LAKE_PKG_URL_MAP' has invalid JSON: {e}"
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-136-  @[macro_inline] getUrlD var default := do
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-137-    if let some url ← IO.getEnv var then
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-138-      return if url.back == '/' then url.dropRight 1 else url
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-139-    else
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-140-       return default
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-141-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-142-/--
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-143-The string Lake uses to identify Lean in traces.
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean:144:Either the environment-specified `LEAN_GITHASH` or the detected Lean's githash.
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-145-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-146-The override allows one to replace the Lean version used by a library
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-147-(e.g., Mathlib) without completely rebuilding it, which is useful for testing
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-148-custom builds of Lean.
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-149--/
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-150-def leanGithash (env : Env) : String :=
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-151-  if env.githashOverride.isEmpty then env.lean.githash else env.githashOverride
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-152-
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-153-/--
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/Env.lean-154-The binary search path of the environment (i.e., `PATH`).

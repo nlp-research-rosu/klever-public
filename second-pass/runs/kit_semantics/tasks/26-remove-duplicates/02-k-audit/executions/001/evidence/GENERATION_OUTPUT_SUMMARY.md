@@ -1,0 +1,765 @@
+# Generation console-log review
+
+- Complete lines read: 21248
+- Event-marker lines: 83
+- Proof/build/test signal lines: 670
+- Signal counts: `{'#Top': 69, 'ERROR': 22, 'RESULT:': 4, 'WarnStuckClaimState': 20, 'differential cases': 24, 'kompile': 181, 'kprove': 156, 'krun': 66, 'mismatches:': 35, 'mutation': 149}`
+
+## Event markers
+
+- 12: `user`
+- 94: `warning: Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.`
+- 96: `codex`
+- 103: `exec`
+- 105: ` succeeded in 0ms:`
+- 150: `user asked for that mode.`
+- 221: `exec`
+- 223: ` succeeded in 0ms:`
+- 271: `execute it. Program-defined code belongs to the program under verification; do`
+- 792: `codex`
+- 794: `exec`
+- 796: ` succeeded in 0ms:`
+- 1504: `executed and enumerate the complete state footprint of that execution.`
+- 1507: `execute it or prove an auxiliary reachability claim connecting the exact body,`
+- 1524: `execution to its value.`
+- 1533: `execution, then an exact auxiliary execution theorem, then a stronger invariant`
+- 1748: `exec`
+- 1750: ` succeeded in 0ms:`
+- 2279: `exec`
+- 2281: ` succeeded in 0ms:`
+- 2748: `exec`
+- 2750: ` succeeded in 0ms:`
+- 3578: `exec`
+- 3580: ` succeeded in 0ms:`
+- 3945: `exec`
+- 3947: ` succeeded in 0ms:`
+- 4546: `exec`
+- 4548: ` succeeded in 0ms:`
+- 4806: `codex`
+- 4845: `exec`
+- 4862: ` succeeded in 0ms:`
+- 4894: `exec`
+- 4930: ` succeeded in 11043ms:`
+- 5079: `exec`
+- 5082: ` succeeded in 0ms:`
+- 5206: `exec`
+- 5254: ` succeeded in 1404ms:`
+- 5692: `codex`
+- 5881: `exec`
+- 6245: ` succeeded in 6242ms:`
+- 6275: `exec`
+- 6464: ` exited 1 in 4162ms:`
+- 6575: `codex`
+- 6945: `exec`
+- 7129: ` exited 113 in 2921ms:`
+- 7715: `exec`
+- 8081: ` succeeded in 6026ms:`
+- 8111: `exec`
+- 8483: ` exited 1 in 44124ms:`
+- 9016: `exec`
+- 9388: ` exited 1 in 33529ms:`
+- 9909: `exec`
+- 10275: ` succeeded in 7122ms:`
+- 10305: `exec`
+- 10677: ` exited 1 in 44685ms:`
+- 10831: `codex`
+- 11198: `exec`
+- 11562: ` succeeded in 9913ms:`
+- 11773: `exec`
+- 12143: ` exited 1 in 37734ms:`
+- 12639: `exec`
+- 12829: ` succeeded in 6029ms:`
+- 12873: `codex`
+- 12875: `exec`
+- 13247: `codex`
+- 13795: ` exited 130 in 141894ms:`
+- 13796: `exec`
+- 13986: ` succeeded in 11295ms:`
+- 14030: `codex`
+- 14743: `exec`
+- 15107: ` succeeded in 7780ms:`
+- 15199: `exec`
+- 15562: ` succeeded in 7404ms:`
+- 16547: `exec`
+- 16552: ` succeeded in 0ms:`
+- 16967: `codex`
+- 16969: `exec`
+- 17789: ` succeeded in 51278ms:`
+- 19167: `codex`
+- 19169: `exec`
+- 19176: ` succeeded in 0ms:`
+- 20550: `codex`
+- 21238: `tokens used`
+
+## Proof/build/test signals
+
+- 16: `must be written here. The K toolchain (`kompile`, `krun`, `kprove`) and`
+- 45: `The final `RESULT:` runner marker is separate from the `PROOF.md` proof-quality`
+- 58: `4. Exercise the program with `krun`, prove every claim in `spec.k` with`
+- 59: `   `kprove`, and record exact commands in `prove.sh`.`
+- 76: `RESULT: <KPROVE_PASSED|PARTIAL|BLOCKED> — <one sentence>`
+- 82: `   intended to close the task's proof claims) printed `#Top` and exited 0.`
+- 83: `   Expected-failure mutation probes and other negative validation probes are`
+- 95: `2026-07-25T04:46:32.149833Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit`
+- 116: ``kprove` establishes reachability claims by symbolic execution. For a loop, an`
+- 123: `- **Verification** — `kprove` exits 0 and prints `#Top` under the supplied theory.`
+- 126: `- **Validation** — theorem scope, non-vacuity, trust, and independent evidence`
+- 143: ``kompile --version && kprove --version`. See`
+- 155: `intent → code → semantics → spec → proof → #Top`
+- 156: `      → extension audit → adequacy → non-vacuity → evidence → exact-status report`
+- 158: `Gate A PASS → continue to adequacy, non-vacuity, evidence, and status`
+- 159: `Gate A FAIL → remove/disable offending extension → proving-spec → rebuild → #Top → Gate A`
+- 173: `| Make the claims close | `verification.k` and `#Top` | `proving-spec` |`
+- 222: `/bin/bash -lc "wc -l prompt.py py2mpy.py /codex-home/skills/shared/proof-extension-soundness.md /codex-home/skills/shared/running-k.md reference-semantics/semantics.k reference-semantics/semantics/*.k && sed -n '1,260p' /codex-home/skills/shared/proof-extension-soundness.md && sed -n '1,220p' prompt.py && sed -n '1,260p' py2mpy.py && command -v kompile && kompile --version && command -v krun && krun --version && command -v kprove && kprove --version" in /workspace`
+- 256: `that contributes to closing a reachability claim. A successful kprove run`
+- 345: `of context and postcondition mutations. Choose satisfiable ground cases with`
+- 377: `Use an operational-sensitivity mutation independently of A5: materially change`
+- 380: `changes. This is separate from a postcondition mutation, which tests whether the`
+- 394: `### A5. Result constraint and non-vacuity`
+- 411: `   `#Top`, and reapply Gate A.`
+- 420: `blocker. Repair that requires redesign is not a hard blocker. `#Top` obtained`
+- 462: `For every claimed differential, mutation, or concrete test, record an existing`
+- 782: `/usr/bin/kompile`
+- 785: `/usr/bin/krun`
+- 788: `/usr/bin/kprove`
+- 922: `States what the loop does at the loop head, given symbolic accumulator values. This is the coinductive hypothesis — kprove uses the claim to discharge the loop by applying it to itself.`
+- 970: `Machine-check the spec structure with a focused `kprove` attempt even before`
+- 980: `- `proving-spec` — next step: add `verification.k` (summary function + kompiled definition) and make the claims pass `kprove`.`
+- 985: `description: 'Use when a K spec does not pass kprove yet — the proof hangs, diverges, prints WarnStuckClaimState, or exits non-zero — and you need to make it pass.'`
+- 990: ``spec.k` is a set of K reachability claims. `kprove` attempts to prove each claim by symbolically executing from the LHS and checking it reaches the RHS under the given conditions. When the proof fails, `kprove` exits non-zero and prints a residual configuration — the state it reached but could not close. This skill provides the tools to read that residual and extend `verification.k` until the proof closes.`
+- 998: ``kprove` closes a claim by rewriting the LHS to the RHS. It gets stuck when:`
+- 1006: `  [circularity debugging](../shared/kprove-debug-troubleshoot/circularity-not-applying.md).`
+- 1068: `1. **First, remove or disable the offending extension.** Do not treat `#Top``
+- 1084: `After a repaired construction reaches `#Top`, return to `validating-proof` and`
+- 1129: `[symbolic-recursion debugging](../shared/kprove-debug-troubleshoot/symbolic-recursion.md).`
+- 1153: `run kprove → read the residual → add one lemma or strengthen invariant → re-run`
+- 1156: `**Step 1: run `kprove`.**`
+- 1160: `kprove spec.k --definition verification-kompiled --spec-module SPEC`
+- 1163: `A bare `#Top` on stdout with exit code 0 means the claim closed under the`
+- 1165: `Failure is a non-zero exit with a `WarnStuckClaimState` warning and a residual`
+- 1168: `**Step 2: read the residual.** The residual is the symbolic configuration `kprove` reached but could not match against the claim's RHS. Compare its term shape to the RHS. The mismatch locates what is missing.`
+- 1173: `[the troubleshooting index](../shared/kprove-debug-troubleshoot/index.md).`
+- 1179: `Record the extension even when the proof reaches `#Top`; prover success does not`
+- 1185: `kompile --backend haskell verification.k \`
+- 1188: `        --output-definition verification-kompiled`
+- 1200: `- [kprove debugging index](../shared/kprove-debug-troubleshoot/index.md) — symptom-based`
+- 1213: `description: 'Use when kprove reports success (#Top) and you must audit proof-local functions, lemmas, or rewrites, theorem intent, or the trust boundary before writing PROOF.md.'`
+- 1218: ``kprove` exiting 0 with `#Top` proves closure under the supplied semantics, claims,`
+- 1257: `   check is separate from the false-postcondition mutation in A5: the former`
+- 1307: `5. Exhibit a satisfiable witness and run a meaningful false-postcondition mutation.`
+- 1314: `discard `#Top` obtained through it as an unusable proof state, and return to`
+- 1316: `construction, rebuild, recover `#Top`, and restart Gate A within the same agent`
+- 1326: `blocker. Repair that requires redesign is not a hard blocker. `#Top` obtained`
+- 1332: `### A5 non-vacuity procedure`
+- 1335: `small, deliberate false alternative. Choose a mutation that is false for a`
+- 1341: `kprove spec-vacuity.k --definition verification-kompiled \`
+- 1349: `kore-exec: Warning (WarnStuckClaimState):`
+- 1357: `Record the exact mutation, satisfiable witness, command, exit code, and residual.`
+- 1358: `If the mutation closes, investigate the precondition, result constraint, and`
+- 1417: `kompile --backend haskell verification.k \`
+- 1420: `        --output-definition verification-kompiled`
+- 1421: `kprove spec.k --definition verification-kompiled --spec-module SPEC`
+- 1422: `# Output: #Top   Exit: 0`
+- 1431: `- [Running the K tools](../shared/running-k.md) — `#Top` success and stuck-claim`
+- 1432: `  output needed to interpret proof and mutation runs.`
+- 1437: `description: 'Use when constructing a K reachability proof requires deriving a loop invariant, choosing a summary representation, laying out proof obligations, or abstracting an operation kprove cannot evaluate.'`
+- 1446: `This skill does **not** run any tool. Machine-checking the proof — running `kprove`, reading a residual configuration, adding a `[simplification]` lemma, narrowing with `--depth N` — belongs to `proving-spec`.`
+- 1481: `[symbolic-recursion debugging](../shared/kprove-debug-troubleshoot/symbolic-recursion.md).`
+- 1548: `that fires under `kprove`** plus a `[concrete]` rule that computes the real value`
+- 1549: `under `krun`:`
+- 1556: `- Under `kprove` the argument is symbolic, the `[concrete]` rule does not fire, and`
+- 1560: `- Under `krun` the argument is ground, the `[concrete]` rule fires, and the smoke/differential`
+- 1565: `is an emergent property of the *rules*: no `kprove`-firing rule ⇒ opaque everywhere; a`
+- 1567: `rule ⇒ krun computes it, kprove applies it only on ground arguments.`
+- 1571: `- A `[concrete]` rule **still fires on ground arguments under `kprove`** and hits the missing`
+- 1589: `- [Symbolic recursion](../shared/kprove-debug-troubleshoot/symbolic-recursion.md)`
+- 1613: `| LLVM | Fast concrete execution with `krun` |`
+- 1614: `| Haskell | Concrete execution with `krun` and symbolic proof with `kprove` |`
+- 1620: `kompile --backend llvm semantics.k \`
+- 1623: `  --output-definition semantics-kompiled`
+- 1625: `krun path/to/program --definition semantics-kompiled`
+- 1636: `kompile --backend haskell verification.k \`
+- 1639: `  --output-definition verification-kompiled`
+- 1641: `kprove spec.k \`
+- 1642: `  --definition verification-kompiled \`
+- 1646: `The `--definition` argument names the kompiled directory, not a `.k` source`
+- 1648: ``<main-module>-SYNTAX`; otherwise `kompile` may infer the wrong module.`
+- 1652: `A successful `kprove` run prints:`
+- 1655: `#Top`
+- 1658: `and exits with status 0. `#Top` is the complete success signal from the`
+- 1659: ``kprove` binary; output formats from higher-level drivers may differ.`
+- 1662: ``WarnStuckClaimState` plus a residual configuration. Other failures, such as`
+- 1674: `  [the kprove troubleshooting index](kprove-debug-troubleshoot/index.md).`
+- 1676: `Run `kprove --help` against the installed toolchain before relying on an`
+- 1708: `apply. Keep ordinary helper rules and functions in the kompiled definition.`
+- 1753: `description: 'Use when kprove reports success (#Top) and you must audit proof-local functions, lemmas, or rewrites, theorem intent, or the trust boundary before writing PROOF.md.'`
+- 1758: ``kprove` exiting 0 with `#Top` proves closure under the supplied semantics, claims,`
+- 1797: `   check is separate from the false-postcondition mutation in A5: the former`
+- 1847: `5. Exhibit a satisfiable witness and run a meaningful false-postcondition mutation.`
+- 1854: `discard `#Top` obtained through it as an unusable proof state, and return to`
+- 1856: `construction, rebuild, recover `#Top`, and restart Gate A within the same agent`
+- 1866: `blocker. Repair that requires redesign is not a hard blocker. `#Top` obtained`
+- 1872: `### A5 non-vacuity procedure`
+- 1875: `small, deliberate false alternative. Choose a mutation that is false for a`
+- 1881: `kprove spec-vacuity.k --definition verification-kompiled \`
+- 1889: `kore-exec: Warning (WarnStuckClaimState):`
+- 1897: `Record the exact mutation, satisfiable witness, command, exit code, and residual.`
+- 1898: `If the mutation closes, investigate the precondition, result constraint, and`
+- 1957: `kompile --backend haskell verification.k \`
+- 1960: `        --output-definition verification-kompiled`
+- 1961: `kprove spec.k --definition verification-kompiled --spec-module SPEC`
+- 1962: `# Output: #Top   Exit: 0`
+- 1971: `- [Running the K tools](../shared/running-k.md) — `#Top` success and stuck-claim`
+- 1972: `  output needed to interpret proof and mutation runs.`
+- 2151: `//   kompile reference-semantics/semantics.k --backend llvm \`
+- 2153: `//     --output-definition runtime-kompiled`
+- 2166: `//   semantics/float.k          MPY-FLOAT        Float Val: literal + opaque float ops ([concrete] for krun)`
+- 2230: `// The krun (llvm) main module: MPY plus the concrete-only legs (keyed sort's`
+- 2232: `// never see MPY-CONCRETE. The llvm kompile MUST use --main-module MPY-KRUN —`
+- 2234: `// while: sorted-key stuck and comprehension asserted wrong under krun).`
+- 2265: `reference-semantics/semantics/methods.k:63:  // ==== list.count(v) — number of occurrences of v in the list (concrete for krun) ==========`
+- 2754: `// Minimal, TRUSTED float support. K/Haskell (kprove) has no usable symbolic IEEE-754 theory and`
+- 2756: `// (the Python true division I / F) is `[no-evaluators]` for kprove — it never reduces on symbolic`
+- 2758: `// builds). The `[concrete]` rule evaluates it for krun (llvm HAS the Int2Float / /Float hooks), so`
+- 2774: `  // Int / float true division. OPAQUE for kprove (no-evaluators); concrete for krun.`
+- 2780: `  // Int / Int true division (Python: always a float). OPAQUE for kprove; concrete for krun.`
+- 2785: `  // float % float (e.g. `number % 1.0` = the fractional part). OPAQUE for kprove, concrete for`
+- 2786: `  // krun. Python's float `%` is floor-based: a % b = a - floor(a/b)*b (K's %Float is IEEE`
+- 2792: `  // float equality — for concrete krun asserts (e.g. `area == 7.5`); the FLOAT.eq hook is fine on`
+- 2793: `  // concrete floats. kprove proofs return floats structurally and do not compare them.`
+- 2797: `  // float `<` and abs — OPAQUE for kprove ([no-evaluators], so a SYMBOLIC float compare stays an`
+- 2799: `  // [concrete] for krun. Additive, sort-disjoint from the Int rules. (has_close_elements: the pairwise`
+- 2842: `  // kprove — structural). [concrete] so the Int2Float/ceilFloat hooks only run for krun (llvm).`
+- 2848: `  // unary minus on a float (e.g. the literal -2.4 = UnaryOp("-", Float(2.4))). Concrete for krun;`
+- 2852: `  // ---- float - / / / + (OPAQUE for kprove [no-evaluators], concrete for krun) — for float-list`
+- 2990: `  // isFloat(V)` seed + a Float-accumulator fold via K's minFloat/maxFloat — concrete for krun. A proof`
+- 2992: `  // #applyK, priority 40, in its verification.k) BEFORE #minAcc0, so this fold is krun-only. Additive:`
+- 3008: `  // ---- sum over a float list (krun; mirrors the min/max float paths). The Int-only shared`
+- 3069: `  // model). strLt reduces on GROUND code-seqs (krun) but is inert/OPAQUE on symbolic ones`
+- 3469: `  // ==== list.count(v) — number of occurrences of v in the list (concrete for krun) ==========`
+- 3477: `  // Concrete string ops for krun. A proof over a symbolic string intercepts the split problem-locally.`
+- 3836: `  // ==== list.count(v) — number of occurrences of v in the list (concrete for krun) ==========`
+- 3844: `  // Concrete string ops for krun. A proof over a symbolic string intercepts the split problem-locally.`
+- 4431: `  // code-level tokenizer. Reduces on concrete strings (krun); a symbolic`
+- 4551: `// Trusted sorted(): sorted(list) as an opaque ascending permutation `sortVS` — opaque symbolic`
+- 4552: `// for kprove (a trusted primitive, correctness/ordering proved in Lean / notes/sort-probe),`
+- 4553: `// and a concrete insertion sort for krun. Wrappers verify the logic AROUND the sort (index /`
+- 4564: `  // concrete insertion sort for krun.`
+- 4619: `  // over the concrete sort for krun. No separate sortedAt indirection is needed; wrappers write`
+- 4644: `// the original position). Concrete for krun (the ordered build + `.keys()` are the real ops); a proof`
+- 4675: `  // total (its #Ceil is #Top) — needed when a symbolic proof carries a built dict as a config value.`
+- 4746: `// Concrete-execution-only rules, visible ONLY to the llvm build (run.sh kompiles`
+- 4767: `  // allocates the result. priority(40) beats sort.k's opaque rules, so krun`
+- 4895: `/bin/bash -lc 'kompile reference-semantics/semantics.k --backend llvm --main-module MPY-KRUN --syntax-module MPY-SYNTAX --output-definition runtime-kompiled' in /workspace`
+- 5208: `krun smoke.mpy --definition runtime-kompiled > krun-smoke.out 2>&1`
+- 5211: `printf '"'krun exit: %s\\n' \""'$status"`
+- 5212: `sed -n '"'1,260p' krun-smoke.out`
+- 5255: `krun exit: 0`
+- 5882: `/bin/bash -lc 'kompile --backend haskell verification.k --main-module VERIFICATION --syntax-module MPY-SYNTAX --output-definition verification-kompiled' in /workspace`
+- 6277: `kprove spec.k --definition verification-kompiled --spec-module SPEC --claims SPEC.remove-duplicates-loop > kprove-loop.out 2>&1`
+- 6280: `printf '"'kprove loop exit: %s\\n' \""'$status"`
+- 6281: `sed -n '"'1,320p' kprove-loop.out`
+- 6465: `kprove loop exit: 1`
+- 6466: `kore-exec: [1139850] Warning (WarnStuckClaimState):`
+- 6946: `/bin/bash -lc 'kompile --backend haskell verification.k --main-module VERIFICATION --syntax-module MPY-SYNTAX --output-definition verification-kompiled' in /workspace`
+- 7716: `/bin/bash -lc 'kompile --backend haskell verification.k --main-module VERIFICATION --syntax-module MPY-SYNTAX --output-definition verification-kompiled' in /workspace`
+- 8113: `kprove spec.k --definition verification-kompiled --spec-module SPEC --claims SPEC.remove-duplicates-loop > kprove-loop.out 2>&1`
+- 8116: `printf '"'kprove loop exit: %s\\n' \""'$status"`
+- 8117: `sed -n '"'1,360p' kprove-loop.out`
+- 8484: `kprove loop exit: 1`
+- 8485: `kore-exec: [41307973] Warning (WarnStuckClaimState):`
+- 9018: `kprove spec.k --definition verification-kompiled --spec-module SPEC --claims SPEC.remove-duplicates-loop > kprove-loop.out 2>&1`
+- 9021: `printf '"'kprove loop exit: %s\\n' \""'$status"`
+- 9022: `sed -n '"'1,360p' kprove-loop.out`
+- 9389: `kprove loop exit: 1`
+- 9390: `kore-exec: [30069819] Warning (WarnStuckClaimState):`
+- 9910: `/bin/bash -lc 'kompile --backend haskell verification.k --main-module VERIFICATION --syntax-module MPY-SYNTAX --output-definition verification-kompiled' in /workspace`
+- 10307: `kprove spec.k --definition verification-kompiled --spec-module SPEC --claims SPEC.remove-duplicates-loop > kprove-loop.out 2>&1`
+- 10310: `printf '"'kprove loop exit: %s\\n' \""'$status"`
+- 10311: `sed -n '"'1,360p' kprove-loop.out`
+- 10678: `kprove loop exit: 1`
+- 10679: `kore-exec: [41257338] Warning (WarnStuckClaimState):`
+- 11199: `/bin/bash -lc 'kompile --backend haskell verification.k --main-module VERIFICATION --syntax-module MPY-SYNTAX --output-definition verification-kompiled' in /workspace`
+- 11775: `kprove spec.k --definition verification-kompiled --spec-module SPEC --claims SPEC.remove-duplicates-loop > kprove-loop.out 2>&1`
+- 11778: `printf '"'kprove loop exit: %s\\n' \""'$status"`
+- 11779: `sed -n '"'1,360p' kprove-loop.out`
+- 12144: `kprove loop exit: 1`
+- 12145: `kore-exec: [34278682] Warning (WarnStuckClaimState):`
+- 12641: `kprove spec.k --definition verification-kompiled --spec-module SPEC --claims SPEC.remove-duplicates-loop > kprove-loop.out 2>&1`
+- 12644: `printf '"'kprove loop exit: %s\\n' \""'$status"`
+- 12645: `sed -n '"'1,360p' kprove-loop.out`
+- 12830: `kprove loop exit: 0`
+- 12831: `#Top`
+- 12874: `The loop claim now closes with `#Top`. The decisive restriction is explicit and intended: both the original sequence and remaining suffix satisfy `allInts`, preventing heap-reference alias cases that are outside `List[int]` and behave differently in this deliberately partial Python semantics. Next I’m discharging the full module-load/function-call claim.`
+- 12877: `kprove spec.k --definition verification-kompiled --spec-module SPEC --claims SPEC.remove-duplicates > kprove-entry.out 2>&1`
+- 12880: `printf '"'kprove entry exit: %s\\n' \""'$status"`
+- 12881: `sed -n '"'1,400p' kprove-entry.out`
+- 13798: `kprove spec.k --definition verification-kompiled --spec-module SPEC > kprove-all.out 2>&1`
+- 13801: `printf '"'kprove all exit: %s\\n' \""'$status"`
+- 13802: `sed -n '"'1,420p' kprove-all.out`
+- 13987: `kprove all exit: 0`
+- 13988: `#Top`
+- 14031: `With both claims jointly enabled, `kprove` closes the complete spec with `#Top` (the focused entry-only run was intentionally stopped because filtering out the invariant prevents its circularity from being available). I’m now applying `validating-proof`: rebuilding the extension inventory, adding a false-postcondition witness, a body-sensitivity mutation, and an independent differential oracle before assigning Gates A–C.`
+- 14035: `/workspace/spec-body-mutation.k`
+- 14036: `/workspace/spec-vacuity.k`
+- 14076: `+print(f"differential cases: {checked}")`
+- 14077: `+print(f"mismatches: {len(mismatches)}")`
+- 14078: `+if mismatches:`
+- 14120: `diff --git a/spec-body-mutation.k b/spec-body-mutation.k`
+- 14124: `+++ b/spec-body-mutation.k`
+- 14169: `diff --git a/spec-vacuity.k b/spec-vacuity.k`
+- 14173: `+++ b/spec-vacuity.k`
+- 14429: `+print(f"differential cases: {checked}")`
+- 14430: `+print(f"mismatches: {len(mismatches)}")`
+- 14431: `+if mismatches:`
+- 14473: `diff --git a/spec-body-mutation.k b/spec-body-mutation.k`
+- 14477: `+++ b/spec-body-mutation.k`
+- 14522: `diff --git a/spec-vacuity.k b/spec-vacuity.k`
+- 14526: `+++ b/spec-vacuity.k`
+- 14746: `kprove spec-vacuity.k --definition verification-kompiled --spec-module SPEC-VACUITY > kprove-vacuity.out 2>&1`
+- 14747: `vacuity_status=$?`
+- 14749: `printf '"'vacuity mutation exit: %s\\n' \""'$vacuity_status"`
+- 14750: `sed -n '"'1,320p' kprove-vacuity.out`
+- 14751: `if [ \""'$vacuity_status" -eq 0 ]; then`
+- 14793: `+print(f"differential cases: {checked}")`
+- 14794: `+print(f"mismatches: {len(mismatches)}")`
+- 14795: `+if mismatches:`
+- 14837: `diff --git a/spec-body-mutation.k b/spec-body-mutation.k`
+- 14841: `+++ b/spec-body-mutation.k`
+- 14886: `diff --git a/spec-vacuity.k b/spec-vacuity.k`
+- 14890: `+++ b/spec-vacuity.k`
+- 15108: `vacuity mutation exit: 1`
+- 15109: `kore-exec: [2949154] Warning (WarnStuckClaimState):`
+- 15110: `    The configuration's term doesn't unify with the destination's term and the configuration cannot be rewritten further. Location: /workspace/spec-vacuity.k:8:5-71:31`
+- 15201: `kprove spec-body-mutation.k --definition verification-kompiled --spec-module SPEC-BODY-MUTATION > kprove-body-mutation.out 2>&1`
+- 15204: `printf '"'body mutation exit: %s\\n' \""'$body_status"`
+- 15205: `sed -n '"'1,360p' kprove-body-mutation.out`
+- 15248: `+print(f"differential cases: {checked}")`
+- 15249: `+print(f"mismatches: {len(mismatches)}")`
+- 15250: `+if mismatches:`
+- 15292: `diff --git a/spec-body-mutation.k b/spec-body-mutation.k`
+- 15296: `+++ b/spec-body-mutation.k`
+- 15341: `diff --git a/spec-vacuity.k b/spec-vacuity.k`
+- 15345: `+++ b/spec-vacuity.k`
+- 15563: `body mutation exit: 1`
+- 15564: `kore-exec: [3142030] Warning (WarnStuckClaimState):`
+- 15565: `    The configuration's term unifies with the destination's term, but the implication check between the conditions has failed. Location: /workspace/spec-body-mutation.k:9:5-42:48`
+- 15721: `	Source(/workspace/spec-body-mutation.k)`
+- 15727: `	Source(/workspace/spec-body-mutation.k)`
+- 15776: `+print(f"differential cases: {checked}")`
+- 15777: `+print(f"mismatches: {len(mismatches)}")`
+- 15778: `+if mismatches:`
+- 15794: `+kompile reference-semantics/semantics.k \`
+- 15798: `+  --output-definition runtime-kompiled`
+- 15800: `+krun smoke.mpy --definition runtime-kompiled`
+- 15802: `+kompile --backend haskell verification.k \`
+- 15805: `+  --output-definition verification-kompiled`
+- 15807: `+kprove spec.k \`
+- 15808: `+  --definition verification-kompiled \`
+- 15812: `+kprove spec.k \`
+- 15813: `+  --definition verification-kompiled \`
+- 15816: `+if kprove spec-vacuity.k \`
+- 15817: `+  --definition verification-kompiled \`
+- 15819: `+  echo "ERROR: false-postcondition mutation unexpectedly proved" >&2`
+- 15822: `+  echo "EXPECTED FAILURE: false-postcondition mutation was rejected"`
+- 15825: `+if kprove spec-body-mutation.k \`
+- 15826: `+  --definition verification-kompiled \`
+- 15828: `+  echo "ERROR: body mutation unexpectedly proved" >&2`
+- 15831: `+  echo "EXPECTED FAILURE: body mutation was rejected"`
+- 15872: `diff --git a/spec-body-mutation.k b/spec-body-mutation.k`
+- 15876: `+++ b/spec-body-mutation.k`
+- 15921: `diff --git a/spec-vacuity.k b/spec-vacuity.k`
+- 15925: `+++ b/spec-vacuity.k`
+- 16181: `+print(f"differential cases: {checked}")`
+- 16182: `+print(f"mismatches: {len(mismatches)}")`
+- 16183: `+if mismatches:`
+- 16199: `+kompile reference-semantics/semantics.k \`
+- 16203: `+  --output-definition runtime-kompiled`
+- 16205: `+krun smoke.mpy --definition runtime-kompiled`
+- 16207: `+kompile --backend haskell verification.k \`
+- 16210: `+  --output-definition verification-kompiled`
+- 16212: `+kprove spec.k \`
+- 16213: `+  --definition verification-kompiled \`
+- 16217: `+kprove spec.k \`
+- 16218: `+  --definition verification-kompiled \`
+- 16221: `+if kprove spec-vacuity.k \`
+- 16222: `+  --definition verification-kompiled \`
+- 16224: `+  echo "ERROR: false-postcondition mutation unexpectedly proved" >&2`
+- 16227: `+  echo "EXPECTED FAILURE: false-postcondition mutation was rejected"`
+- 16230: `+if kprove spec-body-mutation.k \`
+- 16231: `+  --definition verification-kompiled \`
+- 16233: `+  echo "ERROR: body mutation unexpectedly proved" >&2`
+- 16236: `+  echo "EXPECTED FAILURE: body mutation was rejected"`
+- 16277: `diff --git a/spec-body-mutation.k b/spec-body-mutation.k`
+- 16281: `+++ b/spec-body-mutation.k`
+- 16326: `diff --git a/spec-vacuity.k b/spec-vacuity.k`
+- 16330: `+++ b/spec-vacuity.k`
+- 16601: `+print(f"differential cases: {checked}")`
+- 16602: `+print(f"mismatches: {len(mismatches)}")`
+- 16603: `+if mismatches:`
+- 16619: `+kompile reference-semantics/semantics.k \`
+- 16623: `+  --output-definition runtime-kompiled`
+- 16625: `+krun smoke.mpy --definition runtime-kompiled`
+- 16627: `+kompile --backend haskell verification.k \`
+- 16630: `+  --output-definition verification-kompiled`
+- 16632: `+kprove spec.k \`
+- 16633: `+  --definition verification-kompiled \`
+- 16637: `+kprove spec.k \`
+- 16638: `+  --definition verification-kompiled \`
+- 16641: `+if kprove spec-vacuity.k \`
+- 16642: `+  --definition verification-kompiled \`
+- 16644: `+  echo "ERROR: false-postcondition mutation unexpectedly proved" >&2`
+- 16647: `+  echo "EXPECTED FAILURE: false-postcondition mutation was rejected"`
+- 16650: `+if kprove spec-body-mutation.k \`
+- 16651: `+  --definition verification-kompiled \`
+- 16653: `+  echo "ERROR: body mutation unexpectedly proved" >&2`
+- 16656: `+  echo "EXPECTED FAILURE: body mutation was rejected"`
+- 16697: `diff --git a/spec-body-mutation.k b/spec-body-mutation.k`
+- 16701: `+++ b/spec-body-mutation.k`
+- 16746: `diff --git a/spec-vacuity.k b/spec-vacuity.k`
+- 16750: `+++ b/spec-vacuity.k`
+- 16968: `The validation probes are behaving correctly: 21,531 independent Python differential cases had zero mismatches; the singleton false-result claim exited 1 with an actual `[1]` heap; and changing the body to keep count-two values made the loop theorem exit 1. I’ve assembled `prove.sh` and am running it end-to-end once to confirm the deliverables reproduce those outcomes from a clean command sequence.`
+- 16974: `printf '"'prove.sh exit: %s\\n' \""'$status"`
+- 16975: `rg -n '"'differential cases|mismatches:|#Top|EXPECTED FAILURE|ERROR:|WarnStuckClaimState|<exit-code>|"'^    0$'"' prove-run.out | tail -n 80`
+- 17018: `+print(f"differential cases: {checked}")`
+- 17019: `+print(f"mismatches: {len(mismatches)}")`
+- 17020: `+if mismatches:`
+- 17036: `+kompile reference-semantics/semantics.k \`
+- 17040: `+  --output-definition runtime-kompiled`
+- 17042: `+krun smoke.mpy --definition runtime-kompiled`
+- 17044: `+kompile --backend haskell verification.k \`
+- 17047: `+  --output-definition verification-kompiled`
+- 17049: `+kprove spec.k \`
+- 17050: `+  --definition verification-kompiled \`
+- 17054: `+kprove spec.k \`
+- 17055: `+  --definition verification-kompiled \`
+- 17058: `+if kprove spec-vacuity.k \`
+- 17059: `+  --definition verification-kompiled \`
+- 17061: `+  echo "ERROR: false-postcondition mutation unexpectedly proved" >&2`
+- 17064: `+  echo "EXPECTED FAILURE: false-postcondition mutation was rejected"`
+- 17067: `+if kprove spec-body-mutation.k \`
+- 17068: `+  --definition verification-kompiled \`
+- 17070: `+  echo "ERROR: body mutation unexpectedly proved" >&2`
+- 17073: `+  echo "EXPECTED FAILURE: body mutation was rejected"`
+- 17114: `diff --git a/spec-body-mutation.k b/spec-body-mutation.k`
+- 17118: `+++ b/spec-body-mutation.k`
+- 17163: `diff --git a/spec-vacuity.k b/spec-vacuity.k`
+- 17167: `+++ b/spec-vacuity.k`
+- 17423: `+print(f"differential cases: {checked}")`
+- 17424: `+print(f"mismatches: {len(mismatches)}")`
+- 17425: `+if mismatches:`
+- 17441: `+kompile reference-semantics/semantics.k \`
+- 17445: `+  --output-definition runtime-kompiled`
+- 17447: `+krun smoke.mpy --definition runtime-kompiled`
+- 17449: `+kompile --backend haskell verification.k \`
+- 17452: `+  --output-definition verification-kompiled`
+- 17454: `+kprove spec.k \`
+- 17455: `+  --definition verification-kompiled \`
+- 17459: `+kprove spec.k \`
+- 17460: `+  --definition verification-kompiled \`
+- 17463: `+if kprove spec-vacuity.k \`
+- 17464: `+  --definition verification-kompiled \`
+- 17466: `+  echo "ERROR: false-postcondition mutation unexpectedly proved" >&2`
+- 17469: `+  echo "EXPECTED FAILURE: false-postcondition mutation was rejected"`
+- 17472: `+if kprove spec-body-mutation.k \`
+- 17473: `+  --definition verification-kompiled \`
+- 17475: `+  echo "ERROR: body mutation unexpectedly proved" >&2`
+- 17478: `+  echo "EXPECTED FAILURE: body mutation was rejected"`
+- 17519: `diff --git a/spec-body-mutation.k b/spec-body-mutation.k`
+- 17523: `+++ b/spec-body-mutation.k`
+- 17568: `diff --git a/spec-vacuity.k b/spec-vacuity.k`
+- 17572: `+++ b/spec-vacuity.k`
+- 17790: `prove.sh exit: 0`
+- 17791: `1:differential cases: 21531`
+- 17792: `2:mismatches: 0`
+- 17796: `164:#Top`
+- 17797: `205:#Top`
+- 17798: `246:kore-exec: [2356192] Warning (WarnStuckClaimState):`
+- 17802: `335:EXPECTED FAILURE: false-postcondition mutation was rejected`
+- 17803: `336:kore-exec: [3250744] Warning (WarnStuckClaimState):`
+- 17805: `505:EXPECTED FAILURE: body mutation was rejected`
+- 17918: `+  `#Top`.`
+- 17919: `+- **Control/value validation:** `spec-body-mutation.k` changes the comparison`
+- 17941: `+differential cases: 21531`
+- 17942: `+mismatches: 0`
+- 17946: `+kompile reference-semantics/semantics.k \`
+- 17950: `+  --output-definition runtime-kompiled`
+- 17951: `+krun smoke.mpy --definition runtime-kompiled`
+- 17954: `+Actual results: both commands exited `0`. `krun` ended with `.K`, `NoExc`, and`
+- 17959: `+kompile --backend haskell verification.k \`
+- 17962: `+  --output-definition verification-kompiled`
+- 17963: `+kprove spec.k \`
+- 17964: `+  --definition verification-kompiled \`
+- 17967: `+kprove spec.k \`
+- 17968: `+  --definition verification-kompiled \`
+- 17975: `+#Top`
+- 17976: `+#Top`
+- 17979: `+All three commands exited `0`. The full, unfiltered `kprove` command is the`
+- 17986: `+kprove spec-vacuity.k \`
+- 17987: `+  --definition verification-kompiled \`
+- 17989: `+kprove spec-body-mutation.k \`
+- 17990: `+  --definition verification-kompiled \`
+- 17994: `+Both expected-failure probes exited `1` with `WarnStuckClaimState`.`
+- 17995: `+`spec-vacuity.k` claimed that `[1]` returns `[]`; its residual contained the`
+- 17996: `+actual heap `list(vCons(1, .ValSeq))`. `spec-body-mutation.k` changed the body`
+- 18016: `+  The count-two body mutation invalidates the loop theorem.`
+- 18046: `+  `spec-vacuity.k`, `spec-body-mutation.k`, `prove.sh`, and`
+- 18049: `+  are separated here. `#Top` is reported only as proof execution, not by`
+- 18057: `+| Supplied `MPY` modules, especially core/functions/call/controls/list/methods/int | They are the fixed language model requested by the task | Define binding, control, heap, `count`, integer equality, append, return, and thus both claims | Concrete LLVM smoke run; body and false-result mutations; source audit |`
+- 18058: `+| K v7.1.293 Haskell backend and solver | Proof-checker implementation is below the theorem | Determines `#Top` and rejection of mutations | Exact versions checked; reproducible positive and negative runs |`
+- 18066: `+negative/zero/mixed-multiplicity cases through LLVM `krun`.`
+- 18123: `+print(f"differential cases: {checked}")`
+- 18124: `+print(f"mismatches: {len(mismatches)}")`
+- 18125: `+if mismatches:`
+- 18141: `+kompile reference-semantics/semantics.k \`
+- 18145: `+  --output-definition runtime-kompiled`
+- 18147: `+krun smoke.mpy --definition runtime-kompiled`
+- 18149: `+kompile --backend haskell verification.k \`
+- 18152: `+  --output-definition verification-kompiled`
+- 18154: `+kprove spec.k \`
+- 18155: `+  --definition verification-kompiled \`
+- 18159: `+kprove spec.k \`
+- 18160: `+  --definition verification-kompiled \`
+- 18163: `+if kprove spec-vacuity.k \`
+- 18164: `+  --definition verification-kompiled \`
+- 18166: `+  echo "ERROR: false-postcondition mutation unexpectedly proved" >&2`
+- 18169: `+  echo "EXPECTED FAILURE: false-postcondition mutation was rejected"`
+- 18172: `+if kprove spec-body-mutation.k \`
+- 18173: `+  --definition verification-kompiled \`
+- 18175: `+  echo "ERROR: body mutation unexpectedly proved" >&2`
+- 18178: `+  echo "EXPECTED FAILURE: body mutation was rejected"`
+- 18219: `diff --git a/spec-body-mutation.k b/spec-body-mutation.k`
+- 18223: `+++ b/spec-body-mutation.k`
+- 18268: `diff --git a/spec-vacuity.k b/spec-vacuity.k`
+- 18272: `+++ b/spec-vacuity.k`
+- 18596: `+  `#Top`.`
+- 18597: `+- **Control/value validation:** `spec-body-mutation.k` changes the comparison`
+- 18619: `+differential cases: 21531`
+- 18620: `+mismatches: 0`
+- 18624: `+kompile reference-semantics/semantics.k \`
+- 18628: `+  --output-definition runtime-kompiled`
+- 18629: `+krun smoke.mpy --definition runtime-kompiled`
+- 18632: `+Actual results: both commands exited `0`. `krun` ended with `.K`, `NoExc`, and`
+- 18637: `+kompile --backend haskell verification.k \`
+- 18640: `+  --output-definition verification-kompiled`
+- 18641: `+kprove spec.k \`
+- 18642: `+  --definition verification-kompiled \`
+- 18645: `+kprove spec.k \`
+- 18646: `+  --definition verification-kompiled \`
+- 18653: `+#Top`
+- 18654: `+#Top`
+- 18657: `+All three commands exited `0`. The full, unfiltered `kprove` command is the`
+- 18664: `+kprove spec-vacuity.k \`
+- 18665: `+  --definition verification-kompiled \`
+- 18667: `+kprove spec-body-mutation.k \`
+- 18668: `+  --definition verification-kompiled \`
+- 18672: `+Both expected-failure probes exited `1` with `WarnStuckClaimState`.`
+- 18673: `+`spec-vacuity.k` claimed that `[1]` returns `[]`; its residual contained the`
+- 18674: `+actual heap `list(vCons(1, .ValSeq))`. `spec-body-mutation.k` changed the body`
+- 18694: `+  The count-two body mutation invalidates the loop theorem.`
+- 18724: `+  `spec-vacuity.k`, `spec-body-mutation.k`, `prove.sh`, and`
+- 18727: `+  are separated here. `#Top` is reported only as proof execution, not by`
+- 18735: `+| Supplied `MPY` modules, especially core/functions/call/controls/list/methods/int | They are the fixed language model requested by the task | Define binding, control, heap, `count`, integer equality, append, return, and thus both claims | Concrete LLVM smoke run; body and false-result mutations; source audit |`
+- 18736: `+| K v7.1.293 Haskell backend and solver | Proof-checker implementation is below the theorem | Determines `#Top` and rejection of mutations | Exact versions checked; reproducible positive and negative runs |`
+- 18744: `+negative/zero/mixed-multiplicity cases through LLVM `krun`.`
+- 18801: `+print(f"differential cases: {checked}")`
+- 18802: `+print(f"mismatches: {len(mismatches)}")`
+- 18803: `+if mismatches:`
+- 18819: `+kompile reference-semantics/semantics.k \`
+- 18823: `+  --output-definition runtime-kompiled`
+- 18825: `+krun smoke.mpy --definition runtime-kompiled`
+- 18827: `+kompile --backend haskell verification.k \`
+- 18830: `+  --output-definition verification-kompiled`
+- 18832: `+kprove spec.k \`
+- 18833: `+  --definition verification-kompiled \`
+- 18837: `+kprove spec.k \`
+- 18838: `+  --definition verification-kompiled \`
+- 18841: `+if kprove spec-vacuity.k \`
+- 18842: `+  --definition verification-kompiled \`
+- 18844: `+  echo "ERROR: false-postcondition mutation unexpectedly proved" >&2`
+- 18847: `+  echo "EXPECTED FAILURE: false-postcondition mutation was rejected"`
+- 18850: `+if kprove spec-body-mutation.k \`
+- 18851: `+  --definition verification-kompiled \`
+- 18853: `+  echo "ERROR: body mutation unexpectedly proved" >&2`
+- 18856: `+  echo "EXPECTED FAILURE: body mutation was rejected"`
+- 18897: `diff --git a/spec-body-mutation.k b/spec-body-mutation.k`
+- 18901: `+++ b/spec-body-mutation.k`
+- 18946: `diff --git a/spec-vacuity.k b/spec-vacuity.k`
+- 18950: `+++ b/spec-vacuity.k`
+- 19168: `The end-to-end runner exits `0`: both positive proof commands print `#Top`, while both negative probes fail as expected. The reconstructed audit finds no operational bridge or opaque result oracle; Gates A, B, and C all pass, so `PROOF.md` begins with `VALIDATED` while the separate runner outcome remains `KPROVE_PASSED`.`
+- 19174: `rg -n '"'"'^#Top$|''^EXPECTED FAILURE:'"' prove-run.out`
+- 19182: `164:#Top`
+- 19183: `205:#Top`
+- 19184: `335:EXPECTED FAILURE: false-postcondition mutation was rejected`
+- 19185: `505:EXPECTED FAILURE: body mutation was rejected`
+- 19295: `+  `#Top`.`
+- 19296: `+- **Control/value validation:** `spec-body-mutation.k` changes the comparison`
+- 19318: `+differential cases: 21531`
+- 19319: `+mismatches: 0`
+- 19323: `+kompile reference-semantics/semantics.k \`
+- 19327: `+  --output-definition runtime-kompiled`
+- 19328: `+krun smoke.mpy --definition runtime-kompiled`
+- 19331: `+Actual results: both commands exited `0`. `krun` ended with `.K`, `NoExc`, and`
+- 19336: `+kompile --backend haskell verification.k \`
+- 19339: `+  --output-definition verification-kompiled`
+- 19340: `+kprove spec.k \`
+- 19341: `+  --definition verification-kompiled \`
+- 19344: `+kprove spec.k \`
+- 19345: `+  --definition verification-kompiled \`
+- 19352: `+#Top`
+- 19353: `+#Top`
+- 19356: `+All three commands exited `0`. The full, unfiltered `kprove` command is the`
+- 19363: `+kprove spec-vacuity.k \`
+- 19364: `+  --definition verification-kompiled \`
+- 19366: `+kprove spec-body-mutation.k \`
+- 19367: `+  --definition verification-kompiled \`
+- 19371: `+Both expected-failure probes exited `1` with `WarnStuckClaimState`.`
+- 19372: `+`spec-vacuity.k` claimed that `[1]` returns `[]`; its residual contained the`
+- 19373: `+actual heap `list(vCons(1, .ValSeq))`. `spec-body-mutation.k` changed the body`
+- 19393: `+  The count-two body mutation invalidates the loop theorem.`
+- 19423: `+  `spec-vacuity.k`, `spec-body-mutation.k`, `prove.sh`, and`
+- 19426: `+  are separated here. `#Top` is reported only as proof execution, not by`
+- 19434: `+| Supplied `MPY` modules, especially core/functions/call/controls/list/methods/int | They are the fixed language model requested by the task | Define binding, control, heap, `count`, integer equality, append, return, and thus both claims | Concrete LLVM smoke run; body and false-result mutations; source audit |`
+- 19435: `+| K v7.1.293 Haskell backend and solver | Proof-checker implementation is below the theorem | Determines `#Top` and rejection of mutations | Exact versions checked; reproducible positive and negative runs |`
+- 19443: `+negative/zero/mixed-multiplicity cases through LLVM `krun`.`
+- 19500: `+print(f"differential cases: {checked}")`
+- 19501: `+print(f"mismatches: {len(mismatches)}")`
+- 19502: `+if mismatches:`
+- 19518: `+kompile reference-semantics/semantics.k \`
+- 19522: `+  --output-definition runtime-kompiled`
+- 19524: `+krun smoke.mpy --definition runtime-kompiled`
+- 19526: `+kompile --backend haskell verification.k \`
+- 19529: `+  --output-definition verification-kompiled`
+- 19531: `+kprove spec.k \`
+- 19532: `+  --definition verification-kompiled \`
+- 19536: `+kprove spec.k \`
+- 19537: `+  --definition verification-kompiled \`
+- 19540: `+if kprove spec-vacuity.k \`
+- 19541: `+  --definition verification-kompiled \`
+- 19543: `+  echo "ERROR: false-postcondition mutation unexpectedly proved" >&2`
+- 19546: `+  echo "EXPECTED FAILURE: false-postcondition mutation was rejected"`
+- 19549: `+if kprove spec-body-mutation.k \`
+- 19550: `+  --definition verification-kompiled \`
+- 19552: `+  echo "ERROR: body mutation unexpectedly proved" >&2`
+- 19555: `+  echo "EXPECTED FAILURE: body mutation was rejected"`
+- 19596: `diff --git a/spec-body-mutation.k b/spec-body-mutation.k`
+- 19600: `+++ b/spec-body-mutation.k`
+- 19645: `diff --git a/spec-vacuity.k b/spec-vacuity.k`
+- 19649: `+++ b/spec-vacuity.k`
+- 19866: `All required artifacts are present. The LLVM smoke suite and 21,531-case differential test pass; the focused loop and full two-claim proof print #Top; false-result and body mutations are rejected; Gates A–C are documented as PASS in a VALIDATED report.`
+- 19979: `+  `#Top`.`
+- 19980: `+- **Control/value validation:** `spec-body-mutation.k` changes the comparison`
+- 20002: `+differential cases: 21531`
+- 20003: `+mismatches: 0`
+- 20007: `+kompile reference-semantics/semantics.k \`
+- 20011: `+  --output-definition runtime-kompiled`
+- 20012: `+krun smoke.mpy --definition runtime-kompiled`
+- 20015: `+Actual results: both commands exited `0`. `krun` ended with `.K`, `NoExc`, and`
+- 20020: `+kompile --backend haskell verification.k \`
+- 20023: `+  --output-definition verification-kompiled`
+- 20024: `+kprove spec.k \`
+- 20025: `+  --definition verification-kompiled \`
+- 20028: `+kprove spec.k \`
+- 20029: `+  --definition verification-kompiled \`
+- 20036: `+#Top`
+- 20037: `+#Top`
+- 20040: `+All three commands exited `0`. The full, unfiltered `kprove` command is the`
+- 20047: `+kprove spec-vacuity.k \`
+- 20048: `+  --definition verification-kompiled \`
+- 20050: `+kprove spec-body-mutation.k \`
+- 20051: `+  --definition verification-kompiled \`
+- 20055: `+Both expected-failure probes exited `1` with `WarnStuckClaimState`.`
+- 20056: `+`spec-vacuity.k` claimed that `[1]` returns `[]`; its residual contained the`
+- 20057: `+actual heap `list(vCons(1, .ValSeq))`. `spec-body-mutation.k` changed the body`
+- 20077: `+  The count-two body mutation invalidates the loop theorem.`
+- 20107: `+  `spec-vacuity.k`, `spec-body-mutation.k`, `prove.sh`, and`
+- 20110: `+  are separated here. `#Top` is reported only as proof execution, not by`
+- 20118: `+| Supplied `MPY` modules, especially core/functions/call/controls/list/methods/int | They are the fixed language model requested by the task | Define binding, control, heap, `count`, integer equality, append, return, and thus both claims | Concrete LLVM smoke run; body and false-result mutations; source audit |`
+- 20119: `+| K v7.1.293 Haskell backend and solver | Proof-checker implementation is below the theorem | Determines `#Top` and rejection of mutations | Exact versions checked; reproducible positive and negative runs |`
+- 20127: `+negative/zero/mixed-multiplicity cases through LLVM `krun`.`
+- 20184: `+print(f"differential cases: {checked}")`
+- 20185: `+print(f"mismatches: {len(mismatches)}")`
+- 20186: `+if mismatches:`
+- 20202: `+kompile reference-semantics/semantics.k \`
+- 20206: `+  --output-definition runtime-kompiled`
+- 20208: `+krun smoke.mpy --definition runtime-kompiled`
+- 20210: `+kompile --backend haskell verification.k \`
+- 20213: `+  --output-definition verification-kompiled`
+- 20215: `+kprove spec.k \`
+- 20216: `+  --definition verification-kompiled \`
+- 20220: `+kprove spec.k \`
+- 20221: `+  --definition verification-kompiled \`
+- 20224: `+if kprove spec-vacuity.k \`
+- 20225: `+  --definition verification-kompiled \`
+- 20227: `+  echo "ERROR: false-postcondition mutation unexpectedly proved" >&2`
+- 20230: `+  echo "EXPECTED FAILURE: false-postcondition mutation was rejected"`
+- 20233: `+if kprove spec-body-mutation.k \`
+- 20234: `+  --definition verification-kompiled \`
+- 20236: `+  echo "ERROR: body mutation unexpectedly proved" >&2`
+- 20239: `+  echo "EXPECTED FAILURE: body mutation was rejected"`
+- 20280: `diff --git a/spec-body-mutation.k b/spec-body-mutation.k`
+- 20284: `+++ b/spec-body-mutation.k`
+- 20329: `diff --git a/spec-vacuity.k b/spec-vacuity.k`
+- 20333: `+++ b/spec-vacuity.k`
+- 20554: `- `prove.sh` exits 0; both positive proofs print `#Top`.`
+- 20555: `- LLVM smoke tests and 21,531 differential cases pass.`
+- 20556: `- False-postcondition and body-mutation probes fail as expected.`
+- 20559: `RESULT: KPROVE_PASSED — Every required positive target-proof command printed #Top and exited 0.`
+- 20667: `+  `#Top`.`
+- 20668: `+- **Control/value validation:** `spec-body-mutation.k` changes the comparison`
+- 20690: `+differential cases: 21531`
+- 20691: `+mismatches: 0`
+- 20695: `+kompile reference-semantics/semantics.k \`
+- 20699: `+  --output-definition runtime-kompiled`
+- 20700: `+krun smoke.mpy --definition runtime-kompiled`
+- 20703: `+Actual results: both commands exited `0`. `krun` ended with `.K`, `NoExc`, and`
+- 20708: `+kompile --backend haskell verification.k \`
+- 20711: `+  --output-definition verification-kompiled`
+- 20712: `+kprove spec.k \`
+- 20713: `+  --definition verification-kompiled \`
+- 20716: `+kprove spec.k \`
+- 20717: `+  --definition verification-kompiled \`
+- 20724: `+#Top`
+- 20725: `+#Top`
+- 20728: `+All three commands exited `0`. The full, unfiltered `kprove` command is the`
+- 20735: `+kprove spec-vacuity.k \`
+- 20736: `+  --definition verification-kompiled \`
+- 20738: `+kprove spec-body-mutation.k \`
+- 20739: `+  --definition verification-kompiled \`
+- 20743: `+Both expected-failure probes exited `1` with `WarnStuckClaimState`.`
+- 20744: `+`spec-vacuity.k` claimed that `[1]` returns `[]`; its residual contained the`
+- 20745: `+actual heap `list(vCons(1, .ValSeq))`. `spec-body-mutation.k` changed the body`
+- 20765: `+  The count-two body mutation invalidates the loop theorem.`
+- 20795: `+  `spec-vacuity.k`, `spec-body-mutation.k`, `prove.sh`, and`
+- 20798: `+  are separated here. `#Top` is reported only as proof execution, not by`
+- 20806: `+| Supplied `MPY` modules, especially core/functions/call/controls/list/methods/int | They are the fixed language model requested by the task | Define binding, control, heap, `count`, integer equality, append, return, and thus both claims | Concrete LLVM smoke run; body and false-result mutations; source audit |`
+- 20807: `+| K v7.1.293 Haskell backend and solver | Proof-checker implementation is below the theorem | Determines `#Top` and rejection of mutations | Exact versions checked; reproducible positive and negative runs |`
+- 20815: `+negative/zero/mixed-multiplicity cases through LLVM `krun`.`
+- 20872: `+print(f"differential cases: {checked}")`
+- 20873: `+print(f"mismatches: {len(mismatches)}")`
+- 20874: `+if mismatches:`
+- 20890: `+kompile reference-semantics/semantics.k \`
+- 20894: `+  --output-definition runtime-kompiled`
+- 20896: `+krun smoke.mpy --definition runtime-kompiled`
+- 20898: `+kompile --backend haskell verification.k \`
+- 20901: `+  --output-definition verification-kompiled`
+- 20903: `+kprove spec.k \`
+- 20904: `+  --definition verification-kompiled \`
+- 20908: `+kprove spec.k \`
+- 20909: `+  --definition verification-kompiled \`
+- 20912: `+if kprove spec-vacuity.k \`
+- 20913: `+  --definition verification-kompiled \`
+- 20915: `+  echo "ERROR: false-postcondition mutation unexpectedly proved" >&2`
+- 20918: `+  echo "EXPECTED FAILURE: false-postcondition mutation was rejected"`
+- 20921: `+if kprove spec-body-mutation.k \`
+- 20922: `+  --definition verification-kompiled \`
+- 20924: `+  echo "ERROR: body mutation unexpectedly proved" >&2`
+- 20927: `+  echo "EXPECTED FAILURE: body mutation was rejected"`
+- 20968: `diff --git a/spec-body-mutation.k b/spec-body-mutation.k`
+- 20972: `+++ b/spec-body-mutation.k`
+- 21017: `diff --git a/spec-vacuity.k b/spec-vacuity.k`
+- 21021: `+++ b/spec-vacuity.k`
+- 21243: `- `prove.sh` exits 0; both positive proofs print `#Top`.`
+- 21244: `- LLVM smoke tests and 21,531 differential cases pass.`
+- 21245: `- False-postcondition and body-mutation probes fail as expected.`
+- 21248: `RESULT: KPROVE_PASSED — Every required positive target-proof command printed #Top and exited 0.`

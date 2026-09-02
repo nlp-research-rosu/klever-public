@@ -1,0 +1,42 @@
+requires "semantic.k"
+
+module FIBFIB-SPEC
+  imports FIBFIB
+  imports FIBFIB-VERIFICATION
+
+  claim [program-correct]:
+    <k> fibfibProgram ~> invoke(N) => .K </k>
+    <env>
+      .Map
+      =>
+      "a" |-> fibfibMath(N)
+      "b" |-> fibfibMath(N +Int 1)
+      "c" |-> fibfibMath(N +Int 2)
+      "i" |-> N
+      "n" |-> N
+    </env>
+    <result> 0 => fibfibMath(N) </result>
+    requires 0 <=Int N
+
+  claim [loop-invariant]:
+    <k> While(loopCondition, loopBody)
+         ~> (Return(Name("b")) .Stmts)
+         ~> finish
+      => .K
+    </k>
+    <env>
+      "a" |-> fibfibMath(I)
+      "b" |-> fibfibMath(I +Int 1)
+      "c" |-> fibfibMath(I +Int 2)
+      "i" |-> I
+      "n" |-> N
+      =>
+      "a" |-> fibfibMath(N)
+      "b" |-> fibfibMath(N +Int 1)
+      "c" |-> fibfibMath(N +Int 2)
+      "i" |-> N
+      "n" |-> N
+    </env>
+    <result> _R => fibfibMath(N) </result>
+    requires 0 <=Int I andBool I <=Int N
+endmodule

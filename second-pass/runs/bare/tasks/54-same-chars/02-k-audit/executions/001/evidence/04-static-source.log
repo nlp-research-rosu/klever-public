@@ -1,0 +1,431 @@
++ nl -ba /tmp/audit-work/reconstruction/semantic.k
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports STRING-SYNTAX
+     5	
+     6	  syntax Program ::= "Module" "(" Function ")"
+     7	  syntax Function ::= "FuncDef" "(" String "," Params "," Statement ")"
+     8	  syntax Params ::= "Params" "(" String "," String ")"
+     9	
+    10	  syntax Statement ::= "Return" "(" Expr ")"
+    11	
+    12	  syntax Expr ::= "Name" "(" String ")"
+    13	                | "Call" "(" Expr "," Expr ")"
+    14	                | "Compare" "(" Expr "," CmpOp ")"
+    15	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    16	endmodule
+    17	
+    18	module MPY
+    19	  imports MPY-SYNTAX
+    20	  imports BOOL
+    21	  imports INT
+    22	  imports K-EQUAL
+    23	  imports MAP
+    24	  imports SET
+    25	  imports STRING
+    26	
+    27	  syntax Value ::= "stringValue" "(" String ")"
+    28	                 | "setValue" "(" Set ")"
+    29	                 | "boolValue" "(" Bool ")"
+    30	  syntax Result ::= "noResult" | "result" "(" Value ")"
+    31	
+    32	  syntax Set ::= "charSet" "(" String ")" [function]
+    33	  rule charSet("") => .Set [concrete]
+    34	  rule charSet(S) => SetItem(substrString(S, 0, 1))
+    35	                     |Set charSet(substrString(S, 1, lengthString(S)))
+    36	    requires S =/=String ""
+    37	    [concrete]
+    38	
+    39	  syntax KItem ::= "eval" "(" Expr ")"
+    40	                 | "makeSet"
+    41	                 | "compareRight" "(" Expr ")"
+    42	                 | "compareValues" "(" Value ")"
+    43	                 | "finishReturn"
+    44	
+    45	  configuration
+    46	    <mpy>
+    47	      <k> $PGM:Program </k>
+    48	      <s0> $S0:String </s0>
+    49	      <s1> $S1:String </s1>
+    50	      <env> .Map </env>
+    51	      <result> noResult </result>
+    52	    </mpy>
+    53	
+    54	  rule <k> Module(FuncDef(_F, Params(P0, P1), BODY)) => BODY ...</k>
+    55	       <s0> S0 </s0>
+    56	       <s1> S1 </s1>
+    57	       <env> .Map => (P0 |-> stringValue(S0)) (P1 |-> stringValue(S1)) </env>
+    58	
+    59	  rule <k> Return(E) => eval(E) ~> finishReturn ...</k>
+    60	
+    61	  rule <k> eval(Name(N)) => V ...</k>
+    62	       <env>... N |-> V ...</env>
+    63	
+    64	  rule <k> eval(Call(Name("set"), E)) => eval(E) ~> makeSet ...</k>
+    65	  rule <k> stringValue(S) ~> makeSet => setValue(charSet(S)) ...</k>
+    66	
+    67	  rule <k> eval(Compare(E0, CmpOp("==", E1)))
+    68	        => eval(E0) ~> compareRight(E1) ...</k>
+    69	  rule <k> V0:Value ~> compareRight(E1)
+    70	        => eval(E1) ~> compareValues(V0) ...</k>
+    71	  rule <k> setValue(CHARS1) ~> compareValues(setValue(CHARS0))
+    72	        => boolValue(CHARS0 ==K CHARS1) ...</k>
+    73	
+    74	  rule <k> V:Value ~> finishReturn => .K </k>
+    75	       <result> noResult => result(V) </result>
+    76	endmodule
+EXIT_STATUS=0
++ nl -ba /tmp/audit-work/reconstruction/solution-program.k
+     1	requires "semantic.k"
+     2	
+     3	module SOLUTION
+     4	  imports MPY
+     5	  syntax Program ::= "solutionProgram" [function]
+     6	  rule solutionProgram => Module(
+     7	  FuncDef("same_chars", Params("s0", "s1"),
+     8	    Return(
+     9	      Compare(
+    10	        Call(Name("set"), Name("s0")),
+    11	        CmpOp("==", Call(Name("set"), Name("s1")))))))
+    12	endmodule
+EXIT_STATUS=0
++ nl -ba /tmp/audit-work/reconstruction/verification.k
+     1	requires "semantic.k"
+     2	requires "solution-program.k"
+     3	
+     4	module VERIFICATION
+     5	  imports SOLUTION
+     6	
+     7	  // The contract: the two strings induce the same mathematical set of
+     8	  // one-code-point strings.  Set equality deliberately ignores order and
+     9	  // duplicate occurrences.
+    10	  syntax Bool ::= "sameCharsSpec" "(" String "," String ")" [function, total]
+    11	  rule sameCharsSpec(S0, S1) => charSet(S0) ==K charSet(S1)
+    12	endmodule
+EXIT_STATUS=0
++ nl -ba /tmp/audit-work/reconstruction/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Universal functional-correctness theorem over arbitrary K strings.
+     7	  claim
+     8	    <k> solutionProgram => .K </k>
+     9	    <s0> S0:String </s0>
+    10	    <s1> S1:String </s1>
+    11	    <env>
+    12	      .Map
+    13	      => ("s0" |-> stringValue(S0)) ("s1" |-> stringValue(S1))
+    14	    </env>
+    15	    <result>
+    16	      noResult => result(boolValue(sameCharsSpec(S0, S1)))
+    17	    </result>
+    18	
+    19	  // The examples from prompt.py are also executable reachability claims.
+    20	  claim
+    21	    <k> solutionProgram => .K </k>
+    22	    <s0> "eabcdzzzz" </s0>
+    23	    <s1> "dddzzzzzzzddeddabc" </s1>
+    24	    <env> .Map => ("s0" |-> stringValue("eabcdzzzz"))
+    25	                 ("s1" |-> stringValue("dddzzzzzzzddeddabc")) </env>
+    26	    <result> noResult => result(boolValue(true)) </result>
+    27	
+    28	  claim
+    29	    <k> solutionProgram => .K </k>
+    30	    <s0> "abcd" </s0>
+    31	    <s1> "dddddddabc" </s1>
+    32	    <env> .Map => ("s0" |-> stringValue("abcd"))
+    33	                 ("s1" |-> stringValue("dddddddabc")) </env>
+    34	    <result> noResult => result(boolValue(true)) </result>
+    35	
+    36	  claim
+    37	    <k> solutionProgram => .K </k>
+    38	    <s0> "dddddddabc" </s0>
+    39	    <s1> "abcd" </s1>
+    40	    <env> .Map => ("s0" |-> stringValue("dddddddabc"))
+    41	                 ("s1" |-> stringValue("abcd")) </env>
+    42	    <result> noResult => result(boolValue(true)) </result>
+    43	
+    44	  claim
+    45	    <k> solutionProgram => .K </k>
+    46	    <s0> "eabcd" </s0>
+    47	    <s1> "dddddddabc" </s1>
+    48	    <env> .Map => ("s0" |-> stringValue("eabcd"))
+    49	                 ("s1" |-> stringValue("dddddddabc")) </env>
+    50	    <result> noResult => result(boolValue(false)) </result>
+    51	
+    52	  claim
+    53	    <k> solutionProgram => .K </k>
+    54	    <s0> "abcd" </s0>
+    55	    <s1> "dddddddabce" </s1>
+    56	    <env> .Map => ("s0" |-> stringValue("abcd"))
+    57	                 ("s1" |-> stringValue("dddddddabce")) </env>
+    58	    <result> noResult => result(boolValue(false)) </result>
+    59	
+    60	  claim
+    61	    <k> solutionProgram => .K </k>
+    62	    <s0> "eabcdzzzz" </s0>
+    63	    <s1> "dddzzzzzzzddddabc" </s1>
+    64	    <env> .Map => ("s0" |-> stringValue("eabcdzzzz"))
+    65	                 ("s1" |-> stringValue("dddzzzzzzzddddabc")) </env>
+    66	    <result> noResult => result(boolValue(false)) </result>
+    67	endmodule
+EXIT_STATUS=0
++ rg -n \^\[\[:space:\]\]\*\(syntax\|configuration\|rule\|claim\)\|\\\\\[\(function\|total\|functional\|simplification\|concrete\|priority\|owise\|anywhere\) /tmp/audit-work/reconstruction/semantic.k /tmp/audit-work/reconstruction/solution-program.k /tmp/audit-work/reconstruction/verification.k /tmp/audit-work/reconstruction/spec.k
+rg: regex parse error:
+    (?:^[[:space:]]*(syntax|configuration|rule|claim)|\\[(function|total|functional|simplification|concrete|priority|owise|anywhere))
+                                                        ^
+error: unclosed character class
+EXIT_STATUS=2
++ sed -n 1680\,1760p /usr/include/kframework/builtin/domains.md
+
+Provided here is the syntax of an implementation of Unicode strings in K. This
+type is hooked to an implementation of strings provided by the backend. The
+implementation is currently incomplete and does not fully support encodings
+and code points beyond the initial 256 code points of the Basic Latin and
+Latin-1 Supplement blocks. In the future, there may be breaking changes to
+the semantics of this module in order to support this functionality.
+
+The syntax of strings in K is delineated by double quotes. Inside the double
+quotes, any character can appear verbatim except double quotes, backslash,
+newline, and carriage return. K also supports the following escape sequences:
+
+* \" - the " character
+* \\ - the \ character
+* \n - newline character
+* \r - carriage return character
+* \t - tab character
+* \f - form feed character
+* \xFF - \x followed by two hexadecimal characters indicates a code point
+  between 0x00 and 0xff
+* \uFFFF - \u followed by four hexadecimal characters indicates a code point
+  between 0x0000 and 0xffff
+* \UFFFFFFFF - \U followed by eight hexadecimal characters indicates a code
+  point between 0x000000 and 0x10ffff
+
+```k
+module STRING-SYNTAX
+  syntax String [hook(STRING.String)]
+  syntax String ::= r"[\\\"](([^\\\"\\n\\r\\\\])|([\\\\][nrtf\\\"\\\\])|([\\\\][x][0-9a-fA-F]{2})|([\\\\][u][0-9a-fA-F]{4})|([\\\\][U][0-9a-fA-F]{8}))*[\\\"]"      [token]
+endmodule
+
+module STRING-COMMON
+  imports STRING-SYNTAX
+  imports private INT
+  imports private FLOAT-SYNTAX
+  imports private K-EQUAL
+  imports private BOOL
+```
+
+### String concatenation
+
+You can concatenate two strings in O(N) time. For successive concatenation
+operations, it may be better to use the `STRING-BUFFER` module.
+
+```k
+  syntax String ::= String "+String" String    [function, total, left, hook(STRING.concat)]
+```
+
+### String length
+
+You can get the length of a string in O(1) time.
+
+```k
+  syntax Int ::= lengthString ( String ) [function, total, hook(STRING.length)]
+```
+
+### Character and integer conversion
+
+You can convert between a character (as represented by a string containing
+a single code point) and an integer in O(1) time.
+
+```k
+  syntax String ::= chrChar ( Int )      [function, hook(STRING.chr)]
+  syntax Int ::= ordChar ( String )      [function, hook(STRING.ord)]
+```
+
+### String substring
+
+You can compute a substring of a string in O(N) time (where N is the
+length of the substring). There are two important facts to note:
+
+1.  the range generated includes the character at `startIndex` but excludes the
+    character at `endIndex`, i.e., the range is `[startIndex..endIndex)`.
+2.  this function is only defined on valid indices (i.e., it is defined when
+    `startIndex < endIndex` and `endIndex` is less than or equal to the string
+    length).
+
+```k
+  syntax String ::= substrString ( String , startIndex: Int , endIndex: Int ) [function, total, hook(STRING.substr)]
+```
+
+EXIT_STATUS=0
++ sed -n 695\,750p /usr/include/kframework/builtin/domains.md
+```k
+module SET
+  imports private INT-SYNTAX
+  imports private BASIC-K
+
+  syntax Set [hook(SET.Set)]
+```
+
+### Set concatenation
+
+The `Set` sort represents a mathematical set (A collection of unique items).
+The sets are nilpotent, i.e., the concatenation of two sets containing elements
+in common is `#False` (note however, this may be silently allowed during
+concrete execution). If you intend to add an element to a set that might
+already be present in the set, use the `|Set` operator instead.
+
+The concatenation operator is O(N*log(M)) where N is the size of the smaller
+set, when it appears on the right hand side. When it appears on the left hand
+side and all variables are bound, it is O(N*log(M)) where M is the size of the
+set it is matching and N is the number of elements being matched. When it
+appears on the left hand side containing variables not bound elsewhere in the
+term, it is O(N^K) where N is the size of the set it is matching and K is the
+number of unbound keys being mached. In other words, one unbound variable is
+linear, two is quadratic, three is cubic, etc.
+
+```k
+  syntax Set ::= Set Set                  [left, function, hook(SET.concat), symbol(_Set_), assoc, comm, unit(.Set), idem, element(SetItem), format(%1%n%2)]
+```
+
+### Set unit
+
+The set with zero elements is represented by `.Set`.
+
+```k
+  syntax Set ::= ".Set"                   [function, total, hook(SET.unit), symbol(.Set)]
+```
+
+### Set elements
+
+An element of a `Set` is constructed via the `SetItem` operator.
+
+```k
+  syntax Set ::= SetItem(KItem)               [function, total, hook(SET.element), symbol(SetItem), injective]
+```
+
+### Set union
+
+You can compute the union of two sets in O(N*log(M)) time (Where N is the size
+of the smaller set). Note that the base of the logarithm is a relatively high
+number and thus the time is effectively linear. The union consists of all the
+elements present in either set.
+
+```k
+  syntax Set ::= Set "|Set" Set              [left, function, total, hook(SET.union), comm]
+  rule S1:Set |Set S2:Set => S1 (S2 -Set S1) [concrete]
+```
+EXIT_STATUS=0
++ sed -n 2307\,2358p /usr/include/kframework/builtin/domains.md
+Equality and conditionals
+-------------------------
+
+Provided here are implementations of two important primitives in K:
+
+* `==K` - the equality between two terms. Returns `true` if they are equal
+  and `false` if they are not equal.
+* `#if #then #else #fi` - polymorphic conditional function. If the first
+  argument evaluates to `true`, the second argument is returned. Otherwise,
+  the third argument is returned. Note that this does not short-circuit on
+  symbolic backends.
+
+```k
+module K-EQUAL-SYNTAX
+  imports private BOOL
+  imports private BASIC-K
+
+  syntax Bool ::= left:
+                  K "==K" K           [function, total, comm, smt-hook(=), hook(KEQUAL.eq), symbol(_==K_), group(equalEqualK)]
+                | K "=/=K" K          [function, total, comm, smt-hook(distinct), hook(KEQUAL.ne), symbol(_=/=K_), group(notEqualEqualK)]
+
+  syntax priority equalEqualK notEqualEqualK > boolOperation mlOp
+
+  syntax {Sort} Sort ::= "#if" Bool "#then" Sort "#else" Sort "#fi" [function, total, symbol(ite), smt-hook(ite), hook(KEQUAL.ite)]
+
+endmodule
+
+module K-EQUAL-KORE [symbolic]
+  imports private BOOL
+  imports K-EQUAL-SYNTAX
+
+  rule K1:Bool ==K K2:Bool => K1 ==Bool K2 [simplification]
+  rule {K1 ==K K2 #Equals true} => {K1 #Equals K2} [simplification]
+  rule {true #Equals K1 ==K K2} => {K1 #Equals K2} [simplification]
+  rule {K1 ==K K2 #Equals false} => #Not({K1 #Equals K2}) [simplification]
+  rule {false #Equals K1 ==K K2} => #Not({K1 #Equals K2}) [simplification]
+  rule {K1 =/=K K2 #Equals true} => #Not({K1 #Equals K2}) [simplification]
+  rule {true #Equals K1 =/=K K2} => #Not({K1 #Equals K2}) [simplification]
+  rule {K1 =/=K K2 #Equals false} => {K1 #Equals K2} [simplification]
+  rule {false #Equals K1 =/=K K2} => {K1 #Equals K2} [simplification]
+
+endmodule
+
+module K-EQUAL
+  imports private BOOL
+  imports K-EQUAL-SYNTAX
+  imports K-EQUAL-KORE
+
+  rule K1:K =/=K K2:K => notBool (K1 ==K K2)
+
+  rule #if C:Bool #then B1::K #else _ #fi => B1 requires C
+  rule #if C:Bool #then _ #else B2::K #fi => B2 requires notBool C
+EXIT_STATUS=0
++ python3 /audit-output/evidence/04-pinning.py
+solution_mpy=/tmp/audit-work/reconstruction/solution.mpy
+solution_program_helper=/tmp/audit-work/reconstruction/solution-program.k
+helper_is_exact_wrapper=True
+universal_entry_precondition_has_no_requires_clause
+entry_state_shape=<k> solutionProgram </k>, <s0> S0:String </s0>, <s1> S1:String </s1>, <env> .Map </env>, <result> noResult </result>
+witness='ab','ba' set_left=['a', 'b'] set_right=['a', 'b'] claimed_result=True canonical=True solution=True
+witness='ab','aa' set_left=['a', 'b'] set_right=['a'] claimed_result=False canonical=False solution=False
+witness='','' set_left=[] set_right=[] claimed_result=True canonical=True solution=True
+witness='','a' set_left=[] set_right=['a'] claimed_result=False canonical=False solution=False
+EXIT_STATUS=0
++ python3 /audit-output/evidence/04-string-boundary-probes.py
+CASE=1 PYTHON_INPUT='Ā','ĀĀ' K_INPUT="\u0100","\u0100\u0100"
++ krun /tmp/audit-work/reconstruction/solution.mpy --definition /tmp/audit-work/reconstruction/semantic-kompiled '-cS0="\u0100"' '-cS1="\u0100\u0100"'
+EXIT_STATUS=0 K_RESULT=True PYTHON_RESULT=True
+CASE=2 PYTHON_INPUT='😀','😀😀' K_INPUT="\U0001F600","\U0001F600\U0001F600"
++ krun /tmp/audit-work/reconstruction/solution.mpy --definition /tmp/audit-work/reconstruction/semantic-kompiled '-cS0="\U0001F600"' '-cS1="\U0001F600\U0001F600"'
+EXIT_STATUS=0 K_RESULT=True PYTHON_RESULT=True
+CASE=3 PYTHON_INPUT='😀','😁' K_INPUT="\U0001F600","\U0001F601"
++ krun /tmp/audit-work/reconstruction/solution.mpy --definition /tmp/audit-work/reconstruction/semantic-kompiled '-cS0="\U0001F600"' '-cS1="\U0001F601"'
+EXIT_STATUS=0 K_RESULT=False PYTHON_RESULT=False
+CASE=4 PYTHON_INPUT='\U0010ffff','\U0010ffff\U0010ffff' K_INPUT="\U0010FFFF","\U0010FFFF\U0010FFFF"
++ krun /tmp/audit-work/reconstruction/solution.mpy --definition /tmp/audit-work/reconstruction/semantic-kompiled '-cS0="\U0010FFFF"' '-cS1="\U0010FFFF\U0010FFFF"'
+EXIT_STATUS=0 K_RESULT=True PYTHON_RESULT=True
+CASE=5 PYTHON_INPUT='\ud800','\ud800\ud800' K_INPUT="\uD800","\uD800\uD800"
++ krun /tmp/audit-work/reconstruction/solution.mpy --definition /tmp/audit-work/reconstruction/semantic-kompiled '-cS0="\uD800"' '-cS1="\uD800\uD800"'
+EXIT_STATUS=255 K_RESULT=None PYTHON_RESULT=True
+K_OUTPUT_BEGIN
+Scanner error at /tmp/.krun-2026-07-23-08-44-02-z5rzlvoD7F/tmp.in.z5uHpNsDlM:11.20-25: The surrogate code points in the range [U+D800, U+DFFF] are illegal in Unicode escape sequences
+
+[Error] krun: kore-expand-macros 
+/tmp/audit-work/reconstruction/semantic-kompiled 
+/tmp/.krun-2026-07-23-08-44-02-z5rzlvoD7F/tmp.in.z5uHpNsDlM
+K_OUTPUT_END
+CASE=6 PYTHON_INPUT='\ud800','\ud801' K_INPUT="\uD800","\uD801"
++ krun /tmp/audit-work/reconstruction/solution.mpy --definition /tmp/audit-work/reconstruction/semantic-kompiled '-cS0="\uD800"' '-cS1="\uD801"'
+EXIT_STATUS=255 K_RESULT=None PYTHON_RESULT=False
+K_OUTPUT_BEGIN
+Scanner error at /tmp/.krun-2026-07-23-08-44-04-dLEtwdTRx3/tmp.in.WB1iaAVRVT:11.20-25: The surrogate code points in the range [U+D800, U+DFFF] are illegal in Unicode escape sequences
+
+[Error] krun: kore-expand-macros 
+/tmp/audit-work/reconstruction/semantic-kompiled 
+/tmp/.krun-2026-07-23-08-44-04-dLEtwdTRx3/tmp.in.WB1iaAVRVT
+K_OUTPUT_END
+CASE=7 PYTHON_INPUT='\x00','\x00\x00' K_INPUT="\x00","\x00\x00"
++ krun /tmp/audit-work/reconstruction/solution.mpy --definition /tmp/audit-work/reconstruction/semantic-kompiled '-cS0="\x00"' '-cS1="\x00\x00"'
+EXIT_STATUS=0 K_RESULT=True PYTHON_RESULT=True
+CASE=8 PYTHON_INPUT='\\','\\\\' K_INPUT="\\","\\\\"
++ krun /tmp/audit-work/reconstruction/solution.mpy --definition /tmp/audit-work/reconstruction/semantic-kompiled '-cS0="\\"' '-cS1="\\\\"'
+EXIT_STATUS=0 K_RESULT=True PYTHON_RESULT=True
+cases=8
+mismatches=0
+unsupported=2
+first_unsupported=(5, '\ud800', '\ud800\ud800', 255)
+EXIT_STATUS=0

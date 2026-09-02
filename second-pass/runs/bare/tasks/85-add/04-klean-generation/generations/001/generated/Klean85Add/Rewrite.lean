@@ -1,0 +1,5 @@
+import Klean85Add.Func
+
+inductive Rewrites : SortGeneratedTopCell → SortGeneratedTopCell → Prop where
+  | tran {s1 s2 s3 : SortGeneratedTopCell} (t1 : Rewrites s1 s2) (t2 : Rewrites s2 s3) : Rewrites s1 s3
+  | VERIFICATION_KLEAN_EXPORT_kxExport0 {V0 : SortISeq} {_DotVar0 : SortGeneratedCounterCell} {_DotVar2 : SortK} {_Gen0 : SortInputCell} {_Gen1 : SortFunctionsCell} {_Gen2 : SortEnvCell} {_Gen3 : SortCallStackCell} {_Val0 : SortInt} (defn_Val0 : «oddIndexEvenSum(_)_VERIFICATION_Int_ISeq» V0 = some _Val0) : Rewrites { mpy := { k := { val := SortK.kseq (SortKItem.«#kxExport0(_)_VERIFICATION-KLEAN-EXPORT_KItem_ISeq» V0) _DotVar2 }, input := _Gen0, functions := _Gen1, env := _Gen2, callStack := _Gen3 }, generatedCounter := _DotVar0 } { mpy := { k := { val := SortK.kseq ((@inj SortInt SortKItem) _Val0) _DotVar2 }, input := _Gen0, functions := _Gen1, env := _Gen2, callStack := _Gen3 }, generatedCounter := _DotVar0 }

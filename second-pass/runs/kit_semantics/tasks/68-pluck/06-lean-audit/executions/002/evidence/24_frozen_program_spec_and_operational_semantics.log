@@ -1,0 +1,519 @@
+Script started on 2026-07-31 04:04:09-05:00 [<not executed on terminal>]
++ sed -n 1,125p /reference/k-proof/verification.k
+requires "reference-semantics/semantics.k"
+
+module VERIFICATION
+  imports MPY
+
+  // Guarded total projection from the dynamic Val sort to Int.  This is the
+  // standard total twin of K's partial subsort cast; it is used only under
+  // definedProjectInt and collapses on every statically known Int.
+  syntax Bool ::= definedProjectInt(Val) [function, total]
+  rule definedProjectInt(V:Val) => isInt(V)
+
+  syntax Int ::= projectIntTotal(Val)
+    [function, total, symbol(projectIntTotal), no-evaluators]
+
+  rule #Ceil({@V:Val}:>Int)
+    => ({ definedProjectInt(@V) #Equals true } #And #Ceil(@V))
+    [simplification]
+
+  rule projectIntTotal(V:Val) => {V}:>Int
+    requires definedProjectInt(V)
+    [concrete, simplification(10), preserves-definedness]
+
+  rule {V:Val}:>Int => projectIntTotal(V)
+    requires definedProjectInt(V)
+    [symbolic(V), simplification, preserves-definedness]
+
+  rule projectIntTotal(I:Int) => I [simplification]
+  rule projectIntTotal(projectIntTotal(V:Val))
+    => projectIntTotal(V)
+    [simplification]
+
+  // Guarded dispatch twin for the exact fixed rule
+  // applyBin("+", I1:Int, I2:Int) => I1 +Int I2.  It lets the source's
+  // value + 0 normalization refine a dynamically sorted list head.
+  rule applyBin("+", V:Val, I:Int)
+    => projectIntTotal(V) +Int I
+    requires definedProjectInt(V)
+    [simplification]
+
+  // Exact contract domain: finite list payloads containing only non-negative
+  // Python integers.
+  syntax Bool ::= allNonNegative(ValSeq) [function, total]
+  rule allNonNegative(.ValSeq) => true
+  rule allNonNegative(vCons(V:Val, R:ValSeq))
+    => definedProjectInt(V)
+       andBool projectIntTotal(V) >=Int 0
+       andBool allNonNegative(R)
+
+  // shouldTake exactly mirrors the nested source condition.  A negative
+  // current best is the source sentinel; otherwise only a strictly smaller
+  // even value replaces it.
+  syntax Bool ::= shouldTake(Int, Int) [function, total]
+  rule shouldTake(B:Int, V:Int)
+    => pyMod(V, 2) ==Int 0
+       andBool (B <Int 0 orBool V <Int B)
+
+  syntax Int ::= nextBest(Int, Int) [function, total]
+  rule nextBest(B:Int, V:Int) => V
+    requires shouldTake(B, V)
+  rule nextBest(B:Int, V:Int) => B
+    requires notBool shouldTake(B, V)
+
+  syntax Int ::= nextBestIndex(Int, Int, Int, Int) [function, total]
+  rule nextBestIndex(B:Int, _J:Int, V:Int, I:Int) => I
+    requires shouldTake(B, V)
+  rule nextBestIndex(B:Int, J:Int, V:Int, _I:Int) => J
+    requires notBool shouldTake(B, V)
+
+  syntax Int ::= scanBest(ValSeq, Int, Int) [function, total]
+  rule scanBest(.ValSeq, _I:Int, B:Int) => B
+  rule scanBest(vCons(V:Val, R:ValSeq), I:Int, B:Int)
+    => scanBest(R, I +Int 1, nextBest(B, projectIntTotal(V)))
+
+  syntax Int ::= scanBestIndex(ValSeq, Int, Int, Int)
+    [function, total]
+  rule scanBestIndex(.ValSeq, _I:Int, _B:Int, J:Int) => J
+  rule scanBestIndex(
+         vCons(V:Val, R:ValSeq), I:Int, B:Int, J:Int)
+    => scanBestIndex(
+         R,
+         I +Int 1,
+         nextBest(B, projectIntTotal(V)),
+         nextBestIndex(B, J, projectIntTotal(V), I))
+
+  syntax Int ::= afterIndex(ValSeq, Int) [function, total]
+  rule afterIndex(.ValSeq, I:Int) => I
+  rule afterIndex(vCons(_V:Val, R:ValSeq), I:Int)
+    => afterIndex(R, I +Int 1)
+
+  syntax Val ::= resultList(Int, Int) [function, total]
+  rule resultList(B:Int, _J:Int) => list(.ValSeq)
+    requires B <Int 0
+  rule resultList(B:Int, J:Int)
+    => list(vCons(B, vCons(J, .ValSeq)))
+    requires B >=Int 0
+endmodule
++ sed -n 1,45p /reference/k-proof/solution.py
+def pluck(arr):
+    smallest = -1
+    smallest_index = 0
+    index = 0
+    value = 0
+
+    for value in arr:
+        value = value + 0
+        if value % 2 == 0:
+            if smallest < 0:
+                smallest = value
+                smallest_index = index
+            else:
+                if value < smallest:
+                    smallest = value
+                    smallest_index = index
+        index += 1
+
+    if smallest < 0:
+        return []
+    return [smallest, smallest_index]
++ sed -n 1,145p /reference/k-proof/spec.k
+requires "verification.k"
+
+module SPEC
+  imports VERIFICATION
+
+  claim [pluck-loop]:
+    <k>
+      #loop(
+        list(vCons(HEAD:Val, REST:ValSeq)),
+        Name("value"),
+        Assign(Name("value"), BinOp("+", Name("value"), Int(0)))
+        If(
+          Compare(
+            BinOp("%", Name("value"), Int(2)),
+            CmpOp("==", Int(0))),
+          If(
+            Compare(Name("smallest"), CmpOp("<", Int(0))),
+            Assign(Name("smallest"), Name("value"))
+            Assign(Name("smallest_index"), Name("index")),
+            If(
+              Compare(Name("value"), CmpOp("<", Name("smallest"))),
+              Assign(Name("smallest"), Name("value"))
+              Assign(Name("smallest_index"), Name("index")),
+              .Stmts)),
+          .Stmts)
+        AugAssign(Name("index"), "+", Int(1)))
+      => .K
+      ...
+    </k>
+    <env> L:Int </env>
+    <scopes>
+      ...
+      L |-> scope(
+        "arr"            |-> list(ORIGINAL:ValSeq)
+        "smallest"       |-> (BEST:Int
+                              => scanBest(
+                                   vCons(HEAD, REST), POS, BEST))
+        "smallest_index" |-> (BEST_INDEX:Int
+                              => scanBestIndex(
+                                   vCons(HEAD, REST),
+                                   POS,
+                                   BEST,
+                                   BEST_INDEX))
+        "index"          |-> (POS:Int
+                              => afterIndex(vCons(HEAD, REST), POS))
+        "value"          |-> (_OLD:Val => ?FINAL_VALUE:Val),
+        parent(0))
+      ...
+    </scopes>
+    requires POS >=Int 0
+      andBool definedProjectInt(HEAD)
+      andBool projectIntTotal(HEAD) >=Int 0
+      andBool allNonNegative(REST)
+
+  claim [pluck-entry]:
+    <k>
+      Call(Name("pluck"), list(INPUT:ValSeq))
+      => ref(0)
+    </k>
+    <env> 0 </env>
+    <scopes>
+      -1 |-> builtinsScope
+      0  |-> scope(
+        "pluck" |-> closureVal(
+          "arr",
+          Assign(Name("smallest"), UnaryOp("-", Int(1)))
+          Assign(Name("smallest_index"), Int(0))
+          Assign(Name("index"), Int(0))
+          Assign(Name("value"), Int(0))
+          For(
+            Name("value"),
+            Name("arr"),
+            Assign(Name("value"), BinOp("+", Name("value"), Int(0)))
+            If(
+              Compare(
+                BinOp("%", Name("value"), Int(2)),
+                CmpOp("==", Int(0))),
+              If(
+                Compare(Name("smallest"), CmpOp("<", Int(0))),
+                Assign(Name("smallest"), Name("value"))
+                Assign(Name("smallest_index"), Name("index")),
+                If(
+                  Compare(Name("value"), CmpOp("<", Name("smallest"))),
+                  Assign(Name("smallest"), Name("value"))
+                  Assign(Name("smallest_index"), Name("index")),
+                  .Stmts)),
+              .Stmts)
+            AugAssign(Name("index"), "+", Int(1)))
+          If(
+            Compare(Name("smallest"), CmpOp("<", Int(0))),
+            Return(ListExpr(.Exprs)),
+            .Stmts)
+          Return(ListExpr(Name("smallest"), Name("smallest_index"))),
+          0),
+        parent(-1))
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap>
+      .Map
+      => 0 |-> resultList(
+                  scanBest(INPUT, 0, -1),
+                  scanBestIndex(INPUT, 0, -1, 0))
+    </heap>
+    <heapLoc> 0 => 1 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    requires allNonNegative(INPUT)
+endmodule
++ sed -n 1,50p /reference/k-proof/reference-semantics/semantics/core.k
+// reference/src/semantics/core.k — MPY-CORE
+
+module MPY-CORE
+  imports MPY-SYNTAX
+  imports INT
+  imports BOOL
+  imports STRING
+  imports MAP
+  imports LIST
+  imports K-EQUAL
+
+  // ==== values, the algebraic lists, and the scope heap =====================
+  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+  syntax Str    ::= str(IntSeq)
+
+  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+  syntax Iterable ::= list(ValSeq)
+                    | tuple(ValSeq)
+                    | Str
+                    | rangeObj(Int, Int, Int)
+                    | zipObj(ValSeq, ValSeq)
+                    | zipObjS(IntSeq, IntSeq)
+
+  syntax Val      ::= Int
+                    | Bool
+                    | "noneV"
+                    | Iterable
+                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+                    | closureVal(ParamNames, Stmts, Int)
+                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+
+  syntax Parent   ::= "root" | parent(Int)
+  syntax Scope    ::= scope(Map, Parent)
+  syntax KResult  ::= Val
+  syntax Expr     ::= Val   // cooling puts results back into expression holes
+  syntax Vals     ::= List{Val, ","}
+  syntax Exc      ::= "NoExc" | "AssertionError"
+  syntax RetState ::= "noRet" | retV(Val)
+
+  // ==== configuration =======================================================
+  // The builtins namespace is a real scope at reserved location -1 (the bottom of every
+  // chain; scopeLoc only allocates >=1, so -1 never collides). The module scope (loc 0)
+  // has it as parent, so an unbound name resolves there last — exactly LEGB. `int`/`str`
+  // resolve to their type objects; any local/global binding shadows them via normal lookup.
+  configuration
+    <k>       #loadAll($PGM:Module) </k>
++ sed -n 1,45p /reference/k-proof/reference-semantics/semantics/operators.k
+// reference/src/semantics/operators.k — MPY-OPERATORS
+// The operator DISPATCH layer: operands evaluate by strictness (heat/cool over KResult=Val),
+// the cooled node hands to applyUn/applyBin/applyCmp (declared in core.k; each domain file
+// owns its cases — bool.k, int.k, float.k, str.k, list.k, tuple.k, set.k, dict.k).
+
+module MPY-OPERATORS
+  imports MPY-CORE
+  imports MPY-ITER
+
+  rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>
+
+  rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+
+  // Compare's right operand sits under the CmpOp wrapper — contexts instead of attributes
+  context Compare(HOLE, _)
+  context Compare(_:Val, CmpOp(_, HOLE))
+  rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]
+
+  rule applyCmp("is",     V:Val, noneV) => V ==K noneV
+  rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)
+
+  // ==== operand deref: heap objects combine/compare by STRUCTURE ============
+  // (Python: list == is structural; identity only via `is`.) priority(40)
+  // preempts the generic dispatch so applyUn/applyBin/applyCmp never see a ref.
+  rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isRefV(L)
+       [priority(40)]
+
+  // the left operand of `in`/`not in` is an ELEMENT (compares by ==K) — never deref'd
+  rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires OP =/=String "in" andBool OP =/=String "not in"
+       [priority(40)]
+  rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isRefV(L)
+        orBool OP ==String "in" orBool OP ==String "not in"
+       [priority(40)]
+
+  rule <k> UnaryOp(OP:String, ref(H:Int)) => UnaryOp(OP, V) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
++ sed -n 1,35p /reference/k-proof/reference-semantics/semantics/int.k
+// reference/src/semantics/int.k — MPY-INT
+// Int cases of the operator dispatch; Python // and % are floored (pyMod).
+
+module MPY-INT
+  imports MPY-CORE
+
+  rule applyUn("-", I:Int) => 0 -Int I
+
+  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+  // Bool participates in int arithmetic (x += (a == b))
+  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+
+  syntax Int ::= pyMod(Int, Int) [function]
+  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+
+  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+endmodule
++ sed -n 1,115p /reference/k-proof/reference-semantics/semantics/controls.k
+// reference/src/semantics/controls.k — MPY-CONTROLS
+
+module MPY-CONTROLS
+  imports MPY-CORE
+  imports MPY-TUPLE
+  imports MPY-ITER
+
+  // ==== Assign / AugAssign (write the current scope; RHS evaluated by strictness) ==
+  rule <k> Assign(Name(X:String), V:Val) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>
+  rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires "$cells" in_keys(M)
+        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+        andBool X in_keys(M) andBool isCellRef({M[X]}:>Val)
+       [priority(40)]
+
+  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes>
+       requires X in_keys(M)
+  // `lst += [..]` where lst is a heap ref: the generic rule leaves applyBin(OP, ref, V) — but the
+  // ref-deref preemption is BinOp-level (operators.k), so applyBin never derefs and it sticks. Route
+  // the ref case through BinOp so the deref + list-concat + #alloc path fires (result is a fresh ref).
+  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires X in_keys(M) andBool isRefV({M[X]}:>Val)
+       [priority(40)]
+
+  // ==== import trivia: `from math import floor, ceil` binds the supported
+  // names as builtins in the current scope; every other import is a no-op
+  rule <k> ImportFrom("math", NS:ParamNames) => #bindImports(NS) ... </k>
+  rule <k> ImportFrom(_:String, _:ParamNames) => .K ... </k> [owise]
+  syntax KItem ::= #bindImports(ParamNames)
+  rule <k> #bindImports(.ParamNames) => .K ... </k>
+  rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ N <- builtinV(N) ], _) ... </scopes>
+       requires N ==String "floor" orBool N ==String "ceil"
+  rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>
+       requires notBool (N ==String "floor" orBool N ==String "ceil")
+
+  // ==== Expr statement: evaluate for effect, discard the value ===============
+  // (bare calls — mutator methods, docstrings; the WP0 statement-trivia rung)
+  rule <k> Expr(_:Val) => .K ... </k>
+
+  // ==== If (condition evaluated by strictness) ==============================
+  syntax KItem ::= #branch(Bool, Stmts, Stmts)
+  rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>
+  rule <k> #branch(true,  T:Stmts, _:Stmts) => T ... </k>
+  rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>
+
+  // ==== IfExp: ternary T if C else E ========================================
+  rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k>
+       requires truthy(V)
+  rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k>
+       requires notBool truthy(V)
+
+  // ==== For: one loop, in-cell continuation, over #iterNext =================
+  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+  // circularities anchor on #loop and narrowing substitutes the structure)
+  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+                 | #loopLbl(K) | "#cont" | "#brk"
+
+  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+
+  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+
+  // ==== While ==============================================================
+  rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>
+  rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>
+  rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k>
+       requires truthy(V)
+  rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k>
+       requires notBool truthy(V)
+
+  // ==== loop control (break / continue) =====================================
+  rule <k> #loopLbl(NEXT:K) => NEXT ... </k>
+  rule <k> Continue => #cont ... </k>
+  rule <k> Break => #brk ... </k>
+  rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>
+  rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]
+  rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>
+  rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]
+
+  // ==== heap-object deref at the truthiness/iteration consumers ==============
+  // (priority(40) preempts the generic Val rules so truthy/#loop never see a ref)
+  rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  // For derefs its iterable ONCE at loop start (iteration is over the snapshot;
+  // mutating the iterated list inside its own loop is outside the subset)
+  rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+endmodule
++ sed -n 1,160p /reference/k-proof/prove.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+python3 py2mpy.py solution.py > solution.mpy
+python3 py2mpy.py smoke.py > smoke.mpy
+
+kompile reference-semantics/semantics.k \
+  --backend llvm \
+  --main-module MPY-KRUN \
+  --syntax-module MPY-SYNTAX \
+  --output-definition runtime-kompiled
+
+krun smoke.mpy --definition runtime-kompiled
+python3 test_solution.py
+
+kompile verification.k \
+  --backend haskell \
+  --main-module VERIFICATION \
+  --syntax-module MPY-SYNTAX \
+  --output-definition verification-kompiled
+
+kprove spec.k \
+  --definition verification-kompiled \
+  --spec-module SPEC \
+  --claims SPEC.pluck-loop
+
+kprove spec.k \
+  --definition verification-kompiled \
+  --spec-module SPEC
+
+if kprove spec-vacuity.k \
+     --definition verification-kompiled \
+     --spec-module SPEC-VACUITY
+then
+  echo "ERROR: false-postcondition mutation unexpectedly proved"
+  exit 1
+else
+  echo "EXPECTED FAILURE: false-postcondition mutation was rejected"
+fi
+
+if kprove spec-body-mutation.k \
+     --definition verification-kompiled \
+     --spec-module SPEC-BODY-MUTATION
+then
+  echo "ERROR: mutated implementation unexpectedly proved"
+  exit 1
+else
+  echo "EXPECTED FAILURE: mutated implementation was rejected"
+fi
+
+Script done on 2026-07-31 04:04:09-05:00 [COMMAND_EXIT_CODE="0"]

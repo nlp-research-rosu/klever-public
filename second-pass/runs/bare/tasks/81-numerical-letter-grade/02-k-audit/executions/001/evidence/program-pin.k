@@ -1,0 +1,70 @@
+requires "verification.k"
+
+module PROGRAM-PIN
+  imports VERIFICATION
+
+  // Audit-only equality: the proof helper must expand to the submitted
+  // translator output, including the docstring statement and full branch tree.
+  claim
+    <k>
+      solutionProgram
+      =>
+      Module(
+      FuncDef("numerical_letter_grade", Params("grades"),
+        Expr(
+          Str("Convert each numerical GPA in grades to its letter grade."))
+        Assign(Name("result"), ListExpr(.Exprs))
+        For(Name("grade"), Name("grades"),
+          If(Compare(Name("grade"), CmpOp("==", Float(4.0))),
+            Expr(Call(Attribute(Name("result"), "append"), Str("A+"))),
+            If(Compare(Name("grade"), CmpOp(">", Float(3.7))),
+              Expr(Call(Attribute(Name("result"), "append"), Str("A"))),
+              If(Compare(Name("grade"), CmpOp(">", Float(3.3))),
+                Expr(Call(Attribute(Name("result"), "append"), Str("A-"))),
+                If(Compare(Name("grade"), CmpOp(">", Float(3.0))),
+                  Expr(Call(Attribute(Name("result"), "append"), Str("B+"))),
+                  If(Compare(Name("grade"), CmpOp(">", Float(2.7))),
+                    Expr(
+                      Call(Attribute(Name("result"), "append"), Str("B"))),
+                    If(Compare(Name("grade"), CmpOp(">", Float(2.3))),
+                      Expr(
+                        Call(Attribute(Name("result"), "append"), Str("B-"))),
+                      If(Compare(Name("grade"), CmpOp(">", Float(2.0))),
+                        Expr(
+                          Call(
+                            Attribute(Name("result"), "append"),
+                            Str("C+"))),
+                        If(Compare(Name("grade"), CmpOp(">", Float(1.7))),
+                          Expr(
+                            Call(
+                              Attribute(Name("result"), "append"),
+                              Str("C"))),
+                          If(Compare(Name("grade"), CmpOp(">", Float(1.3))),
+                            Expr(
+                              Call(
+                                Attribute(Name("result"), "append"),
+                                Str("C-"))),
+                            If(Compare(Name("grade"), CmpOp(">", Float(1.0))),
+                              Expr(
+                                Call(
+                                  Attribute(Name("result"), "append"),
+                                  Str("D+"))),
+                              If(Compare(Name("grade"), CmpOp(">", Float(0.7))),
+                                Expr(
+                                  Call(
+                                    Attribute(Name("result"), "append"),
+                                    Str("D"))),
+                                If(Compare(
+                                  Name("grade"),
+                                  CmpOp(">", Float(0.0))),
+                                  Expr(
+                                    Call(
+                                      Attribute(Name("result"), "append"),
+                                      Str("D-"))),
+                                  Expr(
+                                    Call(
+                                      Attribute(Name("result"), "append"),
+                                      Str("E"))))))))))))))))
+        Return(Name("result"))))
+    </k>
+endmodule

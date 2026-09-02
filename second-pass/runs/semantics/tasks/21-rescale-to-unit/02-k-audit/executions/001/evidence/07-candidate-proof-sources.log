@@ -1,0 +1,284 @@
+COMMAND: bash -lc for\ artifact\ in\ /candidate/solution.py\ /candidate/solution.mpy\ /candidate/spec.k\ /candidate/verification.k\ /candidate/prove.sh\ /candidate/smoke.py\ /candidate/smoke.mpy\;\ do\ printf\ \"FILE_BEGIN\ %s\\n\"\ \"\$artifact\"\;\ nl\ -ba\ \"\$artifact\"\;\ printf\ \"FILE_END\ %s\\n\"\ \"\$artifact\"\;\ done 
+EXIT_STATUS: 0
+OUTPUT_BEGIN
+FILE_BEGIN /candidate/solution.py
+     1	from typing import List
+     2	
+     3	
+     4	def rescale_to_unit(numbers: List[float]) -> List[float]:
+     5	    min_number = min(numbers)
+     6	    max_number = max(numbers)
+     7	    return [
+     8	        (number - min_number) / (max_number - min_number)
+     9	        for number in numbers
+    10	    ]
+FILE_END /candidate/solution.py
+FILE_BEGIN /candidate/solution.mpy
+     1	Module(
+     2	  ImportFrom("typing", "List")
+     3	  FuncDef("rescale_to_unit", Params("numbers"), CellVars("max_number", "min_number"), FreeVars(),
+     4	    Assign(Name("min_number"), Call(Name("min"), Name("numbers")))
+     5	    Assign(Name("max_number"), Call(Name("max"), Name("numbers")))
+     6	    Return(
+     7	      ListComp(BinOp(
+     8	        "/",
+     9	        BinOp("-", Name("number"), Name("min_number")),
+    10	        BinOp("-", Name("max_number"), Name("min_number"))),
+    11	        CompFor(Name("number"), Name("numbers"), Bool(true))))))
+FILE_END /candidate/solution.mpy
+FILE_BEGIN /candidate/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim
+     7	    <k>
+     8	      #runRescale(
+     9	        vCons(FIRST:Float,
+    10	          vCons(SECOND:Float, REST:ValSeq)))
+    11	      => list(
+    12	           scaleAcc(
+    13	             .ValSeq,
+    14	             vCons(FIRST,
+    15	               vCons(SECOND, REST)),
+    16	             minVF(
+    17	               vCons(FIRST,
+    18	                 vCons(SECOND, REST))),
+    19	             maxVF(
+    20	               vCons(FIRST,
+    21	                 vCons(SECOND, REST)))))
+    22	    </k>
+    23	    <env> 0 </env>
+    24	    <scopes>
+    25	      (0  |-> scope(.Map, parent(-1))
+    26	       -1 |-> builtinsScope)
+    27	      => ?FINALSCOPES:Map
+    28	    </scopes>
+    29	    <scopeLoc> 1 </scopeLoc>
+    30	    <heap> .Map => ?FINALHEAP:Map </heap>
+    31	    <heapLoc> 0 => ?FINALHEAPLOC:Int </heapLoc>
+    32	    <stack> .List </stack>
+    33	    <ret> noRet </ret>
+    34	    <exc> NoExc </exc>
+    35	    <exit-code> 0 </exit-code>
+    36	    requires allFloats(REST)
+    37	endmodule
+FILE_END /candidate/spec.k
+FILE_BEGIN /candidate/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Opaque extrema are the symbolic counterparts of the concrete float folds.
+     7	  // The reference float semantics explicitly reserves these problem-local
+     8	  // summaries because Haskell has no useful symbolic IEEE-754 theory.
+     9	  syntax Float ::= minVF(ValSeq) [function, total, symbol(minVF), no-evaluators]
+    10	                 | maxVF(ValSeq) [function, total, symbol(maxVF), no-evaluators]
+    11	
+    12	  rule <k> #applyK(toCall(builtinV("min")), (list(VS:ValSeq), .Vals))
+    13	        => minVF(VS) ... </k>
+    14	       [priority(40)]
+    15	  rule <k> #applyK(toCall(builtinV("max")), (list(VS:ValSeq), .Vals))
+    16	        => maxVF(VS) ... </k>
+    17	       [priority(40)]
+    18	
+    19	  // A mathematical description of the returned list.  The accumulator form
+    20	  // mirrors the reference semantics' expansion of a list comprehension.
+    21	  syntax Float ::= asFloat(Val) [function, total, symbol(asFloat)]
+    22	  rule asFloat(F:Float) => F
+    23	
+    24	  syntax Float ::= scaleF(Float, Float, Float) [function, total]
+    25	  rule scaleF(F:Float, LO:Float, HI:Float)
+    26	    => divF(subF(F, LO), subF(HI, LO))
+    27	
+    28	  syntax ValSeq ::= scaleAcc(ValSeq, ValSeq, Float, Float) [function, total]
+    29	  rule scaleAcc(ACC:ValSeq, .ValSeq, _:Float, _:Float) => ACC
+    30	  rule scaleAcc(ACC:ValSeq, vCons(V:Val, REST:ValSeq), LO:Float, HI:Float)
+    31	    => scaleAcc(
+    32	         valSeqConcat(ACC, vCons(scaleF(asFloat(V), LO, HI), .ValSeq)),
+    33	         REST,
+    34	         LO,
+    35	         HI)
+    36	
+    37	  syntax Bool ::= allFloats(ValSeq) [function, total]
+    38	  rule allFloats(.ValSeq) => true
+    39	  rule allFloats(vCons(V:Val, REST:ValSeq))
+    40	    => isFloat(V) andBool allFloats(REST)
+    41	
+    42	  // A sort-safe symbolic generator for arbitrary tails of Float values.  This
+    43	  // avoids asking the prover to infer a K subsort from an isFloat predicate.
+    44	  syntax FloatSeq ::= ".FloatSeq" | fCons(Float, FloatSeq)
+    45	  syntax ValSeq ::= injectFloats(FloatSeq) [function, total]
+    46	  rule injectFloats(.FloatSeq) => .ValSeq
+    47	  rule injectFloats(fCons(F:Float, REST:FloatSeq))
+    48	    => vCons(F, injectFloats(REST))
+    49	
+    50	  // The reference semantics expands a comprehension into an allocation-heavy
+    51	  // accumulator loop.  This observational summary preserves exactly the list
+    52	  // value that loop builds while abstracting its unreachable intermediate
+    53	  // heap objects.  Its left side is the exact comprehension in solution.mpy.
+    54	  rule <k>
+    55	         ListComp(
+    56	           BinOp(
+    57	             "/",
+    58	             BinOp("-", Name("number"), Name("min_number")),
+    59	             BinOp("-", Name("max_number"), Name("min_number"))),
+    60	           CompFor(
+    61	             Name("number"),
+    62	             Name("numbers"),
+    63	             Bool(true)))
+    64	         => #alloc(list(scaleAcc(.ValSeq, VS, LO, HI)))
+    65	         ...
+    66	       </k>
+    67	       <env> L:Int </env>
+    68	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    69	       <heap>
+    70	         ...
+    71	         MINH:Int |-> cellV(LO:Float)
+    72	         MAXH:Int |-> cellV(HI:Float)
+    73	         ...
+    74	       </heap>
+    75	       requires "numbers" in_keys(M)
+    76	        andBool {M["numbers"]}:>Val ==K list(VS)
+    77	        andBool "min_number" in_keys(M)
+    78	        andBool {M["min_number"]}:>Val ==K cellRef(MINH)
+    79	        andBool "max_number" in_keys(M)
+    80	        andBool {M["max_number"]}:>Val ==K cellRef(MAXH)
+    81	       [priority(40)]
+    82	
+    83	  // #observe turns the heap reference returned by the Python function into
+    84	  // its list value, keeping the functional claim independent of allocation.
+    85	  syntax KItem ::= "#observe"
+    86	  rule <k> ref(H:Int) ~> #observe => V ... </k>
+    87	       <heap> ... H |-> V:Val ... </heap>
+    88	
+    89	  // Exact translated program followed by a symbolic call.  Keeping this term
+    90	  // identical to solution.mpy makes the proof exercise the submitted code.
+    91	  syntax KItem ::= #runRescale(ValSeq)
+    92	  rule <k> #runRescale(VS:ValSeq)
+    93	        => #loadAll(Module(
+    94	             ImportFrom("typing", "List")
+    95	             FuncDef(
+    96	               "rescale_to_unit",
+    97	               Params("numbers"),
+    98	               CellVars("max_number", "min_number"),
+    99	               FreeVars(.ParamNames),
+   100	               Assign(
+   101	                 Name("min_number"),
+   102	                 Call(Name("min"), Name("numbers")))
+   103	               Assign(
+   104	                 Name("max_number"),
+   105	                 Call(Name("max"), Name("numbers")))
+   106	               Return(
+   107	                 ListComp(
+   108	                   BinOp(
+   109	                     "/",
+   110	                     BinOp("-", Name("number"), Name("min_number")),
+   111	                     BinOp("-", Name("max_number"), Name("min_number"))),
+   112	                   CompFor(
+   113	                     Name("number"),
+   114	                     Name("numbers"),
+   115	                     Bool(true)))))))
+   116	           ~> Call(Name("rescale_to_unit"), list(VS))
+   117	           ~> #observe
+   118	           ...
+   119	       </k>
+   120	endmodule
+FILE_END /candidate/verification.k
+FILE_BEGIN /candidate/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Regenerate the submitted constructor term from the submitted Python source.
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	
+     7	# Build the required concrete LLVM semantics and run executable assertions.
+     8	kompile reference-semantics/semantics.k \
+     9	  --backend llvm \
+    10	  --main-module MPY-KRUN \
+    11	  --syntax-module MPY-SYNTAX \
+    12	  --output-definition runtime-kompiled
+    13	python3 py2mpy.py smoke.py > smoke.mpy
+    14	krun smoke.mpy --definition runtime-kompiled
+    15	
+    16	# Build the symbolic definition from the supplied MPY semantics plus the
+    17	# task-local verification layer, then prove every claim in spec.k.
+    18	kompile verification.k \
+    19	  --backend haskell \
+    20	  --main-module VERIFICATION \
+    21	  --syntax-module VERIFICATION \
+    22	  --output-definition verification-kompiled
+    23	kprove spec.k \
+    24	  --definition verification-kompiled \
+    25	  --spec-module SPEC
+FILE_END /candidate/prove.sh
+FILE_BEGIN /candidate/smoke.py
+     1	from typing import List
+     2	
+     3	
+     4	def rescale_to_unit(numbers: List[float]) -> List[float]:
+     5	    min_number = min(numbers)
+     6	    max_number = max(numbers)
+     7	    return [
+     8	        (number - min_number) / (max_number - min_number)
+     9	        for number in numbers
+    10	    ]
+    11	
+    12	
+    13	assert rescale_to_unit([1.0, 2.0, 3.0, 4.0, 5.0]) == [
+    14	    0.0,
+    15	    0.25,
+    16	    0.5,
+    17	    0.75,
+    18	    1.0,
+    19	]
+    20	assert rescale_to_unit([-3.0, -1.0, 1.0]) == [0.0, 0.5, 1.0]
+    21	assert rescale_to_unit([5.0, 1.0]) == [1.0, 0.0]
+FILE_END /candidate/smoke.py
+FILE_BEGIN /candidate/smoke.mpy
+     1	Module(
+     2	  ImportFrom("typing", "List")
+     3	  FuncDef("rescale_to_unit", Params("numbers"), CellVars("max_number", "min_number"), FreeVars(),
+     4	    Assign(Name("min_number"), Call(Name("min"), Name("numbers")))
+     5	    Assign(Name("max_number"), Call(Name("max"), Name("numbers")))
+     6	    Return(
+     7	      ListComp(BinOp(
+     8	        "/",
+     9	        BinOp("-", Name("number"), Name("min_number")),
+    10	        BinOp("-", Name("max_number"), Name("min_number"))),
+    11	        CompFor(Name("number"), Name("numbers"), Bool(true)))))
+    12	  Assert(
+    13	    Compare(
+    14	      Call(
+    15	        Name("rescale_to_unit"),
+    16	        ListExpr(
+    17	          Float(1.0),
+    18	          Float(2.0),
+    19	          Float(3.0),
+    20	          Float(4.0),
+    21	          Float(5.0))),
+    22	      CmpOp(
+    23	        "==",
+    24	        ListExpr(
+    25	          Float(0.0),
+    26	          Float(0.25),
+    27	          Float(0.5),
+    28	          Float(0.75),
+    29	          Float(1.0)))))
+    30	  Assert(
+    31	    Compare(
+    32	      Call(
+    33	        Name("rescale_to_unit"),
+    34	        ListExpr(
+    35	          UnaryOp("-", Float(3.0)),
+    36	          UnaryOp("-", Float(1.0)),
+    37	          Float(1.0))),
+    38	      CmpOp("==", ListExpr(Float(0.0), Float(0.5), Float(1.0)))))
+    39	  Assert(
+    40	    Compare(
+    41	      Call(Name("rescale_to_unit"), ListExpr(Float(5.0), Float(1.0))),
+    42	      CmpOp("==", ListExpr(Float(1.0), Float(0.0))))))
+FILE_END /candidate/smoke.mpy
+OUTPUT_END

@@ -1,0 +1,291 @@
+Script started on 2026-07-31 07:35:25-05:00 [<not executed on terminal>]
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // The code emitted for one source character by solution.py.
+     7	  syntax Int ::= rot4Code(Int) [function, total]
+     8	  rule rot4Code(C)
+     9	    => pyMod(C -Int 97 +Int 4, 26) +Int 97
+    10	
+    11	  // A source character outside the lowercase alphabet passes through.
+    12	  syntax IntSeq ::= encryptedChar(Int) [function, total]
+    13	  rule encryptedChar(C) => iCons(C, .IntSeq)
+    14	    requires C <Int 97
+    15	  rule encryptedChar(C) => iCons(rot4Code(C), .IntSeq)
+    16	    requires 97 <=Int C andBool C <=Int 122
+    17	  rule encryptedChar(C) => iCons(C, .IntSeq)
+    18	    requires C >Int 122
+    19	
+    20	  // Tail-recursive left fold matching the program's `out += ...` updates.
+    21	  syntax IntSeq ::= encryptFold(IntSeq, IntSeq) [function, total]
+    22	  rule encryptFold(A, .IntSeq) => A
+    23	  rule encryptFold(A, iCons(C, R))
+    24	    => encryptFold(
+    25	         seqConcat(A, encryptedChar(C)),
+    26	         R)
+    27	
+    28	  syntax IntSeq ::= encryptResult(IntSeq) [function, total]
+    29	  rule encryptResult(S) => encryptFold(.IntSeq, S)
+    30	
+    31	  // Python leaves the for-target bound to its last value, if there is one.
+    32	  syntax Val ::= finalLoopChar(IntSeq, Val) [function, total]
+    33	  rule finalLoopChar(.IntSeq, V) => V
+    34	  rule finalLoopChar(iCons(C, R), _V)
+    35	    => finalLoopChar(R, str(iCons(C, .IntSeq)))
+    36	endmodule
+     1	def encrypt(s):
+     2	    """Rotate lowercase letters four places and preserve other characters."""
+     3	    out = ""
+     4	    c = ""
+     5	    for c in s:
+     6	        if ord(c) >= 97 and ord(c) <= 122:
+     7	            out += chr((ord(c) - 97 + 4) % 26 + 97)
+     8	        else:
+     9	            out += c
+    10	    return out
+     8	  // ==== Assign / AugAssign (write the current scope; RHS evaluated by strictness) ==
+     9	  rule <k> Assign(Name(X:String), V:Val) => .K ... </k>
+    10	       <env> L:Int </env>
+    11	       <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>
+    12	  rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k>
+    13	       <env> L:Int </env>
+    14	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    15	       requires "$cells" in_keys(M)
+    16	        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+    17	        andBool X in_keys(M) andBool isCellRef({M[X]}:>Val)
+    18	       [priority(40)]
+    19	
+    20	  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k>
+    21	       <env> L:Int </env>
+    22	       <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes>
+    23	       requires X in_keys(M)
+    24	  // `lst += [..]` where lst is a heap ref: the generic rule leaves applyBin(OP, ref, V) — but the
+    25	  // ref-deref preemption is BinOp-level (operators.k), so applyBin never derefs and it sticks. Route
+    26	  // the ref case through BinOp so the deref + list-concat + #alloc path fires (result is a fresh ref).
+    27	  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k>
+    28	       <env> L:Int </env>
+    29	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    30	       requires X in_keys(M) andBool isRefV({M[X]}:>Val)
+    31	       [priority(40)]
+    62	  // ==== For: one loop, in-cell continuation, over #iterNext =================
+    63	  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+    64	  // circularities anchor on #loop and narrowing substitutes the structure)
+    65	  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+    66	                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+    67	                 | #loopLbl(K) | "#cont" | "#brk"
+    68	
+    69	  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+    70	
+    71	  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+    72	  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+    73	  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+    74	        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+    75	
+     7	  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+     8	  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+     9	  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+    10	        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+    11	
+    12	  // ==== str literal (ASCII-only) ============================================
+    13	  syntax IntSeq ::= strToCodes(String) [function]
+    14	  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+    15	  rule strToCodes("") => .IntSeq
+    16	  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    17	    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+    18	
+    19	  // ==== operators: + / == / != / in =========================================
+    20	  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+    21	  rule seqConcat(.IntSeq, T:IntSeq)                => T
+    22	  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+    23	
+    24	  rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+    25	  rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+     7	  rule applyUn("-", I:Int) => 0 -Int I
+     8	
+     9	  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    10	  // Bool participates in int arithmetic (x += (a == b))
+    11	  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+    12	  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+    13	  // bool is a subtype of int: any Bool operand promotes to 0/1 and re-dispatches
+    14	  // to the Int cases (the "+" mixed cases above are kept, so "+" is excluded here
+    15	  // to avoid a duplicate rule — Bool + Bool still promotes via the Bool x Bool rule).
+    16	  rule applyBin(OP:String, B1:Bool, B2:Bool) => applyBin(OP, boolAsInt(B1), boolAsInt(B2))
+    17	       requires isArithOp(OP)
+    18	  rule applyBin(OP:String, B:Bool, I:Int)    => applyBin(OP, boolAsInt(B), I)
+    19	       requires isArithOp(OP) andBool OP =/=String "+"
+    20	  rule applyBin(OP:String, I:Int, B:Bool)    => applyBin(OP, I, boolAsInt(B))
+    21	       requires isArithOp(OP) andBool OP =/=String "+"
+    22	  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+    23	  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+    24	  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+    25	  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+    26	  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+    27	
+    28	  syntax Int ::= pyMod(Int, Int) [function]
+    29	  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+    30	
+    31	  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+    32	  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+    33	  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+    34	  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+    35	  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+    36	  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+   183	  // ==== int(x) identities (int(round(x)) composes through) ====================
+   184	  rule applyBuiltin("int", I:Int, .Vals) => I
+   185	
+   186	  // ==== ord / chr ===========================================================
+   187	  rule applyBuiltin("ord", str(iCons(C:Int, .IntSeq)), .Vals) => C
+   188	  rule applyBuiltin("chr", I:Int, .Vals) => str(iCons(I, .IntSeq))
+   189	       requires 0 <=Int I andBool I <Int 128
+   190	
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [encrypt-loop]:
+     7	    <k>
+     8	      #loop(
+     9	        str(S:IntSeq),
+    10	        Name("c"),
+    11	        If(
+    12	          BoolOp(
+    13	            "and",
+    14	            Compare(
+    15	              Call(Name("ord"), Name("c")),
+    16	              CmpOp(">=", Int(97))),
+    17	            Compare(
+    18	              Call(Name("ord"), Name("c")),
+    19	              CmpOp("<=", Int(122)))),
+    20	          AugAssign(
+    21	            Name("out"),
+    22	            "+",
+    23	            Call(
+    24	              Name("chr"),
+    25	              BinOp(
+    26	                "+",
+    27	                BinOp(
+    28	                  "%",
+    29	                  BinOp(
+    30	                    "+",
+    31	                    BinOp("-", Call(Name("ord"), Name("c")), Int(97)),
+    32	                    Int(4)),
+    33	                  Int(26)),
+    34	                Int(97)))),
+    35	          AugAssign(Name("out"), "+", Name("c"))))
+    36	      => .K
+    37	      ...
+    38	    </k>
+    39	    <env> 1 </env>
+    40	    <scopes>
+    41	      0 |-> scope("encrypt" |-> _ENC:Val, parent(-1))
+    42	      -1 |-> builtinsScope
+    43	      1 |-> scope(
+    44	        ("s"   |-> str(_INPUT:IntSeq))
+    45	        ("out" |-> (str(A:IntSeq) => str(encryptFold(A, S))))
+    46	        ("c"   |-> (C0:Val => finalLoopChar(S, C0))),
+    47	        parent(0))
+    48	    </scopes>
+    49	
+    50	  claim [encrypt-entry]:
+    51	    <k>
+    52	      #loadAll(Module(
+    53	        FuncDef(
+    54	          "encrypt",
+    55	          Params("s"),
+    56	          Expr(
+    57	            Str("Rotate lowercase letters four places and preserve other characters."))
+    58	          Assign(Name("out"), Str(""))
+    59	          Assign(Name("c"), Str(""))
+    60	          For(
+    61	            Name("c"),
+    62	            Name("s"),
+    63	            If(
+    64	              BoolOp(
+    65	                "and",
+    66	                Compare(
+    67	                  Call(Name("ord"), Name("c")),
+    68	                  CmpOp(">=", Int(97))),
+    69	                Compare(
+    70	                  Call(Name("ord"), Name("c")),
+    71	                  CmpOp("<=", Int(122)))),
+    72	              AugAssign(
+    73	                Name("out"),
+    74	                "+",
+    75	                Call(
+    76	                  Name("chr"),
+    77	                  BinOp(
+    78	                    "+",
+    79	                    BinOp(
+    80	                      "%",
+    81	                      BinOp(
+    82	                        "+",
+    83	                        BinOp("-", Call(Name("ord"), Name("c")), Int(97)),
+    84	                        Int(4)),
+    85	                      Int(26)),
+    86	                    Int(97)))),
+    87	              AugAssign(Name("out"), "+", Name("c"))))
+    88	          Return(Name("out")))
+    89	        Assign(
+    90	          Name("result"),
+    91	          Call(Name("encrypt"), str(S:IntSeq)))))
+    92	      => .K
+    93	    </k>
+    94	    <env> 0 </env>
+    95	    <scopes>
+    96	      0 |-> scope(.Map, parent(-1))
+    97	      -1 |-> builtinsScope
+    98	      =>
+    99	      0 |-> scope(
+   100	        ("encrypt" |->
+   101	          closureVal(
+   102	            "s",
+   103	            Expr(
+   104	              Str("Rotate lowercase letters four places and preserve other characters."))
+   105	            Assign(Name("out"), Str(""))
+   106	            Assign(Name("c"), Str(""))
+   107	            For(
+   108	              Name("c"),
+   109	              Name("s"),
+   110	              If(
+   111	                BoolOp(
+   112	                  "and",
+   113	                  Compare(
+   114	                    Call(Name("ord"), Name("c")),
+   115	                    CmpOp(">=", Int(97))),
+   116	                  Compare(
+   117	                    Call(Name("ord"), Name("c")),
+   118	                    CmpOp("<=", Int(122)))),
+   119	                AugAssign(
+   120	                  Name("out"),
+   121	                  "+",
+   122	                  Call(
+   123	                    Name("chr"),
+   124	                    BinOp(
+   125	                      "+",
+   126	                      BinOp(
+   127	                        "%",
+   128	                        BinOp(
+   129	                          "+",
+   130	                          BinOp("-", Call(Name("ord"), Name("c")), Int(97)),
+   131	                          Int(4)),
+   132	                        Int(26)),
+   133	                      Int(97)))),
+   134	                AugAssign(Name("out"), "+", Name("c"))))
+   135	            Return(Name("out")),
+   136	            0))
+   137	        ("result" |-> str(encryptResult(S))),
+   138	        parent(-1))
+   139	      -1 |-> builtinsScope
+   140	    </scopes>
+   141	    <scopeLoc> 1 </scopeLoc>
+   142	    <heap> .Map </heap>
+   143	    <heapLoc> 0 </heapLoc>
+   144	    <stack> .List </stack>
+   145	    <ret> noRet </ret>
+   146	    <exc> NoExc </exc>
+   147	endmodule
+
+Script done on 2026-07-31 07:35:25-05:00 [COMMAND_EXIT_CODE="0"]

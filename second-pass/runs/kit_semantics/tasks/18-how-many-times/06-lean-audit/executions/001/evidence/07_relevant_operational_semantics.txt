@@ -1,0 +1,373 @@
+Script started on 2026-07-30 23:22:10-05:00 [<not executed on terminal>]
+Relevant K symbol declarations/rules in supplied semantics
+/reference/k-proof/verification.k
+18-  rule overlapCount(.IntSeq, P:IntSeq)
+19-    => 0
+20-    requires notBool (P ==K .IntSeq)
+21-
+22-  rule overlapCount(S:IntSeq, P:IntSeq)
+23:    => (#if startsWith(P, S)
+24-        #then 1 #else 0 #fi)
+25-       +Int overlapCount(tailIS(S), P)
+26-    requires notBool (S ==K .IntSeq)
+27-     andBool notBool (P ==K .IntSeq)
+28-
+29-  // Derived slice lemma: taking [1:] of a nonempty code sequence yields its
+30-  // tail.  This is an induction consequence of buildIS/intSeqAt/isLen.
+31:  rule buildIS(
+32-         S:IntSeq,
+33-         clampHi(1, isLen(S), 1),
+34-         isLen(S),
+35-         1)
+36-    => tailIS(S)
+
+/reference/k-proof/reference-semantics/semantics.k
+18-//   semantics/float.k          MPY-FLOAT        Float Val: literal + opaque float ops ([concrete] for krun)
+19-//   semantics/str.k            MPY-STR          str(IntSeq): literal, +, ==, in
+20-//   semantics/set.k            MPY-SET          set(str): distinct char codes (len / membership)
+21-//   semantics/list.k           MPY-LIST         ListExpr, list(ValSeq): +, ==, in
+22-//   semantics/tuple.k          MPY-TUPLE        TupleExpr, tuple ==, target-binding + unpacking
+23://   semantics/subscript.k      MPY-SUBSCRIPT    Subscript indexing + Slice
+24-//   semantics/comprehension.k  MPY-COMPREHENSION  list comprehensions [ELT for T in ITER if COND]
+25-//   semantics/methods.k        MPY-METHODS      pure str methods: is*/lower/upper/swapcase/startswith
+26-//   semantics/controls.k       MPY-CONTROLS     Assign/AugAssign, If, IfExp, For, While, break/continue
+27-//   semantics/functions.k      MPY-FUNCTIONS    def / call / return (frame stack)
+28-//   semantics/builtins.k       MPY-BUILTINS     builtins as calls: len/sum/abs/min/max/ord/chr/str
+
+/reference/k-proof/reference-semantics/semantics/subscript.k
+20-
+21-  syntax Int ::= normIdx(Int, Int) [function, total]
+22-  rule normIdx(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0
+23-  rule normIdx(I:Int, _:Int)   => I          requires I >=Int 0
+24-
+25:  // ==== Subscript: indexing obj[i] (list / tuple / str) =====================
+26-  // contexts (not strict attrs): the Index slot's Slice alternative must never heat
+27:  context Subscript(HOLE, _)
+28:  context Subscript(_:Val, HOLE:Expr)
+29-
+30-  // heap-object deref (covers both the index and slice forms via the Index slot)
+31:  rule <k> Subscript(ref(H:Int), IX:Index) => Subscript(V, IX) ... </k>
+32-       <heap> ... H |-> V:Val ... </heap>
+33-       [priority(40)]
+34-
+35:  rule <k> Subscript(OBJ:Val, I:Int) => applyIndex(OBJ, I) ... </k>
+36-
+37-  syntax Val ::= applyIndex(Val, Int) [function]
+38-  rule applyIndex(list(VS:ValSeq),  I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+39-  rule applyIndex(tuple(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+40-  rule applyIndex(str(IS:IntSeq),   I:Int)
+--
+49-  syntax OptInt ::= "noB" | someB(Int)
+50-  rule <k> #evalB(NoBound)  => noB ... </k>
+51-  rule <k> #evalB(E:Expr)   => E ~> #toSome ... </k>
+52-  rule <k> I:Int ~> #toSome => someB(I) ... </k>
+53-
+54:  rule <k> Subscript(OBJ:Val, Slice(LO:Bound, HI:Bound, ST:Bound)) => #evalB(LO) ~> #slLo(OBJ, HI, ST) ... </k>
+55-  rule <k> LO:OptInt ~> #slLo(OBJ:Val, HI:Bound, ST:Bound)   => #evalB(HI) ~> #slHi(OBJ, LO, ST) ... </k>
+56-  rule <k> HI:OptInt ~> #slHi(OBJ:Val, LO:OptInt, ST:Bound)  => #evalB(ST) ~> #slStep(OBJ, LO, HI) ... </k>
+57-  // a list slice constructs a NEW object; a str slice stays a value
+58-  rule <k> ST:OptInt ~> #slStep(list(VS:ValSeq), LO:OptInt, HI:OptInt)
+59:        => #alloc(doSlice(list(VS), LO, HI, ST)) ... </k>
+60-       [priority(45)]
+61:  rule <k> ST:OptInt ~> #slStep(OBJ:Val, LO:OptInt, HI:OptInt) => doSlice(OBJ, LO, HI, ST) ... </k>
+62-
+63:  syntax Val ::= doSlice(Val, OptInt, OptInt, OptInt) [function]
+64:  rule doSlice(list(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+65-    => list(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))
+66:  rule doSlice(tuple(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+67-    => tuple(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))
+68:  rule doSlice(str(IS:IntSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+69-    => str(buildIS(IS, slStart(LO, ST, isLen(IS)), slStop(HI, ST, isLen(IS)), slStep(ST)))
+70-
+71-  // ==== slice.indices: step / start / stop / clamp ==========================
+72-  syntax Int ::= slStep(OptInt) [function, total]
+73-  rule slStep(noB)          => 1
+--
+97-  rule clampLo(J:Int, _STEP:Int) => J
+98-       requires J >=Int 0
+99-  rule clampLo(J:Int, STEP:Int)  => #if STEP <Int 0 #then -1 #else 0 #fi
+100-       requires J <Int 0
+101-
+102:  syntax Int ::= clampHi(Int, Int, Int) [function, total]
+103:  rule clampHi(I:Int, LEN:Int, _STEP:Int) => I
+104-       requires I  <Int LEN
+105:  rule clampHi(I:Int, LEN:Int, STEP:Int)  => #if STEP <Int 0 #then LEN -Int 1 #else LEN #fi
+106-       requires I >=Int LEN
+107-
+108-  // ==== build the strided sub-sequence (indices in range by construction) ====
+109-  syntax ValSeq ::= buildVS(ValSeq, Int, Int, Int) [function]
+110-  rule buildVS(VS:ValSeq, I:Int, STOP:Int, STEP:Int)
+111-    => vCons(valSeqAt(VS, I), buildVS(VS, I +Int STEP, STOP, STEP))
+112-       requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)
+113-  rule buildVS(_:ValSeq, I:Int, STOP:Int, STEP:Int) => .ValSeq
+114-       requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))
+115-
+116:  syntax IntSeq ::= buildIS(IntSeq, Int, Int, Int) [function]
+117:  rule buildIS(IS:IntSeq, I:Int, STOP:Int, STEP:Int)
+118-    => iCons(intSeqAt(IS, I), buildIS(IS, I +Int STEP, STOP, STEP))
+119-       requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)
+120:  rule buildIS(_:IntSeq, I:Int, STOP:Int, STEP:Int) => .IntSeq
+121-       requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))
+122-endmodule
+
+/reference/k-proof/reference-semantics/semantics/dict.k
+60-       [priority(40)]
+61-
+62-  // ==== dict subscript READ: d[k] (assoc lookup; KeyError is out of subset) ==
+63-  rule applyIndexD(dictV(KS:ValSeq, VS:ValSeq), K:Val) => dGet(KS, VS, K)
+64-  syntax Val ::= applyIndexD(Val, Val) [function]
+65:  rule <k> Subscript(dictV(KS:ValSeq, VS:ValSeq), K:Val) => applyIndexD(dictV(KS, VS), K) ... </k>
+66-       [priority(45)]
+67-
+68-  // ==== dict subscript-assign: d[k] = v (insert/update in place) =============
+69-  // Only for a LOCAL dict variable X (the current scope holds it). Reuses dPutK/dPutV.
+70-  syntax Val ::= dictSet(Val, Val, Val) [function]
+--
+72-
+73-  // RHS evaluates first (Assign strictness), then the key. Dispatch on the scope
+74-  // value: a bare dict updates in the scope (dicts stay values); a ref (a heap
+75-  // list — or a heap dict later) writes the heap in place.
+76-  syntax KItem ::= #dsetK(String, Val)
+77:  rule <k> Assign(Subscript(Name(X:String), K:Expr), VV:Val) => K ~> #dsetK(X, VV) ... </k>
+78-  rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => .K ... </k>
+79-       <env> L:Int </env>
+80-       <scopes> ... L |-> scope(M:Map => M [ X <- dictSet({M[X]}:>Val, KV, VV) ], _) ... </scopes>
+81-       requires X in_keys(M) andBool notBool isRefV({M[X]}:>Val)
+82-  rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => #dsetV({M[X]}:>Val, KV, VV) ... </k>
+
+/reference/k-proof/reference-semantics/semantics/core.k
+222-  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+223-  syntax Int ::= vsLen(ValSeq) [function, total]
+224-  rule vsLen(.ValSeq)                => 0
+225-  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+226-
+227:  syntax Int ::= isLen(IntSeq) [function, total]
+228:  rule isLen(.IntSeq)                => 0
+229:  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+230-
+231-  // in-bounds positional write (list subscript-assign); OOB leaves the seq unchanged
+232-  // (valid programs write in-bounds — mirrors valSeqAt's total-but-underspecified stance)
+233-  syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]
+234-  rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq
+
+/reference/k-proof/reference-semantics/semantics/syntax.k
+17-                | "ListExpr"  "(" Exprs ")"
+18-                | "DictExpr"  "(" Entries ")"
+19-                | "ListComp"  "(" Expr "," CompFors ")" [macro]
+20-                | "GenExp"    "(" Expr "," CompFors ")" [macro]
+21-                | "TupleExpr" "(" Exprs ")"
+22:                | "Subscript" "(" Expr "," Index ")"
+23-                | "IfExp"     "(" Expr "," Expr "," Expr ")" [strict(1)]
+24-                | "Lambda"    "(" Params "," Expr ")"
+25-                | "KwArg"     "(" String "," Expr ")"
+26-                | "Lambda"    "(" Params "," CellVars "," FreeVars "," Expr ")"
+27-                | "NoneVal"
+
+/reference/k-proof/reference-semantics/semantics/methods.k
+56-
+57-  // S.encode('ascii'): identity on the code-sequence model (bytes == codes)
+58-  rule applyMethod(str(CS:IntSeq), "encode", str(_:IntSeq), .Vals) => str(CS)
+59-
+60-  // ==== prefix ===============================================================
+61:  rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)
+62-
+63-  // ==== list.count(v) — number of occurrences of v in the list (concrete for krun) ==========
+64-  rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)
+65-  syntax Int ::= cntOccVS(ValSeq, Val) [function, total]
+66-  rule cntOccVS(.ValSeq, _:Val)                => 0
+--
+161-
+162-  syntax IntSeq ::= mapSwap(IntSeq) [function, total]
+163-  rule mapSwap(.IntSeq) => .IntSeq
+164-  rule mapSwap(iCons(C:Int, S:IntSeq)) => iCons(swapC(C), mapSwap(S))
+165-
+166:  syntax Bool ::= startsWith(IntSeq, IntSeq) [function, total]
+167:  rule startsWith(.IntSeq, _:IntSeq)               => true
+168:  rule startsWith(iCons(_:Int, _:IntSeq), .IntSeq) => false
+169:  rule startsWith(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool startsWith(As, Bs)
+170-endmodule
+
+Imports relevant to MPY closure
+/reference/k-proof/reference-semantics/semantics/functions.k
+3:module MPY-FUNCTIONS
+4:  imports MPY-CORE
+
+/reference/k-proof/reference-semantics/semantics/tuple.k
+3:module MPY-TUPLE
+4:  imports MPY-CORE
+5:  imports MPY-ITER
+6:  imports MPY-LIST
+7:  imports MPY-METHODS
+
+/reference/k-proof/reference-semantics/semantics/syntax.k
+3:module MPY-SYNTAX
+4:  imports INT-SYNTAX
+5:  imports FLOAT-SYNTAX
+6:  imports BOOL-SYNTAX
+7:  imports STRING-SYNTAX
+
+/reference/k-proof/reference-semantics/semantics/float.k
+14:module MPY-FLOAT
+15:  imports MPY-OPERATORS
+16:  imports MPY-BUILTINS
+17:  imports FLOAT
+
+/reference/k-proof/reference-semantics/semantics/subscript.k
+3:module MPY-SUBSCRIPT
+4:  imports MPY-CORE
+
+/reference/k-proof/reference-semantics/semantics/dict.k
+13:module MPY-DICT
+14:  imports MPY-CORE
+15:  imports MPY-ITER
+16:  imports MPY-METHODS
+17:  imports MPY-LIST
+
+/reference/k-proof/reference-semantics/semantics/str.k
+3:module MPY-STR
+4:  imports MPY-CORE
+5:  imports MPY-ITER
+
+/reference/k-proof/reference-semantics/semantics/core.k
+3:module MPY-CORE
+4:  imports MPY-SYNTAX
+5:  imports INT
+6:  imports BOOL
+7:  imports STRING
+8:  imports MAP
+9:  imports LIST
+10:  imports K-EQUAL
+
+/reference/k-proof/reference-semantics/semantics/sort.k
+10:module MPY-SORT
+11:  imports MPY-BUILTINS
+12:  imports MPY-SUBSCRIPT
+
+/reference/k-proof/reference-semantics/semantics/controls.k
+3:module MPY-CONTROLS
+4:  imports MPY-CORE
+5:  imports MPY-TUPLE
+6:  imports MPY-ITER
+
+/reference/k-proof/reference-semantics/semantics/set.k
+3:module MPY-SET
+4:  imports MPY-CORE
+
+/reference/k-proof/reference-semantics/semantics/concrete.k
+8:module MPY-CONCRETE
+9:  imports MPY
+
+/reference/k-proof/reference-semantics/semantics/range.k
+5:module MPY-RANGE
+6:  imports MPY-CORE
+7:  imports MPY-ITER
+
+/reference/k-proof/reference-semantics/semantics/comprehension.k
+3:module MPY-COMPREHENSION
+4:  imports MPY-CORE
+5:  imports MPY-OPERATORS
+6:  imports MPY-LIST
+7:  imports MPY-CONTROLS
+8:  imports MPY-FUNCTIONS
+
+/reference/k-proof/reference-semantics/semantics/operators.k
+6:module MPY-OPERATORS
+7:  imports MPY-CORE
+8:  imports MPY-ITER
+
+/reference/k-proof/reference-semantics/semantics/call.k
+10:module MPY-CALL
+11:  imports MPY-METHODS
+12:  imports MPY-BUILTINS
+13:  imports MPY-FUNCTIONS
+
+/reference/k-proof/reference-semantics/semantics/methods.k
+3:module MPY-METHODS
+4:  imports MPY-CORE
+5:  imports K-EQUAL
+6:  imports MPY-STR
+7:  imports MPY-LIST
+
+/reference/k-proof/reference-semantics/semantics/builtins.k
+3:module MPY-BUILTINS
+4:  imports MPY-CORE
+5:  imports MPY-STR
+6:  imports MPY-SET
+7:  imports MPY-ITER
+8:  imports MPY-RANGE
+9:  imports MPY-INT
+10:  imports MPY-METHODS
+
+/reference/k-proof/reference-semantics/semantics/list.k
+3:module MPY-LIST
+4:  imports MPY-CORE
+5:  imports MPY-ITER
+6:  imports MPY-OPERATORS
+
+/reference/k-proof/reference-semantics/semantics/bool.k
+5:module MPY-BOOL
+6:  imports MPY-CORE
+
+/reference/k-proof/reference-semantics/semantics/iter.k
+6:module MPY-ITER
+7:  imports MPY-CORE
+
+/reference/k-proof/reference-semantics/semantics/assert.k
+3:module MPY-ASSERT
+4:  imports MPY-CORE
+
+/reference/k-proof/reference-semantics/semantics/int.k
+4:module MPY-INT
+5:  imports MPY-CORE
+
+/reference/k-proof/reference-semantics/semantics.k
+34:requires "semantics/syntax.k"
+35:requires "semantics/core.k"
+36:requires "semantics/iter.k"
+37:requires "semantics/range.k"
+38:requires "semantics/operators.k"
+39:requires "semantics/int.k"
+40:requires "semantics/bool.k"
+41:requires "semantics/float.k"
+42:requires "semantics/str.k"
+43:requires "semantics/set.k"
+44:requires "semantics/list.k"
+45:requires "semantics/tuple.k"
+46:requires "semantics/subscript.k"
+47:requires "semantics/comprehension.k"
+48:requires "semantics/methods.k"
+49:requires "semantics/controls.k"
+50:requires "semantics/functions.k"
+51:requires "semantics/builtins.k"
+52:requires "semantics/call.k"
+53:requires "semantics/sort.k"
+54:requires "semantics/assert.k"
+55:requires "semantics/dict.k"
+56:requires "semantics/concrete.k"
+58:module MPY
+59:  imports MPY-CORE
+60:  imports MPY-ITER
+61:  imports MPY-RANGE
+62:  imports MPY-OPERATORS
+63:  imports MPY-INT
+64:  imports MPY-BOOL
+65:  imports MPY-FLOAT
+66:  imports MPY-STR
+67:  imports MPY-SET
+68:  imports MPY-LIST
+69:  imports MPY-TUPLE
+70:  imports MPY-SUBSCRIPT
+71:  imports MPY-COMPREHENSION
+72:  imports MPY-METHODS
+73:  imports MPY-CONTROLS
+74:  imports MPY-FUNCTIONS
+75:  imports MPY-BUILTINS
+76:  imports MPY-CALL
+77:  imports MPY-SORT
+78:  imports MPY-ASSERT
+79:  imports MPY-DICT
+87:module MPY-KRUN
+88:  imports MPY
+89:  imports MPY-CONCRETE
+
+Script done on 2026-07-30 23:22:10-05:00 [COMMAND_EXIT_CODE="0"]

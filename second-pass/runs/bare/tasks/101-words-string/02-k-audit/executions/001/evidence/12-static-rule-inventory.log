@@ -1,0 +1,247 @@
+COMMAND: bash -lc $'\ncd /tmp/audit-work/reconstruction\nprintf "## source-k-files\\n"\nfind . -maxdepth 1 -type f -name "*.k" -printf "%f\\\\n" | sort\nprintf "## declarations-and-rules\\n"\nrg -n "^\\\\s*(requires|module|endmodule|imports|syntax|configuration|rule|claim)|\\\\[(function|functional|total|simplification|priority|priorities|opaque|concrete)" semantic.k verification.k spec.k\nprintf "## all-local-rule-blocks\\n"\nnl -ba semantic.k\nnl -ba verification.k\nnl -ba spec.k\nprintf "## absence-checks\\n"\nfor term in functional simplification priority priorities opaque concrete; do\n  if rg -n "${term}" semantic.k verification.k spec.k; then\n    printf "FOUND_%s=yes\\n" "$term"\n  else\n    printf "FOUND_%s=no\\n" "$term"\n  fi\ndone\n'
+## source-k-files
+semantic.k
+spec.k
+verification.k
+## declarations-and-rules
+verification.k:1:module VERIFICATION
+verification.k:2:  imports STRING
+verification.k:3:  imports LIST
+verification.k:4:  imports INT
+verification.k:5:  imports BOOL
+verification.k:9:  syntax List ::= splitSpaces(String) [function]
+verification.k:11:  rule splitSpaces("") => .List
+verification.k:12:  rule splitSpaces(S) => splitSpaces(substrString(S, 1, lengthString(S)))
+verification.k:13:    requires lengthString(S) >Int 0
+verification.k:15:  rule splitSpaces(S) => ListItem(S)
+verification.k:16:    requires lengthString(S) >Int 0
+verification.k:18:  rule splitSpaces(S)
+verification.k:22:    requires findString(S, " ", 0) >Int 0
+verification.k:26:  syntax List ::= wordsContract(String) [function, total]
+verification.k:27:  rule wordsContract(S) => splitSpaces(replaceAll(S, ",", " "))
+verification.k:28:endmodule
+semantic.k:1:requires "verification.k"
+semantic.k:3:module SEMANTIC-SYNTAX
+semantic.k:4:  imports STRING-SYNTAX
+semantic.k:7:  syntax Program ::= "Module" "(" Stmts ")"
+semantic.k:9:  syntax Stmts ::= List{Stmt, ""}
+semantic.k:10:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+semantic.k:13:  syntax Ids    ::= List{String, ","}
+semantic.k:14:  syntax Params ::= "Params" "(" Ids ")"
+semantic.k:15:  syntax Exprs  ::= List{Expr, ","}
+semantic.k:16:  syntax Expr ::= "Name" "(" String ")"
+semantic.k:20:endmodule
+semantic.k:22:module SEMANTIC
+semantic.k:23:  imports SEMANTIC-SYNTAX
+semantic.k:24:  imports VERIFICATION
+semantic.k:25:  imports MAP
+semantic.k:27:  syntax Function ::= function(String, Stmts)
+semantic.k:28:  syntax PyVal ::= StrVal(String) | ListVal(List)
+semantic.k:30:  syntax KItem ::= invoke(String, String)
+semantic.k:33:  syntax PyVal ::= eval(Expr, Map) [function]
+semantic.k:34:  syntax String ::= asString(PyVal) [function]
+semantic.k:36:  configuration
+semantic.k:41:  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
+semantic.k:45:  rule <k> invoke(F, S) => execute(BODY, P |-> StrVal(S)) ... </k>
+semantic.k:48:  rule <k> execute(Return(E), ENV) => eval(E, ENV) ... </k>
+semantic.k:50:  rule eval(Name(X), X |-> V:PyVal) => V
+semantic.k:51:  rule eval(Str(S), _) => StrVal(S)
+semantic.k:54:  rule eval(Call(Attribute(RECV, "replace"), Str(OLD), Str(NEW)), ENV)
+semantic.k:58:  rule eval(Call(Attribute(RECV, "split"), .Exprs), ENV)
+semantic.k:61:  rule asString(StrVal(S)) => S
+semantic.k:62:endmodule
+spec.k:1:requires "semantic.k"
+spec.k:3:module SPEC
+spec.k:4:  imports SEMANTIC
+spec.k:7:  claim [words-string-general]:
+spec.k:33:  claim [prompt-example-hi]:
+spec.k:60:  claim [prompt-example-numbers]:
+spec.k:86:endmodule
+## all-local-rule-blocks
+     1	requires "verification.k"
+     2	
+     3	module SEMANTIC-SYNTAX
+     4	  imports STRING-SYNTAX
+     5	
+     6	  // The concrete syntax emitted by py2mpy.py for the subset used here.
+     7	  syntax Program ::= "Module" "(" Stmts ")"
+     8	
+     9	  syntax Stmts ::= List{Stmt, ""}
+    10	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    11	                | "Return" "(" Expr ")"
+    12	
+    13	  syntax Ids    ::= List{String, ","}
+    14	  syntax Params ::= "Params" "(" Ids ")"
+    15	  syntax Exprs  ::= List{Expr, ","}
+    16	  syntax Expr ::= "Name" "(" String ")"
+    17	                | "Str" "(" String ")"
+    18	                | "Attribute" "(" Expr "," String ")"
+    19	                | "Call" "(" Expr "," Exprs ")"
+    20	endmodule
+    21	
+    22	module SEMANTIC
+    23	  imports SEMANTIC-SYNTAX
+    24	  imports VERIFICATION
+    25	  imports MAP
+    26	
+    27	  syntax Function ::= function(String, Stmts)
+    28	  syntax PyVal ::= StrVal(String) | ListVal(List)
+    29	
+    30	  syntax KItem ::= invoke(String, String)
+    31	                 | execute(Stmts, Map)
+    32	
+    33	  syntax PyVal ::= eval(Expr, Map) [function]
+    34	  syntax String ::= asString(PyVal) [function]
+    35	
+    36	  configuration
+    37	    <k> $PGM:Program ~> invoke("words_string", $INPUT:String) </k>
+    38	    <functions> .Map </functions>
+    39	
+    40	  // Loading a module installs its (single, capture-free) function definition.
+    41	  rule <k> Module(FuncDef(F, Params(P), BODY)) => .K ... </k>
+    42	       <functions> .Map => F |-> function(P, BODY) </functions>
+    43	
+    44	  // Invocation creates a fresh one-variable local environment.
+    45	  rule <k> invoke(F, S) => execute(BODY, P |-> StrVal(S)) ... </k>
+    46	       <functions>... F |-> function(P, BODY) ...</functions>
+    47	
+    48	  rule <k> execute(Return(E), ENV) => eval(E, ENV) ... </k>
+    49	
+    50	  rule eval(Name(X), X |-> V:PyVal) => V
+    51	  rule eval(Str(S), _) => StrVal(S)
+    52	
+    53	  // Python str.replace(old, new) with no count replaces every occurrence.
+    54	  rule eval(Call(Attribute(RECV, "replace"), Str(OLD), Str(NEW)), ENV)
+    55	    => StrVal(replaceAll(asString(eval(RECV, ENV)), OLD, NEW))
+    56	
+    57	  // Python str.split() without an explicit separator returns maximal words.
+    58	  rule eval(Call(Attribute(RECV, "split"), .Exprs), ENV)
+    59	    => ListVal(splitSpaces(asString(eval(RECV, ENV))))
+    60	
+    61	  rule asString(StrVal(S)) => S
+    62	endmodule
+     1	module VERIFICATION
+     2	  imports STRING
+     3	  imports LIST
+     4	  imports INT
+     5	  imports BOOL
+     6	
+     7	  // splitSpaces is a mathematical model of splitting on runs of spaces.
+     8	  // The prompt's input alphabet uses commas and spaces as its separators.
+     9	  syntax List ::= splitSpaces(String) [function]
+    10	
+    11	  rule splitSpaces("") => .List
+    12	  rule splitSpaces(S) => splitSpaces(substrString(S, 1, lengthString(S)))
+    13	    requires lengthString(S) >Int 0
+    14	     andBool substrString(S, 0, 1) ==String " "
+    15	  rule splitSpaces(S) => ListItem(S)
+    16	    requires lengthString(S) >Int 0
+    17	     andBool findString(S, " ", 0) ==Int -1
+    18	  rule splitSpaces(S)
+    19	    => ListItem(substrString(S, 0, findString(S, " ", 0)))
+    20	       splitSpaces(substrString(S, findString(S, " ", 0) +Int 1,
+    21	                                  lengthString(S)))
+    22	    requires findString(S, " ", 0) >Int 0
+    23	
+    24	  // Formal statement of the HumanEval contract: commas and spaces delimit
+    25	  // words, consecutive/edge separators contribute no empty strings.
+    26	  syntax List ::= wordsContract(String) [function, total]
+    27	  rule wordsContract(S) => splitSpaces(replaceAll(S, ",", " "))
+    28	endmodule
+     1	requires "semantic.k"
+     2	
+     3	module SPEC
+     4	  imports SEMANTIC
+     5	
+     6	  // Universal functional-correctness claim for every input string.
+     7	  claim [words-string-general]:
+     8	    <k>
+     9	      Module(
+    10	        FuncDef("words_string", Params("s"),
+    11	          Return(
+    12	            Call(
+    13	              Attribute(
+    14	                Call(Attribute(Name("s"), "replace"), Str(","), Str(" ")),
+    15	                "split"),
+    16	              .Exprs))))
+    17	      ~> invoke("words_string", S)
+    18	    => ListVal(wordsContract(S))
+    19	    </k>
+    20	    <functions>
+    21	      .Map
+    22	    =>
+    23	      "words_string" |-> function("s",
+    24	        Return(
+    25	          Call(
+    26	            Attribute(
+    27	              Call(Attribute(Name("s"), "replace"), Str(","), Str(" ")),
+    28	              "split"),
+    29	            .Exprs)))
+    30	    </functions>
+    31	
+    32	  // The two examples from prompt.py are also executable proof obligations.
+    33	  claim [prompt-example-hi]:
+    34	    <k>
+    35	      Module(
+    36	        FuncDef("words_string", Params("s"),
+    37	          Return(
+    38	            Call(
+    39	              Attribute(
+    40	                Call(Attribute(Name("s"), "replace"), Str(","), Str(" ")),
+    41	                "split"),
+    42	              .Exprs))))
+    43	      ~> invoke("words_string", "Hi, my name is John")
+    44	    =>
+    45	      ListVal(ListItem("Hi") ListItem("my") ListItem("name")
+    46	              ListItem("is") ListItem("John"))
+    47	    </k>
+    48	    <functions>
+    49	      .Map
+    50	    =>
+    51	      "words_string" |-> function("s",
+    52	        Return(
+    53	          Call(
+    54	            Attribute(
+    55	              Call(Attribute(Name("s"), "replace"), Str(","), Str(" ")),
+    56	              "split"),
+    57	            .Exprs)))
+    58	    </functions>
+    59	
+    60	  claim [prompt-example-numbers]:
+    61	    <k>
+    62	      Module(
+    63	        FuncDef("words_string", Params("s"),
+    64	          Return(
+    65	            Call(
+    66	              Attribute(
+    67	                Call(Attribute(Name("s"), "replace"), Str(","), Str(" ")),
+    68	                "split"),
+    69	              .Exprs))))
+    70	      ~> invoke("words_string", "One, two, three, four, five, six")
+    71	    =>
+    72	      ListVal(ListItem("One") ListItem("two") ListItem("three")
+    73	              ListItem("four") ListItem("five") ListItem("six"))
+    74	    </k>
+    75	    <functions>
+    76	      .Map
+    77	    =>
+    78	      "words_string" |-> function("s",
+    79	        Return(
+    80	          Call(
+    81	            Attribute(
+    82	              Call(Attribute(Name("s"), "replace"), Str(","), Str(" ")),
+    83	              "split"),
+    84	            .Exprs)))
+    85	    </functions>
+    86	endmodule
+## absence-checks
+spec.k:6:  // Universal functional-correctness claim for every input string.
+FOUND_functional=yes
+FOUND_simplification=no
+FOUND_priority=no
+FOUND_priorities=no
+FOUND_opaque=no
+semantic.k:6:  // The concrete syntax emitted by py2mpy.py for the subset used here.
+FOUND_concrete=yes
+
+EXIT_STATUS: 0

@@ -1,0 +1,304 @@
+LABEL: 13-source-listing
+WORKDIR: /tmp/audit-work/build
+COMMAND: bash -lc nl\ -ba\ semantic.k\;\ nl\ -ba\ verification.k\;\ nl\ -ba\ spec.k\;\ nl\ -ba\ solution.mpy\;\ nl\ -ba\ solution.py
+EXIT_STATUS: 0
+OUTPUT_LINES: 297
+OUTPUT_BYTES: 10665
+--- OUTPUT (bounded) ---
+     1	module MPY-SYNTAX
+     2	  imports INT
+     3	  imports BOOL
+     4	  imports STRING
+     5	  imports MAP
+     6	
+     7	  syntax Program ::= "Module" "(" Stmts ")"
+     8	
+     9	  syntax Stmts ::= List{Stmt, ""}
+    10	  syntax Stmt ::= "FuncDef" "(" String "," "Params" "(" Ids ")" "," Stmts ")"
+    11	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    12	                | "While" "(" Expr "," Stmts ")"
+    13	                | "Assign" "(" Expr "," Expr ")"
+    14	                | "Return" "(" Expr ")"
+    15	
+    16	  syntax Ids ::= List{String, ","}
+    17	  syntax Expr ::= "Int" "(" Int ")"
+    18	                | "Name" "(" String ")"
+    19	                | "BinOp" "(" String "," Expr "," Expr ")"
+    20	                | "Compare" "(" Expr "," CmpOps ")"
+    21	  syntax CmpOps ::= List{CmpOp, ","}
+    22	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    23	endmodule
+    24	
+    25	module MPY
+    26	  imports MPY-SYNTAX
+    27	
+    28	  syntax Val ::= intVal(Int) | boolVal(Bool)
+    29	
+    30	  syntax KItem ::= exec(Stmts)
+    31	                 | eval(Expr)
+    32	                 | store(String)
+    33	                 | binLeft(String, Expr)
+    34	                 | binApply(String, Int)
+    35	                 | cmpLeft(String, Expr)
+    36	                 | cmpApply(String, Int)
+    37	                 | branch(Stmts, Stmts, Stmts)
+    38	                 | whileBranch(Expr, Stmts, Stmts)
+    39	                 | "doReturn"
+    40	
+    41	  configuration
+    42	    <mpy>
+    43	      <k> $PGM:Program </k>
+    44	      <env> .Map </env>
+    45	      <n> $N:Int </n>
+    46	      <x> $X:Int </x>
+    47	      <y> $Y:Int </y>
+    48	      <result> .K </result>
+    49	    </mpy>
+    50	
+    51	  rule <k> Module(FuncDef("x_or_y", Params("n", "x", "y"), BODY))
+    52	            => exec(BODY) ...</k>
+    53	       <env> .Map =>
+    54	         ("n" |-> intVal(N))
+    55	         ("x" |-> intVal(X))
+    56	         ("y" |-> intVal(Y))
+    57	       </env>
+    58	       <n> N </n>
+    59	       <x> X </x>
+    60	       <y> Y </y>
+    61	
+    62	  rule exec(.Stmts) => .K
+    63	  rule exec(S:Stmt SS:Stmts) => S ~> exec(SS)
+    64	
+    65	  rule If(COND, THEN, ELSE) => eval(COND) ~> branch(THEN, ELSE, .Stmts)
+    66	  rule While(COND, BODY) => eval(COND) ~> whileBranch(COND, BODY, .Stmts)
+    67	  rule Assign(Name(A), E) => eval(E) ~> store(A)
+    68	  rule Return(E) => eval(E) ~> doReturn
+    69	
+    70	  rule boolVal(true) ~> branch(THEN, _ELSE, REST)
+    71	    => exec(THEN) ~> exec(REST)
+    72	  rule boolVal(false) ~> branch(_THEN, ELSE, REST)
+    73	    => exec(ELSE) ~> exec(REST)
+    74	
+    75	  rule boolVal(true) ~> whileBranch(COND, BODY, REST)
+    76	    => exec(BODY) ~> eval(COND) ~> whileBranch(COND, BODY, REST)
+    77	  rule boolVal(false) ~> whileBranch(_COND, _BODY, REST)
+    78	    => exec(REST)
+    79	
+    80	  rule <k> V:Val ~> store(A) => .K ...</k>
+    81	       <env> ENV => ENV [ A <- V ] </env>
+    82	
+    83	  rule <k> V:Val ~> doReturn ~> _REST => .K </k>
+    84	       <result> .K => V </result>
+    85	
+    86	  rule eval(Int(I)) => intVal(I)
+    87	  rule <k> eval(Name(A)) => V ...</k>
+    88	       <env>... A |-> V ...</env>
+    89	
+    90	  rule eval(BinOp(OP, LEFT, RIGHT))
+    91	    => eval(LEFT) ~> binLeft(OP, RIGHT)
+    92	  rule intVal(I) ~> binLeft(OP, RIGHT)
+    93	    => eval(RIGHT) ~> binApply(OP, I)
+    94	  rule intVal(J) ~> binApply("+", I) => intVal(I +Int J)
+    95	  rule intVal(J) ~> binApply("*", I) => intVal(I *Int J)
+    96	  rule intVal(J) ~> binApply("%", I) => intVal(I %Int J)
+    97	    requires J =/=Int 0
+    98	
+    99	  rule eval(Compare(LEFT, CmpOp(OP, RIGHT)))
+   100	    => eval(LEFT) ~> cmpLeft(OP, RIGHT)
+   101	  rule intVal(I) ~> cmpLeft(OP, RIGHT)
+   102	    => eval(RIGHT) ~> cmpApply(OP, I)
+   103	  rule intVal(J) ~> cmpApply("<", I) => boolVal(I <Int J)
+   104	  rule intVal(J) ~> cmpApply("<=", I) => boolVal(I <=Int J)
+   105	  rule intVal(J) ~> cmpApply("==", I) => boolVal(I ==Int J)
+   106	endmodule
+     1	requires "semantic.k"
+     2	
+     3	module MPY-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // primeFrom(N, D) means that N has no divisor in the inclusive range
+     7	  // from D through floor(sqrt(N)).  Its recursive shape mirrors the loop.
+     8	  syntax Bool ::= primeFrom(Int, Int) [function]
+     9	  rule primeFrom(N, D) => true
+    10	    requires N <Int D *Int D
+    11	  rule primeFrom(N, D) => false
+    12	    requires D *Int D <=Int N andBool N %Int D ==Int 0
+    13	  rule primeFrom(N, D) => primeFrom(N, D +Int 1)
+    14	    requires D *Int D <=Int N andBool N %Int D =/=Int 0
+    15	
+    16	  syntax Bool ::= isPrime(Int) [function]
+    17	  rule isPrime(N) => false
+    18	    requires N <Int 2
+    19	  rule isPrime(N) => primeFrom(N, 2)
+    20	    requires 2 <=Int N
+    21	
+    22	  syntax Val ::= chooseVal(Bool, Int, Int) [function]
+    23	  rule chooseVal(true, X, _Y) => intVal(X)
+    24	  rule chooseVal(false, _X, Y) => intVal(Y)
+    25	endmodule
+     1	requires "verification.k"
+     2	
+     3	module LOOP-SPEC
+     4	  imports MPY-VERIFICATION
+     5	
+     6	  // Generalized loop invariant.  It deliberately starts at an arbitrary
+     7	  // D >= 2 so that one non-dividing iteration re-enters the same claim at
+     8	  // D + 1 and K's reachability prover can apply circularity.
+     9	  claim
+    10	    <k>
+    11	      eval(
+    12	        Compare(
+    13	          BinOp("*", Name("divisor"), Name("divisor")),
+    14	          CmpOp("<=", Name("n"))))
+    15	      ~> whileBranch(
+    16	        Compare(
+    17	          BinOp("*", Name("divisor"), Name("divisor")),
+    18	          CmpOp("<=", Name("n"))),
+    19	        If(
+    20	          Compare(
+    21	            BinOp("%", Name("n"), Name("divisor")),
+    22	            CmpOp("==", Int(0))),
+    23	          Return(Name("y")),
+    24	          .Stmts)
+    25	        Assign(
+    26	          Name("divisor"),
+    27	          BinOp("+", Name("divisor"), Int(1))),
+    28	        .Stmts)
+    29	      ~> exec(Return(Name("x")))
+    30	      => .K
+    31	    </k>
+    32	    <env>
+    33	      ("divisor" |-> intVal(D))
+    34	      ("n" |-> intVal(N))
+    35	      ("x" |-> intVal(X))
+    36	      ("y" |-> intVal(Y))
+    37	      => ?_FINALENV:Map
+    38	    </env>
+    39	    <n> N </n>
+    40	    <x> X </x>
+    41	    <y> Y </y>
+    42	    <result> .K => chooseVal(primeFrom(N, D), X, Y) </result>
+    43	    requires 2 <=Int D
+    44	endmodule
+    45	
+    46	module SPEC
+    47	  imports LOOP-SPEC
+    48	
+    49	  claim
+    50	    <k>
+    51	      Module(
+    52	        FuncDef("x_or_y", Params("n", "x", "y"),
+    53	          If(
+    54	            Compare(Name("n"), CmpOp("<", Int(2))),
+    55	            Return(Name("y")),
+    56	            .Stmts)
+    57	          Assign(Name("divisor"), Int(2))
+    58	          While(
+    59	            Compare(
+    60	              BinOp("*", Name("divisor"), Name("divisor")),
+    61	              CmpOp("<=", Name("n"))),
+    62	            If(
+    63	              Compare(
+    64	                BinOp("%", Name("n"), Name("divisor")),
+    65	                CmpOp("==", Int(0))),
+    66	              Return(Name("y")),
+    67	              .Stmts)
+    68	            Assign(
+    69	              Name("divisor"),
+    70	              BinOp("+", Name("divisor"), Int(1))))
+    71	          Return(Name("x"))))
+    72	      => .K
+    73	    </k>
+    74	    <env> .Map => ?_FINALENV:Map </env>
+    75	    <n> N </n>
+    76	    <x> X </x>
+    77	    <y> Y </y>
+    78	    <result> .K => chooseVal(isPrime(N), X, Y) </result>
+    79	
+    80	  claim
+    81	    <k>
+    82	      Module(
+    83	        FuncDef("x_or_y", Params("n", "x", "y"),
+    84	          If(
+    85	            Compare(Name("n"), CmpOp("<", Int(2))),
+    86	            Return(Name("y")),
+    87	            .Stmts)
+    88	          Assign(Name("divisor"), Int(2))
+    89	          While(
+    90	            Compare(
+    91	              BinOp("*", Name("divisor"), Name("divisor")),
+    92	              CmpOp("<=", Name("n"))),
+    93	            If(
+    94	              Compare(
+    95	                BinOp("%", Name("n"), Name("divisor")),
+    96	                CmpOp("==", Int(0))),
+    97	              Return(Name("y")),
+    98	              .Stmts)
+    99	            Assign(
+   100	              Name("divisor"),
+   101	              BinOp("+", Name("divisor"), Int(1))))
+   102	          Return(Name("x"))))
+   103	      => .K
+   104	    </k>
+   105	    <env> .Map => ?_FINALENV:Map </env>
+   106	    <n> 7 </n>
+   107	    <x> 34 </x>
+   108	    <y> 12 </y>
+   109	    <result> .K => intVal(34) </result>
+   110	
+   111	  claim
+   112	    <k>
+   113	      Module(
+   114	        FuncDef("x_or_y", Params("n", "x", "y"),
+   115	          If(
+   116	            Compare(Name("n"), CmpOp("<", Int(2))),
+   117	            Return(Name("y")),
+   118	            .Stmts)
+   119	          Assign(Name("divisor"), Int(2))
+   120	          While(
+   121	            Compare(
+   122	              BinOp("*", Name("divisor"), Name("divisor")),
+   123	              CmpOp("<=", Name("n"))),
+   124	            If(
+   125	              Compare(
+   126	                BinOp("%", Name("n"), Name("divisor")),
+   127	                CmpOp("==", Int(0))),
+   128	              Return(Name("y")),
+   129	              .Stmts)
+   130	            Assign(
+   131	              Name("divisor"),
+   132	              BinOp("+", Name("divisor"), Int(1))))
+   133	          Return(Name("x"))))
+   134	      => .K
+   135	    </k>
+   136	    <env> .Map => ?_FINALENV:Map </env>
+   137	    <n> 15 </n>
+   138	    <x> 8 </x>
+   139	    <y> 5 </y>
+   140	    <result> .K => intVal(5) </result>
+   141	endmodule
+     1	Module(
+     2	  FuncDef("x_or_y", Params("n", "x", "y"),
+     3	    If(Compare(Name("n"), CmpOp("<", Int(2))),
+     4	      Return(Name("y")),
+     5	      )
+     6	    Assign(Name("divisor"), Int(2))
+     7	    While(Compare(
+     8	      BinOp("*", Name("divisor"), Name("divisor")),
+     9	      CmpOp("<=", Name("n"))),
+    10	      If(Compare(
+    11	        BinOp("%", Name("n"), Name("divisor")),
+    12	        CmpOp("==", Int(0))),
+    13	        Return(Name("y")),
+    14	        )
+    15	      Assign(Name("divisor"), BinOp("+", Name("divisor"), Int(1))))
+    16	    Return(Name("x"))))
+     1	def x_or_y(n, x, y):
+     2	    if n < 2:
+     3	        return y
+     4	    divisor = 2
+     5	    while divisor * divisor <= n:
+     6	        if n % divisor == 0:
+     7	            return y
+     8	        divisor = divisor + 1
+     9	    return x

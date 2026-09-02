@@ -1,0 +1,1583 @@
+$ sed -n 1,360p /reference/tools/k_rule_inventory.py
+#!/usr/bin/env python3
+"""Canonical lexical inventory of simplification rules in verification.k."""
+
+from __future__ import annotations
+
+import dataclasses
+import hashlib
+import json
+import re
+import stat
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+_MODULE_NAME_RE = re.compile(
+    r"^[ \t]+(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"(?:[ \t]+\[[^\]\r\n]*\])?[ \t]*$"
+)
+_TRAILING_ATTRIBUTES_RE = re.compile(
+    r"\[(?P<attributes>[^\[\]]*)\][ \t\r\n]*\Z", re.S
+)
+_CELL_TAG_RE = re.compile(
+    r"<(?P<close>/)?(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"[ \t]*(?P<self_close>/)?>"
+)
+_OUTER_SENTENCE_KEYWORDS = {
+    "imports",
+    "syntax",
+    "rule",
+    "configuration",
+    "context",
+    "claim",
+    "alias",
+}
+
+
+class KRuleInventoryError(RuntimeError):
+    """Raised when verification.k cannot produce a canonical inventory."""
+
+
+@dataclass(frozen=True)
+class KRule:
+    source_rule_id: str
+    module: str
+    start_line: int
+    end_line: int
+    normalized_sha256: str
+    attributes: list[str]
+    text: str
+
+
+@dataclass(frozen=True)
+class _Sentence:
+    keyword: str
+    start: int
+
+
+@dataclass(frozen=True)
+class _Module:
+    name: str
+    content_start: int
+    content_end: int
+    imports: tuple[str, ...]
+    sentences: tuple[_Sentence, ...]
+
+
+@dataclass(frozen=True)
+class _RuleSpan:
+    rule: KRule
+    start_offset: int
+    end_offset: int
+    attribute_start: int | None
+    attribute_end: int | None
+
+
+def canonical_json_sha256(document: Any) -> str:
+    encoded = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _mask_non_code(text: str) -> str:
+    """Mask comments and string bodies without changing source offsets."""
+
+    output = list(text)
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                state = "code"
+            else:
+                output[index] = " "
+            index += 1
+            continue
+        if state == "string":
+            if character == "\\" and following:
+                output[index] = " "
+                output[index + 1] = " "
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            elif character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                output[index] = output[index + 1] = " "
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                output[index] = output[index + 1] = " "
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output[index] = output[index + 1] = " "
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output[index] = output[index + 1] = " "
+            state = "block-comment"
+            block_depth = 1
+            index += 2
+            continue
+        if character == '"':
+            state = "string"
+        index += 1
+    return "".join(output)
+
+
+def _line_ranges(text: str, start: int = 0) -> list[tuple[int, int, int]]:
+    ranges: list[tuple[int, int, int]] = []
+    line_start = start
+    while line_start < len(text):
+        newline = text.find("\n", line_start)
+        next_start = len(text) if newline < 0 else newline + 1
+        line_end = len(text) if newline < 0 else newline
+        content_end = (
+            line_end - 1
+            if line_end > line_start and text[line_end - 1] == "\r"
+            else line_end
+        )
+        ranges.append((line_start, content_end, next_start))
+        if newline < 0:
+            break
+        line_start = next_start
+    return ranges
+
+
+def _line_heads(text: str) -> list[tuple[int, int, str, str]]:
+    """Return physical-line word heads without assigning K grammar meaning."""
+
+    heads: list[tuple[int, int, str, str]] = []
+    for line_start, content_end, _next_start in _line_ranges(text):
+        index = line_start
+        while index < content_end and text[index] in " \t":
+            index += 1
+        word_end = index
+        while word_end < content_end and (
+            text[word_end].isalnum() or text[word_end] in "_'"
+        ):
+            word_end += 1
+        if word_end > index:
+            heads.append(
+                (
+                    line_start,
+                    content_end,
+                    text[index:word_end],
+                    text[word_end:content_end],
+                )
+            )
+    return heads
+
+
+def _line_word(line: str) -> tuple[str, str, int]:
+    stripped = line.lstrip()
+    indent = len(line) - len(stripped)
+    word_end = 0
+    while word_end < len(stripped) and (
+        stripped[word_end].isalnum() or stripped[word_end] in "_'"
+    ):
+        word_end += 1
+    return stripped[:word_end], stripped[word_end:], indent + word_end
+
+
+def _rule_continuation(line: str) -> tuple[str, int] | None:
+    stripped = line.lstrip()
+    if stripped.startswith("["):
+        return "attributes", len(line) - len(stripped)
+    word, rest, word_end = _line_word(line)
+    for keyword in ("requires", "ensures"):
+        if word == keyword and (
+            not rest
+            or not (
+                rest[0].isalnum()
+                or rest[0] in "_'"
+            )
+        ):
+            return keyword, word_end
+    return None
+
+
+def _starts_outer_transition(line: str) -> bool:
+    keyword, rest, _word_end = _line_word(line)
+    separated = bool(rest) and rest[0] in " \t"
+    if keyword == "module":
+        return separated and _MODULE_NAME_RE.fullmatch(rest) is not None
+    if keyword == "endmodule":
+        return not rest.strip()
+    if keyword == "rule":
+        return not rest or separated
+    return keyword in _OUTER_SENTENCE_KEYWORDS and separated
+
+
+def _terminal_attribute_line(line: str) -> bool:
+    match = _TRAILING_ATTRIBUTES_RE.search(line)
+    if match is None:
+        return False
+    start = match.start()
+    return start == 0 or line[start - 1].isspace()
+
+
+def _scan_rule_delimiters(
+    line: str,
+    delimiters: list[str],
+) -> None:
+    closing = {")": "(", "]": "[", "}": "{"}
+    index = 0
+    while index < len(line):
+        if line[index] == "<":
+            cell = _CELL_TAG_RE.match(line, index)
+            if cell is not None:
+                marker = f"<{cell.group('name')}>"
+                if cell.group("close"):
+                    if delimiters and delimiters[-1] == marker:
+                        delimiters.pop()
+                elif not cell.group("self_close"):
+                    delimiters.append(marker)
+                index = cell.end()
+                continue
+        character = line[index]
+        if character in "([{":
+            delimiters.append(character)
+        elif character in closing:
+            if delimiters and delimiters[-1] == closing[character]:
+                delimiters.pop()
+        index += 1
+
+
+def _rule_bubble_end(masked_text: str, start: int) -> int:
+    """Find when an outer rule bubble returns control to outer parsing."""
+
+    seen_rewrite = False
+    clause_has_content = False
+    candidate_end: int | None = None
+    delimiters: list[str] = []
+    ranges = _line_ranges(masked_text, start)
+    for line_start, line_end, next_start in ranges:
+        line = masked_text[line_start:line_end]
+        if not line.strip():
+            continue
+
+        continuation = (
+            _rule_continuation(line)
+            if seen_rewrite and candidate_end is not None
+            else None
+        )
+        if candidate_end is not None:
+            if continuation is None and _starts_outer_transition(line):
+                return candidate_end
+            candidate_end = None
+
+        content_start = 0
+        if continuation is not None:
+            kind, content_start = continuation
+            if kind in {"requires", "ensures"}:
+                clause_has_content = False
+
+        if not seen_rewrite:
+            rewrite = line.find("=>")
+            if rewrite >= 0:
+                seen_rewrite = True
+                content_start = rewrite + 2
+            else:
+                content_start = len(line)
+
+        _scan_rule_delimiters(line, delimiters)
+        if seen_rewrite and line[content_start:].strip():
+            clause_has_content = True
+
+        if (
+            seen_rewrite
+            and clause_has_content
+            and not delimiters
+            and _terminal_attribute_line(line)
+        ):
+            return next_start
+        if seen_rewrite and clause_has_content and not delimiters:
+            candidate_end = next_start
+    if candidate_end is not None:
+        return candidate_end
+    return len(masked_text) + 1
+
+
+def _modules(masked_text: str) -> tuple[_Module, ...]:
+    modules: list[_Module] = []
+    open_module: tuple[
+        str, int, list[str], list[_Sentence]
+    ] | None = None
+    open_rule_until = 0
+    for line_start, line_end, keyword, rest in _line_heads(masked_text):
+        if line_start < open_rule_until:
+            continue
+        open_rule_until = 0
+        separated = bool(rest) and rest[0] in " \t"
+        if keyword == "module":
+            if not separated:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            named = _MODULE_NAME_RE.fullmatch(rest)
+            if named is None or open_module is not None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            open_module = (named.group("name"), line_end, [], [])
+            continue
+        if keyword == "endmodule":
+            if rest.strip():
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            if open_module is None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            name, content_start, imports, sentences = open_module
+            modules.append(
+                _Module(
+                    name=name,
+                    content_start=content_start,
+$ rg -n def.*hash|tree_sha|sha256 /reference/tools/*.py
+/reference/tools/check_audit_campaign.py:52:    return hashlib.sha256(raw).hexdigest()
+/reference/tools/check_audit_campaign.py:70:        "toolchain_lock_sha256": digest(toolchain_raw),
+/reference/tools/check_audit_campaign.py:74:        "kit_lock_sha256": digest(kit_raw),
+/reference/tools/check_audit_campaign.py:75:        "audit_prompt_sha256": digest(prompt_raw),
+/reference/tools/usage_accounting.py:127:def _hash_tree_entries(entries: Sequence[tuple[str, str, Path]]) -> str:
+/reference/tools/usage_accounting.py:128:    digest = hashlib.sha256()
+/reference/tools/usage_accounting.py:149:def sha256_tree(root: Path) -> str:
+/reference/tools/usage_accounting.py:292:            "source_trace_sha256": source_hash,
+/reference/tools/usage_accounting.py:315:        "source_trace_sha256": source_hash,
+/reference/tools/usage_accounting.py:461:    source_hash = document.get("source_trace_sha256")
+/reference/tools/usage_accounting.py:468:            "usage document source_trace_sha256 must be a lowercase SHA-256"
+/reference/tools/lemma_discovery_contract.py:14:_MANIFEST_KEYS = {"schema_version", "inventory_sha256", "rules"}
+/reference/tools/lemma_discovery_contract.py:86:    if document["inventory_sha256"] != inventory["inventory_sha256"]:
+/reference/tools/lemma_discovery_contract.py:88:            "lemma discovery inventory_sha256 does not match canonical inventory"
+/reference/tools/stage6_resolution_contract.py:43:def canonical_json_sha256(document: Any) -> str:
+/reference/tools/stage6_resolution_contract.py:50:    return hashlib.sha256(encoded).hexdigest()
+/reference/tools/stage6_resolution_contract.py:53:def validate_sha256(value: object, label: str) -> str:
+/reference/tools/stage6_resolution_contract.py:67:        "resolved_input_sha256": canonical_json_sha256(resolution),
+/reference/tools/stage6_resolution_contract.py:77:        "resolved_input_sha256",
+/reference/tools/stage6_resolution_contract.py:101:    digest = validate_sha256(
+/reference/tools/stage6_resolution_contract.py:102:        document.get("resolved_input_sha256"),
+/reference/tools/stage6_resolution_contract.py:105:    if canonical_json_sha256(resolution) != digest:
+/reference/tools/audit_contract.py:119:def sha256_file(path: Path) -> str:
+/reference/tools/audit_contract.py:120:    digest = hashlib.sha256()
+/reference/tools/audit_contract.py:130:def _optional_regular_file_hash(path: Path) -> str | None:
+/reference/tools/audit_contract.py:138:        return sha256_file(path)
+/reference/tools/audit_contract.py:186:def sha256_tree(root: Path) -> str:
+/reference/tools/audit_contract.py:212:    digest = hashlib.sha256()
+/reference/tools/audit_contract.py:233:def _optional_tree_hash(root: Path) -> str | None:
+/reference/tools/audit_contract.py:241:        return sha256_tree(root)
+/reference/tools/audit_contract.py:246:def legacy_content_tree_hash(root: Path) -> str:
+/reference/tools/audit_contract.py:250:    digest = hashlib.sha256()
+/reference/tools/audit_contract.py:302:def _manifest_input_hash(manifest: dict[str, Any], name: str) -> object:
+/reference/tools/audit_contract.py:309:def build_resolution_and_hashes(
+/reference/tools/audit_contract.py:326:    trusted_prompt_hash = sha256_file(prompt)
+/reference/tools/audit_contract.py:327:    trusted_translator_hash = sha256_file(translator)
+/reference/tools/audit_contract.py:328:    trusted_semantics_hash = sha256_tree(semantics) if semantics is not None else None
+/reference/tools/audit_contract.py:331:        "candidate_tree_sha256": sha256_tree(candidate),
+/reference/tools/audit_contract.py:332:        "manifest_sha256": sha256_file(manifest_path),
+/reference/tools/audit_contract.py:333:        "canonical_sha256": sha256_file(canonical),
+/reference/tools/audit_contract.py:334:        "trusted_prompt_sha256": trusted_prompt_hash,
+/reference/tools/audit_contract.py:335:        "candidate_prompt_sha256": candidate_prompt_hash,
+/reference/tools/audit_contract.py:336:        "trusted_translator_sha256": trusted_translator_hash,
+/reference/tools/audit_contract.py:337:        "candidate_translator_sha256": candidate_translator_hash,
+/reference/tools/audit_contract.py:338:        "trusted_reference_semantics_sha256": trusted_semantics_hash,
+/reference/tools/audit_contract.py:339:        "candidate_reference_semantics_sha256": candidate_semantics_hash,
+/reference/tools/audit_contract.py:340:        "generation_metrics_sha256": sha256_file(generation_evidence["metrics"]),
+/reference/tools/audit_contract.py:341:        "generation_codex_output_sha256": sha256_file(
+/reference/tools/audit_contract.py:344:        "generation_codex_last_sha256": sha256_file(
+/reference/tools/audit_contract.py:347:        "generation_codex_trace_sha256": sha256_tree(
+/reference/tools/audit_contract.py:362:            _manifest_input_hash(manifest, "problem_prompt_sha256")
+/reference/tools/audit_contract.py:366:            _manifest_input_hash(manifest, "translator_sha256")
+/reference/tools/audit_contract.py:370:            _manifest_input_hash(manifest, "reference_semantics_sha256")
+/reference/tools/audit_contract.py:511:        manifest.get("inputs", {}).get("reference_semantics_sha256")
+/reference/tools/audit_contract.py:534:    actual = pipeline_contract.sha256_tree(semantics)
+/reference/tools/audit_contract.py:581:        result.get("outputs", {}).get("workspace_sha256")
+/reference/tools/audit_contract.py:605:    candidate_hash = pipeline_contract.sha256_tree(workspace)
+/reference/tools/audit_contract.py:669:        manifest_semantics_hash = pipeline_contract.sha256_tree(semantics)
+/reference/tools/audit_contract.py:674:                "trusted_reference_semantics_legacy_sha256"
+/reference/tools/audit_contract.py:678:            "trusted_reference_semantics_manifest_sha256"
+/reference/tools/audit_contract.py:683:            _manifest_input_hash(manifest, "reference_semantics_sha256")
+/reference/tools/audit_contract.py:694:            "run_manifest_sha256": sha256_file(run_manifest_path),
+/reference/tools/audit_contract.py:695:            "task_manifest_sha256": sha256_file(task_manifest_path),
+/reference/tools/audit_contract.py:696:            "stage1_result_sha256": sha256_file(stage1_result_path),
+/reference/tools/audit_contract.py:697:            "stage1_invocation_sha256": sha256_file(
+/reference/tools/audit_contract.py:700:            "generation_prompt_sha256": sha256_file(
+/reference/tools/audit_contract.py:706:        resolution["hashes"]["generation_runtime_metrics_sha256"] = sha256_file(
+/reference/tools/audit_contract.py:710:        resolution["hashes"]["generation_usage_sha256"] = sha256_file(
+/reference/tools/audit_contract.py:830:        current_hash = pipeline_contract.sha256_tree(execution)
+/reference/tools/audit_contract.py:833:    if current_hash != selected.get("artifact_sha256"):
+/reference/tools/audit_contract.py:855:        "selected_artifact_sha256": current_hash,
+/reference/tools/audit_contract.py:856:        "selected_verdict_sha256": pipeline_contract.sha256_file(
+/reference/tools/stage5_runner.py:58:    sha256: str
+/reference/tools/stage5_runner.py:70:    k_reference_sha256: str
+/reference/tools/stage5_runner.py:71:    stage4_stage1_sha256: str
+/reference/tools/stage5_runner.py:82:    sha256: str
+/reference/tools/stage5_runner.py:91:    sha256: str
+/reference/tools/stage5_runner.py:123:        sha256=hashlib.sha256(data).hexdigest(),
+/reference/tools/stage5_runner.py:139:    if re.fullmatch(r"sha256:[0-9a-f]{64}", image_id) is None:
+/reference/tools/stage5_runner.py:233:        sha256=hashlib.sha256(data).hexdigest(),
+/reference/tools/stage5_runner.py:358:    stage1_workspace_sha256: str,
+/reference/tools/stage5_runner.py:359:    stage3_discovery_manifest_sha256: str,
+/reference/tools/stage5_runner.py:386:    expected_candidate_sha256 = selected.get("artifact_sha256")
+/reference/tools/stage5_runner.py:388:        not isinstance(expected_candidate_sha256, str)
+/reference/tools/stage5_runner.py:390:            r"[0-9a-f]{64}", expected_candidate_sha256
+/reference/tools/stage5_runner.py:401:        validated_sha256 = stage4_runner._validated_candidate_sha256(
+/reference/tools/stage5_runner.py:404:            expected_candidate_sha256=expected_candidate_sha256,
+/reference/tools/stage5_runner.py:406:            stage1_workspace_sha256=stage1_workspace_sha256,
+/reference/tools/stage5_runner.py:407:            stage3_discovery_manifest_sha256=(
+/reference/tools/stage5_runner.py:408:                stage3_discovery_manifest_sha256
+/reference/tools/stage5_runner.py:438:        or pipeline_contract.sha256_tree(generation) != validated_sha256
+/reference/tools/stage5_runner.py:450:            sha256=validated_sha256,
+/reference/tools/stage5_runner.py:466:        k_reference, k_reference_sha256 = (
+/reference/tools/stage5_runner.py:476:        stage4_stage1_sha256 = klean_export.tree_digest(k_reference)
+/reference/tools/stage5_runner.py:484:        stage1_workspace_sha256=stage4_stage1_sha256,
+/reference/tools/stage5_runner.py:485:        stage3_discovery_manifest_sha256=discovery.sha256,
+/reference/tools/stage5_runner.py:494:        k_reference_sha256=k_reference_sha256,
+/reference/tools/stage5_runner.py:495:        stage4_stage1_sha256=stage4_stage1_sha256,
+/reference/tools/stage5_runner.py:567:        binding_sha256 = parameter.get("binding_sha256")
+/reference/tools/stage5_runner.py:591:        expected_binding_sha256 = hashlib.sha256(
+/reference/tools/stage5_runner.py:596:        if binding_sha256 != expected_binding_sha256:
+/reference/tools/stage5_runner.py:697:        k_reference, k_reference_sha256 = (
+/reference/tools/stage5_runner.py:710:        or k_reference_sha256 != expected.k_reference_sha256
+/reference/tools/stage5_runner.py:716:        stage4_stage1_sha256 = klean_export.tree_digest(k_reference)
+/reference/tools/stage5_runner.py:721:    if stage4_stage1_sha256 != expected.stage4_stage1_sha256:
+/reference/tools/stage5_runner.py:733:            stage1_workspace_sha256=stage4_stage1_sha256,
+/reference/tools/stage5_runner.py:734:            stage3_discovery_manifest_sha256=discovery.sha256,
+/reference/tools/stage5_runner.py:1010:                    mechanical_document.get("generation_sha256")
+/reference/tools/stage5_runner.py:1012:                    or mechanical_document.get("candidate_sha256")
+/reference/tools/stage5_runner.py:1026:                "codex-last.txt": completion.sha256,
+/reference/tools/stage5_runner.py:1027:                "lean-validation.json": mechanical.sha256,
+/reference/tools/stage5_runner.py:1044:                    or current.sha256 != completion.sha256
+/reference/tools/stage5_runner.py:1071:                    or hashlib.sha256(current_data).hexdigest()
+/reference/tools/stage5_runner.py:1072:                    != mechanical.sha256
+/reference/tools/stage5_runner.py:1074:                    != mechanical.document.get("candidate_sha256")
+/reference/tools/stage5_runner.py:1076:                    != mechanical.document.get("generation_sha256")
+/reference/tools/legacy_migration.py:47:    tree_sha256: str
+/reference/tools/legacy_migration.py:245:def _sha256_file(path: Path, label: str = "file") -> str:
+/reference/tools/legacy_migration.py:246:    return hashlib.sha256(_read_regular_bytes(path, label)).hexdigest()
+/reference/tools/legacy_migration.py:312:def _framed_tree_hash(entries: Sequence[tuple[str, str, Path, int]]) -> str:
+/reference/tools/legacy_migration.py:313:    digest = hashlib.sha256()
+/reference/tools/legacy_migration.py:333:        tree_sha256=_framed_tree_hash(entries),
+/reference/tools/legacy_migration.py:372:                files.append((relative, _sha256_file(path)))
+/reference/tools/legacy_migration.py:450:        "instruction_prompt_sha256",
+/reference/tools/legacy_migration.py:451:        "problem_prompt_sha256",
+/reference/tools/legacy_migration.py:452:        "translator_sha256",
+/reference/tools/legacy_migration.py:453:        *(("reference_semantics_sha256",) if spec.condition == "semantics" else ()),
+/reference/tools/legacy_migration.py:460:    if spec.condition == "bare" and "reference_semantics_sha256" in inputs:
+/reference/tools/legacy_migration.py:888:            {"relative_path": relative, "sha256": digest}
+/reference/tools/legacy_migration.py:895:                "tree_sha256": item.tree_sha256,
+/reference/tools/legacy_migration.py:910:                    {"relative_path": relative, "sha256": digest}
+/reference/tools/legacy_migration.py:981:def _source_inventory_sha256(task: LegacyTaskPlan) -> str:
+/reference/tools/legacy_migration.py:985:            {"relative_path": relative, "sha256": digest}
+/reference/tools/legacy_migration.py:992:                "tree_sha256": item.tree_sha256,
+/reference/tools/legacy_migration.py:1005:    return hashlib.sha256(encoded).hexdigest()
+/reference/tools/legacy_migration.py:1029:    expected_sha256: str,
+/reference/tools/legacy_migration.py:1032:    if _sha256_file(source, label) != expected_sha256:
+/reference/tools/legacy_migration.py:1039:    if _sha256_file(destination, f"copied {label}") != expected_sha256:
+/reference/tools/legacy_migration.py:1072:    prompt_hash = inputs.get("instruction_prompt_sha256")
+/reference/tools/legacy_migration.py:1096:        "problem_prompt_sha256",
+/reference/tools/legacy_migration.py:1097:        "instruction_prompt_sha256",
+/reference/tools/legacy_migration.py:1098:        "translator_sha256",
+/reference/tools/legacy_migration.py:1099:        "reference_semantics_sha256",
+/reference/tools/legacy_migration.py:1196:                "sha256": digest,
+/reference/tools/legacy_migration.py:1214:            {"relative_path": relative, "sha256": digest}
+/reference/tools/legacy_migration.py:1224:    prompt_sha256: str | None,
+/reference/tools/legacy_migration.py:1225:    source_tree_sha256: str,
+/reference/tools/legacy_migration.py:1226:    workspace_sha256: str,
+/reference/tools/legacy_migration.py:1237:        "prompt_sha256": (
+/reference/tools/legacy_migration.py:1238:            prompt_sha256
+/reference/tools/legacy_migration.py:1239:            if prompt_sha256 is not None
+/reference/tools/legacy_migration.py:1243:            "source_tree_sha256": source_tree_sha256,
+/reference/tools/legacy_migration.py:1244:            "workspace_sha256": workspace_sha256,
+/reference/tools/legacy_migration.py:1258:        "source_tree_sha256": source_tree_sha256,
+/reference/tools/legacy_migration.py:1259:        "retained_workspace_sha256": workspace_sha256,
+/reference/tools/legacy_migration.py:1322:    source_tree_sha256: str,
+/reference/tools/legacy_migration.py:1323:    workspace_sha256: str,
+/reference/tools/legacy_migration.py:1350:        "source_tree_sha256": source_tree_sha256,
+/reference/tools/legacy_migration.py:1351:        "retained_workspace_sha256": workspace_sha256,
+/reference/tools/legacy_migration.py:1358:                "tree_sha256": item.tree_sha256,
+/reference/tools/legacy_migration.py:1446:    prompt_sha256: str | None = None
+/reference/tools/legacy_migration.py:1452:        prompt_sha256 = _copy_instruction_prompt(
+/reference/tools/legacy_migration.py:1499:    source_tree_sha256 = _source_inventory_sha256(task_plan)
+/reference/tools/legacy_migration.py:1500:    workspace_sha256 = pipeline_contract.sha256_tree(workspace)
+/reference/tools/legacy_migration.py:1510:            prompt_sha256,
+/reference/tools/legacy_migration.py:1511:            source_tree_sha256,
+/reference/tools/legacy_migration.py:1512:            workspace_sha256,
+/reference/tools/legacy_migration.py:1543:            source_tree_sha256,
+/reference/tools/legacy_migration.py:1544:            workspace_sha256,
+/reference/tools/legacy_migration.py:1810:            _sha256_file(
+/reference/tools/legacy_migration.py:1844:        "artifact_sha256": pipeline_contract.sha256_tree(execution),
+/reference/tools/legacy_migration.py:1884:        if _sha256_file(destination, "staged retained file") != expected:
+/reference/tools/legacy_migration.py:1887:    source_tree_sha256 = _source_inventory_sha256(task_plan)
+/reference/tools/legacy_migration.py:1888:    workspace_sha256 = pipeline_contract.sha256_tree(workspace)
+/reference/tools/legacy_migration.py:1890:    prompt_sha256: str | None = None
+/reference/tools/legacy_migration.py:1897:        prompt_sha256 = (
+/reference/tools/legacy_migration.py:1898:            inputs.get("instruction_prompt_sha256")
+/reference/tools/legacy_migration.py:1920:        prompt_sha256,
+/reference/tools/legacy_migration.py:1921:        source_tree_sha256,
+/reference/tools/legacy_migration.py:1922:        workspace_sha256,
+/reference/tools/legacy_migration.py:1960:        _sha256_file(state_rollout, "staged state rollout")
+/reference/tools/legacy_migration.py:1962:        or _sha256_file(invocation_rollout, "staged invocation rollout")
+/reference/tools/legacy_migration.py:2006:        if _sha256_file(
+/reference/tools/legacy_migration.py:2009:        ) != prompt_sha256:
+/reference/tools/legacy_migration.py:2088:        source_tree_sha256,
+/reference/tools/legacy_migration.py:2089:        workspace_sha256,
+/reference/tools/legacy_migration.py:2564:                "source_sha256": pipeline_contract.sha256_tree(source),
+/reference/tools/legacy_migration.py:2565:                "staged_sha256": pipeline_contract.sha256_tree(staging),
+/reference/tools/legacy_migration.py:2566:                "state_sha256": pipeline_contract.sha256_tree(state_staging),
+/reference/tools/legacy_migration.py:2587:        "source_sha256": pipeline_contract.sha256_tree(audit_source),
+/reference/tools/legacy_migration.py:2669:        expected = run["source_sha256"]
+/reference/tools/legacy_migration.py:2670:        if pipeline_contract.sha256_tree(source) != expected:
+/reference/tools/legacy_migration.py:2674:    if pipeline_contract.sha256_tree(source) != audit["source_sha256"]:
+/reference/tools/legacy_migration.py:2740:def _validate_published_hashes(journal: Mapping[str, Any]) -> None:
+/reference/tools/legacy_migration.py:2744:        if pipeline_contract.sha256_tree(final) != run["staged_sha256"]:
+/reference/tools/legacy_migration.py:2746:        if pipeline_contract.sha256_tree(state_final) != run["state_sha256"]:
+/reference/tools/klean_preflight.py:41:    stage1_workspace_sha256: str
+/reference/tools/klean_preflight.py:42:    stage3_discovery_manifest_sha256: str
+/reference/tools/klean_preflight.py:43:    generated_tree_sha256: str
+/reference/tools/klean_preflight.py:44:    sidecar_sha256: tuple[tuple[str, str], ...]
+/reference/tools/klean_preflight.py:57:                hashlib.sha256(
+/reference/tools/klean_preflight.py:72:            stage1_workspace_sha256=klean_export.tree_digest(
+/reference/tools/klean_preflight.py:75:            stage3_discovery_manifest_sha256=hashlib.sha256(
+/reference/tools/klean_preflight.py:78:            generated_tree_sha256=klean_export.tree_digest(generated),
+/reference/tools/klean_preflight.py:79:            sidecar_sha256=sidecars,
+/reference/tools/klean_preflight.py:96:    if current.stage1_workspace_sha256 != (
+/reference/tools/klean_preflight.py:97:        expected.stage1_workspace_sha256
+/reference/tools/klean_preflight.py:102:    if current.stage3_discovery_manifest_sha256 != (
+/reference/tools/klean_preflight.py:103:        expected.stage3_discovery_manifest_sha256
+/reference/tools/klean_preflight.py:108:    if current.generated_tree_sha256 != expected.generated_tree_sha256:
+/reference/tools/klean_preflight.py:112:    if current.sidecar_sha256 != expected.sidecar_sha256:
+/reference/tools/klean_preflight.py:228:    discovery_hash = hashlib.sha256(discovery_manifest.read_bytes()).hexdigest()
+/reference/tools/klean_preflight.py:229:    if input_manifest.get("inventory_sha256") != validated[
+/reference/tools/klean_preflight.py:230:        "inventory_sha256"
+/reference/tools/klean_preflight.py:242:    if input_manifest.get("verification_sha256") != hashlib.sha256(
+/reference/tools/klean_preflight.py:269:        if obligation.get("lean_conjunct_sha256") != klean_export.sha256_text(
+/reference/tools/klean_preflight.py:284:            "normalized_sha256",
+/reference/tools/klean_preflight.py:285:            "inventory_sha256",
+/reference/tools/klean_preflight.py:286:            "discovery_manifest_sha256",
+/reference/tools/klean_preflight.py:305:    if generator_manifest.get("obligation_map_sha256") != hashlib.sha256(
+/reference/tools/klean_preflight.py:323:        or target.get("definition_sha256")
+/reference/tools/klean_preflight.py:324:        != klean_export.sha256_text(expected_definition)
+/reference/tools/klean_preflight.py:434:    input_hash = snapshot.stage1_workspace_sha256
+/reference/tools/klean_preflight.py:435:    discovery_hash = snapshot.stage3_discovery_manifest_sha256
+/reference/tools/klean_preflight.py:436:    generated_hash = snapshot.generated_tree_sha256
+/reference/tools/klean_preflight.py:437:    sidecar_hashes = dict(snapshot.sidecar_sha256)
+/reference/tools/klean_preflight.py:442:    if input_manifest.get("frozen_input_sha256") != input_hash:
+/reference/tools/klean_preflight.py:444:    if input_manifest.get("stage1_workspace_sha256") != input_hash:
+/reference/tools/klean_preflight.py:447:        input_manifest.get("stage3_discovery_manifest_sha256")
+/reference/tools/klean_preflight.py:453:    if generator_manifest.get("generated_tree_sha256") != generated_hash:
+/reference/tools/klean_preflight.py:460:    if provenance.get("stage1_workspace_sha256") != input_hash:
+/reference/tools/klean_preflight.py:464:    if provenance.get("stage3_discovery_manifest_sha256") != discovery_hash:
+/reference/tools/klean_preflight.py:468:    if provenance.get("inventory_sha256") != input_manifest.get(
+/reference/tools/klean_preflight.py:469:        "inventory_sha256"
+/reference/tools/klean_preflight.py:549:        "frozen_input_sha256": input_hash,
+/reference/tools/klean_preflight.py:550:        "stage3_discovery_manifest_sha256": discovery_hash,
+/reference/tools/klean_preflight.py:551:        "generated_tree_sha256": generated_hash,
+/reference/tools/klean_preflight.py:552:        "trust_inventory_sha256": sidecar_hashes[
+/reference/tools/klean_preflight.py:560:                if field == "trust_inventory_sha256"
+/reference/tools/klean_preflight.py:577:                    "output_sha256": hashlib.sha256(output.encode()).hexdigest(),
+/reference/tools/klean_preflight.py:591:        "frozen_input_sha256": input_hash,
+/reference/tools/klean_preflight.py:592:        "stage1_workspace_sha256": input_hash,
+/reference/tools/klean_preflight.py:593:        "stage3_discovery_manifest_sha256": discovery_hash,
+/reference/tools/klean_preflight.py:594:        "generated_tree_sha256": generated_hash,
+/reference/tools/klean_preflight.py:624:            stage3_hash = hashlib.sha256(
+/reference/tools/klean_preflight.py:633:            "stage1_workspace_sha256": stage1_hash,
+/reference/tools/klean_preflight.py:634:            "stage3_discovery_manifest_sha256": stage3_hash,
+/reference/tools/stage4_runner.py:40:    sha256: str
+/reference/tools/stage4_runner.py:42:    result_sha256: str
+/reference/tools/stage4_runner.py:68:        outputs.get("workspace_sha256")
+/reference/tools/stage4_runner.py:72:    current = pipeline_contract.sha256_tree(workspace)
+/reference/tools/stage4_runner.py:92:    digest = result.get("trust_boundary_sha256")
+/reference/tools/stage4_runner.py:133:        or invocation_manifest.get("trust_boundary_sha256") != digest
+/reference/tools/stage4_runner.py:148:    if hashlib.sha256(data).hexdigest() != digest:
+/reference/tools/stage4_runner.py:154:        sha256=digest,
+/reference/tools/stage4_runner.py:156:        result_sha256=pipeline_contract.sha256_file(result_path),
+/reference/tools/stage4_runner.py:177:        "frozen_input_sha256": frozen_hash,
+/reference/tools/stage4_runner.py:179:        "discovery_manifest_sha256": discovery.sha256,
+/reference/tools/stage4_runner.py:236:    stage1_workspace_sha256: str,
+/reference/tools/stage4_runner.py:237:    stage3_discovery_manifest_sha256: str,
+/reference/tools/stage4_runner.py:251:        preflight.get("stage1_workspace_sha256")
+/reference/tools/stage4_runner.py:252:        != stage1_workspace_sha256
+/reference/tools/stage4_runner.py:258:        preflight.get("stage3_discovery_manifest_sha256")
+/reference/tools/stage4_runner.py:259:        != stage3_discovery_manifest_sha256
+/reference/tools/stage4_runner.py:274:            generated_sha256 = klean_export.tree_digest(
+/reference/tools/stage4_runner.py:281:        if preflight.get("generated_tree_sha256") != generated_sha256:
+/reference/tools/stage4_runner.py:310:def _validated_candidate_sha256(
+/reference/tools/stage4_runner.py:314:    expected_candidate_sha256: str,
+/reference/tools/stage4_runner.py:316:    stage1_workspace_sha256: str,
+/reference/tools/stage4_runner.py:317:    stage3_discovery_manifest_sha256: str,
+/reference/tools/stage4_runner.py:319:    before_sha256 = pipeline_contract.sha256_tree(generation)
+/reference/tools/stage4_runner.py:320:    if before_sha256 != expected_candidate_sha256:
+/reference/tools/stage4_runner.py:331:        stage1_workspace_sha256=stage1_workspace_sha256,
+/reference/tools/stage4_runner.py:332:        stage3_discovery_manifest_sha256=(
+/reference/tools/stage4_runner.py:333:            stage3_discovery_manifest_sha256
+/reference/tools/stage4_runner.py:349:        generated_sha256 = preflight["generated_tree_sha256"]
+/reference/tools/stage4_runner.py:362:            or input_manifest.get("frozen_input_sha256")
+/reference/tools/stage4_runner.py:363:            != stage1_workspace_sha256
+/reference/tools/stage4_runner.py:364:            or input_manifest.get("stage1_workspace_sha256")
+/reference/tools/stage4_runner.py:365:            != stage1_workspace_sha256
+/reference/tools/stage4_runner.py:366:            or input_manifest.get("stage3_discovery_manifest_sha256")
+/reference/tools/stage4_runner.py:367:            != stage3_discovery_manifest_sha256
+/reference/tools/stage4_runner.py:374:            generator_manifest.get("generated_tree_sha256")
+/reference/tools/stage4_runner.py:375:            != generated_sha256
+/reference/tools/stage4_runner.py:377:            or provenance.get("stage1_workspace_sha256")
+/reference/tools/stage4_runner.py:378:            != stage1_workspace_sha256
+/reference/tools/stage4_runner.py:379:            or provenance.get("stage3_discovery_manifest_sha256")
+/reference/tools/stage4_runner.py:380:            != stage3_discovery_manifest_sha256
+/reference/tools/stage4_runner.py:393:            or export_result.get("frozen_input_sha256")
+/reference/tools/stage4_runner.py:394:            != stage1_workspace_sha256
+/reference/tools/stage4_runner.py:395:            or export_result.get("stage3_discovery_manifest_sha256")
+/reference/tools/stage4_runner.py:396:            != stage3_discovery_manifest_sha256
+/reference/tools/stage4_runner.py:397:            or export_result.get("generated_tree_sha256")
+/reference/tools/stage4_runner.py:398:            != generated_sha256
+/reference/tools/stage4_runner.py:399:            or export_result.get("trust_inventory_sha256")
+/reference/tools/stage4_runner.py:400:            != hashlib.sha256(trust_inventory_bytes).hexdigest()
+/reference/tools/stage4_runner.py:418:    after_sha256 = pipeline_contract.sha256_tree(generation)
+/reference/tools/stage4_runner.py:420:        after_sha256 != before_sha256
+/reference/tools/stage4_runner.py:421:        or after_sha256 != expected_candidate_sha256
+/reference/tools/stage4_runner.py:426:    return after_sha256
+/reference/tools/stage4_runner.py:449:    stage1_workspace_sha256 = klean_export.tree_digest(frozen)
+/reference/tools/stage4_runner.py:498:        if pipeline_contract.sha256_tree(frozen) != frozen_hash:
+/reference/tools/stage4_runner.py:516:        produced_hash = pipeline_contract.sha256_tree(produced)
+/reference/tools/stage4_runner.py:522:        if pipeline_contract.sha256_tree(publication) != produced_hash:
+/reference/tools/stage4_runner.py:545:        stage1_workspace_sha256=stage1_workspace_sha256,
+/reference/tools/stage4_runner.py:546:        stage3_discovery_manifest_sha256=discovery.sha256,
+/reference/tools/stage4_runner.py:548:    candidate_sha256 = pipeline_contract.sha256_tree(generation)
+/reference/tools/stage4_runner.py:555:    if pipeline_contract.sha256_tree(frozen) != frozen_hash or (
+/reference/tools/stage4_runner.py:556:        klean_export.tree_digest(frozen) != stage1_workspace_sha256
+/reference/tools/stage4_runner.py:565:    candidate_sha256 = _validated_candidate_sha256(
+/reference/tools/stage4_runner.py:568:        expected_candidate_sha256=candidate_sha256,
+/reference/tools/stage4_runner.py:570:        stage1_workspace_sha256=stage1_workspace_sha256,
+/reference/tools/stage4_runner.py:571:        stage3_discovery_manifest_sha256=discovery.sha256,
+/reference/tools/stage4_runner.py:579:        expected_candidate_sha256=candidate_sha256,
+/reference/tools/klean_final_gate.py:237:                    "output_sha256": hashlib.sha256(
+/reference/tools/klean_final_gate.py:273:        "generation_sha256": before_generation,
+/reference/tools/klean_final_gate.py:274:        "candidate_sha256": before_candidate,
+/reference/tools/klean_final_gate.py:323:        "resolved_input_sha256": digest,
+/reference/tools/klean_final_gate.py:327:def _input_hashes(
+/reference/tools/klean_final_gate.py:335:            "k_workspace_sha256": pipeline_contract.sha256_tree(
+/reference/tools/klean_final_gate.py:338:            "stage1_export_sha256": klean_export.tree_digest(
+/reference/tools/klean_final_gate.py:341:            "discovery_manifest_sha256": (
+/reference/tools/klean_final_gate.py:342:                pipeline_contract.sha256_file(discovery_manifest)
+/reference/tools/klean_final_gate.py:344:            "klean_generation_sha256": (
+/reference/tools/klean_final_gate.py:345:                pipeline_contract.sha256_tree(generation)
+/reference/tools/klean_final_gate.py:347:            "lean_workspace_sha256": (
+/reference/tools/klean_final_gate.py:348:                pipeline_contract.sha256_tree(candidate)
+/reference/tools/klean_final_gate.py:382:        "resolved_input_sha256": document[
+/reference/tools/klean_final_gate.py:383:            "resolved_input_sha256"
+/reference/tools/klean_final_gate.py:482:            "resolved_input_sha256": audit_binding[
+/reference/tools/klean_final_gate.py:483:                "resolved_input_sha256"
+/reference/tools/klean_final_gate.py:489:            "generation_sha256": klean_export.tree_digest(generation),
+/reference/tools/klean_final_gate.py:490:            "candidate_sha256": None,
+/reference/tools/klean_final_gate.py:509:            after_hashes.get("lean_workspace_sha256")
+/reference/tools/klean_final_gate.py:510:            != before_hashes.get("lean_workspace_sha256")
+/reference/tools/klean_final_gate.py:522:        "resolved_input_sha256": audit_binding[
+/reference/tools/klean_final_gate.py:523:            "resolved_input_sha256"
+/reference/tools/klean_final_gate.py:529:        "generation_sha256": proof_check["generation_sha256"],
+/reference/tools/klean_final_gate.py:530:        "candidate_sha256": proof_check["candidate_sha256"],
+/reference/tools/stage3_runner.py:60:    sha256: str
+/reference/tools/stage3_runner.py:109:def _stage1_workspace_hash(task: Path) -> tuple[Path, str]:
+/reference/tools/stage3_runner.py:118:        outputs.get("workspace_sha256")
+/reference/tools/stage3_runner.py:122:    current = pipeline_contract.sha256_tree(workspace)
+/reference/tools/stage3_runner.py:154:    return path, pipeline_contract.sha256_file(path)
+/reference/tools/stage3_runner.py:192:    output_hash = pipeline_contract.sha256_file(output_log)
+/reference/tools/stage3_runner.py:215:    workspace_hash = pipeline_contract.sha256_tree(stage_root / "workspace")
+/reference/tools/stage3_runner.py:219:        or inputs.get("workspace_sha256") != workspace_hash
+/reference/tools/stage3_runner.py:221:        or outputs.get("workspace_sha256") != workspace_hash
+/reference/tools/stage3_runner.py:248:            "evidence_sha256": output_hash,
+/reference/tools/stage3_runner.py:250:        "prompt_sha256": None,
+/reference/tools/stage3_runner.py:251:        "inputs": {"workspace_sha256": workspace_hash},
+/reference/tools/stage3_runner.py:442:        sha256=hashlib.sha256(data).hexdigest(),
+/reference/tools/stage3_runner.py:476:        or hashlib.sha256(live_data).hexdigest() != protected.sha256
+/reference/tools/stage3_runner.py:499:    if pipeline_contract.sha256_tree(k_reference) != expected_k_hash:
+/reference/tools/stage3_runner.py:504:        pipeline_contract.sha256_file(inventory_path)
+/reference/tools/stage3_runner.py:752:                "trust_boundary_sha256": protected.sha256,
+/reference/tools/stage3_runner.py:756:                evidence_path: protected.sha256,
+/reference/tools/klean_export.py:481:def sha256_text(text: str) -> str:
+/reference/tools/klean_export.py:482:    return hashlib.sha256(text.encode()).hexdigest()
+/reference/tools/klean_export.py:1500:    digest = hashlib.sha256()
+/reference/tools/klean_export.py:1647:        binding_sha256 = parameter.get("binding_sha256")
+/reference/tools/klean_export.py:1669:        expected_binding_sha256 = sha256_text(
+/reference/tools/klean_export.py:1672:        if binding_sha256 != expected_binding_sha256:
+/reference/tools/klean_export.py:1676:            {**binding, "binding_sha256": binding_sha256}
+/reference/tools/klean_export.py:1684:        "statement_sha256": sha256_text(statement),
+/reference/tools/klean_export.py:1685:        "definition_sha256": sha256_text(definition),
+/reference/tools/klean_export.py:1724:    discovery_manifest_sha256: str,
+/reference/tools/klean_export.py:1726:    inventory_sha256 = validated["inventory_sha256"]
+/reference/tools/klean_export.py:1730:            "inventory_sha256": inventory_sha256,
+/reference/tools/klean_export.py:1731:            "discovery_manifest_sha256": discovery_manifest_sha256,
+/reference/tools/klean_export.py:1746:            "normalized_sha256": rule["normalized_sha256"],
+/reference/tools/klean_export.py:1794:                "normalized_sha256": rule["normalized_sha256"],
+/reference/tools/klean_export.py:1795:                "inventory_sha256": rule["inventory_sha256"],
+/reference/tools/klean_export.py:1796:                "discovery_manifest_sha256": rule[
+/reference/tools/klean_export.py:1797:                    "discovery_manifest_sha256"
+/reference/tools/klean_export.py:1854:    discovery_manifest_sha256 = hashlib.sha256(discovery_bytes).hexdigest()
+/reference/tools/klean_export.py:1879:        validated, discovery_manifest_sha256
+/reference/tools/klean_export.py:2056:                "frozen_input_sha256": before_hash,
+/reference/tools/klean_export.py:2057:                "stage1_workspace_sha256": before_hash,
+/reference/tools/klean_export.py:2058:                "stage3_discovery_manifest_sha256": (
+/reference/tools/klean_export.py:2059:                    discovery_manifest_sha256
+/reference/tools/klean_export.py:2061:                "verification_sha256": hashlib.sha256(
+/reference/tools/klean_export.py:2069:                "inventory_sha256": validated["inventory_sha256"],
+/reference/tools/klean_export.py:2105:                "klean_py_sha256": hashlib.sha256(KLEAN.read_bytes()).hexdigest(),
+/reference/tools/klean_export.py:2106:                "exporter_sha256": hashlib.sha256(
+/reference/tools/klean_export.py:2116:                "generated_tree_sha256": tree_digest(generated),
+/reference/tools/klean_export.py:2118:                "obligation_map_sha256": hashlib.sha256(
+/reference/tools/klean_export.py:2123:                    "stage1_workspace_sha256": before_hash,
+/reference/tools/klean_export.py:2124:                    "stage3_discovery_manifest_sha256": (
+/reference/tools/klean_export.py:2125:                        discovery_manifest_sha256
+/reference/tools/klean_export.py:2127:                    "inventory_sha256": validated["inventory_sha256"],
+/reference/tools/klean_export.py:2137:                "generated_tree_sha256": generator_manifest[
+/reference/tools/klean_export.py:2138:                    "generated_tree_sha256"
+/reference/tools/klean_export.py:2140:                "frozen_input_sha256": before_hash,
+/reference/tools/klean_export.py:2141:                "stage3_discovery_manifest_sha256": (
+/reference/tools/klean_export.py:2142:                    discovery_manifest_sha256
+/reference/tools/klean_export.py:2144:                "trust_inventory_sha256": "",
+/reference/tools/klean_export.py:2153:            result["trust_inventory_sha256"] = hashlib.sha256(
+/reference/tools/stage1_runner.py:12:from hashlib import sha256
+/reference/tools/stage1_runner.py:62:    suffix = sha256(readable.encode()).hexdigest()[:12]
+/reference/tools/klean_audit_contract.py:35:def _canonical_json_sha256(document: Any) -> str:
+/reference/tools/klean_audit_contract.py:36:    return stage6_resolution_contract.canonical_json_sha256(document)
+/reference/tools/klean_audit_contract.py:39:def _validate_sha256(value: object, label: str) -> str:
+/reference/tools/klean_audit_contract.py:41:        return stage6_resolution_contract.validate_sha256(
+/reference/tools/klean_audit_contract.py:100:            pipeline_contract.sha256_tree(candidate)
+/reference/tools/klean_audit_contract.py:101:            != selected.get("artifact_sha256")
+/reference/tools/klean_audit_contract.py:169:            current_outputs.get("workspace_sha256")
+/reference/tools/klean_audit_contract.py:171:                result_outputs.get("workspace_sha256")
+/reference/tools/klean_audit_contract.py:175:            or current_outputs.get("workspace_sha256")
+/reference/tools/klean_audit_contract.py:177:                invocation_outputs.get("workspace_sha256")
+/reference/tools/klean_audit_contract.py:207:def _stage1_source_hashes(workspace: Path) -> dict[str, str]:
+/reference/tools/klean_audit_contract.py:211:                pipeline_contract.sha256_file(path)
+/reference/tools/klean_audit_contract.py:230:    if not isinstance(image_id, str) or not image_id.startswith("sha256:"):
+/reference/tools/klean_audit_contract.py:234:    image_key = image_id.removeprefix("sha256:")
+/reference/tools/klean_audit_contract.py:249:            "klean_export.py": generator_manifest.get("exporter_sha256"),
+/reference/tools/klean_audit_contract.py:250:            "klean.py": generator_manifest.get("klean_py_sha256"),
+/reference/tools/klean_audit_contract.py:281:            digest = _validate_sha256(
+/reference/tools/klean_audit_contract.py:287:            if pipeline_contract.sha256_file(source) != digest:
+/reference/tools/klean_audit_contract.py:292:        return bundle, pipeline_contract.sha256_tree(bundle)
+/reference/tools/klean_audit_contract.py:318:        k_hash = pipeline_contract.sha256_tree(k_workspace)
+/reference/tools/klean_audit_contract.py:321:            or k_result["outputs"].get("workspace_sha256") != k_hash
+/reference/tools/klean_audit_contract.py:377:        if generator_manifest.get("generated_tree_sha256") != generated_hash:
+/reference/tools/klean_audit_contract.py:384:            or provenance.get("stage1_workspace_sha256")
+/reference/tools/klean_audit_contract.py:386:            or provenance.get("stage3_discovery_manifest_sha256")
+/reference/tools/klean_audit_contract.py:387:            != discovery.sha256
+/reference/tools/klean_audit_contract.py:460:                "k_workspace_sha256": k_hash,
+/reference/tools/klean_audit_contract.py:461:                "stage1_export_sha256": stage1_export_hash,
+/reference/tools/klean_audit_contract.py:462:                "discovery_manifest_sha256": discovery.sha256,
+/reference/tools/klean_audit_contract.py:463:                "k_audit_sha256": pipeline_contract.sha256_tree(k_audit),
+/reference/tools/klean_audit_contract.py:464:                "klean_generation_sha256": pipeline_contract.sha256_tree(
+/reference/tools/klean_audit_contract.py:467:                "generation_producer_sources_sha256": (
+/reference/tools/klean_audit_contract.py:470:                "generated_tree_sha256": generated_hash,
+/reference/tools/klean_audit_contract.py:471:                "lean_workspace_sha256": (
+/reference/tools/klean_audit_contract.py:472:                    pipeline_contract.sha256_tree(lean_workspace)
+/reference/tools/klean_audit_contract.py:476:                "lean_invocation_sha256": (
+/reference/tools/klean_audit_contract.py:477:                    pipeline_contract.sha256_tree(lean_invocation)
+/reference/tools/klean_audit_contract.py:526:    expected_resolved_input_sha256: str,
+/reference/tools/klean_audit_contract.py:529:    expected_digest = _validate_sha256(
+/reference/tools/klean_audit_contract.py:530:        expected_resolved_input_sha256,
+/reference/tools/klean_audit_contract.py:539:    if resolution["resolved_input_sha256"] != expected_digest:
+/reference/tools/klean_audit_contract.py:603:    if mechanical.get("resolved_input_sha256") != expected_digest:
+/reference/tools/klean_audit_contract.py:672:    expected_resolved_input_sha256: str,
+/reference/tools/klean_audit_contract.py:673:    expected_candidate_sha256: str,
+/reference/tools/klean_audit_contract.py:676:    expected_digest = _validate_sha256(
+/reference/tools/klean_audit_contract.py:677:        expected_resolved_input_sha256,
+/reference/tools/klean_audit_contract.py:680:    expected_candidate = _validate_sha256(
+/reference/tools/klean_audit_contract.py:681:        expected_candidate_sha256,
+/reference/tools/klean_audit_contract.py:714:    if pipeline_contract.sha256_tree(candidate) != expected_candidate:
+/reference/tools/klean_audit_contract.py:744:        expected_candidate_sha256=expected_candidate,
+/reference/tools/klean_audit_contract.py:759:                "--expected-resolved-input-sha256",
+/reference/tools/klean_audit_contract.py:775:        "--expected-resolved-input-sha256",
+/reference/tools/klean_audit_contract.py:779:        "--expected-candidate-sha256",
+/reference/tools/klean_audit_contract.py:813:                    expected_resolved_input_sha256=(
+/reference/tools/klean_audit_contract.py:814:                        arguments.expected_resolved_input_sha256
+/reference/tools/klean_audit_contract.py:827:                        expected_resolved_input_sha256=(
+/reference/tools/klean_audit_contract.py:828:                            arguments.expected_resolved_input_sha256
+/reference/tools/klean_audit_contract.py:830:                        expected_candidate_sha256=(
+/reference/tools/klean_audit_contract.py:831:                            arguments.expected_candidate_sha256
+/reference/tools/run_pipeline.py:122:    if pipeline_contract.sha256_tree(candidate) != selected.get(
+/reference/tools/run_pipeline.py:123:        "artifact_sha256"
+/reference/tools/klean.py:1173:        binding["binding_sha256"] = hashlib.sha256(
+/reference/tools/klean.py:1203:        binding["binding_sha256"] = hashlib.sha256(
+/reference/tools/klean.py:1271:                "lean_conjunct_sha256": hashlib.sha256(
+/reference/tools/k_rule_inventory.py:48:    normalized_sha256: str
+/reference/tools/k_rule_inventory.py:77:def canonical_json_sha256(document: Any) -> str:
+/reference/tools/k_rule_inventory.py:84:    return hashlib.sha256(encoded).hexdigest()
+/reference/tools/k_rule_inventory.py:580:        digest = hashlib.sha256(normalized.encode()).hexdigest()
+/reference/tools/k_rule_inventory.py:593:            normalized_sha256=digest,
+/reference/tools/k_rule_inventory.py:786:        "verification_sha256": hashlib.sha256(verification_bytes).hexdigest(),
+/reference/tools/k_rule_inventory.py:790:        "inventory_sha256": canonical_json_sha256(rule_documents),
+/reference/tools/populate_runs.py:87:def sha256_file(path: Path) -> str:
+/reference/tools/populate_runs.py:88:    return hashlib.sha256(path.read_bytes()).hexdigest()
+/reference/tools/populate_runs.py:91:def sha256_tree(root: Path) -> str:
+/reference/tools/populate_runs.py:92:    digest = hashlib.sha256()
+/reference/tools/populate_runs.py:373:            "problem_prompt_sha256": sha256_file(prompt),
+/reference/tools/populate_runs.py:375:            "instruction_prompt_sha256": sha256_file(instruction),
+/reference/tools/populate_runs.py:376:            "translator_sha256": sha256_file(repo / "tools/py2mpy.py"),
+/reference/tools/populate_runs.py:380:        manifest["inputs"]["reference_semantics_sha256"] = sha256_tree(
+/reference/tools/import_humaneval_prompts.py:58:            "sha256": hashlib.sha256(prompts[number]).hexdigest(),
+/reference/tools/pipeline_contract.py:26:    "sha256:f3f64ab72bd7b560082d50e4c6c23e107025cf217ca62ab73700104fc45de09a"
+/reference/tools/pipeline_contract.py:179:def sha256_file(path: Path) -> str:
+/reference/tools/pipeline_contract.py:180:    digest = hashlib.sha256()
+/reference/tools/pipeline_contract.py:190:def sha256_tree(root: Path) -> str:
+/reference/tools/pipeline_contract.py:192:    digest = hashlib.sha256()
+/reference/tools/pipeline_contract.py:429:        sha256_tree(semantics)
+/reference/tools/pipeline_contract.py:443:                "prompt_sha256": sha256_file(prompt),
+/reference/tools/pipeline_contract.py:445:                "translator_sha256": sha256_file(translator),
+/reference/tools/pipeline_contract.py:446:                "instruction_sha256": sha256_file(instruction),
+/reference/tools/pipeline_contract.py:448:                "semantics_sha256": (
+/reference/tools/pipeline_contract.py:449:                    sha256_tree(semantics) if semantics is not None else None
+/reference/tools/pipeline_contract.py:496:            "problem_prompt_sha256": input_document["prompt_sha256"],
+/reference/tools/pipeline_contract.py:497:            "instruction_prompt_sha256": input_document["instruction_sha256"],
+/reference/tools/pipeline_contract.py:498:            "translator_sha256": input_document["translator_sha256"],
+/reference/tools/pipeline_contract.py:501:    if input_document["semantics_sha256"] is not None:
+/reference/tools/pipeline_contract.py:502:        task_manifest["inputs"]["reference_semantics_sha256"] = input_document[
+/reference/tools/pipeline_contract.py:503:            "semantics_sha256"
+/reference/tools/pipeline_contract.py:583:                "klean_toolchain_lock_sha256": sha256_file(
+/reference/tools/pipeline_contract.py:686:            "klean_toolchain_lock_sha256": sha256_file(lock_path),
+/reference/tools/pipeline_contract.py:1171:        "prompt_sha256": task_manifest.get("inputs", {}).get(
+/reference/tools/pipeline_contract.py:1172:            "instruction_prompt_sha256"
+/reference/tools/pipeline_contract.py:1175:            "workspace_sha256": sha256_tree(stage_root / "workspace"),
+/reference/tools/pipeline_contract.py:1226:    current_workspace = sha256_tree(stage_root / "workspace")
+/reference/tools/pipeline_contract.py:1234:        or previous_outputs.get("workspace_sha256") != current_workspace
+/reference/tools/pipeline_contract.py:1266:        "prompt_sha256": task_manifest.get("inputs", {}).get(
+/reference/tools/pipeline_contract.py:1267:            "instruction_prompt_sha256"
+/reference/tools/pipeline_contract.py:1269:        "inputs": {"workspace_sha256": current_workspace},
+/reference/tools/pipeline_contract.py:1329:    current_workspace = sha256_tree(stage_root / "workspace")
+/reference/tools/pipeline_contract.py:1337:        or previous_outputs.get("workspace_sha256") != current_workspace
+/reference/tools/pipeline_contract.py:1367:        "prompt_sha256": task_manifest.get("inputs", {}).get(
+/reference/tools/pipeline_contract.py:1368:            "instruction_prompt_sha256"
+/reference/tools/pipeline_contract.py:1370:        "inputs": {"workspace_sha256": current_workspace},
+/reference/tools/pipeline_contract.py:1448:    current_workspace = sha256_tree(stage_root / "workspace")
+/reference/tools/pipeline_contract.py:1456:            inputs.get("workspace_sha256")
+/reference/tools/pipeline_contract.py:1461:            outputs.get("workspace_sha256")
+/reference/tools/pipeline_contract.py:1487:    output_hash = sha256_file(output_log)
+/reference/tools/pipeline_contract.py:1512:        "evidence_sha256": output_hash,
+/reference/tools/pipeline_contract.py:1552:            "evidence_sha256": sha256_file(
+/reference/tools/pipeline_contract.py:1575:        "prompt_sha256": task_manifest.get("inputs", {}).get(
+/reference/tools/pipeline_contract.py:1576:            "instruction_prompt_sha256"
+/reference/tools/pipeline_contract.py:1578:        "inputs": {"workspace_sha256": current_workspace},
+/reference/tools/pipeline_contract.py:1615:    document["prompt_sha256"] = sha256_file(prompt)
+/reference/tools/pipeline_contract.py:1620:def _invocation_output_hashes(invocation: Path, workspace: Path) -> dict[str, Any]:
+/reference/tools/pipeline_contract.py:1625:        evidence[path.relative_to(invocation).as_posix()] = sha256_file(path)
+/reference/tools/pipeline_contract.py:1627:        "workspace_sha256": sha256_tree(workspace),
+/reference/tools/pipeline_contract.py:1819:    trust_digest = metadata.get("trust_boundary_sha256")
+/reference/tools/pipeline_contract.py:2130:    expected_candidate_sha256: str | None = None,
+/reference/tools/pipeline_contract.py:2145:    if expected_candidate_sha256 is not None and (
+/reference/tools/pipeline_contract.py:2146:        not isinstance(expected_candidate_sha256, str)
+/reference/tools/pipeline_contract.py:2147:        or re.fullmatch(r"[0-9a-f]{64}", expected_candidate_sha256) is None
+/reference/tools/pipeline_contract.py:2185:    candidate_sha256 = sha256_tree(candidate)
+/reference/tools/pipeline_contract.py:2187:        expected_candidate_sha256 is not None
+/reference/tools/pipeline_contract.py:2188:        and candidate_sha256 != expected_candidate_sha256
+/reference/tools/pipeline_contract.py:2197:        "artifact_sha256": candidate_sha256,
+/reference/tools/pipeline_contract.py:2222:    expected_candidate_sha256: str | None = None,
+/reference/tools/pipeline_contract.py:2233:        expected_candidate_sha256=expected_candidate_sha256,
+/reference/tools/migrate_six_stage_layout.py:147:def _tree_hash(path: Path, label: str) -> str:
+/reference/tools/migrate_six_stage_layout.py:149:        return pipeline_contract.sha256_tree(path)
+/reference/tools/migrate_six_stage_layout.py:202:        "source_sha256": _tree_hash(task, "schema-v2 task"),
+/reference/tools/migrate_six_stage_layout.py:295:                "sha256": hashlib.sha256(data).hexdigest(),
+/reference/tools/migrate_six_stage_layout.py:312:        "legacy_session_sha256": (
+/reference/tools/migrate_six_stage_layout.py:313:            hashlib.sha256(session_bytes).hexdigest()
+/reference/tools/migrate_six_stage_layout.py:419:        item["sha256"] for item in persistent_evidence
+/reference/tools/migrate_six_stage_layout.py:421:    stage1_hashes = sorted(item["sha256"] for item in stage1_evidence)
+/reference/tools/migrate_six_stage_layout.py:437:        "legacy_session_sha256": hashlib.sha256(
+/reference/tools/migrate_six_stage_layout.py:441:        "stage1_result_sha256": hashlib.sha256(
+/reference/tools/migrate_six_stage_layout.py:444:        "stage1_invocation_sha256": hashlib.sha256(
+/reference/tools/migrate_six_stage_layout.py:482:        "source_sha256": _tree_hash(run, "schema-v2 run"),
+/reference/tools/migrate_six_stage_layout.py:484:        "runner_state_sha256": _tree_hash(state, "schema-v2 runner state"),
+/reference/tools/migrate_six_stage_layout.py:631:def _copy_tree(source: Path, destination: Path, expected_hash: str) -> None:
+/reference/tools/migrate_six_stage_layout.py:808:        if hashlib.sha256(session_bytes).hexdigest() != (
+/reference/tools/migrate_six_stage_layout.py:809:            session_provenance.get("legacy_session_sha256")
+/reference/tools/migrate_six_stage_layout.py:954:            if hashlib.sha256(legacy_session.read_bytes()).hexdigest() != (
+/reference/tools/migrate_six_stage_layout.py:955:                session_provenance.get("legacy_session_sha256")
+/reference/tools/migrate_six_stage_layout.py:1027:    source_hash = run_plan.get("source_sha256")
+/reference/tools/migrate_six_stage_layout.py:1028:    state_hash = run_plan.get("runner_state_sha256")
+/reference/tools/migrate_six_stage_layout.py:1283:        ) != run.get("source_sha256"):
+/reference/tools/migrate_six_stage_layout.py:1291:        ) != run.get("runner_state_sha256"):
+/reference/tools/migrate_six_stage_layout.py:1372:        if not _valid_digest(entry.get("original_sha256")) or not _valid_digest(
+/reference/tools/migrate_six_stage_layout.py:1373:            entry.get("migrated_sha256")
+/reference/tools/migrate_six_stage_layout.py:1413:    original = entry["original_sha256"]
+/reference/tools/migrate_six_stage_layout.py:1414:    migrated = entry["migrated_sha256"]
+/reference/tools/migrate_six_stage_layout.py:1480:            "original_sha256"
+/reference/tools/migrate_six_stage_layout.py:1483:        _discard_verified_backup(entry, entry.get("migrated_sha256"))
+/reference/tools/migrate_six_stage_layout.py:1500:            "migrated_sha256"
+/reference/tools/migrate_six_stage_layout.py:1503:        _discard_verified_backup(entry, entry.get("original_sha256"))
+/reference/tools/migrate_six_stage_layout.py:1584:                    "original_sha256": run["source_sha256"],
+/reference/tools/migrate_six_stage_layout.py:1585:                    "migrated_sha256": _tree_hash(
+/reference/tools/migrate_six_stage_layout.py:1596:                    "original_sha256": run["runner_state_sha256"],
+/reference/tools/migrate_six_stage_layout.py:1597:                    "migrated_sha256": _tree_hash(
+/reference/tools/check_kit_bundle.py:56:def hash_file(path: Path, expected_mode: str) -> str:
+/reference/tools/check_kit_bundle.py:67:        digest = hashlib.sha256()
+/reference/tools/check_kit_bundle.py:86:def hash_files(root: Path) -> dict[str, str]:
+/reference/tools/check_kit_bundle.py:146:            files[relative] = hashlib.sha256(
+    return len(masked_text) + 1
+
+
+def _modules(masked_text: str) -> tuple[_Module, ...]:
+    modules: list[_Module] = []
+    open_module: tuple[
+        str, int, list[str], list[_Sentence]
+    ] | None = None
+    open_rule_until = 0
+    for line_start, line_end, keyword, rest in _line_heads(masked_text):
+        if line_start < open_rule_until:
+            continue
+        open_rule_until = 0
+        separated = bool(rest) and rest[0] in " \t"
+        if keyword == "module":
+            if not separated:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            named = _MODULE_NAME_RE.fullmatch(rest)
+            if named is None or open_module is not None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            open_module = (named.group("name"), line_end, [], [])
+            continue
+        if keyword == "endmodule":
+            if rest.strip():
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            if open_module is None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            name, content_start, imports, sentences = open_module
+            modules.append(
+                _Module(
+                    name=name,
+                    content_start=content_start,
+                    content_end=line_start,
+                    imports=tuple(imports),
+                    sentences=tuple(sentences),
+                )
+            )
+            open_module = None
+            continue
+        if open_module is not None and keyword == "rule":
+            open_module[3].append(
+                _Sentence(keyword=keyword, start=line_start)
+            )
+            open_rule_until = _rule_bubble_end(masked_text, line_start)
+            continue
+        if open_module is not None and keyword == "imports" and separated:
+            imported = rest.strip().split()
+            if len(imported) != 1:
+                raise KRuleInventoryError(
+                    "verification.k has malformed imports"
+                )
+            open_module[2].append(imported[0])
+        if (
+            open_module is not None
+            and keyword in _OUTER_SENTENCE_KEYWORDS
+            and separated
+        ):
+            open_module[3].append(
+                _Sentence(keyword=keyword, start=line_start)
+            )
+    if not modules or open_module is not None:
+        raise KRuleInventoryError(
+            "verification.k has malformed module boundaries"
+        )
+    return tuple(modules)
+
+
+def _verification_module(
+    modules: tuple[_Module, ...], selected_name: str | None = None
+) -> _Module:
+    if selected_name is not None:
+        selected = [module for module in modules if module.name == selected_name]
+        if len(selected) != 1:
+            raise KRuleInventoryError(
+                "prove.sh selects an unknown verification main module: "
+                + selected_name
+            )
+        return selected[0]
+    candidates = [
+        module
+        for module in modules
+        if module.name.endswith("VERIFICATION")
+        and not module.name.endswith("-SYNTAX")
+    ]
+    if len(candidates) != 1:
+        raise KRuleInventoryError(
+            "verification.k must contain exactly one verification module"
+        )
+    return candidates[0]
+
+
+def _last_verification_main_module(workspace: Path) -> str | None:
+    script = workspace / "prove.sh"
+    if not script.exists() and not script.is_symlink():
+        return None
+    try:
+        mode = script.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(f"cannot inspect prove.sh: {script}") from error
+    if not stat.S_ISREG(mode):
+        raise KRuleInventoryError(f"prove.sh must be a regular file: {script}")
+    try:
+        text = script.read_text()
+    except (OSError, UnicodeError) as error:
+        raise KRuleInventoryError(f"cannot read prove.sh: {script}") from error
+    logical = re.sub(r"\\\r?\n", " ", text)
+    selected: str | None = None
+    for line in logical.splitlines():
+        code = line.split("#", 1)[0]
+        if not re.search(r"(?:^|[;&|]\s*)kompile\s+", code):
+            continue
+        if re.search(r"(?:^|\s)(?:\./)?verification\.k(?:\s|$)", code) is None:
+            continue
+        match = re.search(
+            r"(?:^|\s)--main-module(?:=|\s+)([A-Za-z][A-Za-z0-9_'-]*)",
+            code,
+        )
+        if match is not None:
+            selected = match.group(1)
+    return selected
+
+
+def _verification_closure(
+    modules: tuple[_Module, ...], verification: _Module
+) -> tuple[_Module, ...]:
+    by_name = {module.name: module for module in modules}
+    reached: set[str] = set()
+    pending = [verification.name]
+    while pending:
+        name = pending.pop()
+        if name in reached:
+            continue
+        reached.add(name)
+        module = by_name.get(name)
+        if module is not None:
+            pending.extend(module.imports)
+    return tuple(module for module in modules if module.name in reached)
+
+
+def _without_comments(text: str) -> str:
+    """Remove K comments while preserving strings and their exact contents."""
+
+    output: list[str] = []
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                output.append(character)
+                state = "code"
+            index += 1
+            continue
+        if state == "string":
+            output.append(character)
+            if character == "\\" and following:
+                output.append(following)
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character in "\r\n":
+                output.append(character)
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output.append(" ")
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output.append(" ")
+            state = "block-comment"
+            block_depth = 1
+            index += 2
+            continue
+        output.append(character)
+        if character == '"':
+            state = "string"
+        index += 1
+    return "".join(output)
+
+
+def _attribute_tokens(text: str, masked_text: str) -> list[str]:
+    tokens: list[str] = []
+    start = 0
+    depth = 0
+    for index, character in enumerate(masked_text):
+        if character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth = max(depth - 1, 0)
+        elif character == "," and depth == 0:
+            token = _without_comments(text[start:index]).strip()
+            if token:
+                tokens.append(token)
+            start = index + 1
+    final = _without_comments(text[start:]).strip()
+    if final:
+        tokens.append(final)
+    return tokens
+
+
+def _rule_spans(text: str, module: _Module) -> list[_RuleSpan]:
+    masked_text = _mask_non_code(text)
+    sentences = module.sentences
+    rules: list[_RuleSpan] = []
+    seen_hashes: set[str] = set()
+    for index, sentence in enumerate(sentences):
+        if sentence.keyword != "rule":
+            continue
+        end_offset = (
+            sentences[index + 1].start
+            if index + 1 < len(sentences)
+            else module.content_end
+        )
+        start_offset = sentence.start
+        raw_segment = text[start_offset:end_offset]
+        masked_segment = masked_text[start_offset:end_offset]
+        logical_length = len(masked_segment.rstrip(" \t\r\n"))
+        if logical_length == 0:
+            continue
+        rule_text = raw_segment[:logical_length].rstrip(" \t\r\n")
+        masked_rule = _mask_non_code(rule_text)
+        attribute_match = _TRAILING_ATTRIBUTES_RE.search(masked_rule)
+        attribute_start = None
+        attribute_end = None
+        attributes: list[str] = []
+        if attribute_match is not None:
+            attribute_start = attribute_match.start("attributes")
+            attribute_end = attribute_match.end("attributes")
+            attributes = _attribute_tokens(
+                rule_text[attribute_start:attribute_end],
+                masked_rule[attribute_start:attribute_end],
+            )
+        normalized = " ".join(rule_text.split())
+        digest = hashlib.sha256(normalized.encode()).hexdigest()
+        if digest in seen_hashes:
+            raise KRuleInventoryError(
+                f"duplicate normalized simplification rule hash: {digest}"
+            )
+        seen_hashes.add(digest)
+        start_line = text.count("\n", 0, start_offset) + 1
+        end_line = start_line + rule_text.count("\n")
+        rule = KRule(
+            source_rule_id=f"rule-{digest}",
+            module=module.name,
+            start_line=start_line,
+            end_line=end_line,
+            normalized_sha256=digest,
+            attributes=attributes,
+            text=rule_text,
+        )
+        rules.append(
+            _RuleSpan(
+                rule=rule,
+                start_offset=start_offset,
+                end_offset=start_offset + len(rule_text),
+                attribute_start=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.start()
+                ),
+                attribute_end=(
+                    None
+                    if attribute_match is None
+                    else start_offset + attribute_match.end()
+                ),
+            )
+        )
+    return rules
+
+
+def _rule_documents(
+    text: str, modules: tuple[_Module, ...]
+) -> list[dict[str, Any]]:
+    spans = [span for module in modules for span in _rule_spans(text, module)]
+    spans.sort(key=lambda span: span.start_offset)
+    return [dataclasses.asdict(span.rule) for span in spans]
+
+
+def _attribute_token_spans(
+    text: str,
+    masked_text: str,
+) -> list[tuple[int, int, str]]:
+    spans: list[tuple[int, int, str]] = []
+    start = 0
+    depth = 0
+    for index, character in enumerate(masked_text):
+        if character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth = max(depth - 1, 0)
+        elif character == "," and depth == 0:
+            spans.append(
+                (
+                    start,
+                    index,
+                    _without_comments(text[start:index]).strip(),
+                )
+            )
+            start = index + 1
+    spans.append(
+        (
+            start,
+            len(text),
+            _without_comments(text[start:]).strip(),
+        )
+    )
+    return spans
+
+
+def _blank_non_newlines(text: str) -> str:
+    return "".join(
+        character if character in "\r\n" else " "
+        for character in text
+    )
+
+
+def desimplify_rule_ids(
+    text: str,
+    source_rule_ids: list[str],
+) -> str:
+    """Remove simplification from exactly the selected canonical rule IDs."""
+
+    if len(source_rule_ids) != len(set(source_rule_ids)):
+        raise KRuleInventoryError(
+            "exact rule transformation contains a duplicate source rule ID"
+        )
+    selected = set(source_rule_ids)
+    modules = _modules(_mask_non_code(text))
+    spans = [
+        span
+        for local_module in modules
+        for span in _rule_spans(text, local_module)
+    ]
+    by_id = {span.rule.source_rule_id: span for span in spans}
+    unknown = sorted(selected - set(by_id))
+    if unknown:
+        raise KRuleInventoryError(
+            "exact rule transformation names an unknown source rule ID: "
+            + ", ".join(unknown)
+        )
+
+    edits: list[tuple[int, int]] = []
+    for source_rule_id in source_rule_ids:
+        span = by_id[source_rule_id]
+        if span.attribute_start is None or span.attribute_end is None:
+            raise KRuleInventoryError(
+                "selected source rule has no simplification attribute: "
+                f"{source_rule_id}"
+            )
+        attribute_text = text[
+            span.attribute_start + 1 : span.attribute_end - 1
+        ]
+        masked_attributes = _mask_non_code(attribute_text)
+        tokens = _attribute_token_spans(
+            attribute_text,
+            masked_attributes,
+        )
+        matches = [
+            index
+            for index, (_start, _end, token) in enumerate(tokens)
+            if token == "simplification"
+        ]
+        if len(matches) != 1:
+            raise KRuleInventoryError(
+                "selected source rule has ambiguous simplification "
+                f"attributes: {source_rule_id}"
+            )
+        token_index = matches[0]
+        if len(tokens) == 1:
+            edit_start = span.attribute_start
+            edit_end = span.attribute_end
+        elif token_index < len(tokens) - 1:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index][0]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index + 1][0]
+            )
+        else:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index - 1][1]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index][1]
+            )
+        edits.append((edit_start, edit_end))
+
+    transformed = text
+    for start, end in sorted(edits, reverse=True):
+        transformed = (
+            transformed[:start]
+            + _blank_non_newlines(transformed[start:end])
+            + transformed[end:]
+        )
+    return transformed
+
+
+def inventory_verification(workspace: Path) -> dict[str, Any]:
+    workspace = Path(workspace)
+    try:
+        workspace_mode = workspace.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        ) from error
+    if not stat.S_ISDIR(workspace_mode):
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        )
+    verification = workspace / "verification.k"
+    try:
+        verification_mode = verification.stat(
+            follow_symlinks=False
+        ).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace has no regular verification.k: {verification}"
+        ) from error
+    if not stat.S_ISREG(verification_mode):
+        raise KRuleInventoryError(
+            f"workspace has no regular verification.k: {verification}"
+        )
+    try:
+        verification_bytes = verification.read_bytes()
+        text = verification_bytes.decode()
+    except (OSError, UnicodeError) as error:
+        raise KRuleInventoryError(
+            f"cannot read verification.k: {verification}"
+        ) from error
+    masked_text = _mask_non_code(text)
+    modules = _modules(masked_text)
+    module = _verification_module(
+        modules, _last_verification_main_module(workspace)
+    )
+    closure = _verification_closure(modules, module)
+    rule_documents = _rule_documents(text, closure)
+    return {
+        "schema_version": 2,
+        "verification_file": "verification.k",
+        "verification_sha256": hashlib.sha256(verification_bytes).hexdigest(),
+        "verification_module": module.name,
+        "verification_modules": [module.name for module in closure],
+        "rules": rule_documents,
+        "inventory_sha256": canonical_json_sha256(rule_documents),
+    }
+#!/usr/bin/env python3
+"""Validate Stage 3 classifications against the canonical K rule inventory."""
+
+from __future__ import annotations
+
+import json
+import stat
+from pathlib import Path
+from typing import Any
+
+from tools.k_rule_inventory import KRuleInventoryError, inventory_verification
+
+
+_MANIFEST_KEYS = {"schema_version", "inventory_sha256", "rules"}
+_RULE_KEYS = {"source_rule_id", "classification", "rationale"}
+_CLASSIFICATIONS = {
+    "DEFINITION",
+    "OPERATIONAL_RULE",
+    "PROVED_DERIVED_LEMMA",
+    "DOMAIN_LEMMA",
+}
+
+
+class LemmaDiscoveryContractError(RuntimeError):
+    """Raised when a Stage 3 manifest crosses its trust boundary."""
+
+
+def _regular_json(path: Path) -> dict[str, Any]:
+    path = Path(path)
+    try:
+        mode = path.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest must be a regular file: {path}"
+        ) from error
+    if not stat.S_ISREG(mode):
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest must be a regular file: {path}"
+        )
+    try:
+        document = json.loads(path.read_bytes())
+    except (OSError, UnicodeError, ValueError) as error:
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest is malformed: {path}"
+        ) from error
+    if not isinstance(document, dict):
+        raise LemmaDiscoveryContractError(
+            "lemma discovery manifest must be a JSON object"
+        )
+    return document
+
+
+def _exact_keys(
+    document: dict[str, Any], expected: set[str], label: str
+) -> None:
+    unexpected = sorted(set(document) - expected)
+    if unexpected:
+        raise LemmaDiscoveryContractError(
+            f"{label} has unexpected key: {unexpected[0]}"
+        )
+    missing = sorted(expected - set(document))
+    if missing:
+        raise LemmaDiscoveryContractError(
+            f"{label} is missing key: {missing[0]}"
+        )
+
+
+def validate_trust_boundary(
+    workspace: Path, manifest: Path
+) -> dict[str, Any]:
+    try:
+        inventory = inventory_verification(Path(workspace))
+    except KRuleInventoryError as error:
+        raise LemmaDiscoveryContractError(str(error)) from error
+    document = _regular_json(Path(manifest))
+    _exact_keys(document, _MANIFEST_KEYS, "lemma discovery manifest")
+    schema_version = document["schema_version"]
+    if (
+        not isinstance(schema_version, int)
+        or isinstance(schema_version, bool)
+        or schema_version != 2
+    ):
+        raise LemmaDiscoveryContractError(
+            "lemma discovery schema_version must be 2"
+        )
+    if document["inventory_sha256"] != inventory["inventory_sha256"]:
+        raise LemmaDiscoveryContractError(
+            "lemma discovery inventory_sha256 does not match canonical inventory"
+        )
+    entries = document["rules"]
+    if not isinstance(entries, list):
+        raise LemmaDiscoveryContractError(
+            "lemma discovery rules must be a JSON list"
+        )
+    canonical_rules = inventory["rules"]
+    canonical_by_id = {
+        rule["source_rule_id"]: rule for rule in canonical_rules
+    }
+    classified_by_id: dict[str, dict[str, str]] = {}
+    for index, entry in enumerate(entries):
+        label = f"lemma discovery rule {index}"
+        if not isinstance(entry, dict):
+            raise LemmaDiscoveryContractError(f"{label} must be an object")
+        _exact_keys(entry, _RULE_KEYS, label)
+        source_rule_id = entry["source_rule_id"]
+        if not isinstance(source_rule_id, str) or not source_rule_id:
+            raise LemmaDiscoveryContractError(
+                f"{label} source_rule_id must be a nonempty string"
+            )
+        if source_rule_id in classified_by_id:
+            raise LemmaDiscoveryContractError(
+                f"duplicate lemma discovery source_rule_id: {source_rule_id}"
+            )
+        if source_rule_id not in canonical_by_id:
+            raise LemmaDiscoveryContractError(
+                f"unknown lemma discovery source_rule_id: {source_rule_id}"
+            )
+        classification = entry["classification"]
+        if (
+            not isinstance(classification, str)
+            or classification not in _CLASSIFICATIONS
+        ):
+            raise LemmaDiscoveryContractError(
+                f"{label} classification must be DEFINITION, "
+                "OPERATIONAL_RULE, PROVED_DERIVED_LEMMA, or DOMAIN_LEMMA"
+            )
+        canonical_rule = canonical_by_id[source_rule_id]
+        if (
+            "simplification" in canonical_rule["attributes"]
+            and classification
+            in {"OPERATIONAL_RULE", "PROVED_DERIVED_LEMMA"}
+        ):
+            raise LemmaDiscoveryContractError(
+                f"{label} simplification rule must be classified as "
+                "DEFINITION or DOMAIN_LEMMA"
+            )
+        rationale = entry["rationale"]
+        if not isinstance(rationale, str) or not rationale.strip():
+            raise LemmaDiscoveryContractError(
+                f"{label} rationale must be a nonempty string"
+            )
+        classified_by_id[source_rule_id] = {
+            "classification": classification,
+            "rationale": rationale,
+        }
+    missing = [
+        rule["source_rule_id"]
+        for rule in canonical_rules
+        if rule["source_rule_id"] not in classified_by_id
+    ]
+    if missing:
+        raise LemmaDiscoveryContractError(
+            f"lemma discovery manifest is missing source_rule_id: {missing[0]}"
+        )
+    definitions: list[dict[str, Any]] = []
+    operational_rules: list[dict[str, Any]] = []
+    proved_derived_lemmas: list[dict[str, Any]] = []
+    domain_lemmas: list[dict[str, Any]] = []
+    for rule in canonical_rules:
+        classification = classified_by_id[rule["source_rule_id"]]
+        classified_rule = {**rule, **classification}
+        role = classification["classification"]
+        if role == "DEFINITION":
+            definitions.append(classified_rule)
+        elif role == "OPERATIONAL_RULE":
+            operational_rules.append(classified_rule)
+        elif role == "PROVED_DERIVED_LEMMA":
+            proved_derived_lemmas.append(classified_rule)
+        else:
+            domain_lemmas.append(classified_rule)
+    return {
+        **inventory,
+        "definitions": definitions,
+        "operational_rules": operational_rules,
+        "proved_derived_lemmas": proved_derived_lemmas,
+        "domain_lemmas": domain_lemmas,
+    }

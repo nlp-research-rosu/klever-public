@@ -1,0 +1,352 @@
+Script started on 2026-07-28 18:08:11-05:00 [<not executed on terminal>]
+$ nl -ba /reference/k-proof/solution.py
+     1	def decimal_to_binary(decimal):
+     2	    return "db" + bin(decimal)[2:] + "db"
+$ nl -ba /reference/k-proof/solution.mpy
+     1	Module(
+     2	  FuncDef("decimal_to_binary", Params("decimal"),
+     3	    Return(
+     4	      BinOp(
+     5	        "+",
+     6	        BinOp(
+     7	          "+",
+     8	          Str("db"),
+     9	          Subscript(
+    10	            Call(Name("bin"), Name("decimal")),
+    11	            Slice(Int(2), NoBound, NoBound))),
+    12	        Str("db")))))
+$ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim <k>
+     7	          #runDecimalToBinary(N)
+     8	        =>
+     9	          str(
+    10	            iCons(
+    11	              100,
+    12	              iCons(
+    13	                98,
+    14	                seqConcat(
+    15	                  binCodes(N),
+    16	                  iCons(100, iCons(98, .IntSeq))))))
+    17	        </k>
+    18	        <env> 0 </env>
+    19	        <scopes>
+    20	           0 |-> scope(.Map, parent(-1))
+    21	          -1 |-> builtinsScope
+    22	        </scopes>
+    23	        <scopeLoc> 1 </scopeLoc>
+    24	        <heap> .Map </heap>
+    25	        <heapLoc> 0 </heapLoc>
+    26	        <stack> .List </stack>
+    27	        <ret> noRet </ret>
+    28	        <exc> NoExc </exc>
+    29	        <exit-code> 0 </exit-code>
+    30	    requires N >=Int 0
+    31	    [label(decimal-to-binary-correct)]
+    32	endmodule
+$ nl -ba /reference/k-proof/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 -m py_compile solution.py
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	python3 py2mpy.py smoke.py > smoke.mpy
+     7	
+     8	kompile reference-semantics/semantics.k \
+     9	  --backend llvm \
+    10	  --main-module MPY-KRUN \
+    11	  --syntax-module MPY-SYNTAX \
+    12	  --output-definition runtime-kompiled
+    13	
+    14	krun solution.mpy \
+    15	  --definition runtime-kompiled \
+    16	  --output none
+    17	
+    18	krun smoke.mpy \
+    19	  --definition runtime-kompiled \
+    20	  --output none
+    21	
+    22	kompile verification.k \
+    23	  --backend haskell \
+    24	  --main-module VERIFICATION \
+    25	  --syntax-module MPY-SYNTAX \
+    26	  --output-definition verification-kompiled
+    27	
+    28	kprove spec.k \
+    29	  --definition verification-kompiled \
+    30	  --spec-module SPEC \
+    31	  --output pretty
+$ nl -ba /reference/k-proof/reference-semantics/semantics/subscript.k | sed -n 50,140p
+    50	  rule <k> #evalB(NoBound)  => noB ... </k>
+    51	  rule <k> #evalB(E:Expr)   => E ~> #toSome ... </k>
+    52	  rule <k> I:Int ~> #toSome => someB(I) ... </k>
+    53	
+    54	  rule <k> Subscript(OBJ:Val, Slice(LO:Bound, HI:Bound, ST:Bound)) => #evalB(LO) ~> #slLo(OBJ, HI, ST) ... </k>
+    55	  rule <k> LO:OptInt ~> #slLo(OBJ:Val, HI:Bound, ST:Bound)   => #evalB(HI) ~> #slHi(OBJ, LO, ST) ... </k>
+    56	  rule <k> HI:OptInt ~> #slHi(OBJ:Val, LO:OptInt, ST:Bound)  => #evalB(ST) ~> #slStep(OBJ, LO, HI) ... </k>
+    57	  // a list slice constructs a NEW object; a str slice stays a value
+    58	  rule <k> ST:OptInt ~> #slStep(list(VS:ValSeq), LO:OptInt, HI:OptInt)
+    59	        => #alloc(doSlice(list(VS), LO, HI, ST)) ... </k>
+    60	       [priority(45)]
+    61	  rule <k> ST:OptInt ~> #slStep(OBJ:Val, LO:OptInt, HI:OptInt) => doSlice(OBJ, LO, HI, ST) ... </k>
+    62	
+    63	  syntax Val ::= doSlice(Val, OptInt, OptInt, OptInt) [function]
+    64	  rule doSlice(list(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    65	    => list(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))
+    66	  rule doSlice(tuple(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    67	    => tuple(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))
+    68	  rule doSlice(str(IS:IntSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    69	    => str(buildIS(IS, slStart(LO, ST, isLen(IS)), slStop(HI, ST, isLen(IS)), slStep(ST)))
+    70	
+    71	  // ==== slice.indices: step / start / stop / clamp ==========================
+    72	  syntax Int ::= slStep(OptInt) [function, total]
+    73	  rule slStep(noB)          => 1
+    74	  rule slStep(someB(S:Int)) => S
+    75	
+    76	  syntax Int ::= slStart(OptInt, OptInt, Int) [function]
+    77	  rule slStart(noB,          ST:OptInt, _LEN:Int) => 0
+    78	       requires slStep(ST) >Int 0
+    79	  rule slStart(noB,          ST:OptInt, LEN:Int)  => LEN -Int 1
+    80	       requires slStep(ST) <Int 0
+    81	  rule slStart(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))
+    82	
+    83	  syntax Int ::= slStop(OptInt, OptInt, Int) [function]
+    84	  rule slStop(noB,          ST:OptInt, LEN:Int)  => LEN
+    85	       requires slStep(ST) >Int 0
+    86	  rule slStop(noB,          ST:OptInt, _LEN:Int) => -1
+    87	       requires slStep(ST) <Int 0
+    88	  rule slStop(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))
+    89	
+    90	  syntax Int ::= slAdjust(Int, Int, Int) [function, total]
+    91	  rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampLo(I +Int LEN, STEP)
+    92	       requires I  <Int 0
+    93	  rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampHi(I, LEN, STEP)
+    94	       requires I >=Int 0
+    95	
+    96	  syntax Int ::= clampLo(Int, Int) [function, total]
+    97	  rule clampLo(J:Int, _STEP:Int) => J
+    98	       requires J >=Int 0
+    99	  rule clampLo(J:Int, STEP:Int)  => #if STEP <Int 0 #then -1 #else 0 #fi
+   100	       requires J <Int 0
+   101	
+   102	  syntax Int ::= clampHi(Int, Int, Int) [function, total]
+   103	  rule clampHi(I:Int, LEN:Int, _STEP:Int) => I
+   104	       requires I  <Int LEN
+   105	  rule clampHi(I:Int, LEN:Int, STEP:Int)  => #if STEP <Int 0 #then LEN -Int 1 #else LEN #fi
+   106	       requires I >=Int LEN
+   107	
+   108	  // ==== build the strided sub-sequence (indices in range by construction) ====
+   109	  syntax ValSeq ::= buildVS(ValSeq, Int, Int, Int) [function]
+   110	  rule buildVS(VS:ValSeq, I:Int, STOP:Int, STEP:Int)
+   111	    => vCons(valSeqAt(VS, I), buildVS(VS, I +Int STEP, STOP, STEP))
+   112	       requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)
+   113	  rule buildVS(_:ValSeq, I:Int, STOP:Int, STEP:Int) => .ValSeq
+   114	       requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))
+   115	
+   116	  syntax IntSeq ::= buildIS(IntSeq, Int, Int, Int) [function]
+   117	  rule buildIS(IS:IntSeq, I:Int, STOP:Int, STEP:Int)
+   118	    => iCons(intSeqAt(IS, I), buildIS(IS, I +Int STEP, STOP, STEP))
+   119	       requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)
+   120	  rule buildIS(_:IntSeq, I:Int, STOP:Int, STEP:Int) => .IntSeq
+   121	       requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))
+   122	endmodule
+$ nl -ba /reference/k-proof/reference-semantics/semantics/builtins.k | sed -n 103,125p
+   103	  rule applyBuiltin("min", I:Int, REST:Vals) => minVals(I, REST)
+   104	  rule minVals(M:Int, .Vals)           => M
+   105	  rule minVals(M:Int, (I:Int, R:Vals)) => minVals(minInt(M, I), R)
+   106	
+   107	  // ==== bin(n) — "0b" + binary digit codes (promoted from 103's defined fold) ==
+   108	  rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(48, iCons(98, binCodes(N))))
+   109	       requires N >=Int 0
+   110	  // negative operand: the '-' sign prefixes the magnitude's digits
+   111	  rule applyBuiltin("bin", N:Int, .Vals)
+   112	    => str(iCons(45, iCons(48, iCons(98, binCodes(0 -Int N)))))
+   113	       requires N <Int 0
+   114	  syntax IntSeq ::= binCodes(Int) [function, total]
+   115	  rule binCodes(0) => iCons(48, .IntSeq)
+   116	  rule binCodes(N:Int) => binAcc(N, .IntSeq) requires N >Int 0
+   117	  syntax IntSeq ::= binAcc(Int, IntSeq) [function, total]
+   118	  rule binAcc(0, ACC:IntSeq) => ACC
+   119	  rule binAcc(N:Int, ACC:IntSeq)
+   120	    => binAcc((N -Int pyMod(N, 2)) /Int 2, iCons(48 +Int pyMod(N, 2), ACC))
+   121	       requires N >Int 0
+   122	
+   123	  // ==== enumerate(xs) — pairs (i, v); materialized eagerly over a list =========
+   124	  rule <k> #applyK(toCall(builtinV("enumerate")), (list(VS:ValSeq), .Vals))
+   125	        => #alloc(list(enumVS(VS, 0))) ... </k>
+$ nl -ba /candidate/Proof.lean | sed -n 1,190p
+     1	import Klean79DecimalToBinary.Lemmas
+     2	
+     3	namespace Proof
+     4	
+     5	private def intSeqDrop : Nat → SortIntSeq → SortIntSeq
+     6	  | 0, sequence => sequence
+     7	  | _ + 1, SortIntSeq.«.IntSeq_MPY-CORE_IntSeq» =>
+     8	      SortIntSeq.«.IntSeq_MPY-CORE_IntSeq»
+     9	  | count + 1, SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» _ rest =>
+    10	      intSeqDrop count rest
+    11	
+    12	private def valSeqDrop : Nat → SortValSeq → SortValSeq
+    13	  | 0, sequence => sequence
+    14	  | _ + 1, SortValSeq.«.ValSeq_MPY-CORE_ValSeq» =>
+    15	      SortValSeq.«.ValSeq_MPY-CORE_ValSeq»
+    16	  | count + 1, SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» _ rest =>
+    17	      valSeqDrop count rest
+    18	
+    19	private def intSeqToList : SortIntSeq → List SortInt
+    20	  | SortIntSeq.«.IntSeq_MPY-CORE_IntSeq» => []
+    21	  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» value rest =>
+    22	      value :: intSeqToList rest
+    23	
+    24	private def listToIntSeq : List SortInt → SortIntSeq
+    25	  | [] => SortIntSeq.«.IntSeq_MPY-CORE_IntSeq»
+    26	  | value :: rest =>
+    27	      SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» value (listToIntSeq rest)
+    28	
+    29	private def valSeqToList : SortValSeq → List SortVal
+    30	  | SortValSeq.«.ValSeq_MPY-CORE_ValSeq» => []
+    31	  | SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» value rest =>
+    32	      value :: valSeqToList rest
+    33	
+    34	private def listToValSeq : List SortVal → SortValSeq
+    35	  | [] => SortValSeq.«.ValSeq_MPY-CORE_ValSeq»
+    36	  | value :: rest =>
+    37	      SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» value (listToValSeq rest)
+    38	
+    39	private def sliceStep : SortOptInt → SortInt
+    40	  | SortOptInt.«noB_MPY-SUBSCRIPT_OptInt» => 1
+    41	  | SortOptInt.«someB(_)_MPY-SUBSCRIPT_OptInt_Int» step => step
+    42	
+    43	private def adjustSliceIndex (index length step : SortInt) : SortInt :=
+    44	  if index < 0 then
+    45	    let shifted := index + length
+    46	    if 0 ≤ shifted then shifted
+    47	    else if step < 0 then -1 else 0
+    48	  else if index < length then index
+    49	  else if step < 0 then length - 1 else length
+    50	
+    51	private def sliceStart (lower : SortOptInt) (step length : SortInt) : SortInt :=
+    52	  match lower with
+    53	  | SortOptInt.«noB_MPY-SUBSCRIPT_OptInt» =>
+    54	      if 0 < step then 0 else length - 1
+    55	  | SortOptInt.«someB(_)_MPY-SUBSCRIPT_OptInt_Int» index =>
+    56	      adjustSliceIndex index length step
+    57	
+    58	private def sliceStop (upper : SortOptInt) (step length : SortInt) : SortInt :=
+    59	  match upper with
+    60	  | SortOptInt.«noB_MPY-SUBSCRIPT_OptInt» =>
+    61	      if 0 < step then length else -1
+    62	  | SortOptInt.«someB(_)_MPY-SUBSCRIPT_OptInt_Int» index =>
+    63	      adjustSliceIndex index length step
+    64	
+    65	private def enumerateFrom {α : Type} : Nat → List α → List (SortInt × α)
+    66	  | _, [] => []
+    67	  | index, value :: rest =>
+    68	      (Int.ofNat index, value) :: enumerateFrom (index + 1) rest
+    69	
+    70	private def sliceListGeneral {α : Type}
+    71	    (values : List α) (lower upper stepBound : SortOptInt) : Option (List α) :=
+    72	  let step := sliceStep stepBound
+    73	  if step = 0 then none
+    74	  else
+    75	    let length : SortInt := Int.ofNat values.length
+    76	    let start := sliceStart lower step length
+    77	    let stop := sliceStop upper step length
+    78	    if 0 < step then
+    79	      some <| (enumerateFrom 0 values).filterMap fun (index, value) =>
+    80	        if start ≤ index ∧ index < stop ∧ (index - start) % step = 0
+    81	        then some value
+    82	        else none
+    83	    else
+    84	      some <| (enumerateFrom 0 values).reverse.filterMap fun (index, value) =>
+    85	        if index ≤ start ∧ stop < index ∧ (start - index) % (-step) = 0
+    86	        then some value
+    87	        else none
+    88	
+    89	private def sliceIntSeq
+    90	    (sequence : SortIntSeq)
+    91	    (lower upper stepBound : SortOptInt) : Option SortIntSeq :=
+    92	  match lower, upper, stepBound with
+    93	  | SortOptInt.«noB_MPY-SUBSCRIPT_OptInt»,
+    94	      SortOptInt.«noB_MPY-SUBSCRIPT_OptInt»,
+    95	      SortOptInt.«noB_MPY-SUBSCRIPT_OptInt» =>
+    96	      some sequence
+    97	  | SortOptInt.«someB(_)_MPY-SUBSCRIPT_OptInt_Int» index,
+    98	      SortOptInt.«noB_MPY-SUBSCRIPT_OptInt»,
+    99	      SortOptInt.«noB_MPY-SUBSCRIPT_OptInt» =>
+   100	      if 0 ≤ index then some (intSeqDrop index.toNat sequence)
+   101	      else
+   102	        (sliceListGeneral (intSeqToList sequence) lower upper stepBound).map
+   103	          listToIntSeq
+   104	  | _, _, _ =>
+   105	      (sliceListGeneral (intSeqToList sequence) lower upper stepBound).map
+   106	        listToIntSeq
+   107	
+   108	private def sliceValSeq
+   109	    (sequence : SortValSeq)
+   110	    (lower upper stepBound : SortOptInt) : Option SortValSeq :=
+   111	  match lower, upper, stepBound with
+   112	  | SortOptInt.«noB_MPY-SUBSCRIPT_OptInt»,
+   113	      SortOptInt.«noB_MPY-SUBSCRIPT_OptInt»,
+   114	      SortOptInt.«noB_MPY-SUBSCRIPT_OptInt» =>
+   115	      some sequence
+   116	  | SortOptInt.«someB(_)_MPY-SUBSCRIPT_OptInt_Int» index,
+   117	      SortOptInt.«noB_MPY-SUBSCRIPT_OptInt»,
+   118	      SortOptInt.«noB_MPY-SUBSCRIPT_OptInt» =>
+   119	      if 0 ≤ index then some (valSeqDrop index.toNat sequence)
+   120	      else
+   121	        (sliceListGeneral (valSeqToList sequence) lower upper stepBound).map
+   122	          listToValSeq
+   123	  | _, _, _ =>
+   124	      (sliceListGeneral (valSeqToList sequence) lower upper stepBound).map
+   125	        listToValSeq
+   126	
+   127	/- KORE symbol: LbldoSlice'LParUndsCommUndsCommUndsCommUndsRParUnds'MPY-SUBSCRIPT'Unds'Val'Unds'Val'Unds'OptInt'Unds'OptInt'Unds'OptInt; frozen source obligations: rule-d413ecca2d0d055a04bc2f4fe8404284cf3025dc1bb61dd03e2d09244027583b. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   128	/- The generated Lean signature is total although the K symbol is partial.
+   129	   List, tuple, and string inputs with nonzero steps follow the frozen
+   130	   slStart/slStop/slStep/buildVS/buildIS equations above. For K-stuck inputs
+   131	   (an unsupported value or a zero step), the original value is preserved
+   132	   because SortVal has no constructor for an unreduced doSlice application. -/
+   133	def «doSlice(_,_,_,_)_MPY-SUBSCRIPT_Val_Val_OptInt_OptInt_OptInt»
+   134	    (value : SortVal)
+   135	    (lower upper stepBound : SortOptInt) : SortVal :=
+   136	  match value with
+   137	  | SortVal.inj_SortStr (SortStr.«str(_)_MPY-CORE_Str_IntSeq» sequence) =>
+   138	      match sliceIntSeq sequence lower upper stepBound with
+   139	      | some result =>
+   140	          SortVal.inj_SortStr (SortStr.«str(_)_MPY-CORE_Str_IntSeq» result)
+   141	      | none => value
+   142	  | SortVal.inj_SortIterable
+   143	      (SortIterable.inj_SortStr (SortStr.«str(_)_MPY-CORE_Str_IntSeq» sequence)) =>
+   144	      match sliceIntSeq sequence lower upper stepBound with
+   145	      | some result =>
+   146	          SortVal.inj_SortStr (SortStr.«str(_)_MPY-CORE_Str_IntSeq» result)
+   147	      | none => value
+   148	  | SortVal.inj_SortIterable
+   149	      (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq» sequence) =>
+   150	      match sliceValSeq sequence lower upper stepBound with
+   151	      | some result =>
+   152	          SortVal.inj_SortIterable
+   153	            (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq» result)
+   154	      | none => value
+   155	  | SortVal.inj_SortIterable
+   156	      (SortIterable.«tuple(_)_MPY-CORE_Iterable_ValSeq» sequence) =>
+   157	      match sliceValSeq sequence lower upper stepBound with
+   158	      | some result =>
+   159	          SortVal.inj_SortIterable
+   160	            (SortIterable.«tuple(_)_MPY-CORE_Iterable_ValSeq» result)
+   161	      | none => value
+   162	  | _ => value
+   163	
+   164	theorem final :
+   165	    Klean79DecimalToBinary.Lemmas.targetStatement «doSlice(_,_,_,_)_MPY-SUBSCRIPT_Val_Val_OptInt_OptInt_OptInt» := by
+   166	  intro REST _SECOND _FIRST
+   167	  rfl
+   168	
+   169	end Proof
+
+Script done on 2026-07-28 18:08:11-05:00 [COMMAND_EXIT_CODE="0"]

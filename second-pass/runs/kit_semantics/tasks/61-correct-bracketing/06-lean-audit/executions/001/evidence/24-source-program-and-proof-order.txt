@@ -1,0 +1,86 @@
+COMMAND: inspect frozen source contract, solution, and exact domain-lemma use
+--- prompt.py ---
+     1	
+     2	
+     3	def correct_bracketing(brackets: str):
+     4	    """ brackets is a string of "(" and ")".
+     5	    return True if every opening bracket has a corresponding closing bracket.
+     6	
+     7	    >>> correct_bracketing("(")
+     8	    False
+     9	    >>> correct_bracketing("()")
+    10	    True
+    11	    >>> correct_bracketing("(()())")
+    12	    True
+    13	    >>> correct_bracketing(")(()")
+    14	    False
+    15	    """
+--- solution.py ---
+     1	def correct_bracketing(brackets: str):
+     2	    balance = 0
+     3	    valid = True
+     4	    for bracket in brackets:
+     5	        if bracket == "(":
+     6	            balance += 1
+     7	        else:
+     8	            balance -= 1
+     9	        if balance < 0:
+    10	            valid = False
+    11	    return valid and balance == 0
+--- verification.k relevant rules ---
+     8	  // Mathematical scan of the unprocessed suffix.  The third argument records
+     9	  // whether every prefix processed so far had nonnegative balance.
+    10	  syntax Bool ::= scanBrackets(IntSeq, Int, Bool) [function, total]
+    11	  rule scanBrackets(.IntSeq, B:Int, V:Bool)
+    12	    => V andBool B ==Int 0
+    13	  rule scanBrackets(iCons(C:Int, REST:IntSeq), B:Int, V:Bool)
+    14	    => scanBrackets(
+    15	         REST,
+    16	         #if C ==Int 40 #then B +Int 1 #else B -Int 1 #fi,
+    17	         keepValid(
+    18	           #if C ==Int 40 #then B +Int 1 #else B -Int 1 #fi,
+    19	           V))
+    20	
+    21	  // This is the source-level `if balance < 0: valid = False`.
+    22	  syntax Bool ::= keepValid(Int, Bool) [function, total]
+    23	  rule keepValid(B:Int, _:Bool) => false requires B <Int 0
+    24	  rule keepValid(B:Int, V:Bool) => V     requires B >=Int 0
+    25	
+    26	  // The backend does not otherwise simplify this polymorphic conditional from
+    27	  // the symbolic disequality emitted by the source-level `else` branch.
+    28	  rule (#if C ==Int 40 #then _X:Int #else Y:Int #fi) => Y
+    29	    requires C =/=Int 40
+    30	    [simplification]
+    31	
+    32	  // Exact formalization of prompt.py's input domain.
+    33	  syntax Bool ::= bracketInput(IntSeq) [function, total]
+    34	  rule bracketInput(.IntSeq) => true
+    35	  rule bracketInput(iCons(C:Int, REST:IntSeq))
+    36	    => (C ==Int 40 orBool C ==Int 41) andBool bracketInput(REST)
+    37	endmodule
+--- prove.sh ordering ---
+    25	echo "== Compile the bridge-free symbolic definition =="
+    26	kompile verification.k \
+    27	  --backend haskell \
+    28	  --main-module VERIFICATION \
+    29	  --syntax-module MPY-SYNTAX \
+    30	  --output-definition verification-kompiled
+    31	
+    32	echo "== Positive proof 1: universal loop theorem, bridge-free =="
+    33	kprove spec.k \
+    34	  --definition verification-kompiled \
+    35	  --spec-module SPEC \
+    36	  --claims SPEC.loop
+    37	
+    38	echo "== Compile the proved loop theorem as an exact operational lemma =="
+    39	kompile verification-with-loop.k \
+    40	  --backend haskell \
+    41	  --main-module VERIFICATION-WITH-LOOP \
+    42	  --syntax-module MPY-SYNTAX \
+    43	  --output-definition verification-with-loop-kompiled
+    44	
+    45	echo "== Positive proof 2: exact whole-program entry theorem =="
+    46	kprove spec.k \
+    47	  --definition verification-with-loop-kompiled \
+    48	  --spec-module SPEC \
+    49	  --claims SPEC.correct-bracketing

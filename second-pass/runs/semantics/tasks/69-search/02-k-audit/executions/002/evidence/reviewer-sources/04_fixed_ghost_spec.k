@@ -1,0 +1,22 @@
+requires "04_fixed_ghost.k"
+
+module SEARCH-FIXED-GHOST-SPEC
+  imports SEARCH-FIXED-GHOST
+
+  claim
+    <k> Call(Name("search"), list(oneSeq), .Exprs) => 1 </k>
+    <env> 0 </env>
+    <scopes>
+      0 |-> scope(
+             "search" |-> closureVal("lst", .ParamNames, #searchBody, 0),
+             parent(-1))
+      -1 |-> builtinsScope
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+endmodule

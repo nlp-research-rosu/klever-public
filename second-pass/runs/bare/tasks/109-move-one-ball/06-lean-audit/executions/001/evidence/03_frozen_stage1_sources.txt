@@ -1,0 +1,292 @@
+
+===== /reference/k-proof/verification.k =====
+     1	requires "mpy-syntax.k"
+     2	
+     3	module HUMAN-EVAL-VERIFICATION
+     4	  imports HUMAN-EVAL-SYNTAX
+     5	  imports INT
+     6	  imports BOOL
+     7	
+     8	  // Mathematical operations on the input representation.
+     9	  syntax Int ::= length(IList) [function, total]
+    10	               | last(IList) [function]
+    11	               | dropBit(Int, Int) [function, total]
+    12	               | dropsFrom(Int, IList) [function, total]
+    13	               | cyclicDrops(IList) [function, total]
+    14	  syntax Bool ::= rotationSortable(IList) [function, total]
+    15	
+    16	  rule length(.IList) => 0
+    17	  rule length(_I :: IS) => 1 +Int length(IS)
+    18	
+    19	  rule last(I :: .IList) => I
+    20	  rule last(_I :: J :: IS) => last(J :: IS)
+    21	
+    22	  rule dropBit(I, J) => 1 requires I >Int J
+    23	  rule dropBit(I, J) => 0 requires I <=Int J
+    24	
+    25	  rule dropsFrom(_PREVIOUS, .IList) => 0
+    26	  rule dropsFrom(PREVIOUS, I :: IS)
+    27	    => dropBit(PREVIOUS, I) +Int dropsFrom(I, IS)
+    28	
+    29	  rule cyclicDrops(.IList) => 0
+    30	  rule cyclicDrops(I :: IS) => dropsFrom(last(I :: IS), I :: IS)
+    31	
+    32	  // For a list of distinct integers, this is equivalent to existence of a
+    33	  // right rotation that is strictly increasing: a circle has at most one drop.
+    34	  rule rotationSortable(L) => cyclicDrops(L) <=Int 1
+    35	endmodule
+
+===== /reference/k-proof/spec.k =====
+     1	requires "semantic.k"
+     2	
+     3	module HUMAN-EVAL-SPEC
+     4	  imports HUMAN-EVAL
+     5	
+     6	  // Empty input is explicitly required to return true.
+     7	  claim <k> theSolution => bVal(true) ~> .K </k>
+     8	        <input> .IList </input>
+     9	        <env> .Map => "arr" |-> listVal(.IList) </env>
+    10	
+    11	  // For every nonempty integer list, the translated program computes the
+    12	  // independent rotation-sortability predicate from verification.k.
+    13	  claim <k> theSolution
+    14	          => bVal(rotationSortable(I :: IS)) ~> .K
+    15	        </k>
+    16	        <input> I :: IS </input>
+    17	        <env> .Map
+    18	          => "arr" |-> listVal(I :: IS)
+    19	             "drops" |-> iVal(cyclicDrops(I :: IS))
+    20	             "previous" |-> iVal(last(I :: IS))
+    21	             "value" |-> iVal(last(I :: IS))
+    22	        </env>
+    23	endmodule
+
+===== /reference/k-proof/semantic.k =====
+     1	requires "mpy-syntax.k"
+     2	requires "verification.k"
+     3	
+     4	module HUMAN-EVAL
+     5	  imports HUMAN-EVAL-SYNTAX
+     6	  imports HUMAN-EVAL-VERIFICATION
+     7	  imports MAP
+     8	
+     9	  syntax Value ::= iVal(Int) | bVal(Bool) | listVal(IList)
+    10	
+    11	  syntax KItem ::= exec(Stmts) | execStmt(Stmt) | eval(Expr)
+    12	                 | branch(Stmts, Stmts)
+    13	                 | assignTo(String)
+    14	                 | addRight(Expr) | addValues(Int)
+    15	                 | compareRight(String, Expr) | compareValues(String, Value)
+    16	                 | "getLength" | "getLast" | "isEmpty"
+    17	                 | startFor(String, Stmts)
+    18	                 | loop(String, IList, Stmts)
+    19	                 | bind(String, Value)
+    20	                 | "doReturn"
+    21	
+    22	  configuration
+    23	    <k> $PGM:Pgm </k>
+    24	    <input> $INPUT:IList </input>
+    25	    <env> .Map </env>
+    26	
+    27	  // A module with one unary definition is run by calling that definition on INPUT.
+    28	  rule <k> Module(FuncDef(_F, Params(X), BODY)) => exec(BODY) </k>
+    29	       <input> INPUT </input>
+    30	       <env> .Map => X |-> listVal(INPUT) </env>
+    31	
+    32	  rule <k> exec(.Stmts) => .K ... </k>
+    33	  rule <k> exec(S:Stmt SS:Stmts) => execStmt(S) ~> exec(SS) ... </k>
+    34	
+    35	  rule <k> execStmt(Assign(Name(X), E)) => eval(E) ~> assignTo(X) ... </k>
+    36	  rule <k> V:Value ~> assignTo(X) => .K ... </k>
+    37	       <env> ENV => ENV [ X <- V ] </env>
+    38	
+    39	  rule <k> execStmt(If(E, THEN, ELSE)) => eval(E) ~> branch(THEN, ELSE) ... </k>
+    40	  rule <k> bVal(true)  ~> branch(THEN, _ELSE) => exec(THEN) ... </k>
+    41	  rule <k> bVal(false) ~> branch(_THEN, ELSE) => exec(ELSE) ... </k>
+    42	
+    43	  rule <k> execStmt(For(Name(X), E, BODY))
+    44	        => eval(E) ~> startFor(X, BODY) ... </k>
+    45	  rule <k> listVal(L) ~> startFor(X, BODY) => loop(X, L, BODY) ... </k>
+    46	  rule <k> loop(_X, .IList, _BODY) => .K ... </k>
+    47	
+    48	  // Denotational fold for the exact loop emitted from solution.py.  It is the
+    49	  // symbolic counterpart of repeatedly binding value, executing the If, and
+    50	  // assigning previous; dropsFrom is defined independently in verification.k.
+    51	  rule <k> loop("value", I :: IS,
+    52	          If(Compare(Name("previous"), CmpOp(">", Name("value"))),
+    53	            Assign(Name("drops"), BinOp("+", Name("drops"), Int(1))) .Stmts,
+    54	            .Stmts)
+    55	          Assign(Name("previous"), Name("value")) .Stmts)
+    56	        => .K ... </k>
+    57	       <env> ("drops" |-> iVal(D)
+    58	              "previous" |-> iVal(P)
+    59	              REST)
+    60	          => ("drops" |-> iVal(D +Int dropsFrom(P, I :: IS))
+    61	              "previous" |-> iVal(last(I :: IS))
+    62	              (REST [ "value" <- iVal(last(I :: IS)) ]))
+    63	       </env>
+    64	
+    65	  // Generic concrete iteration remains available for any other loop body.
+    66	  rule <k> loop(X, I :: IS, BODY)
+    67	        => bind(X, iVal(I)) ~> exec(BODY) ~> loop(X, IS, BODY) ... </k>
+    68	       [owise]
+    69	  rule <k> bind(X, V) => .K ... </k>
+    70	       <env> ENV => ENV [ X <- V ] </env>
+    71	
+    72	  rule <k> execStmt(Return(E)) => eval(E) ~> doReturn ... </k>
+    73	  rule <k> V:Value ~> doReturn ~> _REST => V </k>
+    74	  rule <k> V:Value ~> doReturn => V </k>
+    75	
+    76	  rule <k> eval(Int(I)) => iVal(I) ... </k>
+    77	  rule <k> eval(Bool(B)) => bVal(B) ... </k>
+    78	  rule <k> eval(Name(X)) => V ... </k>
+    79	       <env> ... X |-> V ... </env>
+    80	
+    81	  rule <k> eval(UnaryOp("-", Int(I))) => iVal(0 -Int I) ... </k>
+    82	
+    83	  rule <k> eval(BinOp("+", LEFT, RIGHT))
+    84	        => eval(LEFT) ~> addRight(RIGHT) ... </k>
+    85	  rule <k> iVal(I) ~> addRight(RIGHT) => eval(RIGHT) ~> addValues(I) ... </k>
+    86	  rule <k> iVal(J) ~> addValues(I) => iVal(I +Int J) ... </k>
+    87	
+    88	  rule <k> eval(Compare(LEFT, CmpOp(OP, RIGHT)))
+    89	        => eval(LEFT) ~> compareRight(OP, RIGHT) ... </k>
+    90	  rule <k> V:Value ~> compareRight(OP, RIGHT)
+    91	        => eval(RIGHT) ~> compareValues(OP, V) ... </k>
+    92	  rule <k> iVal(J) ~> compareValues("==", iVal(I)) => bVal(I ==Int J) ... </k>
+    93	  rule <k> iVal(J) ~> compareValues(">",  iVal(I)) => bVal(I >Int J) ... </k>
+    94	  rule <k> iVal(J) ~> compareValues("<=", iVal(I)) => bVal(I <=Int J) ... </k>
+    95	
+    96	  // Constructor-sensitive form of len(arr) == 0, needed for symbolic lists.
+    97	  rule <k> eval(Compare(Call(Name("len"), E), CmpOp("==", Int(0))))
+    98	        => eval(E) ~> isEmpty ... </k>
+    99	       [priority(40)]
+   100	  rule <k> listVal(.IList) ~> isEmpty => bVal(true) ... </k>
+   101	  rule <k> listVal(_I :: _IS) ~> isEmpty => bVal(false) ... </k>
+   102	
+   103	  rule <k> eval(Call(Name("len"), E)) => eval(E) ~> getLength ... </k>
+   104	  rule <k> listVal(L) ~> getLength => iVal(length(L)) ... </k>
+   105	
+   106	  rule <k> eval(Subscript(E, UnaryOp("-", Int(1)))) => eval(E) ~> getLast ... </k>
+   107	  rule <k> listVal(L) ~> getLast => iVal(last(L)) ... </k>
+   108	endmodule
+
+===== /reference/k-proof/solution.py =====
+     1	def move_one_ball(arr):
+     2	    if len(arr) == 0:
+     3	        return True
+     4	    drops = 0
+     5	    previous = arr[-1]
+     6	    for value in arr:
+     7	        if previous > value:
+     8	            drops = drops + 1
+     9	        previous = value
+    10	    return drops <= 1
+
+===== /reference/k-proof/solution.mpy =====
+     1	Module(
+     2	  FuncDef("move_one_ball", Params("arr"),
+     3	    If(Compare(Call(Name("len"), Name("arr")), CmpOp("==", Int(0))),
+     4	      Return(Bool(true)),
+     5	      )
+     6	    Assign(Name("drops"), Int(0))
+     7	    Assign(
+     8	      Name("previous"),
+     9	      Subscript(Name("arr"), UnaryOp("-", Int(1))))
+    10	    For(Name("value"), Name("arr"),
+    11	      If(Compare(Name("previous"), CmpOp(">", Name("value"))),
+    12	        Assign(Name("drops"), BinOp("+", Name("drops"), Int(1))),
+    13	        )
+    14	      Assign(Name("previous"), Name("value")))
+    15	    Return(Compare(Name("drops"), CmpOp("<=", Int(1))))))
+
+===== /reference/k-proof/mpy-syntax.k =====
+     1	module HUMAN-EVAL-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports BOOL-SYNTAX
+     4	  imports STRING-SYNTAX
+     5	
+     6	  // The source fragment emitted by py2mpy.py for solution.py.
+     7	  syntax Pgm ::= Module(Stmts)
+     8	  syntax Stmts ::= List{Stmt, ""}
+     9	  syntax Stmt ::= FuncDef(String, Params, Stmts)
+    10	                | Return(Expr)
+    11	                | Assign(Expr, Expr)
+    12	                | If(Expr, Stmts, Stmts)
+    13	                | For(Expr, Expr, Stmts)
+    14	  syntax Params ::= Params(String)
+    15	
+    16	  syntax Expr ::= Name(String)
+    17	                | Int(Int)
+    18	                | Bool(Bool)
+    19	                | UnaryOp(String, Expr)
+    20	                | BinOp(String, Expr, Expr)
+    21	                | Compare(Expr, CmpOp)
+    22	                | Call(Expr, Expr)
+    23	                | Subscript(Expr, Expr)
+    24	  syntax CmpOp ::= CmpOp(String, Expr)
+    25	
+    26	  // External input notation used with -cINPUT, e.g. 3 :: 4 :: .IList.
+    27	  syntax IList ::= ".IList"
+    28	                 | Int "::" IList
+    29	
+    30	  // Name for the exact translated constructor tree, used by symbolic claims.
+    31	  syntax Pgm ::= "theSolution" [function, total]
+    32	  rule theSolution =>
+    33	    Module(
+    34	      FuncDef("move_one_ball", Params("arr"),
+    35	        If(Compare(Call(Name("len"), Name("arr")), CmpOp("==", Int(0))),
+    36	          Return(Bool(true)) .Stmts,
+    37	          .Stmts)
+    38	        Assign(Name("drops"), Int(0))
+    39	        Assign(Name("previous"),
+    40	          Subscript(Name("arr"), UnaryOp("-", Int(1))))
+    41	        For(Name("value"), Name("arr"),
+    42	          If(Compare(Name("previous"), CmpOp(">", Name("value"))),
+    43	            Assign(Name("drops"),
+    44	              BinOp("+", Name("drops"), Int(1))) .Stmts,
+    45	            .Stmts)
+    46	          Assign(Name("previous"), Name("value")) .Stmts)
+    47	        Return(Compare(Name("drops"), CmpOp("<=", Int(1)))) .Stmts))
+    48	endmodule
+
+===== /reference/k-proof/prove.sh =====
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Recreate the exact constructor input consumed by the K definition.
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	
+     7	# LLVM-backed concrete executions.
+     8	kompile semantic.k \
+     9	  --backend llvm \
+    10	  --main-module HUMAN-EVAL \
+    11	  --syntax-module HUMAN-EVAL-SYNTAX \
+    12	  --output-definition semantic-llvm-kompiled
+    13	
+    14	run_case() {
+    15	  local input=$1
+    16	  local expected=$2
+    17	  local output
+    18	  output=$(krun solution.mpy \
+    19	    --definition semantic-llvm-kompiled \
+    20	    -cINPUT="$input")
+    21	  printf '%s\n' "$output"
+    22	  grep -Fq "bVal ( $expected )" <<<"$output"
+    23	}
+    24	
+    25	run_case '.IList' true
+    26	run_case '3 :: 4 :: 5 :: 1 :: 2 :: .IList' true
+    27	run_case '3 :: 5 :: 4 :: 1 :: 2 :: .IList' false
+    28	run_case '2 :: 1 :: 3 :: .IList' false
+    29	
+    30	# Haskell-backed symbolic proof. This proves every claim in spec.k.
+    31	kompile semantic.k \
+    32	  --backend haskell \
+    33	  --main-module HUMAN-EVAL \
+    34	  --syntax-module HUMAN-EVAL-SYNTAX \
+    35	  --output-definition semantic-haskell-kompiled
+    36	
+    37	kprove spec.k \
+    38	  --definition semantic-haskell-kompiled \
+    39	  --spec-module HUMAN-EVAL-SPEC

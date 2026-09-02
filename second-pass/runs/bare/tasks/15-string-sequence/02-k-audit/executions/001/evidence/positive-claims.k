@@ -1,0 +1,67 @@
+requires "verification.k"
+
+module AUDIT-LOOP-CLAIM
+  imports VERIFICATION
+
+  claim
+    <mpy>
+      <k> exec(While(loopCondition(), loopBody())) ~> KREST
+         => KREST </k>
+      <env>
+        ( "i"      |-> IVal(I)
+          "n"      |-> IVal(N)
+          "result" |-> SVal(S)
+          REST
+        =>
+          "i"      |-> IVal(indexAfter(I, N))
+          "n"      |-> IVal(N)
+          "result" |-> SVal(sequenceFrom(I, N, S))
+          REST )
+      </env>
+      <functions> _FUNCTIONS </functions>
+      <stack> _STACK </stack>
+    </mpy>
+    requires I >=Int 1 andBool N >=Int 0
+endmodule
+
+module AUDIT-UNIVERSAL-ENTRY
+  imports AUDIT-LOOP-CLAIM
+
+  claim
+    <mpy>
+      <k> init(targetProgram(), N) => SVal(sequence(N)) </k>
+      <env> .Map </env>
+      <functions>
+        .Map => "string_sequence" |-> targetFunction()
+      </functions>
+      <stack> .List </stack>
+    </mpy>
+endmodule
+
+module AUDIT-EXAMPLE-ZERO
+  imports AUDIT-LOOP-CLAIM
+
+  claim
+    <mpy>
+      <k> init(targetProgram(), 0) => SVal("0") </k>
+      <env> .Map </env>
+      <functions>
+        .Map => "string_sequence" |-> targetFunction()
+      </functions>
+      <stack> .List </stack>
+    </mpy>
+endmodule
+
+module AUDIT-EXAMPLE-FIVE
+  imports AUDIT-LOOP-CLAIM
+
+  claim
+    <mpy>
+      <k> init(targetProgram(), 5) => SVal("0 1 2 3 4 5") </k>
+      <env> .Map </env>
+      <functions>
+        .Map => "string_sequence" |-> targetFunction()
+      </functions>
+      <stack> .List </stack>
+    </mpy>
+endmodule

@@ -1,0 +1,405 @@
+COMMAND: bash -lc for\ artifact\ in\ /reference/prompt.py\ /reference/canonical.py\ /reference/py2mpy.py\ /candidate/solution.py\ /candidate/solution.mpy\ /candidate/spec.k\ /candidate/verification.k\ /candidate/prove.sh\ /candidate/smoke.py\ /candidate/smoke.mpy\;\ do\ printf\ \"FILE_BEGIN\ %s\\n\"\ \"\$artifact\"\;\ nl\ -ba\ \"\$artifact\"\;\ printf\ \"FILE_END\ %s\\n\"\ \"\$artifact\"\;\ done 
+EXIT_STATUS: 0
+OUTPUT_BEGIN
+FILE_BEGIN /reference/prompt.py
+     1	from typing import List
+     2	
+     3	
+     4	def rescale_to_unit(numbers: List[float]) -> List[float]:
+     5	    """ Given list of numbers (of at least two elements), apply a linear transform to that list,
+     6	    such that the smallest number will become 0 and the largest will become 1
+     7	    >>> rescale_to_unit([1.0, 2.0, 3.0, 4.0, 5.0])
+     8	    [0.0, 0.25, 0.5, 0.75, 1.0]
+     9	    """
+FILE_END /reference/prompt.py
+FILE_BEGIN /reference/canonical.py
+     1	# canonical.py — the UNMODIFIED HumanEval/21 reference solution (from the dataset).
+     2	# Co-located with solution.py (the proof rewrite) to make the original<->rewrite link
+     3	# explicit & auditable.  entry point: rescale_to_unit
+     4	
+     5	from typing import List
+     6	
+     7	
+     8	def rescale_to_unit(numbers: List[float]) -> List[float]:
+     9	    """ Given list of numbers (of at least two elements), apply a linear transform to that list,
+    10	    such that the smallest number will become 0 and the largest will become 1
+    11	    >>> rescale_to_unit([1.0, 2.0, 3.0, 4.0, 5.0])
+    12	    [0.0, 0.25, 0.5, 0.75, 1.0]
+    13	    """
+    14	    min_number = min(numbers)
+    15	    max_number = max(numbers)
+    16	    return [(x - min_number) / (max_number - min_number) for x in numbers]
+FILE_END /reference/canonical.py
+FILE_BEGIN /reference/py2mpy.py
+     1	#!/usr/bin/env python3
+     2	"""py2mpy — a *pure* CPython-AST -> K-constructor transliterator.
+     3	
+     4	Reads a .py file and prints the matching `.mpy` term: a Lisp-indented tree of K
+     5	constructors that a (future) K semantics will parse. The design rule is strict:
+     6	
+     7	    PURE TRANSLITERATION. Every Python AST node maps to exactly one K
+     8	    constructor with the same structure. The front-end makes NO semantic
+     9	    decisions — it does not desugar, simplify, normalize, or "interpret"
+    10	    anything. All meaning lives in the K semantics that consumes the term.
+    11	
+    12	Consequences of that rule (vs. a "helpful" front-end):
+    13	
+    14	  * `is` / `is not` transliterate to `CmpOp("is", ...)` / `CmpOp("is not", ...)`
+    15	    — NOT to `==` / `!=`. K decides what identity means.
+    16	  * a chained comparison `a < b < c` stays a single `Compare` carrying the
+    17	    chain (`Compare(a, CmpOp("<", b), CmpOp("<", c))`) — it is NOT pre-expanded
+    18	    into `a < b and b < c`.
+    19	  * a method call `x.append(v)` stays `Call(Attribute(Name("x"), "append"), v)`
+    20	    — there is no special `MethodCall` constructor folding the receiver in.
+    21	  * `a[i] = v` stays `Assign(Subscript(Name("a"), Name("i")), v)` — the target
+    22	    is just an expression in store position; no special `SubscriptAssign`.
+    23	
+    24	The only choices the transliterator makes are unavoidably *syntactic* — e.g. a
+    25	`bool` literal becomes `Bool(...)` not `Int(...)`, because that is the literal's
+    26	actual Python type as read off the AST, not a semantic judgement.
+    27	
+    28	Anything outside the covered subset raises `Unsupported`, naming the node, so
+    29	coverage gaps fail loudly instead of being silently dropped.
+    30	
+    31	Usage:
+    32	    python scripts/py2mpy.py FILE.py          # print the .mpy term (default)
+    33	    python scripts/py2mpy.py FILE.py --ast    # print the Python AST (ast.dump)
+    34	"""
+    35	from __future__ import annotations
+    36	
+    37	import argparse
+    38	import symtable
+    39	import ast
+    40	import json
+    41	import sys
+    42	
+    43	
+    44	class Unsupported(Exception):
+    45	    """Raised for any AST node the transliterator does not cover."""
+    46	
+    47	
+    48	# ---------------------------------------------------------------------------
+    49	# Term model: a .mpy term is a tree of these three node kinds.
+    50	#   Ctor(name, *args)  -> `name(arg, arg, ...)`  (comma-separated args)
+    51	#   Seq([item, ...])   -> a statement list: juxtaposed, no parens, no commas
+    52	#   str                -> a leaf token already in K surface form
+    53	#                         (a quoted string `"op"`, a number `0`, `true`, `Break`)
+    54	# ---------------------------------------------------------------------------
+    55	class Ctor:
+    56	    __slots__ = ("name", "args")
+    57	
+    58	    def __init__(self, name: str, *args):
+    59	        self.name = name
+    60	        self.args = list(args)
+    61	
+    62	
+    63	class Seq:
+    64	    __slots__ = ("items",)
+    65	
+    66	    def __init__(self, items):
+    67	        self.items = list(items)
+    68	
+    69	
+    70	def q(s: str) -> str:
+    71	    """A Python string as a K String token (double-quoted, escaped)."""
+    72	    return json.dumps(s)
+    73	
+    74	
+    75	# --- Operator spellings (string tokens carried inside constructors) ----------
+    76	# These are transliterations of the operator *symbol*, not its meaning.
+    77	_BINOP = {
+    78	    ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
+    79	    ast.FloorDiv: "//", ast.Mod: "%", ast.Pow: "**",
+    80	    ast.BitOr: "|", ast.BitAnd: "&", ast.BitXor: "^",
+    81	    ast.LShift: "<<", ast.RShift: ">>", ast.MatMult: "@",
+    82	}
+    83	_UNARY = {ast.USub: "-", ast.UAdd: "+", ast.Not: "not", ast.Invert: "~"}
+    84	_BOOLOP = {ast.And: "and", ast.Or: "or"}
+    85	_CMPOP = {
+    86	    ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
+    87	    ast.Gt: ">", ast.GtE: ">=", ast.Is: "is", ast.IsNot: "is not",
+    88	    ast.In: "in", ast.NotIn: "not in",
+    89	}
+    90	
+    91	
+    92	# ---------------------------------------------------------------------------
+    93	# Closure scopes (Python's own symtable, faithfully exposed)
+    94	# ---------------------------------------------------------------------------
+    95	# (name, lineno) -> (cellvars, freevars, nested). A def/lambda gets the
+    96	# ANNOTATED node form iff it is nested inside a function or has cells/frees;
+    97	# module-level capture-free defs keep the old shape (zero churn).
+    98	SCOPES: dict = {}
+    99	
+   100	
+   101	def _frees(table):
+   102	    return set(table.get_frees()) if isinstance(table, symtable.Function) else set()
+   103	
+   104	
+   105	def _deep_frees(table):
+   106	    out = _frees(table)
+   107	    for g in table.get_children():
+   108	        out |= _deep_frees(g) - set(table.get_locals())
+   109	    return out
+   110	
+   111	
+   112	def _walk_symtable(table, depth=0):
+   113	    for child in table.get_children():
+   114	        if child.get_type() in ("function", "lambda"):
+   115	            frees = sorted(_frees(child))
+   116	            cells = sorted(
+   117	                s for s in child.get_locals()
+   118	                if any(s in _deep_frees(g) for g in child.get_children())
+   119	            )
+   120	            SCOPES[(child.get_name(), child.get_lineno())] = (
+   121	                cells, frees, depth > 0 or table.get_type() != "module")
+   122	        _walk_symtable(child, depth + (1 if child.get_type() in ("function", "lambda") else 0))
+   123	
+   124	
+   125	def scope_info(name, lineno):
+   126	    return SCOPES.get((name, lineno))
+   127	
+   128	
+   129	# ---------------------------------------------------------------------------
+   130	# Expressions
+   131	# ---------------------------------------------------------------------------
+   132	def emit_expr(node: ast.expr):
+   133	    if isinstance(node, ast.Constant):
+   134	        v = node.value
+   135	        if v is None:
+   136	            return "NoneVal"
+   137	        if isinstance(v, bool):                 # MUST precede int (bool ⊂ int)
+   138	            return Ctor("Bool", "true" if v else "false")
+   139	        if isinstance(v, int):
+   140	            return Ctor("Int", str(v))
+   141	        if isinstance(v, float):
+   142	            return Ctor("Float", repr(v))
+   143	        if isinstance(v, str):
+   144	            return Ctor("Str", q(v))
+   145	        raise Unsupported(f"Constant {type(v).__name__}")
+   146	
+   147	    if isinstance(node, ast.Name):
+   148	        return Ctor("Name", q(node.id))
+   149	
+   150	    if isinstance(node, ast.Lambda):
+   151	        a = node.args
+   152	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   153	            raise Unsupported("complex lambda signature")
+   154	        names = [p.arg for p in (a.posonlyargs + a.args)]
+   155	        params = Ctor("Params", *(q(n) for n in names))
+   156	        info = scope_info("lambda", node.lineno)
+   157	        if info and (info[0] or info[1] or info[2]):
+   158	            cells, frees, _ = info
+   159	            return Ctor("Lambda", params,
+   160	                        Ctor("CellVars", *(q(n) for n in cells)),
+   161	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   162	                        emit_expr(node.body))
+   163	        return Ctor("Lambda", params, emit_expr(node.body))
+   164	
+   165	    if isinstance(node, ast.BinOp):
+   166	        op = _BINOP.get(type(node.op))
+   167	        if op is None:
+   168	            raise Unsupported(f"BinOp {type(node.op).__name__}")
+   169	        return Ctor("BinOp", q(op), emit_expr(node.left), emit_expr(node.right))
+   170	
+   171	    if isinstance(node, ast.UnaryOp):
+   172	        op = _UNARY.get(type(node.op))
+   173	        if op is None:
+   174	            raise Unsupported(f"UnaryOp {type(node.op).__name__}")
+   175	        return Ctor("UnaryOp", q(op), emit_expr(node.operand))
+   176	
+   177	    if isinstance(node, ast.BoolOp):
+   178	        op = _BOOLOP[type(node.op)]
+   179	        return Ctor("BoolOp", q(op), *(emit_expr(v) for v in node.values))
+   180	
+   181	    if isinstance(node, ast.Compare):
+   182	        # Faithful, non-desugared: left operand + a chain of (op, comparator).
+   183	        # Single comparison => one CmpOp; `a < b < c` => two CmpOps.
+   184	        chain = [
+   185	            Ctor("CmpOp", q(_op_or_raise(_CMPOP, op, "Compare")), emit_expr(c))
+   186	            for op, c in zip(node.ops, node.comparators)
+   187	        ]
+   188	        return Ctor("Compare", emit_expr(node.left), *chain)
+   189	
+   190	    if isinstance(node, ast.List):
+   191	        return Ctor("ListExpr", *(emit_expr(e) for e in node.elts))
+   192	
+   193	    if isinstance(node, ast.Tuple):
+   194	        return Ctor("TupleExpr", *(emit_expr(e) for e in node.elts))
+   195	
+   196	    if isinstance(node, ast.Set):
+   197	        return Ctor("SetExpr", *(emit_expr(e) for e in node.elts))
+   198	
+   199	    if isinstance(node, ast.Dict):
+   200	        entries = []
+   201	        for k, v in zip(node.keys, node.values):
+   202	            if k is None:
+   203	                raise Unsupported("dict unpacking {**x}")
+   204	            entries.append(Ctor("Entry", emit_expr(k), emit_expr(v)))
+   205	        return Ctor("DictExpr", *entries)
+   206	
+   207	    if isinstance(node, ast.Subscript):
+   208	        return Ctor("Subscript", emit_expr(node.value), emit_index(node.slice))
+   209	
+   210	    if isinstance(node, ast.Attribute):
+   211	        return Ctor("Attribute", emit_expr(node.value), q(node.attr))
+   212	
+   213	    if isinstance(node, ast.Call):
+   214	        if any(isinstance(a, ast.Starred) for a in node.args):
+   215	            raise Unsupported("*args unpacking")
+   216	        if any(kw.arg is None for kw in node.keywords):
+   217	            raise Unsupported("**kwargs unpacking")
+   218	        # Call grammar is `Call(Expr, Exprs)` — the comma is mandatory, so a zero-arg
+   219	        # call must render as `Call(f, )` (empty Exprs), NOT `Call(f)` (which won't parse).
+   220	        args = [emit_expr(a) for a in node.args]
+   221	        args += [Ctor("KwArg", q(kw.arg), emit_expr(kw.value)) for kw in node.keywords]
+   222	        args = args or [""]
+   223	        return Ctor("Call", emit_expr(node.func), *args)
+   224	
+   225	    if isinstance(node, ast.IfExp):
+   226	        # AST field order: test, body, orelse — kept verbatim.
+   227	        return Ctor("IfExp", emit_expr(node.test),
+   228	                    emit_expr(node.body), emit_expr(node.orelse))
+   229	
+   230	    if isinstance(node, ast.ListComp):
+   231	        return Ctor("ListComp", emit_expr(node.elt), _gens(node.generators))
+   232	    if isinstance(node, ast.SetComp):
+   233	        return Ctor("SetComp", emit_expr(node.elt), _gens(node.generators))
+   234	    if isinstance(node, ast.GeneratorExp):
+   235	        return Ctor("GenExp", emit_expr(node.elt), _gens(node.generators))
+   236	    if isinstance(node, ast.DictComp):
+   237	        return Ctor("DictComp", emit_expr(node.key), emit_expr(node.value),
+   238	                    _gens(node.generators))
+   239	
+   240	    raise Unsupported(f"Expr {type(node).__name__}")
+   241	
+   242	
+   243	def _op_or_raise(table, op, label):
+   244	    spelled = table.get(type(op))
+   245	    if spelled is None:
+   246	        raise Unsupported(f"{label} {type(op).__name__}")
+   247	    return spelled
+   248	
+   249	
+   250	def _compfor(g):
+   251	    """A single generator -> CompFor(target, iter, <ifs as Exprs; .Exprs if none>)."""
+   252	    if getattr(g, "is_async", 0):
+   253	        raise Unsupported("async comprehension")
+   254	    ifs = [emit_expr(c) for c in g.ifs] or [Ctor("Bool", "true")]
+   255	    return Ctor("CompFor", emit_expr(g.target), emit_expr(g.iter), *ifs)
+   256	
+   257	
+   258	def _gens(generators):
+   259	    """The generator list -> a juxtaposed CompFors (a Seq of CompFor)."""
+   260	    return Seq([_compfor(g) for g in generators])
+   261	
+   262	
+   263	def emit_index(node: ast.expr):
+   264	    """Subscript index position: an `ast.Slice` -> `Slice(...)`, else the expr."""
+   265	    # Python <3.9 wrapped the index in ast.Index; unwrap if present.
+   266	    inner = getattr(ast, "Index", None)
+   267	    if inner is not None and isinstance(node, inner):
+   268	        node = node.value
+   269	    if isinstance(node, ast.Slice):
+   270	        def bound(b):
+   271	            # omitted bound (absent field) OR an explicit None constant -> NoBound.
+   272	            # Python treats `a[None:5]` exactly like `a[:5]`; only a *value* None
+   273	            # (Constant(None) outside a slice) becomes NoneVal. Keeping the two
+   274	            # distinct lets NoneVal be a real value without perturbing slices.
+   275	            if b is None or (isinstance(b, ast.Constant) and b.value is None):
+   276	                return "NoBound"
+   277	            return emit_expr(b)
+   278	        return Ctor("Slice", bound(node.lower), bound(node.upper), bound(node.step))
+   279	    return emit_expr(node)
+   280	
+   281	
+   282	# ---------------------------------------------------------------------------
+   283	# Statements
+   284	# ---------------------------------------------------------------------------
+   285	def emit_stmt(node: ast.stmt):
+   286	    if isinstance(node, ast.FunctionDef):
+   287	        a = node.args
+   288	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   289	            raise Unsupported("complex function signature (defaults/varargs/kwonly)")
+   290	        if node.decorator_list:
+   291	            raise Unsupported("decorators")
+   292	        names = [p.arg for p in (a.posonlyargs + a.args)]  # type annotations ignored
+   293	        params = Ctor("Params", *(q(n) for n in names))
+   294	        info = scope_info(node.name, node.lineno)
+   295	        if info and (info[0] or info[1] or info[2]):
+   296	            cells, frees, _ = info
+   297	            return Ctor("FuncDef", q(node.name), params,
+   298	                        Ctor("CellVars", *(q(n) for n in cells)),
+   299	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   300	                        emit_stmts(node.body))
+   301	        return Ctor("FuncDef", q(node.name), params, emit_stmts(node.body))
+   302	
+   303	    if isinstance(node, ast.Return):
+   304	        if node.value is None:
+   305	            return Ctor("Return")
+   306	        return Ctor("Return", emit_expr(node.value))
+   307	
+   308	    if isinstance(node, ast.Assign):
+   309	        if len(node.targets) != 1:
+   310	            raise Unsupported("chained assignment (a = b = ...)")
+   311	        # Target is just an expression in store position (Name / Tuple / Subscript / Attribute).
+   312	        return Ctor("Assign", emit_expr(node.targets[0]), emit_expr(node.value))
+   313	
+   314	    if isinstance(node, ast.AugAssign):
+   315	        op = _BINOP.get(type(node.op))
+   316	        if op is None:
+   317	            raise Unsupported(f"AugAssign {type(node.op).__name__}")
+   318	        return Ctor("AugAssign", emit_expr(node.target), q(op), emit_expr(node.value))
+   319	
+   320	    if isinstance(node, ast.If):
+   321	        return Ctor("If", emit_expr(node.test),
+   322	                    emit_stmts(node.body), emit_stmts(node.orelse))
+   323	
+   324	    if isinstance(node, ast.For):
+   325	        if node.orelse:
+   326	            raise Unsupported("for-else")
+   327	        return Ctor("For", emit_expr(node.target), emit_expr(node.iter),
+   328	                    emit_stmts(node.body))
+   329	
+   330	    if isinstance(node, ast.While):
+   331	        if node.orelse:
+   332	            raise Unsupported("while-else")
+   333	        return Ctor("While", emit_expr(node.test), emit_stmts(node.body))
+   334	
+   335	    if isinstance(node, ast.Break):
+   336	        return "Break"
+   337	    if isinstance(node, ast.Continue):
+   338	        return "Continue"
+   339	    if isinstance(node, ast.Pass):
+   340	        return "Pass"
+   341	
+   342	    if isinstance(node, ast.Assert):
+   343	        if node.msg is not None:
+   344	            return Ctor("Assert", emit_expr(node.test), emit_expr(node.msg))
+   345	        return Ctor("Assert", emit_expr(node.test))
+   346	
+   347	    if isinstance(node, ast.Expr):
+   348	        return Ctor("Expr", emit_expr(node.value))
+   349	
+   350	    if isinstance(node, ast.Import):
+   351	        return Ctor("Import", *(q(n.name) for n in node.names))
+   352	    if isinstance(node, ast.ImportFrom):
+   353	        mod = node.module if node.module is not None else ""
+   354	        return Ctor("ImportFrom", q(mod), *(q(n.name) for n in node.names))
+   355	
+   356	    raise Unsupported(f"Stmt {type(node).__name__}")
+   357	
+   358	
+   359	def emit_stmts(stmts) -> Seq:
+   360	    return Seq([emit_stmt(s) for s in stmts])
+   361	
+   362	
+   363	def emit_module(tree: ast.Module) -> Ctor:
+   364	    return Ctor("Module", emit_stmts(tree.body))
+   365	
+   366	
+   367	# ---------------------------------------------------------------------------
+   368	# Lisp-style pretty printer
+   369	# ---------------------------------------------------------------------------
+   370	WIDTH = 72  # an expression constructor wider than this breaks onto its own lines
+[bounded: first 400 of 745 lines]
+OUTPUT_END

@@ -1,0 +1,959 @@
+COMMAND: bash -lc for\ f\ in\ /reference/prompt.py\ /reference/canonical.py\ /reference/py2mpy.py\ /candidate/solution.py\ /candidate/solution.mpy\ /candidate/semantic.k\ /candidate/verification.k\ /candidate/spec.k\ /candidate/prove.sh\;\ do\ printf\ \"\\nFILE\ %s\\n\"\ \"\$f\"\;\ nl\ -ba\ \"\$f\"\;\ done
+
+FILE /reference/prompt.py
+     1	import math
+     2	
+     3	
+     4	def poly(xs: list, x: float):
+     5	    """
+     6	    Evaluates polynomial with coefficients xs at point x.
+     7	    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n
+     8	    """
+     9	    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])
+    10	
+    11	
+    12	def find_zero(xs: list):
+    13	    """ xs are coefficients of a polynomial.
+    14	    find_zero find x such that poly(x) = 0.
+    15	    find_zero returns only only zero point, even if there are many.
+    16	    Moreover, find_zero only takes list xs having even number of coefficients
+    17	    and largest non zero coefficient as it guarantees
+    18	    a solution.
+    19	    >>> round(find_zero([1, 2]), 2) # f(x) = 1 + 2x
+    20	    -0.5
+    21	    >>> round(find_zero([-6, 11, -6, 1]), 2) # (x - 1) * (x - 2) * (x - 3) = -6 + 11x - 6x^2 + x^3
+    22	    1.0
+    23	    """
+
+FILE /reference/canonical.py
+     1	# canonical.py — the UNMODIFIED HumanEval/32 reference solution (from the dataset).
+     2	# Co-located with solution.py (the proof rewrite) to make the original<->rewrite link
+     3	# explicit & auditable.  entry point: find_zero
+     4	
+     5	import math
+     6	
+     7	
+     8	def poly(xs: list, x: float):
+     9	    """
+    10	    Evaluates polynomial with coefficients xs at point x.
+    11	    return xs[0] + xs[1] * x + xs[1] * x^2 + .... xs[n] * x^n
+    12	    """
+    13	    return sum([coeff * math.pow(x, i) for i, coeff in enumerate(xs)])
+    14	
+    15	
+    16	def find_zero(xs: list):
+    17	    """ xs are coefficients of a polynomial.
+    18	    find_zero find x such that poly(x) = 0.
+    19	    find_zero returns only only zero point, even if there are many.
+    20	    Moreover, find_zero only takes list xs having even number of coefficients
+    21	    and largest non zero coefficient as it guarantees
+    22	    a solution.
+    23	    >>> round(find_zero([1, 2]), 2) # f(x) = 1 + 2x
+    24	    -0.5
+    25	    >>> round(find_zero([-6, 11, -6, 1]), 2) # (x - 1) * (x - 2) * (x - 3) = -6 + 11x - 6x^2 + x^3
+    26	    1.0
+    27	    """
+    28	    begin, end = -1., 1.
+    29	    while poly(xs, begin) * poly(xs, end) > 0:
+    30	        begin *= 2.0
+    31	        end *= 2.0
+    32	    while end - begin > 1e-10:
+    33	        center = (begin + end) / 2.0
+    34	        if poly(xs, center) * poly(xs, begin) > 0:
+    35	            begin = center
+    36	        else:
+    37	            end = center
+    38	    return begin
+
+FILE /reference/py2mpy.py
+     1	#!/usr/bin/env python3
+     2	"""py2mpy — a *pure* CPython-AST -> K-constructor transliterator.
+     3	
+     4	Reads a .py file and prints the matching `.mpy` term: a Lisp-indented tree of K
+     5	constructors that a (future) K semantics will parse. The design rule is strict:
+     6	
+     7	    PURE TRANSLITERATION. Every Python AST node maps to exactly one K
+     8	    constructor with the same structure. The front-end makes NO semantic
+     9	    decisions — it does not desugar, simplify, normalize, or "interpret"
+    10	    anything. All meaning lives in the K semantics that consumes the term.
+    11	
+    12	Consequences of that rule (vs. a "helpful" front-end):
+    13	
+    14	  * `is` / `is not` transliterate to `CmpOp("is", ...)` / `CmpOp("is not", ...)`
+    15	    — NOT to `==` / `!=`. K decides what identity means.
+    16	  * a chained comparison `a < b < c` stays a single `Compare` carrying the
+    17	    chain (`Compare(a, CmpOp("<", b), CmpOp("<", c))`) — it is NOT pre-expanded
+    18	    into `a < b and b < c`.
+    19	  * a method call `x.append(v)` stays `Call(Attribute(Name("x"), "append"), v)`
+    20	    — there is no special `MethodCall` constructor folding the receiver in.
+    21	  * `a[i] = v` stays `Assign(Subscript(Name("a"), Name("i")), v)` — the target
+    22	    is just an expression in store position; no special `SubscriptAssign`.
+    23	
+    24	The only choices the transliterator makes are unavoidably *syntactic* — e.g. a
+    25	`bool` literal becomes `Bool(...)` not `Int(...)`, because that is the literal's
+    26	actual Python type as read off the AST, not a semantic judgement.
+    27	
+    28	Anything outside the covered subset raises `Unsupported`, naming the node, so
+    29	coverage gaps fail loudly instead of being silently dropped.
+    30	
+    31	Usage:
+    32	    python scripts/py2mpy.py FILE.py          # print the .mpy term (default)
+    33	    python scripts/py2mpy.py FILE.py --ast    # print the Python AST (ast.dump)
+    34	"""
+    35	from __future__ import annotations
+    36	
+    37	import argparse
+    38	import symtable
+    39	import ast
+    40	import json
+    41	import sys
+    42	
+    43	
+    44	class Unsupported(Exception):
+    45	    """Raised for any AST node the transliterator does not cover."""
+    46	
+    47	
+    48	# ---------------------------------------------------------------------------
+    49	# Term model: a .mpy term is a tree of these three node kinds.
+    50	#   Ctor(name, *args)  -> `name(arg, arg, ...)`  (comma-separated args)
+    51	#   Seq([item, ...])   -> a statement list: juxtaposed, no parens, no commas
+    52	#   str                -> a leaf token already in K surface form
+    53	#                         (a quoted string `"op"`, a number `0`, `true`, `Break`)
+    54	# ---------------------------------------------------------------------------
+    55	class Ctor:
+    56	    __slots__ = ("name", "args")
+    57	
+    58	    def __init__(self, name: str, *args):
+    59	        self.name = name
+    60	        self.args = list(args)
+    61	
+    62	
+    63	class Seq:
+    64	    __slots__ = ("items",)
+    65	
+    66	    def __init__(self, items):
+    67	        self.items = list(items)
+    68	
+    69	
+    70	def q(s: str) -> str:
+    71	    """A Python string as a K String token (double-quoted, escaped)."""
+    72	    return json.dumps(s)
+    73	
+    74	
+    75	# --- Operator spellings (string tokens carried inside constructors) ----------
+    76	# These are transliterations of the operator *symbol*, not its meaning.
+    77	_BINOP = {
+    78	    ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
+    79	    ast.FloorDiv: "//", ast.Mod: "%", ast.Pow: "**",
+    80	    ast.BitOr: "|", ast.BitAnd: "&", ast.BitXor: "^",
+    81	    ast.LShift: "<<", ast.RShift: ">>", ast.MatMult: "@",
+    82	}
+    83	_UNARY = {ast.USub: "-", ast.UAdd: "+", ast.Not: "not", ast.Invert: "~"}
+    84	_BOOLOP = {ast.And: "and", ast.Or: "or"}
+    85	_CMPOP = {
+    86	    ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
+    87	    ast.Gt: ">", ast.GtE: ">=", ast.Is: "is", ast.IsNot: "is not",
+    88	    ast.In: "in", ast.NotIn: "not in",
+    89	}
+    90	
+    91	
+    92	# ---------------------------------------------------------------------------
+    93	# Closure scopes (Python's own symtable, faithfully exposed)
+    94	# ---------------------------------------------------------------------------
+    95	# (name, lineno) -> (cellvars, freevars, nested). A def/lambda gets the
+    96	# ANNOTATED node form iff it is nested inside a function or has cells/frees;
+    97	# module-level capture-free defs keep the old shape (zero churn).
+    98	SCOPES: dict = {}
+    99	
+   100	
+   101	def _frees(table):
+   102	    return set(table.get_frees()) if isinstance(table, symtable.Function) else set()
+   103	
+   104	
+   105	def _deep_frees(table):
+   106	    out = _frees(table)
+   107	    for g in table.get_children():
+   108	        out |= _deep_frees(g) - set(table.get_locals())
+   109	    return out
+   110	
+   111	
+   112	def _walk_symtable(table, depth=0):
+   113	    for child in table.get_children():
+   114	        if child.get_type() in ("function", "lambda"):
+   115	            frees = sorted(_frees(child))
+   116	            cells = sorted(
+   117	                s for s in child.get_locals()
+   118	                if any(s in _deep_frees(g) for g in child.get_children())
+   119	            )
+   120	            SCOPES[(child.get_name(), child.get_lineno())] = (
+   121	                cells, frees, depth > 0 or table.get_type() != "module")
+   122	        _walk_symtable(child, depth + (1 if child.get_type() in ("function", "lambda") else 0))
+   123	
+   124	
+   125	def scope_info(name, lineno):
+   126	    return SCOPES.get((name, lineno))
+   127	
+   128	
+   129	# ---------------------------------------------------------------------------
+   130	# Expressions
+   131	# ---------------------------------------------------------------------------
+   132	def emit_expr(node: ast.expr):
+   133	    if isinstance(node, ast.Constant):
+   134	        v = node.value
+   135	        if v is None:
+   136	            return "NoneVal"
+   137	        if isinstance(v, bool):                 # MUST precede int (bool ⊂ int)
+   138	            return Ctor("Bool", "true" if v else "false")
+   139	        if isinstance(v, int):
+   140	            return Ctor("Int", str(v))
+   141	        if isinstance(v, float):
+   142	            return Ctor("Float", repr(v))
+   143	        if isinstance(v, str):
+   144	            return Ctor("Str", q(v))
+   145	        raise Unsupported(f"Constant {type(v).__name__}")
+   146	
+   147	    if isinstance(node, ast.Name):
+   148	        return Ctor("Name", q(node.id))
+   149	
+   150	    if isinstance(node, ast.Lambda):
+   151	        a = node.args
+   152	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   153	            raise Unsupported("complex lambda signature")
+   154	        names = [p.arg for p in (a.posonlyargs + a.args)]
+   155	        params = Ctor("Params", *(q(n) for n in names))
+   156	        info = scope_info("lambda", node.lineno)
+   157	        if info and (info[0] or info[1] or info[2]):
+   158	            cells, frees, _ = info
+   159	            return Ctor("Lambda", params,
+   160	                        Ctor("CellVars", *(q(n) for n in cells)),
+   161	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   162	                        emit_expr(node.body))
+   163	        return Ctor("Lambda", params, emit_expr(node.body))
+   164	
+   165	    if isinstance(node, ast.BinOp):
+   166	        op = _BINOP.get(type(node.op))
+   167	        if op is None:
+   168	            raise Unsupported(f"BinOp {type(node.op).__name__}")
+   169	        return Ctor("BinOp", q(op), emit_expr(node.left), emit_expr(node.right))
+   170	
+   171	    if isinstance(node, ast.UnaryOp):
+   172	        op = _UNARY.get(type(node.op))
+   173	        if op is None:
+   174	            raise Unsupported(f"UnaryOp {type(node.op).__name__}")
+   175	        return Ctor("UnaryOp", q(op), emit_expr(node.operand))
+   176	
+   177	    if isinstance(node, ast.BoolOp):
+   178	        op = _BOOLOP[type(node.op)]
+   179	        return Ctor("BoolOp", q(op), *(emit_expr(v) for v in node.values))
+   180	
+   181	    if isinstance(node, ast.Compare):
+   182	        # Faithful, non-desugared: left operand + a chain of (op, comparator).
+   183	        # Single comparison => one CmpOp; `a < b < c` => two CmpOps.
+   184	        chain = [
+   185	            Ctor("CmpOp", q(_op_or_raise(_CMPOP, op, "Compare")), emit_expr(c))
+   186	            for op, c in zip(node.ops, node.comparators)
+   187	        ]
+   188	        return Ctor("Compare", emit_expr(node.left), *chain)
+   189	
+   190	    if isinstance(node, ast.List):
+   191	        return Ctor("ListExpr", *(emit_expr(e) for e in node.elts))
+   192	
+   193	    if isinstance(node, ast.Tuple):
+   194	        return Ctor("TupleExpr", *(emit_expr(e) for e in node.elts))
+   195	
+   196	    if isinstance(node, ast.Set):
+   197	        return Ctor("SetExpr", *(emit_expr(e) for e in node.elts))
+   198	
+   199	    if isinstance(node, ast.Dict):
+   200	        entries = []
+   201	        for k, v in zip(node.keys, node.values):
+   202	            if k is None:
+   203	                raise Unsupported("dict unpacking {**x}")
+   204	            entries.append(Ctor("Entry", emit_expr(k), emit_expr(v)))
+   205	        return Ctor("DictExpr", *entries)
+   206	
+   207	    if isinstance(node, ast.Subscript):
+   208	        return Ctor("Subscript", emit_expr(node.value), emit_index(node.slice))
+   209	
+   210	    if isinstance(node, ast.Attribute):
+   211	        return Ctor("Attribute", emit_expr(node.value), q(node.attr))
+   212	
+   213	    if isinstance(node, ast.Call):
+   214	        if any(isinstance(a, ast.Starred) for a in node.args):
+   215	            raise Unsupported("*args unpacking")
+   216	        if any(kw.arg is None for kw in node.keywords):
+   217	            raise Unsupported("**kwargs unpacking")
+   218	        # Call grammar is `Call(Expr, Exprs)` — the comma is mandatory, so a zero-arg
+   219	        # call must render as `Call(f, )` (empty Exprs), NOT `Call(f)` (which won't parse).
+   220	        args = [emit_expr(a) for a in node.args]
+   221	        args += [Ctor("KwArg", q(kw.arg), emit_expr(kw.value)) for kw in node.keywords]
+   222	        args = args or [""]
+   223	        return Ctor("Call", emit_expr(node.func), *args)
+   224	
+   225	    if isinstance(node, ast.IfExp):
+   226	        # AST field order: test, body, orelse — kept verbatim.
+   227	        return Ctor("IfExp", emit_expr(node.test),
+   228	                    emit_expr(node.body), emit_expr(node.orelse))
+   229	
+   230	    if isinstance(node, ast.ListComp):
+   231	        return Ctor("ListComp", emit_expr(node.elt), _gens(node.generators))
+   232	    if isinstance(node, ast.SetComp):
+   233	        return Ctor("SetComp", emit_expr(node.elt), _gens(node.generators))
+   234	    if isinstance(node, ast.GeneratorExp):
+   235	        return Ctor("GenExp", emit_expr(node.elt), _gens(node.generators))
+   236	    if isinstance(node, ast.DictComp):
+   237	        return Ctor("DictComp", emit_expr(node.key), emit_expr(node.value),
+   238	                    _gens(node.generators))
+   239	
+   240	    raise Unsupported(f"Expr {type(node).__name__}")
+   241	
+   242	
+   243	def _op_or_raise(table, op, label):
+   244	    spelled = table.get(type(op))
+   245	    if spelled is None:
+   246	        raise Unsupported(f"{label} {type(op).__name__}")
+   247	    return spelled
+   248	
+   249	
+   250	def _compfor(g):
+   251	    """A single generator -> CompFor(target, iter, <ifs as Exprs; .Exprs if none>)."""
+   252	    if getattr(g, "is_async", 0):
+   253	        raise Unsupported("async comprehension")
+   254	    ifs = [emit_expr(c) for c in g.ifs] or [Ctor("Bool", "true")]
+   255	    return Ctor("CompFor", emit_expr(g.target), emit_expr(g.iter), *ifs)
+   256	
+   257	
+   258	def _gens(generators):
+   259	    """The generator list -> a juxtaposed CompFors (a Seq of CompFor)."""
+   260	    return Seq([_compfor(g) for g in generators])
+   261	
+   262	
+   263	def emit_index(node: ast.expr):
+   264	    """Subscript index position: an `ast.Slice` -> `Slice(...)`, else the expr."""
+   265	    # Python <3.9 wrapped the index in ast.Index; unwrap if present.
+   266	    inner = getattr(ast, "Index", None)
+   267	    if inner is not None and isinstance(node, inner):
+   268	        node = node.value
+   269	    if isinstance(node, ast.Slice):
+   270	        def bound(b):
+   271	            # omitted bound (absent field) OR an explicit None constant -> NoBound.
+   272	            # Python treats `a[None:5]` exactly like `a[:5]`; only a *value* None
+   273	            # (Constant(None) outside a slice) becomes NoneVal. Keeping the two
+   274	            # distinct lets NoneVal be a real value without perturbing slices.
+   275	            if b is None or (isinstance(b, ast.Constant) and b.value is None):
+   276	                return "NoBound"
+   277	            return emit_expr(b)
+   278	        return Ctor("Slice", bound(node.lower), bound(node.upper), bound(node.step))
+   279	    return emit_expr(node)
+   280	
+   281	
+   282	# ---------------------------------------------------------------------------
+   283	# Statements
+   284	# ---------------------------------------------------------------------------
+   285	def emit_stmt(node: ast.stmt):
+   286	    if isinstance(node, ast.FunctionDef):
+   287	        a = node.args
+   288	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   289	            raise Unsupported("complex function signature (defaults/varargs/kwonly)")
+   290	        if node.decorator_list:
+   291	            raise Unsupported("decorators")
+   292	        names = [p.arg for p in (a.posonlyargs + a.args)]  # type annotations ignored
+   293	        params = Ctor("Params", *(q(n) for n in names))
+   294	        info = scope_info(node.name, node.lineno)
+   295	        if info and (info[0] or info[1] or info[2]):
+   296	            cells, frees, _ = info
+   297	            return Ctor("FuncDef", q(node.name), params,
+   298	                        Ctor("CellVars", *(q(n) for n in cells)),
+   299	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   300	                        emit_stmts(node.body))
+   301	        return Ctor("FuncDef", q(node.name), params, emit_stmts(node.body))
+   302	
+   303	    if isinstance(node, ast.Return):
+   304	        if node.value is None:
+   305	            return Ctor("Return")
+   306	        return Ctor("Return", emit_expr(node.value))
+   307	
+   308	    if isinstance(node, ast.Assign):
+   309	        if len(node.targets) != 1:
+   310	            raise Unsupported("chained assignment (a = b = ...)")
+   311	        # Target is just an expression in store position (Name / Tuple / Subscript / Attribute).
+   312	        return Ctor("Assign", emit_expr(node.targets[0]), emit_expr(node.value))
+   313	
+   314	    if isinstance(node, ast.AugAssign):
+   315	        op = _BINOP.get(type(node.op))
+   316	        if op is None:
+   317	            raise Unsupported(f"AugAssign {type(node.op).__name__}")
+   318	        return Ctor("AugAssign", emit_expr(node.target), q(op), emit_expr(node.value))
+   319	
+   320	    if isinstance(node, ast.If):
+   321	        return Ctor("If", emit_expr(node.test),
+   322	                    emit_stmts(node.body), emit_stmts(node.orelse))
+   323	
+   324	    if isinstance(node, ast.For):
+   325	        if node.orelse:
+   326	            raise Unsupported("for-else")
+   327	        return Ctor("For", emit_expr(node.target), emit_expr(node.iter),
+   328	                    emit_stmts(node.body))
+   329	
+   330	    if isinstance(node, ast.While):
+   331	        if node.orelse:
+   332	            raise Unsupported("while-else")
+   333	        return Ctor("While", emit_expr(node.test), emit_stmts(node.body))
+   334	
+   335	    if isinstance(node, ast.Break):
+   336	        return "Break"
+   337	    if isinstance(node, ast.Continue):
+   338	        return "Continue"
+   339	    if isinstance(node, ast.Pass):
+   340	        return "Pass"
+   341	
+   342	    if isinstance(node, ast.Assert):
+   343	        if node.msg is not None:
+   344	            return Ctor("Assert", emit_expr(node.test), emit_expr(node.msg))
+   345	        return Ctor("Assert", emit_expr(node.test))
+   346	
+   347	    if isinstance(node, ast.Expr):
+   348	        return Ctor("Expr", emit_expr(node.value))
+   349	
+   350	    if isinstance(node, ast.Import):
+   351	        return Ctor("Import", *(q(n.name) for n in node.names))
+   352	    if isinstance(node, ast.ImportFrom):
+   353	        mod = node.module if node.module is not None else ""
+   354	        return Ctor("ImportFrom", q(mod), *(q(n.name) for n in node.names))
+   355	
+   356	    raise Unsupported(f"Stmt {type(node).__name__}")
+   357	
+   358	
+   359	def emit_stmts(stmts) -> Seq:
+   360	    return Seq([emit_stmt(s) for s in stmts])
+   361	
+   362	
+   363	def emit_module(tree: ast.Module) -> Ctor:
+   364	    return Ctor("Module", emit_stmts(tree.body))
+   365	
+   366	
+   367	# ---------------------------------------------------------------------------
+   368	# Lisp-style pretty printer
+   369	# ---------------------------------------------------------------------------
+   370	WIDTH = 72  # an expression constructor wider than this breaks onto its own lines
+   371	
+   372	
+   373	def render(node, ind: int = 0) -> str:
+   374	    if isinstance(node, str):
+   375	        return node
+   376	
+   377	    if isinstance(node, Seq):
+   378	        if not node.items:
+   379	            return ""
+   380	        pad = "  " * ind
+   381	        return ("\n" + pad).join(render(it, ind) for it in node.items)
+   382	
+   383	    # Ctor
+   384	    cind = ind + 1
+   385	    cpad = "  " * cind
+   386	    has_block = any(isinstance(a, Seq) for a in node.args)
+   387	
+   388	    if not has_block:
+   389	        inline = node.name + "(" + ", ".join(render(a, ind) for a in node.args) + ")"
+   390	        if "\n" not in inline and len("  " * ind) + len(inline) <= WIDTH:
+   391	            return inline
+   392	        parts = [render(a, cind) for a in node.args]
+   393	        return node.name + "(\n" + cpad + (",\n" + cpad).join(parts) + ")"
+   394	
+   395	    # Has a statement block: inline the args before the first block, then put
+   396	    # each remaining arg (blocks included) on its own indented line.
+   397	    first = next(i for i, a in enumerate(node.args) if isinstance(a, Seq))
+   398	    head = node.args[:first]
+   399	    rest = node.args[first:]
+   400	    open_line = node.name + "(" + ", ".join(render(a, ind) for a in head) + ("," if head else "")
+   401	    lines = []
+   402	    for k, a in enumerate(rest):
+   403	        comma = "," if k < len(rest) - 1 else ""
+   404	        lines.append(cpad + render(a, cind) + comma)
+   405	    return open_line + "\n" + "\n".join(lines) + ")"
+   406	
+   407	
+   408	# ---------------------------------------------------------------------------
+   409	# CLI
+   410	# ---------------------------------------------------------------------------
+   411	def main(argv=None) -> int:
+   412	    ap = argparse.ArgumentParser(
+   413	        prog="py2mpy",
+   414	        description="Pure CPython-AST -> K-constructor transliterator.",
+   415	    )
+   416	    ap.add_argument("file", help="Python source file")
+   417	    ap.add_argument("--ast", action="store_true",
+   418	                    help="print the Python AST (ast.dump) instead of the .mpy term")
+   419	    args = ap.parse_args(argv)
+   420	
+   421	    with open(args.file, "r", encoding="utf-8") as fh:
+   422	        src = fh.read()
+   423	    tree = ast.parse(src, filename=args.file)
+   424	    _walk_symtable(symtable.symtable(src, args.file, "exec"))
+   425	
+   426	    if args.ast:
+   427	        print(ast.dump(tree, indent=2))
+   428	    else:
+   429	        print(render(emit_module(tree)))
+   430	    return 0
+   431	
+   432	
+   433	if __name__ == "__main__":
+   434	    sys.exit(main())
+
+FILE /candidate/solution.py
+     1	def evaluate_polynomial(xs: list, x):
+     2	    value = 0
+     3	    power = 1
+     4	    for coefficient in xs:
+     5	        value = value + coefficient * power
+     6	        power = power * x
+     7	    return value
+     8	
+     9	
+    10	def find_zero(xs: list):
+    11	    left = -1
+    12	    right = 1
+    13	
+    14	    while evaluate_polynomial(xs, left) * evaluate_polynomial(xs, right) > 0:
+    15	        left = left * 2
+    16	        right = right * 2
+    17	
+    18	    while right - left > 1 / 10000000000:
+    19	        middle = (left + right) / 2
+    20	        if evaluate_polynomial(xs, middle) * evaluate_polynomial(xs, left) > 0:
+    21	            left = middle
+    22	        else:
+    23	            right = middle
+    24	
+    25	    return (left + right) / 2
+
+FILE /candidate/solution.mpy
+     1	Module(
+     2	  FuncDef("evaluate_polynomial", Params("xs", "x"),
+     3	    Assign(Name("value"), Int(0))
+     4	    Assign(Name("power"), Int(1))
+     5	    For(Name("coefficient"), Name("xs"),
+     6	      Assign(
+     7	        Name("value"),
+     8	        BinOp(
+     9	          "+",
+    10	          Name("value"),
+    11	          BinOp("*", Name("coefficient"), Name("power"))))
+    12	      Assign(Name("power"), BinOp("*", Name("power"), Name("x"))))
+    13	    Return(Name("value")))
+    14	  FuncDef("find_zero", Params("xs"),
+    15	    Assign(Name("left"), UnaryOp("-", Int(1)))
+    16	    Assign(Name("right"), Int(1))
+    17	    While(Compare(
+    18	      BinOp(
+    19	        "*",
+    20	        Call(Name("evaluate_polynomial"), Name("xs"), Name("left")),
+    21	        Call(Name("evaluate_polynomial"), Name("xs"), Name("right"))),
+    22	      CmpOp(">", Int(0))),
+    23	      Assign(Name("left"), BinOp("*", Name("left"), Int(2)))
+    24	      Assign(Name("right"), BinOp("*", Name("right"), Int(2))))
+    25	    While(Compare(
+    26	      BinOp("-", Name("right"), Name("left")),
+    27	      CmpOp(">", BinOp("/", Int(1), Int(10000000000)))),
+    28	      Assign(
+    29	        Name("middle"),
+    30	        BinOp("/", BinOp("+", Name("left"), Name("right")), Int(2)))
+    31	      If(Compare(
+    32	        BinOp(
+    33	          "*",
+    34	          Call(Name("evaluate_polynomial"), Name("xs"), Name("middle")),
+    35	          Call(Name("evaluate_polynomial"), Name("xs"), Name("left"))),
+    36	        CmpOp(">", Int(0))),
+    37	        Assign(Name("left"), Name("middle")),
+    38	        Assign(Name("right"), Name("middle"))))
+    39	    Return(BinOp("/", BinOp("+", Name("left"), Name("right")), Int(2)))))
+
+FILE /candidate/semantic.k
+     1	requires "domains.md"
+     2	
+     3	module SEMANTIC-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports BOOL-SYNTAX
+     6	  imports STRING-SYNTAX
+     7	  imports MAP
+     8	  imports LIST
+     9	
+    10	  syntax Strings ::= List{String, ","}
+    11	  syntax Params ::= "Params" "(" Strings ")"
+    12	
+    13	  syntax Exprs ::= List{Expr, ","}
+    14	  syntax Expr ::= "Int" "(" Int ")"
+    15	                | "Name" "(" String ")"
+    16	                | "UnaryOp" "(" String "," Expr ")"
+    17	                | "BinOp" "(" String "," Expr "," Expr ")"
+    18	                | "Compare" "(" Expr "," CmpOp ")"
+    19	                | "Call" "(" Expr "," Expr ")"
+    20	                | "Call" "(" Expr "," Expr "," Expr ")"
+    21	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    22	
+    23	  syntax Stmts ::= List{Stmt, ""}
+    24	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    25	                | "Assign" "(" Expr "," Expr ")" [strict(2)]
+    26	                | "Return" "(" Expr ")" [strict]
+    27	                | "For" "(" Expr "," Expr "," Stmts ")"
+    28	                | "While" "(" Expr "," Stmts ")"
+    29	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    30	
+    31	  syntax Program ::= "Module" "(" Stmts ")"
+    32	                   | Program ";;" Expr
+    33	
+    34	  // Values are exact rationals.  All rules maintain a positive denominator.
+    35	  syntax Val ::= "rat" "(" Int "," Int ")"
+    36	               | "bool" "(" Bool ")"
+    37	               | "list" "(" List ")"
+    38	  syntax Expr ::= Val
+    39	  syntax KResult ::= Val
+    40	
+    41	  // A convenient external entry point used by runners and specifications.
+    42	  syntax Expr ::= "Invoke" "(" String "," Val ")"
+    43	endmodule
+    44	
+    45	module SEMANTIC
+    46	  imports SEMANTIC-SYNTAX
+    47	  imports INT
+    48	  imports BOOL
+    49	  imports STRING
+    50	  imports MAP
+    51	  imports LIST
+    52	
+    53	  configuration
+    54	    <T>
+    55	      <k> $PGM:Program </k>
+    56	      <env> .Map </env>
+    57	      <functions> .Map </functions>
+    58	      <stack> .List </stack>
+    59	    </T>
+    60	
+    61	  // Runtime data kept outside the translated language.
+    62	  syntax Fun ::= function1(String, Stmts)
+    63	               | function2(String, String, Stmts)
+    64	  syntax Frame ::= frame(K, Map)
+    65	
+    66	  syntax KItem ::= exec(Stmts)
+    67	                 | "cleanup"
+    68	                 | forStart(String, Stmts)
+    69	                 | forLoop(String, List, Stmts)
+    70	                 | whileTest(Expr, Stmts)
+    71	                 | ifTest(Stmts, Stmts)
+    72	                 | compareLeft(String, Expr)
+    73	                 | compareRight(String, Val)
+    74	                 | call1(String)
+    75	                 | callArg1(String, Expr)
+    76	                 | callArg2(String, Val)
+    77	                 | invoke1(String, Val)
+    78	                 | invoke2(String, Val, Val)
+    79	
+    80	  // Rational helpers reduce after every operation to keep execution compact.
+    81	  syntax Int ::= gcdInt(Int, Int) [function, total]
+    82	  rule gcdInt(A, 0) => absInt(A) [simplification]
+    83	  rule gcdInt(A, B) => gcdInt(B, A modInt B)
+    84	    requires B =/=Int 0 [simplification]
+    85	
+    86	  syntax Val ::= makeRat(Int, Int) [function, total]
+    87	               | addRat(Val, Val) [function, total]
+    88	               | subRat(Val, Val) [function, total]
+    89	               | mulRat(Val, Val) [function, total]
+    90	               | divRat(Val, Val) [function, total]
+    91	               | negRat(Val) [function, total]
+    92	
+    93	  rule makeRat(0, D) => rat(0, 1)
+    94	    requires D =/=Int 0 [simplification]
+    95	  rule makeRat(N, D) => makeRat(0 -Int N, 0 -Int D)
+    96	    requires D <Int 0 [simplification]
+    97	  rule makeRat(N, D)
+    98	    => rat(N divInt gcdInt(absInt(N), D), D divInt gcdInt(absInt(N), D))
+    99	    requires N =/=Int 0 andBool D >Int 0 [simplification]
+   100	
+   101	  rule addRat(rat(A, B), rat(C, D))
+   102	    => makeRat(A *Int D +Int C *Int B, B *Int D) [simplification]
+   103	  rule subRat(rat(A, B), rat(C, D))
+   104	    => makeRat(A *Int D -Int C *Int B, B *Int D) [simplification]
+   105	  rule mulRat(rat(A, B), rat(C, D))
+   106	    => makeRat(A *Int C, B *Int D) [simplification]
+   107	  rule divRat(rat(A, B), rat(C, D))
+   108	    => makeRat(A *Int D, B *Int C)
+   109	    requires C =/=Int 0 [simplification]
+   110	  rule negRat(rat(A, B)) => rat(0 -Int A, B) [simplification]
+   111	
+   112	  // Module loading, execution of statement lists, and cleanup.
+   113	  rule <k> Module(SS) ;; E => exec(SS) ~> E ~> cleanup ...</k>
+   114	  rule exec(.Stmts) => .K
+   115	  rule exec(S SS) => S ~> exec(SS)
+   116	
+   117	  rule <k> V:Val ~> cleanup => V ...</k>
+   118	       <env> _ => .Map </env>
+   119	       <functions> _ => .Map </functions>
+   120	       <stack> .List </stack>
+   121	
+   122	  // Function definitions are immutable for this translated program.
+   123	  rule <k> FuncDef(F, Params(P), BODY) => .K ...</k>
+   124	       <functions> M => M [ F <- function1(P, BODY) ] </functions>
+   125	  rule <k> FuncDef(F, Params(P1, P2), BODY) => .K ...</k>
+   126	       <functions> M => M [ F <- function2(P1, P2, BODY) ] </functions>
+   127	
+   128	  // Variables and primitive expressions.
+   129	  rule <k> Int(I) => rat(I, 1) ...</k>
+   130	  rule <k> Name(X) => V ...</k>
+   131	       <env>... X |-> V:Val ...</env>
+   132	
+   133	  rule UnaryOp("-", V:Val) => negRat(V)
+   134	  rule BinOp("+", A:Val, B:Val) => addRat(A, B)
+   135	  rule BinOp("-", A:Val, B:Val) => subRat(A, B)
+   136	  rule BinOp("*", A:Val, B:Val) => mulRat(A, B)
+   137	  rule BinOp("/", A:Val, B:Val) => divRat(A, B)
+   138	
+   139	  context UnaryOp(_, HOLE)
+   140	  context BinOp(_, HOLE, _)
+   141	  context BinOp(_, _V:Val, HOLE)
+   142	
+   143	  // The generated program uses single comparisons, kept faithful to the AST.
+   144	  rule Compare(E, CmpOp(OP, R)) => E ~> compareLeft(OP, R)
+   145	  rule V:Val ~> compareLeft(OP, R) => R ~> compareRight(OP, V)
+   146	  rule rat(B, DB) ~> compareRight(">", rat(A, DA))
+   147	    => bool(A *Int DB >Int B *Int DA)
+   148	
+   149	  // Assignment and structured control flow.
+   150	  rule <k> Assign(Name(X), V:Val) => .K ...</k>
+   151	       <env> RHO => RHO [ X <- V ] </env>
+   152	
+   153	  rule For(Name(X), E, BODY) => E ~> forStart(X, BODY)
+   154	  rule list(L) ~> forStart(X, BODY) => forLoop(X, L, BODY)
+   155	  rule forLoop(_X, .List, _BODY) => .K
+   156	  rule forLoop(X, ListItem(V:Val) REST, BODY)
+   157	    => Assign(Name(X), V) ~> exec(BODY) ~> forLoop(X, REST, BODY)
+   158	
+   159	  rule While(COND, BODY) => COND ~> whileTest(COND, BODY)
+   160	  rule bool(true) ~> whileTest(COND, BODY)
+   161	    => exec(BODY) ~> While(COND, BODY)
+   162	  rule bool(false) ~> whileTest(_COND, _BODY) => .K
+   163	
+   164	  rule If(COND, YES, NO) => COND ~> ifTest(YES, NO)
+   165	  rule bool(true) ~> ifTest(YES, _NO) => exec(YES)
+   166	  rule bool(false) ~> ifTest(_YES, NO) => exec(NO)
+   167	
+   168	  // Evaluate call arguments left-to-right before changing the local frame.
+   169	  rule Call(Name(F), E) => E ~> call1(F)
+   170	  rule V:Val ~> call1(F) => invoke1(F, V)
+   171	  rule Call(Name(F), E1, E2) => E1 ~> callArg1(F, E2)
+   172	  rule V:Val ~> callArg1(F, E2) => E2 ~> callArg2(F, V)
+   173	  rule V2:Val ~> callArg2(F, V1) => invoke2(F, V1, V2)
+   174	  rule Invoke(F, V) => invoke1(F, V)
+   175	
+   176	  rule <k> invoke1(F, V) ~> CALLER => exec(BODY) </k>
+   177	       <env> RHO => P |-> V </env>
+   178	       <functions>... F |-> function1(P, BODY) ...</functions>
+   179	       <stack> S => ListItem(frame(CALLER, RHO)) S </stack>
+   180	
+   181	  rule <k> invoke2(F, V1, V2) ~> CALLER => exec(BODY) </k>
+   182	       <env> RHO => P1 |-> V1 P2 |-> V2 </env>
+   183	       <functions>... F |-> function2(P1, P2, BODY) ...</functions>
+   184	       <stack> S => ListItem(frame(CALLER, RHO)) S </stack>
+   185	
+   186	  // Return abandons the rest of the callee and resumes its saved continuation.
+   187	  rule <k> Return(V:Val) ~> _CURRENT => V ~> CALLER </k>
+   188	       <env> _ => RHO </env>
+   189	       <stack> ListItem(frame(CALLER, RHO)) S => S </stack>
+   190	endmodule
+
+FILE /candidate/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // This constant is the exact constructor tree emitted in solution.mpy.
+     7	  // Keeping it as a macro lets both krun and kprove execute the submitted AST.
+     8	  syntax Program ::= "solution" [macro]
+     9	  rule solution =>
+    10	    Module(
+    11	      FuncDef("evaluate_polynomial", Params("xs", "x"),
+    12	        Assign(Name("value"), Int(0))
+    13	        Assign(Name("power"), Int(1))
+    14	        For(Name("coefficient"), Name("xs"),
+    15	          Assign(
+    16	            Name("value"),
+    17	            BinOp(
+    18	              "+",
+    19	              Name("value"),
+    20	              BinOp("*", Name("coefficient"), Name("power"))))
+    21	          Assign(Name("power"), BinOp("*", Name("power"), Name("x"))))
+    22	        Return(Name("value")))
+    23	      FuncDef("find_zero", Params("xs"),
+    24	        Assign(Name("left"), UnaryOp("-", Int(1)))
+    25	        Assign(Name("right"), Int(1))
+    26	        While(Compare(
+    27	          BinOp(
+    28	            "*",
+    29	            Call(Name("evaluate_polynomial"), Name("xs"), Name("left")),
+    30	            Call(Name("evaluate_polynomial"), Name("xs"), Name("right"))),
+    31	          CmpOp(">", Int(0))),
+    32	          Assign(Name("left"), BinOp("*", Name("left"), Int(2)))
+    33	          Assign(Name("right"), BinOp("*", Name("right"), Int(2))))
+    34	        While(Compare(
+    35	          BinOp("-", Name("right"), Name("left")),
+    36	          CmpOp(">", BinOp("/", Int(1), Int(10000000000)))),
+    37	          Assign(
+    38	            Name("middle"),
+    39	            BinOp("/", BinOp("+", Name("left"), Name("right")), Int(2)))
+    40	          If(Compare(
+    41	            BinOp(
+    42	              "*",
+    43	              Call(Name("evaluate_polynomial"), Name("xs"), Name("middle")),
+    44	              Call(Name("evaluate_polynomial"), Name("xs"), Name("left"))),
+    45	            CmpOp(">", Int(0))),
+    46	            Assign(Name("left"), Name("middle")),
+    47	            Assign(Name("right"), Name("middle"))))
+    48	        Return(BinOp("/", BinOp("+", Name("left"), Name("right")), Int(2)))))
+    49	
+    50	  // Independent postcondition machinery.  Coefficients are in ascending order,
+    51	  // so this is Horner evaluation from the head: c0 + x * (c1 + x * ...).
+    52	  syntax Val ::= polyValue(List, Val) [function]
+    53	               | absRat(Val) [function, total]
+    54	  syntax Bool ::= leRat(Val, Val) [function, total]
+    55	
+    56	  rule polyValue(.List, _X) => rat(0, 1) [simplification]
+    57	  rule polyValue(ListItem(C:Val) REST, X)
+    58	    => addRat(C, mulRat(X, polyValue(REST, X))) [simplification]
+    59	
+    60	  rule absRat(rat(N, D)) => rat(0 -Int N, D)
+    61	    requires N <Int 0 [simplification]
+    62	  rule absRat(rat(N, D)) => rat(N, D)
+    63	    requires N >=Int 0 [simplification]
+    64	  rule leRat(rat(A, B), rat(C, D)) => A *Int D <=Int C *Int B
+    65	    [simplification]
+    66	
+    67	  syntax Expr ::= "VerifyRoot" "(" List "," Expr "," Val ")" [strict(2)]
+    68	  rule VerifyRoot(COEFFS, ROOT:Val, TOLERANCE)
+    69	    => bool(leRat(absRat(polyValue(COEFFS, ROOT)), TOLERANCE))
+    70	endmodule
+
+FILE /candidate/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Prompt example: 1 + 2x.
+     7	  claim
+     8	    <k>
+     9	      solution ;;
+    10	      VerifyRoot(
+    11	        ListItem(rat(1, 1)) ListItem(rat(2, 1)),
+    12	        Invoke("find_zero", list(
+    13	          ListItem(rat(1, 1)) ListItem(rat(2, 1)))),
+    14	        rat(1, 100000000))
+    15	      => bool(true)
+    16	    </k>
+    17	    <env> .Map </env>
+    18	    <functions> .Map </functions>
+    19	    <stack> .List </stack>
+    20	
+    21	  // Prompt example: -6 + 11x - 6x^2 + x^3.
+    22	  claim
+    23	    <k>
+    24	      solution ;;
+    25	      VerifyRoot(
+    26	        ListItem(rat(-6, 1)) ListItem(rat(11, 1))
+    27	          ListItem(rat(-6, 1)) ListItem(rat(1, 1)),
+    28	        Invoke("find_zero", list(
+    29	          ListItem(rat(-6, 1)) ListItem(rat(11, 1))
+    30	            ListItem(rat(-6, 1)) ListItem(rat(1, 1)))),
+    31	        rat(1, 100000000))
+    32	      => bool(true)
+    33	    </k>
+    34	    <env> .Map </env>
+    35	    <functions> .Map </functions>
+    36	    <stack> .List </stack>
+    37	
+    38	  // The root is the initial midpoint; this exercises the zero-product branch.
+    39	  claim
+    40	    <k>
+    41	      solution ;;
+    42	      VerifyRoot(
+    43	        ListItem(rat(0, 1)) ListItem(rat(1, 1)),
+    44	        Invoke("find_zero", list(
+    45	          ListItem(rat(0, 1)) ListItem(rat(1, 1)))),
+    46	        rat(1, 100000000))
+    47	      => bool(true)
+    48	    </k>
+    49	    <env> .Map </env>
+    50	    <functions> .Map </functions>
+    51	    <stack> .List </stack>
+    52	
+    53	  // x^3 - 8: both initial endpoint values are negative, so the bracket grows.
+    54	  claim
+    55	    <k>
+    56	      solution ;;
+    57	      VerifyRoot(
+    58	        ListItem(rat(-8, 1)) ListItem(rat(0, 1))
+    59	          ListItem(rat(0, 1)) ListItem(rat(1, 1)),
+    60	        Invoke("find_zero", list(
+    61	          ListItem(rat(-8, 1)) ListItem(rat(0, 1))
+    62	            ListItem(rat(0, 1)) ListItem(rat(1, 1)))),
+    63	        rat(1, 100000000))
+    64	      => bool(true)
+    65	    </k>
+    66	    <env> .Map </env>
+    67	    <functions> .Map </functions>
+    68	    <stack> .List </stack>
+    69	
+    70	  // x^3 + 8: symmetric expansion to a negative root.
+    71	  claim
+    72	    <k>
+    73	      solution ;;
+    74	      VerifyRoot(
+    75	        ListItem(rat(8, 1)) ListItem(rat(0, 1))
+    76	          ListItem(rat(0, 1)) ListItem(rat(1, 1)),
+    77	        Invoke("find_zero", list(
+    78	          ListItem(rat(8, 1)) ListItem(rat(0, 1))
+    79	            ListItem(rat(0, 1)) ListItem(rat(1, 1)))),
+    80	        rat(1, 100000000))
+    81	      => bool(true)
+    82	    </k>
+    83	    <env> .Map </env>
+    84	    <functions> .Map </functions>
+    85	    <stack> .List </stack>
+    86	endmodule
+
+FILE /candidate/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Regenerate the constructor tree from the submitted Python implementation.
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	
+     7	# Compile the standalone semantics, then the semantics plus proof utilities.
+     8	kompile semantic.k \
+     9	  --backend haskell \
+    10	  --main-module SEMANTIC \
+    11	  --syntax-module SEMANTIC-SYNTAX
+    12	kompile verification.k \
+    13	  --backend haskell \
+    14	  --main-module VERIFICATION \
+    15	  --syntax-module VERIFICATION
+    16	
+    17	# Exercise the actual freshly generated solution.mpy term with the prompt's
+    18	# linear example.  The exact rational result is approximately -0.5.
+    19	TRANSLATED_PROGRAM="$(< solution.mpy)"
+    20	krun --definition verification-kompiled \
+    21	  -cPGM="$TRANSLATED_PROGRAM ;; Invoke(\"find_zero\", list(ListItem(rat(1, 1)) ListItem(rat(2, 1))))" \
+    22	  --output pretty
+    23	
+    24	# Exercise the second prompt example and independently check its residual.
+    25	krun --definition verification-kompiled \
+    26	  -cPGM="$TRANSLATED_PROGRAM ;; VerifyRoot(ListItem(rat(-6, 1)) ListItem(rat(11, 1)) ListItem(rat(-6, 1)) ListItem(rat(1, 1)), Invoke(\"find_zero\", list(ListItem(rat(-6, 1)) ListItem(rat(11, 1)) ListItem(rat(-6, 1)) ListItem(rat(1, 1)))), rat(1, 100000000))" \
+    27	  --output pretty
+    28	
+    29	# This is the required positive target-proof command.  It proves every claim
+    30	# in spec.k and must print #Top and exit zero.
+    31	kprove spec.k \
+    32	  --definition verification-kompiled \
+    33	  --output pretty
+
+EXIT_STATUS: 0

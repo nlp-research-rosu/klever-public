@@ -1,0 +1,1154 @@
+# Exhaustive K source inventory
+
+Every top-level source declaration, context, rule, and claim is listed once.
+`SUPPLIED_FIXED_UNREACHED` means its LHS construct/value cannot arise in the submitted target; it remains part of the supplied-semantics trust boundary.
+
+## Source hashes and counts
+
+- semantics.k: sha256=57e8f9f3178639bbb87f95e5cc596bbaa91a6463f965b1965911eff9a0269f97; endmodule=2, imports=23, module=2, requires=23
+- semantics/assert.k: sha256=4258987a261d24b02ab3abfa52b3b2e013ea6323f9d5eb9a59c8f42cbcba030b; endmodule=1, imports=1, module=1, rule=3
+- semantics/bool.k: sha256=8d6cfa9cd1ed776e51d776e4d358c418960c57715a6f9654ef9af41aea29f4fd; context=1, endmodule=1, imports=1, module=1, rule=13
+- semantics/builtins.k: sha256=fa43a855b8a4548f305f3dd210c8f6c6e7aa15b8d1cb0b8296977f061310c2dd; endmodule=1, imports=7, module=1, rule=137, syntax=38
+- semantics/call.k: sha256=7e4d6c7cabe7bb4ccff52f21c5d5f30920ccb48d42864146ce53146509f736e4; endmodule=1, imports=3, module=1, rule=21, syntax=3
+- semantics/comprehension.k: sha256=cf7c38aad5cff698ebb05ecbadf00cbf210ddb2f54ae86f22b328311c027c6a7; endmodule=1, imports=5, module=1, rule=7, syntax=3
+- semantics/concrete.k: sha256=1ffea42a32610e9116506d709e9163413aeb5f6deb7824ea554aca8341f2d305; endmodule=1, imports=1, module=1, rule=16, syntax=5
+- semantics/controls.k: sha256=325c73757d5a7ccf541b93240accd590a2cee90d84470efa3a4a0a14165aafae; endmodule=1, imports=3, module=1, rule=34, syntax=3
+- semantics/core.k: sha256=e0fdc11dc2b9cd0acb18fe7c832c1ea1ac0c9e79cadf40c63f34276aca513d7e; configuration=1, endmodule=1, imports=7, module=1, rule=46, syntax=37
+- semantics/dict.k: sha256=779b06e18162464c8422bbd6ac35fa0b9e34ef82807d5c707c6f4552d63c0580; endmodule=1, imports=4, module=1, rule=28, syntax=12
+- semantics/float.k: sha256=5dfeee8700c90c3aa6dc515b15b74283882845fb6cdcc3627d97ef650124b70f; endmodule=1, imports=3, module=1, rule=121, syntax=34
+- semantics/functions.k: sha256=e4c8f67741117b29703c3c61d48a5b0f92cf7bd531e78e25c03e794a910ac193; endmodule=1, imports=1, module=1, rule=15, syntax=4
+- semantics/int.k: sha256=dc2da7d81578370651ecb6905b69cb44443cdd8db3869441242b81420382abe5; endmodule=1, imports=1, module=1, rule=16, syntax=1
+- semantics/iter.k: sha256=5085db2fed67b7bbd39f6289ec275905aaee742690895d7b3f843f73bd62f77f; endmodule=1, imports=1, module=1, syntax=1
+- semantics/list.k: sha256=870c72341c25e2c16283726191a71bf5b571ed2995c8ae12e3e2923cdce5a9aa; endmodule=1, imports=3, module=1, rule=27, syntax=5
+- semantics/methods.k: sha256=ff9acc6dab2d1cc99ec4f2d234f27ae4526d752aae62bcfd7f9fd2a0399f7743; endmodule=1, imports=4, module=1, rule=75, syntax=27
+- semantics/operators.k: sha256=f3d1fd85734f5e1757307e606cbfb8d6d4bf0893ee85ce20ec99606ade910e8b; context=2, endmodule=1, imports=2, module=1, rule=10
+- semantics/range.k: sha256=810e4c04b757445c03592aef25c97d6b2cc7c6fffa646288bc6cd15a3cae643d; endmodule=1, imports=2, module=1, rule=6, syntax=2
+- semantics/set.k: sha256=b822c3c6944f9940a4477fa6b7a42490c407663f2a314394e9c146e8951f1ac7; endmodule=1, imports=1, module=1, rule=12, syntax=6
+- semantics/sort.k: sha256=df79670e4794a92e96ffc824857fbc34d3a65b6b6a3026d1dcf322128fbaba5a; endmodule=1, imports=2, module=1, rule=19, syntax=6
+- semantics/str.k: sha256=1bf0abf61d7c5df6301433a89c79d2ef4259d47a68d98385ff74618c4c310e0f; endmodule=1, imports=2, module=1, rule=28, syntax=5
+- semantics/subscript.k: sha256=dba04c0acf213bef4f9f7b11243ca00a2b3ca5fa8666c544ede7d382d27d36a7; context=2, endmodule=1, imports=1, module=1, rule=40, syntax=15
+- semantics/syntax.k: sha256=1e9e629e5e6e14bdd7f4d530375e8655a89366b5ecd0c24a3c57ad3b5708f2a6; endmodule=1, imports=4, module=1, syntax=16
+- semantics/tuple.k: sha256=41395a1ec6a58129c78facb15b44206907c54d79e86ea363ae68cb37bfc64abb; endmodule=1, imports=4, module=1, rule=21, syntax=4
+- candidate/verification.k: sha256=c2c1ac308f8bc7b382807be812a05075c3df7b13fb3e54cee20e9bff11c46237; endmodule=1, imports=3, module=1, requires=1, rule=10, syntax=4
+- candidate/spec.k: sha256=f9f8820d2035313c36c9262d99cb0426f0cc0d17904053b6202dc92acacb55da; claim=2, endmodule=1, imports=1, module=1, requires=1
+
+## Aggregate counts
+
+- kinds: claim=2, configuration=1, context=5, endmodule=27, imports=90, module=27, requires=25, rule=705, syntax=231
+- attributes: concrete=36, function=150, macro=4, opaque/no-evaluators=22, owise=26, priority=45, strict=2, total=111
+
+## Inventory
+
+- semantics.k:34 | requires | DECLARATION | attrs=- | requires "semantics/syntax.k"
+- semantics.k:35 | requires | DECLARATION | attrs=- | requires "semantics/core.k"
+- semantics.k:36 | requires | DECLARATION | attrs=- | requires "semantics/iter.k"
+- semantics.k:37 | requires | DECLARATION | attrs=- | requires "semantics/range.k"
+- semantics.k:38 | requires | DECLARATION | attrs=- | requires "semantics/operators.k"
+- semantics.k:39 | requires | DECLARATION | attrs=- | requires "semantics/int.k"
+- semantics.k:40 | requires | DECLARATION | attrs=- | requires "semantics/bool.k"
+- semantics.k:41 | requires | DECLARATION | attrs=- | requires "semantics/float.k"
+- semantics.k:42 | requires | DECLARATION | attrs=- | requires "semantics/str.k"
+- semantics.k:43 | requires | DECLARATION | attrs=- | requires "semantics/set.k"
+- semantics.k:44 | requires | DECLARATION | attrs=- | requires "semantics/list.k"
+- semantics.k:45 | requires | DECLARATION | attrs=- | requires "semantics/tuple.k"
+- semantics.k:46 | requires | DECLARATION | attrs=- | requires "semantics/subscript.k"
+- semantics.k:47 | requires | DECLARATION | attrs=- | requires "semantics/comprehension.k"
+- semantics.k:48 | requires | DECLARATION | attrs=- | requires "semantics/methods.k"
+- semantics.k:49 | requires | DECLARATION | attrs=- | requires "semantics/controls.k"
+- semantics.k:50 | requires | DECLARATION | attrs=- | requires "semantics/functions.k"
+- semantics.k:51 | requires | DECLARATION | attrs=- | requires "semantics/builtins.k"
+- semantics.k:52 | requires | DECLARATION | attrs=- | requires "semantics/call.k"
+- semantics.k:53 | requires | DECLARATION | attrs=- | requires "semantics/sort.k"
+- semantics.k:54 | requires | DECLARATION | attrs=- | requires "semantics/assert.k"
+- semantics.k:55 | requires | DECLARATION | attrs=- | requires "semantics/dict.k"
+- semantics.k:56 | requires | DECLARATION | attrs=concrete | requires "semantics/concrete.k"
+- semantics.k:58 | module | DECLARATION | attrs=- | module MPY
+- semantics.k:59 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics.k:60 | imports | DECLARATION | attrs=- | imports MPY-ITER
+- semantics.k:61 | imports | DECLARATION | attrs=- | imports MPY-RANGE
+- semantics.k:62 | imports | DECLARATION | attrs=- | imports MPY-OPERATORS
+- semantics.k:63 | imports | DECLARATION | attrs=- | imports MPY-INT
+- semantics.k:64 | imports | DECLARATION | attrs=- | imports MPY-BOOL
+- semantics.k:65 | imports | DECLARATION | attrs=- | imports MPY-FLOAT
+- semantics.k:66 | imports | DECLARATION | attrs=- | imports MPY-STR
+- semantics.k:67 | imports | DECLARATION | attrs=- | imports MPY-SET
+- semantics.k:68 | imports | DECLARATION | attrs=- | imports MPY-LIST
+- semantics.k:69 | imports | DECLARATION | attrs=- | imports MPY-TUPLE
+- semantics.k:70 | imports | DECLARATION | attrs=- | imports MPY-SUBSCRIPT
+- semantics.k:71 | imports | DECLARATION | attrs=- | imports MPY-COMPREHENSION
+- semantics.k:72 | imports | DECLARATION | attrs=- | imports MPY-METHODS
+- semantics.k:73 | imports | DECLARATION | attrs=- | imports MPY-CONTROLS
+- semantics.k:74 | imports | DECLARATION | attrs=- | imports MPY-FUNCTIONS
+- semantics.k:75 | imports | DECLARATION | attrs=- | imports MPY-BUILTINS
+- semantics.k:76 | imports | DECLARATION | attrs=- | imports MPY-CALL
+- semantics.k:77 | imports | DECLARATION | attrs=- | imports MPY-SORT
+- semantics.k:78 | imports | DECLARATION | attrs=- | imports MPY-ASSERT
+- semantics.k:79 | imports | DECLARATION | attrs=- | imports MPY-DICT
+- semantics.k:80 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics.k:87 | module | DECLARATION | attrs=- | module MPY-KRUN
+- semantics.k:88 | imports | DECLARATION | attrs=- | imports MPY
+- semantics.k:89 | imports | DECLARATION | attrs=- | imports MPY-CONCRETE
+- semantics.k:90 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/assert.k:3 | module | DECLARATION | attrs=- | module MPY-ASSERT
+- semantics/assert.k:4 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/assert.k:6 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Assert(V:Val) => .K ... </k> requires truthy(V)
+- semantics/assert.k:8 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Assert(V:Val) ~> _ => .K </k> <exc> NoExc => AssertionError </exc> <exit-code> _ => 1 </exit-code> requires notBool truthy(V)
+- semantics/assert.k:13 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> Assert(ref(H:Int)) => Assert(V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]
+- semantics/assert.k:16 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/bool.k:5 | module | DECLARATION | attrs=- | module MPY-BOOL
+- semantics/bool.k:6 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/bool.k:8 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyUn("not", V:Val) => notBool truthy(V)
+- semantics/bool.k:10 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("==", B1:Bool, B2:Bool) => B1 ==Bool B2
+- semantics/bool.k:11 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("!=", B1:Bool, B2:Bool) => B1 =/=Bool B2
+- semantics/bool.k:16 | context | DECLARATION | attrs=- | context BoolOp(_, (HOLE:Expr, _:Exprs))
+- semantics/bool.k:17 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> BoolOp(_:String, (V:Val, .Exprs)) => V ... </k>
+- semantics/bool.k:18 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> BoolOp("and", (V:Val, A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k> requires truthy(V)
+- semantics/bool.k:20 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> BoolOp("and", (V:Val, _:Expr, _:Exprs)) => V ... </k> requires notBool truthy(V)
+- semantics/bool.k:22 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> BoolOp("or",  (V:Val, _:Expr, _:Exprs)) => V ... </k> requires truthy(V)
+- semantics/bool.k:24 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> BoolOp("or",  (V:Val, A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k> requires notBool truthy(V)
+- semantics/bool.k:29 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> BoolOp(_:String, (ref(H:Int), .Exprs)) => ref(H) ... </k> [priority(40)]
+- semantics/bool.k:31 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> BoolOp("and", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires truthy(V) [priority(40)]
+- semantics/bool.k:35 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> BoolOp("and", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool truthy(V) [priority(40)]
+- semantics/bool.k:39 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> BoolOp("or", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k> <heap> ... H |-> V:Val ... </heap> requires truthy(V) [priority(40)]
+- semantics/bool.k:43 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> BoolOp("or", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool truthy(V) [priority(40)]
+- semantics/bool.k:47 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/builtins.k:3 | module | DECLARATION | attrs=- | module MPY-BUILTINS
+- semantics/builtins.k:4 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/builtins.k:5 | imports | DECLARATION | attrs=- | imports MPY-STR
+- semantics/builtins.k:6 | imports | DECLARATION | attrs=- | imports MPY-SET
+- semantics/builtins.k:7 | imports | DECLARATION | attrs=- | imports MPY-ITER
+- semantics/builtins.k:8 | imports | DECLARATION | attrs=- | imports MPY-RANGE
+- semantics/builtins.k:9 | imports | DECLARATION | attrs=- | imports MPY-INT
+- semantics/builtins.k:10 | imports | DECLARATION | attrs=- | imports MPY-METHODS
+- semantics/builtins.k:17 | syntax | DECLARATION | attrs=function | syntax Val ::= applyBuiltin(String, Vals) [function]
+- semantics/builtins.k:20 | syntax | DECLARATION | attrs=function | syntax Int ::= seqLen(Val) [function]
+- semantics/builtins.k:21 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("len", OBJ:Val, .Vals) => seqLen(OBJ)
+- semantics/builtins.k:22 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule seqLen(list(VS:ValSeq))                  => vsLen(VS)
+- semantics/builtins.k:23 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule seqLen(tuple(VS:ValSeq))                 => vsLen(VS)
+- semantics/builtins.k:24 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule seqLen(str(IS:IntSeq))                   => isLen(IS)
+- semantics/builtins.k:25 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule seqLen(setV(DS:IntSeq))                  => isLen(DS)
+- semantics/builtins.k:26 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule seqLen(rangeObj(LO:Int, HI:Int, ST:Int)) => rangeLen(LO, HI, ST)
+- semantics/builtins.k:32 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("list")), (list(VS:ValSeq),  .Vals)) => #alloc(list(VS)) ... </k>
+- semantics/builtins.k:33 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("list")), (tuple(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>
+- semantics/builtins.k:34 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("list")), .Vals)                     => #alloc(list(.ValSeq)) ... </k>
+- semantics/builtins.k:35 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("list")), (str(CS:IntSeq), .Vals))   => #alloc(list(charsOf(CS))) ... </k>
+- semantics/builtins.k:36 | syntax | DECLARATION | attrs=function,total | syntax ValSeq ::= charsOf(IntSeq) [function, total]
+- semantics/builtins.k:37 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule charsOf(.IntSeq)                => .ValSeq
+- semantics/builtins.k:38 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule charsOf(iCons(C:Int, R:IntSeq)) => vCons(str(iCons(C, .IntSeq)), charsOf(R))
+- semantics/builtins.k:41 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("set", str(CS:IntSeq), .Vals) => setV(dedupCodes(CS))
+- semantics/builtins.k:44 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("abs", I:Int, .Vals) => absInt(I)
+- semantics/builtins.k:47 | syntax | DECLARATION | attrs=- | syntax KItem ::= #sumAcc(Iterable, Int) | #sumCont(Int)
+- semantics/builtins.k:48 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #sumAcc(IT:Iterable, ACC:Int) => #iterNext(IT) ~> #sumCont(ACC) ... </k>
+- semantics/builtins.k:49 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterDone ~> #sumCont(ACC:Int) => ACC ... </k>
+- semantics/builtins.k:50 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int) => #sumAcc(R, ACC +Int intOf(V)) ... </k> requires isInt(V) orBool isBool(V)
+- semantics/builtins.k:54 | syntax | DECLARATION | attrs=function | syntax Int ::= intOf(Val) [function]
+- semantics/builtins.k:55 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule intOf(I:Int)  => I
+- semantics/builtins.k:56 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule intOf(B:Bool) => #if B #then 1 #else 0 #fi
+- semantics/builtins.k:59 | syntax | DECLARATION | attrs=- | syntax KItem ::= #allAcc(Iterable) | "#allCont"
+- semantics/builtins.k:60 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #allAcc(IT:Iterable) => #iterNext(IT) ~> #allCont ... </k>
+- semantics/builtins.k:61 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterDone ~> #allCont => true ... </k>
+- semantics/builtins.k:62 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, R:Iterable) ~> #allCont => #allAcc(R) ... </k> requires truthy(V)
+- semantics/builtins.k:64 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, _:Iterable) ~> #allCont => false ... </k> requires notBool truthy(V)
+- semantics/builtins.k:67 | syntax | DECLARATION | attrs=- | syntax KItem ::= #anyAcc(Iterable) | "#anyCont"
+- semantics/builtins.k:68 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #anyAcc(IT:Iterable) => #iterNext(IT) ~> #anyCont ... </k>
+- semantics/builtins.k:69 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterDone ~> #anyCont => false ... </k>
+- semantics/builtins.k:70 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, _:Iterable) ~> #anyCont => true ... </k> requires truthy(V)
+- semantics/builtins.k:72 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, R:Iterable) ~> #anyCont => #anyAcc(R) ... </k> requires notBool truthy(V)
+- semantics/builtins.k:76 | syntax | DECLARATION | attrs=- | syntax KItem ::= #maxAcc0(Iterable) | "#maxCont0" | #maxAcc(Iterable, Int) | #maxCont(Int)
+- semantics/builtins.k:77 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #maxAcc0(IT:Iterable) => #iterNext(IT) ~> #maxCont0 ... </k>
+- semantics/builtins.k:78 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAcc(R, {V}:>Int) ... </k> requires isInt(V)
+- semantics/builtins.k:80 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #maxAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #maxCont(M) ... </k>
+- semantics/builtins.k:81 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterDone ~> #maxCont(M:Int) => M ... </k>
+- semantics/builtins.k:82 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont(M:Int) => #maxAcc(R, maxInt(M, {V}:>Int)) ... </k> requires isInt(V)
+- semantics/builtins.k:86 | syntax | DECLARATION | attrs=- | syntax KItem ::= #minAcc0(Iterable) | "#minCont0" | #minAcc(Iterable, Int) | #minCont(Int)
+- semantics/builtins.k:87 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #minAcc0(IT:Iterable) => #iterNext(IT) ~> #minCont0 ... </k>
+- semantics/builtins.k:88 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAcc(R, {V}:>Int) ... </k> requires isInt(V)
+- semantics/builtins.k:90 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #minAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #minCont(M) ... </k>
+- semantics/builtins.k:91 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterDone ~> #minCont(M:Int) => M ... </k>
+- semantics/builtins.k:92 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont(M:Int) => #minAcc(R, minInt(M, {V}:>Int)) ... </k> requires isInt(V)
+- semantics/builtins.k:97 | syntax | DECLARATION | attrs=function | syntax Int ::= maxVals(Int, Vals) [function]
+- semantics/builtins.k:98 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("max", I:Int, REST:Vals) => maxVals(I, REST)
+- semantics/builtins.k:99 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule maxVals(M:Int, .Vals)           => M
+- semantics/builtins.k:100 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule maxVals(M:Int, (I:Int, R:Vals)) => maxVals(maxInt(M, I), R)
+- semantics/builtins.k:102 | syntax | DECLARATION | attrs=function | syntax Int ::= minVals(Int, Vals) [function]
+- semantics/builtins.k:103 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("min", I:Int, REST:Vals) => minVals(I, REST)
+- semantics/builtins.k:104 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule minVals(M:Int, .Vals)           => M
+- semantics/builtins.k:105 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule minVals(M:Int, (I:Int, R:Vals)) => minVals(minInt(M, I), R)
+- semantics/builtins.k:108 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(48, iCons(98, binCodes(N)))) requires N >=Int 0
+- semantics/builtins.k:111 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(45, iCons(48, iCons(98, binCodes(0 -Int N))))) requires N <Int 0
+- semantics/builtins.k:114 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= binCodes(Int) [function, total]
+- semantics/builtins.k:115 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule binCodes(0) => iCons(48, .IntSeq)
+- semantics/builtins.k:116 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule binCodes(N:Int) => binAcc(N, .IntSeq) requires N >Int 0
+- semantics/builtins.k:117 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= binAcc(Int, IntSeq) [function, total]
+- semantics/builtins.k:118 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule binAcc(0, ACC:IntSeq) => ACC
+- semantics/builtins.k:119 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule binAcc(N:Int, ACC:IntSeq) => binAcc((N -Int pyMod(N, 2)) /Int 2, iCons(48 +Int pyMod(N, 2), ACC)) requires N >Int 0
+- semantics/builtins.k:124 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("enumerate")), (list(VS:ValSeq), .Vals)) => #alloc(list(enumVS(VS, 0))) ... </k>
+- semantics/builtins.k:126 | syntax | DECLARATION | attrs=function,total | syntax ValSeq ::= enumVS(ValSeq, Int) [function, total]
+- semantics/builtins.k:127 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule enumVS(.ValSeq, _:Int) => .ValSeq
+- semantics/builtins.k:128 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule enumVS(vCons(V:Val, R:ValSeq), I:Int) => vCons(tuple(vCons(I, vCons(V, .ValSeq))), enumVS(R, I +Int 1))
+- semantics/builtins.k:132 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("map")), (typeV("str"), list(VS:ValSeq), .Vals)) => #alloc(list(mapStrVS(VS))) ... </k>
+- semantics/builtins.k:134 | syntax | DECLARATION | attrs=function,total | syntax ValSeq ::= mapStrVS(ValSeq) [function, total]
+- semantics/builtins.k:135 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule mapStrVS(.ValSeq) => .ValSeq
+- semantics/builtins.k:136 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))
+- semantics/builtins.k:137 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule mapStrVS(vCons(str(CS:IntSeq), R:ValSeq)) => vCons(str(CS), mapStrVS(R))
+- semantics/builtins.k:140 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("int", I:Int, .Vals) => I
+- semantics/builtins.k:143 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("ord", str(iCons(C:Int, .IntSeq)), .Vals) => C
+- semantics/builtins.k:144 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("chr", I:Int, .Vals) => str(iCons(I, .IntSeq)) requires 0 <=Int I andBool I <Int 128
+- semantics/builtins.k:148 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("str", I:Int, .Vals)       => str(strToCodes(Int2String(I)))
+- semantics/builtins.k:149 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("str", str(CS:IntSeq), .Vals) => str(CS)
+- semantics/builtins.k:152 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("int", str(iCons(C:Int, .IntSeq)), .Vals) => C -Int 48 requires 48 <=Int C andBool C <=Int 57
+- semantics/builtins.k:156 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("int", str(CS:IntSeq), .Vals) => intDigAcc(CS, 0) requires isLen(CS) >=Int 2
+- semantics/builtins.k:158 | syntax | DECLARATION | attrs=function,total | syntax Int ::= intDigAcc(IntSeq, Int) [function, total]
+- semantics/builtins.k:159 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule intDigAcc(.IntSeq, ACC:Int)             => ACC
+- semantics/builtins.k:160 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule intDigAcc(iCons(C:Int, R:IntSeq), ACC:Int) => intDigAcc(R, (ACC *Int 10) +Int (C -Int 48))
+- semantics/builtins.k:163 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("zip", list(A:ValSeq), list(B:ValSeq), .Vals) => zipObj(A, B)
+- semantics/builtins.k:164 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("zip", str(A:IntSeq), str(B:IntSeq), .Vals)   => zipObjS(A, B)
+- semantics/builtins.k:167 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterNext(zipObj(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq))) => #iterYield(tuple(vCons(A, vCons(B, .ValSeq))), zipObj(As, Bs)) ... </k>
+- semantics/builtins.k:169 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterNext(zipObj(.ValSeq, _:ValSeq))               => #iterDone ... </k>
+- semantics/builtins.k:170 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterNext(zipObj(vCons(_:Val, _:ValSeq), .ValSeq)) => #iterDone ... </k>
+- semantics/builtins.k:171 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterNext(zipObjS(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq))) => #iterYield(tuple(vCons(str(iCons(A, .IntSeq)), vCons(str(iCons(B, .IntSeq)), .ValSeq))), zipObjS(As, Bs)) ... </k>
+- semantics/builtins.k:173 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterNext(zipObjS(.IntSeq, _:IntSeq))              => #iterDone ... </k>
+- semantics/builtins.k:174 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterNext(zipObjS(iCons(_:Int, _:IntSeq), .IntSeq)) => #iterDone ... </k>
+- semantics/builtins.k:177 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("range", I:Int, .Vals)               => rangeObj(0, I, 1)
+- semantics/builtins.k:178 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("range", A:Int, B:Int, .Vals)        => rangeObj(A, B, 1)
+- semantics/builtins.k:179 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("range", A:Int, B:Int, S:Int, .Vals) => rangeObj(A, B, S) requires S =/=Int 0
+- semantics/builtins.k:187 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("eval", str(CS:IntSeq), .Vals) => evalArith(CS)
+- semantics/builtins.k:188 | syntax | DECLARATION | attrs=function | syntax Int ::= evalArith(IntSeq) [function]
+- semantics/builtins.k:189 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule evalArith(CS:IntSeq) => firstNdE(passAddE(passMulE(passPowE(tokOps(CS), tokNds(CS)))))
+- semantics/builtins.k:192 | syntax | DECLARATION | attrs=- | syntax OpSeq ::= ".OpSeq" | oCons(String, OpSeq)
+- semantics/builtins.k:194 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= evDigit(Int) [function, total]
+- semantics/builtins.k:195 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule evDigit(C:Int) => C >=Int 48 andBool C <=Int 57
+- semantics/builtins.k:196 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= evHead42(IntSeq) [function, total]
+- semantics/builtins.k:197 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule evHead42(iCons(42, _:IntSeq)) => true
+- semantics/builtins.k:198 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule evHead42(_:IntSeq)            => false [owise]
+- semantics/builtins.k:199 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= evHead47(IntSeq) [function, total]
+- semantics/builtins.k:200 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule evHead47(iCons(47, _:IntSeq)) => true
+- semantics/builtins.k:201 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule evHead47(_:IntSeq)            => false [owise]
+- semantics/builtins.k:203 | syntax | DECLARATION | attrs=function,total | syntax OpSeq ::= tokOps(IntSeq) [function, total]
+- semantics/builtins.k:204 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule tokOps(.IntSeq)                 => .OpSeq
+- semantics/builtins.k:205 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule tokOps(iCons(32, R:IntSeq))     => tokOps(R)
+- semantics/builtins.k:206 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule tokOps(iCons(C:Int, R:IntSeq))  => tokOps(R) requires evDigit(C)
+- semantics/builtins.k:207 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule tokOps(iCons(42, iCons(42, R:IntSeq))) => oCons("**", tokOps(R))
+- semantics/builtins.k:208 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule tokOps(iCons(42, R:IntSeq))     => oCons("*", tokOps(R)) requires notBool evHead42(R)
+- semantics/builtins.k:209 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule tokOps(iCons(47, iCons(47, R:IntSeq))) => oCons("//", tokOps(R))
+- semantics/builtins.k:210 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule tokOps(iCons(47, R:IntSeq))     => oCons("/", tokOps(R)) requires notBool evHead47(R)
+- semantics/builtins.k:211 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule tokOps(iCons(43, R:IntSeq))     => oCons("+", tokOps(R))
+- semantics/builtins.k:212 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule tokOps(iCons(45, R:IntSeq))     => oCons("-", tokOps(R))
+- semantics/builtins.k:214 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= tokNds(IntSeq) [function, total] | tokNdAcc(Int, IntSeq) [function, total]
+- semantics/builtins.k:216 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule tokNds(.IntSeq)                => .IntSeq
+- semantics/builtins.k:217 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule tokNds(iCons(32, R:IntSeq))    => tokNds(R)
+- semantics/builtins.k:218 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule tokNds(iCons(C:Int, R:IntSeq)) => tokNdAcc(C -Int 48, R) requires evDigit(C)
+- semantics/builtins.k:219 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule tokNds(iCons(C:Int, R:IntSeq)) => tokNds(R) requires notBool evDigit(C) andBool C =/=Int 32
+- semantics/builtins.k:221 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule tokNdAcc(A:Int, iCons(C:Int, R:IntSeq)) => tokNdAcc(A *Int 10 +Int (C -Int 48), R) requires evDigit(C)
+- semantics/builtins.k:223 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule tokNdAcc(A:Int, S:IntSeq) => iCons(A, tokNds(S)) [owise]
+- semantics/builtins.k:225 | syntax | DECLARATION | attrs=- | syntax EvPair ::= evp(OpSeq, IntSeq)
+- semantics/builtins.k:226 | syntax | DECLARATION | attrs=function,total | syntax Int ::= firstNdE(EvPair) [function, total]
+- semantics/builtins.k:227 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule firstNdE(evp(_:OpSeq, iCons(N:Int, _:IntSeq))) => N
+- semantics/builtins.k:228 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule firstNdE(_:EvPair) => 0 [owise]
+- semantics/builtins.k:230 | syntax | DECLARATION | attrs=function,total | syntax Int ::= applyOpE(String, Int, Int) [function, total]
+- semantics/builtins.k:231 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyOpE("+",  A:Int, B:Int) => A +Int B
+- semantics/builtins.k:232 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyOpE("-",  A:Int, B:Int) => A -Int B
+- semantics/builtins.k:233 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyOpE("*",  A:Int, B:Int) => A *Int B
+- semantics/builtins.k:234 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyOpE("//", A:Int, B:Int) => A divInt B
+- semantics/builtins.k:235 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyOpE("**", A:Int, B:Int) => A ^Int B
+- semantics/builtins.k:236 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule applyOpE(_:String, A:Int, _:Int) => A [owise]
+- semantics/builtins.k:238 | syntax | DECLARATION | attrs=function,total | syntax EvPair ::= passPowE(OpSeq, IntSeq) [function, total]
+- semantics/builtins.k:239 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule passPowE(.OpSeq, NDS:IntSeq) => evp(.OpSeq, NDS)
+- semantics/builtins.k:240 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule passPowE(oCons("**", OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCombE(N, passPowE(OPS, NDS))
+- semantics/builtins.k:241 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule passPowE(oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCarryE(O, N, passPowE(OPS, NDS)) requires O =/=String "**"
+- semantics/builtins.k:243 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule passPowE(_:OpSeq, .IntSeq) => evp(.OpSeq, .IntSeq) [owise]
+- semantics/builtins.k:244 | syntax | DECLARATION | attrs=function,total | syntax EvPair ::= powCombE(Int, EvPair) [function, total]
+- semantics/builtins.k:245 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule powCombE(N:Int, evp(OPS:OpSeq, iCons(M:Int, REST:IntSeq))) => evp(OPS, iCons(N ^Int M, REST))
+- semantics/builtins.k:246 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule powCombE(N:Int, evp(OPS:OpSeq, .IntSeq)) => evp(OPS, iCons(N, .IntSeq))
+- semantics/builtins.k:247 | syntax | DECLARATION | attrs=function,total | syntax EvPair ::= powCarryE(String, Int, EvPair) [function, total]
+- semantics/builtins.k:248 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule powCarryE(O:String, N:Int, evp(OPS:OpSeq, NDS:IntSeq)) => evp(oCons(O, OPS), iCons(N, NDS))
+- semantics/builtins.k:250 | syntax | DECLARATION | attrs=function,total | syntax EvPair ::= passMulE(EvPair) [function, total] | passAddE(EvPair) [function, total]
+- semantics/builtins.k:251 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule passMulE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("mul", N0, OPS, NDS, .OpSeq, .IntSeq)
+- semantics/builtins.k:252 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule passMulE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)
+- semantics/builtins.k:253 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule passAddE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("add", N0, OPS, NDS, .OpSeq, .IntSeq)
+- semantics/builtins.k:254 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule passAddE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)
+- semantics/builtins.k:255 | syntax | DECLARATION | attrs=function,total | syntax EvPair ::= passLGoE(String, Int, OpSeq, IntSeq, OpSeq, IntSeq) [function, total]
+- semantics/builtins.k:256 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule passLGoE(_:String, CUR:Int, .OpSeq, _:IntSeq, OO:OpSeq, ON:IntSeq) => evp(OO, appendIE(ON, CUR))
+- semantics/builtins.k:257 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq) => passLGoE(L, applyOpE(O, CUR, N), OPS, NDS, OO, ON) requires inLevelE(L, O)
+- semantics/builtins.k:260 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq) => passLGoE(L, N, OPS, NDS, appendOpE(OO, O), appendIE(ON, CUR)) requires notBool inLevelE(L, O)
+- semantics/builtins.k:263 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule passLGoE(_:String, CUR:Int, oCons(_:String, _:OpSeq), .IntSeq, OO:OpSeq, ON:IntSeq) => evp(OO, appendIE(ON, CUR)) [owise]
+- semantics/builtins.k:265 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= inLevelE(String, String) [function, total]
+- semantics/builtins.k:266 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule inLevelE("mul", O:String) => O ==String "*" orBool O ==String "//" orBool O ==String "/"
+- semantics/builtins.k:267 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule inLevelE("add", O:String) => O ==String "+" orBool O ==String "-"
+- semantics/builtins.k:268 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule inLevelE(_:String, _:String) => false [owise]
+- semantics/builtins.k:269 | syntax | DECLARATION | attrs=function,total | syntax OpSeq ::= appendOpE(OpSeq, String) [function, total]
+- semantics/builtins.k:270 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule appendOpE(.OpSeq, O:String) => oCons(O, .OpSeq)
+- semantics/builtins.k:271 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule appendOpE(oCons(H:String, T:OpSeq), O:String) => oCons(H, appendOpE(T, O))
+- semantics/builtins.k:272 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= appendIE(IntSeq, Int) [function, total]
+- semantics/builtins.k:273 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule appendIE(.IntSeq, N:Int) => iCons(N, .IntSeq)
+- semantics/builtins.k:274 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule appendIE(iCons(H:Int, T:IntSeq), N:Int) => iCons(H, appendIE(T, N))
+- semantics/builtins.k:279 | syntax | DECLARATION | attrs=- | syntax KItem ::= "#md5"
+- semantics/builtins.k:280 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> Call(Attribute(Name("hashlib"), "md5"), (E:Expr, .Exprs)) => E ~> #md5 ... </k> [priority(40)]
+- semantics/builtins.k:282 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> str(CS:IntSeq) ~> #md5 => md5Obj(CS) ... </k>
+- semantics/builtins.k:283 | syntax | DECLARATION | attrs=- | syntax Val ::= md5Obj(IntSeq)
+- semantics/builtins.k:284 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(md5Obj(CS:IntSeq), "hexdigest", .Vals) => str(md5hexCodes(CS))
+- semantics/builtins.k:285 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax IntSeq ::= md5hexCodes(IntSeq) [function, total, symbol(md5hexCodes), no-evaluators]
+- semantics/builtins.k:291 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("isinstance", V:Val, typeV("int"), .Vals) => isIntV(V)
+- semantics/builtins.k:292 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("isinstance", V:Val, typeV("str"), .Vals) => isStrV(V)
+- semantics/builtins.k:293 | syntax | DECLARATION | attrs=function | syntax Bool ::= isIntV(Val) [function] | isStrV(Val) [function]
+- semantics/builtins.k:294 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule isIntV(_:Int)         => true
+- semantics/builtins.k:295 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule isIntV(_:Val)         => false [owise]
+- semantics/builtins.k:296 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule isStrV(str(_:IntSeq)) => true
+- semantics/builtins.k:297 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule isStrV(_:Val)         => false [owise]
+- semantics/builtins.k:298 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/call.k:10 | module | DECLARATION | attrs=- | module MPY-CALL
+- semantics/call.k:11 | imports | DECLARATION | attrs=- | imports MPY-METHODS
+- semantics/call.k:12 | imports | DECLARATION | attrs=- | imports MPY-BUILTINS
+- semantics/call.k:13 | imports | DECLARATION | attrs=- | imports MPY-FUNCTIONS
+- semantics/call.k:16 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Attribute(V:Val, M:String) => boundMethodV(V, M) ... </k>
+- semantics/call.k:19 | syntax | DECLARATION | attrs=- | syntax KItem ::= #callee(Exprs)
+- semantics/call.k:20 | rule | SUPPLIED_FIXED_REACHED | attrs=owise | rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]
+- semantics/call.k:21 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>
+- semantics/call.k:24 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>
+- semantics/call.k:26 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>
+- semantics/call.k:27 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ)    ... </k>
+- semantics/call.k:28 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ)    ... </k>
+- semantics/call.k:29 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ)   ... </k>
+- semantics/call.k:30 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ)   ... </k>
+- semantics/call.k:31 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]
+- semantics/call.k:32 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(typeV(T:String)),     ACC:Vals) => applyBuiltin(T, ACC)  ... </k>
+- semantics/call.k:38 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #applyK(toCall(builtinV(BN:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(builtinV(BN)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]
+- semantics/call.k:42 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #applyK(toCall(builtinV(BN:String)), (A:Val, ref(H:Int), REST:Vals)) => #applyK(toCall(builtinV(BN)), (A, V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(A) [priority(40)]
+- semantics/call.k:47 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #applyK(toCall(typeV(T:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(typeV(T)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]
+- semantics/call.k:52 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= isMutMethod(String) [function, total]
+- semantics/call.k:53 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule isMutMethod(M:String) => M ==String "append" orBool M ==String "sort" orBool M ==String "extend" orBool M ==String "insert" orBool M ==String "pop" orBool M ==String "remove"
+- semantics/call.k:56 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #applyK(toCall(boundMethodV(ref(H:Int), M:String)), ACC:Vals) => #applyK(toCall(boundMethodV(V, M)), ACC) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isMutMethod(M) [priority(40)]
+- semantics/call.k:63 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(boundMethodV(OBJ, M)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isMutMethod(M) andBool notBool isRefV(OBJ) [priority(40)]
+- semantics/call.k:69 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT => #bindP(PNS, ACC) ~> BODY ~> #endcall </k> <env>     CALLERL:Int => NEWL </env> <scopes>   STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes> <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc> <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+- semantics/call.k:80 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(closureValC(PNS:ParamNames, CVS:ParamNames, BODY:Stmts, CM:Map)), ACC:Vals) ~> CONT => #allocCells(CVS) ~> #bindP(PNS, ACC) ~> BODY ~> #endcall </k> <env>     CALLERL:Int => NEWL </env> <scopes>   STORE:Map => STORE [ NEWL <- scope(CM [ "$cells" <- cellsMark(CVS) ], parent(0)) ] </scopes> <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc> <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+- semantics/call.k:87 | syntax | DECLARATION | attrs=- | syntax KItem ::= #allocCells(ParamNames)
+- semantics/call.k:88 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #allocCells(.ParamNames) => .K ... </k>
+- semantics/call.k:89 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #allocCells((CV:String, R:ParamNames)) => #allocCells(R) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ CV <- cellRef(N) ], _) ... </scopes> <heap>    H:Map => (N |-> cellV(noneV)) H </heap> <heapLoc> N:Int => N +Int 1 </heapLoc> requires notBool N in_keys(H)
+- semantics/call.k:95 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/comprehension.k:3 | module | DECLARATION | attrs=- | module MPY-COMPREHENSION
+- semantics/comprehension.k:4 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/comprehension.k:5 | imports | DECLARATION | attrs=- | imports MPY-OPERATORS
+- semantics/comprehension.k:6 | imports | DECLARATION | attrs=- | imports MPY-LIST
+- semantics/comprehension.k:7 | imports | DECLARATION | attrs=- | imports MPY-CONTROLS
+- semantics/comprehension.k:8 | imports | DECLARATION | attrs=- | imports MPY-FUNCTIONS
+- semantics/comprehension.k:11 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule ListComp(ELT:Expr, Gs:CompFors) => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)
+- semantics/comprehension.k:12 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule GenExp(ELT:Expr, Gs:CompFors)   => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)
+- semantics/comprehension.k:14 | syntax | DECLARATION | attrs=macro | syntax Stmts ::= compBody(CompFors, Expr) [macro]
+- semantics/comprehension.k:15 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule compBody(Gs:CompFors, ELT:Expr) => Assign(Name("$acc"), ListExpr(.Exprs)) compNest(Gs, ELT) Return(Name("$acc"))
+- semantics/comprehension.k:18 | syntax | DECLARATION | attrs=macro | syntax Stmt ::= compNest(CompFors, Expr) [macro-rec]
+- semantics/comprehension.k:19 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule compNest(.CompFors, ELT:Expr) => Assign(Name("$acc"), BinOp("+", Name("$acc"), ListExpr(ELT)))
+- semantics/comprehension.k:21 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule compNest((CompFor(T:Expr, ITER:Expr, Fs:Exprs) GRest:CompFors), ELT:Expr) => For(T, ITER, If(compGuard(Fs), compNest(GRest, ELT), .Stmts))
+- semantics/comprehension.k:24 | syntax | DECLARATION | attrs=macro | syntax Expr ::= compGuard(Exprs) [macro]
+- semantics/comprehension.k:25 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule compGuard(.Exprs)             => Bool(true)
+- semantics/comprehension.k:26 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule compGuard((F:Expr, Fs:Exprs)) => BoolOp("and", (F, Fs))
+- semantics/comprehension.k:27 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/concrete.k:8 | module | SUPPLIED_CONCRETE_ONLY | attrs=- | module MPY-CONCRETE
+- semantics/concrete.k:9 | imports | SUPPLIED_CONCRETE_ONLY | attrs=- | imports MPY
+- semantics/concrete.k:13 | rule | SUPPLIED_CONCRETE_ONLY | attrs=- | rule <k> Compare(list(A:ValSeq), CmpOp("==", list(B:ValSeq))) => deepEqVS(A, B, HP) ... </k> <heap> HP:Map </heap> requires hasRefVS(A) orBool hasRefVS(B)
+- semantics/concrete.k:16 | rule | SUPPLIED_CONCRETE_ONLY | attrs=- | rule <k> Compare(list(A:ValSeq), CmpOp("!=", list(B:ValSeq))) => notBool deepEqVS(A, B, HP) ... </k> <heap> HP:Map </heap> requires hasRefVS(A) orBool hasRefVS(B)
+- semantics/concrete.k:25 | syntax | SUPPLIED_CONCRETE_ONLY | attrs=- | syntax Val ::= kvP(Val, Val)
+- semantics/concrete.k:26 | syntax | SUPPLIED_CONCRETE_ONLY | attrs=- | syntax KItem ::= #ksort(ValSeq, Val, ValSeq, Bool) | #ksIns(Val, ValSeq, Val, ValSeq, Bool)
+- semantics/concrete.k:28 | rule | SUPPLIED_CONCRETE_ONLY | attrs=priority | rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals)) => #ksort(VS, KV, .ValSeq, false) ... </k> [priority(40)]
+- semantics/concrete.k:31 | rule | SUPPLIED_CONCRETE_ONLY | attrs=priority | rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals)) => #ksort(VS, KV, .ValSeq, RB) ... </k> [priority(40)]
+- semantics/concrete.k:34 | rule | SUPPLIED_CONCRETE_ONLY | attrs=- | rule <k> #ksort(.ValSeq, _:Val, ACC:ValSeq, RB:Bool) => #alloc(list(condRev(unpairVS(ACC), RB))) ... </k>
+- semantics/concrete.k:36 | rule | SUPPLIED_CONCRETE_ONLY | attrs=- | rule <k> #ksort(vCons(V:Val, R:ValSeq), KV:Val, ACC:ValSeq, RB:Bool) => KV ~> #callee((V, .Exprs)) ~> #ksIns(V, R, KV, ACC, RB) ... </k>
+- semantics/concrete.k:38 | rule | SUPPLIED_CONCRETE_ONLY | attrs=- | rule <k> K:Val ~> #ksIns(V:Val, R:ValSeq, KV:Val, ACC:ValSeq, RB:Bool) => #ksort(R, KV, insPair(ACC, K, V), RB) ... </k> requires notBool isKwV(K)
+- semantics/concrete.k:42 | syntax | SUPPLIED_CONCRETE_ONLY | attrs=function | syntax ValSeq ::= insPair(ValSeq, Val, Val) [function]
+- semantics/concrete.k:43 | rule | SUPPLIED_CONCRETE_ONLY | attrs=- | rule insPair(.ValSeq, K:Val, V:Val) => vCons(kvP(K, V), .ValSeq)
+- semantics/concrete.k:44 | rule | SUPPLIED_CONCRETE_ONLY | attrs=- | rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val) => vCons(kvP(K, V), vCons(kvP(K2, V2), R)) requires kLt(K, K2)
+- semantics/concrete.k:47 | rule | SUPPLIED_CONCRETE_ONLY | attrs=- | rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val) => vCons(kvP(K2, V2), insPair(R, K, V)) requires notBool kLt(K, K2)
+- semantics/concrete.k:51 | syntax | SUPPLIED_CONCRETE_ONLY | attrs=function | syntax Bool ::= kLt(Val, Val) [function]
+- semantics/concrete.k:52 | rule | SUPPLIED_CONCRETE_ONLY | attrs=- | rule kLt(I1:Int, I2:Int)             => I1 <Int I2
+- semantics/concrete.k:53 | rule | SUPPLIED_CONCRETE_ONLY | attrs=- | rule kLt(F1:Float, F2:Float)         => F1 <Float F2
+- semantics/concrete.k:54 | rule | SUPPLIED_CONCRETE_ONLY | attrs=- | rule kLt(str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+- semantics/concrete.k:56 | syntax | SUPPLIED_CONCRETE_ONLY | attrs=function,total | syntax ValSeq ::= unpairVS(ValSeq) [function, total]
+- semantics/concrete.k:57 | rule | SUPPLIED_CONCRETE_ONLY | attrs=- | rule unpairVS(.ValSeq) => .ValSeq
+- semantics/concrete.k:58 | rule | SUPPLIED_CONCRETE_ONLY | attrs=- | rule unpairVS(vCons(kvP(_:Val, V:Val), R:ValSeq)) => vCons(V, unpairVS(R))
+- semantics/concrete.k:59 | rule | SUPPLIED_CONCRETE_ONLY | attrs=owise | rule unpairVS(vCons(V:Val, R:ValSeq)) => vCons(V, unpairVS(R)) [owise]
+- semantics/concrete.k:60 | endmodule | SUPPLIED_CONCRETE_ONLY | attrs=- | endmodule
+- semantics/controls.k:3 | module | DECLARATION | attrs=- | module MPY-CONTROLS
+- semantics/controls.k:4 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/controls.k:5 | imports | DECLARATION | attrs=- | imports MPY-TUPLE
+- semantics/controls.k:6 | imports | DECLARATION | attrs=- | imports MPY-ITER
+- semantics/controls.k:9 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> Assign(Name(X:String), V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>
+- semantics/controls.k:12 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool X in_keys(M) andBool isCellRef({M[X]}:>Val) [priority(40)]
+- semantics/controls.k:20 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes> requires X in_keys(M)
+- semantics/controls.k:27 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires X in_keys(M) andBool isRefV({M[X]}:>Val) [priority(40)]
+- semantics/controls.k:35 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> ImportFrom("math", NS:ParamNames) => #bindImports(NS) ... </k>
+- semantics/controls.k:36 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule <k> ImportFrom(_:String, _:ParamNames) => .K ... </k> [owise]
+- semantics/controls.k:37 | syntax | DECLARATION | attrs=- | syntax KItem ::= #bindImports(ParamNames)
+- semantics/controls.k:38 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #bindImports(.ParamNames) => .K ... </k>
+- semantics/controls.k:39 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ N <- builtinV(N) ], _) ... </scopes> requires N ==String "floor" orBool N ==String "ceil"
+- semantics/controls.k:43 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k> requires notBool (N ==String "floor" orBool N ==String "ceil")
+- semantics/controls.k:48 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Expr(_:Val) => .K ... </k>
+- semantics/controls.k:51 | syntax | DECLARATION | attrs=- | syntax KItem ::= #branch(Bool, Stmts, Stmts)
+- semantics/controls.k:52 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>
+- semantics/controls.k:53 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #branch(true,  T:Stmts, _:Stmts) => T ... </k>
+- semantics/controls.k:54 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>
+- semantics/controls.k:57 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k> requires truthy(V)
+- semantics/controls.k:59 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k> requires notBool truthy(V)
+- semantics/controls.k:65 | syntax | DECLARATION | attrs=- | syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts) | #while(Expr, Stmts) | #whileCond(Expr, Stmts) | #loopLbl(K) | "#cont" | "#brk"
+- semantics/controls.k:69 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+- semantics/controls.k:71 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+- semantics/controls.k:72 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+- semantics/controls.k:73 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts) => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+- semantics/controls.k:77 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>
+- semantics/controls.k:78 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>
+- semantics/controls.k:79 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k> requires truthy(V)
+- semantics/controls.k:81 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k> requires notBool truthy(V)
+- semantics/controls.k:85 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #loopLbl(NEXT:K) => NEXT ... </k>
+- semantics/controls.k:86 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Continue => #cont ... </k>
+- semantics/controls.k:87 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Break => #brk ... </k>
+- semantics/controls.k:88 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>
+- semantics/controls.k:89 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]
+- semantics/controls.k:90 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>
+- semantics/controls.k:91 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]
+- semantics/controls.k:95 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]
+- semantics/controls.k:98 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]
+- semantics/controls.k:101 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]
+- semantics/controls.k:106 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]
+- semantics/controls.k:109 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/core.k:3 | module | DECLARATION | attrs=- | module MPY-CORE
+- semantics/core.k:4 | imports | DECLARATION | attrs=- | imports MPY-SYNTAX
+- semantics/core.k:5 | imports | DECLARATION | attrs=- | imports INT
+- semantics/core.k:6 | imports | DECLARATION | attrs=- | imports BOOL
+- semantics/core.k:7 | imports | DECLARATION | attrs=- | imports STRING
+- semantics/core.k:8 | imports | DECLARATION | attrs=- | imports MAP
+- semantics/core.k:9 | imports | DECLARATION | attrs=- | imports LIST
+- semantics/core.k:10 | imports | DECLARATION | attrs=- | imports K-EQUAL
+- semantics/core.k:13 | syntax | DECLARATION | attrs=- | syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+- semantics/core.k:14 | syntax | DECLARATION | attrs=- | syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+- semantics/core.k:15 | syntax | DECLARATION | attrs=- | syntax Str    ::= str(IntSeq)
+- semantics/core.k:18 | syntax | DECLARATION | attrs=- | syntax Iterable ::= list(ValSeq) | tuple(ValSeq) | Str | rangeObj(Int, Int, Int) | zipObj(ValSeq, ValSeq) | zipObjS(IntSeq, IntSeq)
+- semantics/core.k:25 | syntax | DECLARATION | attrs=function | syntax Val      ::= Int | Bool | "noneV" | Iterable | ref(Int)          // a heap object: <heap> holds its list(VS) | cellRef(Int)      // a closure cell: <heap> holds cellV(V) | closureVal(ParamNames, Stmts, Int) | typeV(String)     // a type object (int/str), resolved from the builtins frame | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough) | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+- semantics/core.k:36 | syntax | DECLARATION | attrs=- | syntax Parent   ::= "root" | parent(Int)
+- semantics/core.k:37 | syntax | DECLARATION | attrs=- | syntax Scope    ::= scope(Map, Parent)
+- semantics/core.k:38 | syntax | DECLARATION | attrs=- | syntax KResult  ::= Val
+- semantics/core.k:39 | syntax | DECLARATION | attrs=- | syntax Expr     ::= Val   // cooling puts results back into expression holes
+- semantics/core.k:40 | syntax | DECLARATION | attrs=- | syntax Vals     ::= List{Val, ","}
+- semantics/core.k:41 | syntax | DECLARATION | attrs=- | syntax Exc      ::= "NoExc" | "AssertionError"
+- semantics/core.k:42 | syntax | DECLARATION | attrs=- | syntax RetState ::= "noRet" | retV(Val)
+- semantics/core.k:49 | configuration | DECLARATION | attrs=- | configuration <k>       #loadAll($PGM:Module) </k> <env>     0 </env> <scopes>   0     |-> scope(.Map, parent(-1)) -1    |-> builtinsScope </scopes> <scopeLoc> 1 </scopeLoc> <heap>    .Map </heap> <heapLoc> 0 </heapLoc> <stack>   .List </stack> <ret>     noRet </ret> <exc>     NoExc </exc> <exit-code exit=""> 0 </exit-code>
+- semantics/core.k:68 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= isRefV(Val) [function, total]
+- semantics/core.k:69 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule isRefV(ref(_:Int)) => true
+- semantics/core.k:70 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule isRefV(_:Val)      => false [owise]
+- semantics/core.k:75 | syntax | DECLARATION | attrs=- | syntax HeapVal ::= cellV(Val)
+- semantics/core.k:76 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= isCellRef(Val) [function, total]
+- semantics/core.k:77 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule isCellRef(cellRef(_:Int)) => true
+- semantics/core.k:78 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule isCellRef(_:Val)          => false [owise]
+- semantics/core.k:85 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> cellRef(H:Int) => V ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> <heap> ... H |-> cellV(V:Val) ... </heap> requires "$cells" in_keys(M) [priority(40)]
+- semantics/core.k:95 | syntax | DECLARATION | attrs=- | syntax Val ::= kwV(String, Val)
+- semantics/core.k:96 | syntax | DECLARATION | attrs=- | syntax KItem ::= #kwTag(String)
+- semantics/core.k:97 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>
+- semantics/core.k:98 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k> requires notBool isKwV(V)
+- semantics/core.k:100 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= isKwV(Val) [function, total]
+- semantics/core.k:101 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule isKwV(kwV(_:String, _:Val)) => true
+- semantics/core.k:102 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule isKwV(_:Val)                => false [owise]
+- semantics/core.k:106 | syntax | DECLARATION | attrs=- | syntax Val ::= cellsMark(ParamNames)
+- semantics/core.k:107 | syntax | DECLARATION | attrs=function | syntax ParamNames ::= cellsOf(Val) [function]
+- semantics/core.k:108 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule cellsOf(cellsMark(CVS:ParamNames)) => CVS
+- semantics/core.k:109 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= pnMember(String, ParamNames) [function, total]
+- semantics/core.k:110 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule pnMember(_:String, .ParamNames) => false
+- semantics/core.k:111 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)
+- semantics/core.k:113 | syntax | DECLARATION | attrs=- | syntax KItem ::= #cellW(Val, Val)
+- semantics/core.k:114 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k> <heap> ... H |-> cellV(_:Val => V) ... </heap>
+- semantics/core.k:117 | syntax | DECLARATION | attrs=- | syntax KItem ::= #alloc(Val)
+- semantics/core.k:118 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #alloc(V:Val) => ref(N) ... </k> <heap>    H:Map => (N |-> V) H </heap> <heapLoc> N:Int => N +Int 1 </heapLoc> requires notBool N in_keys(H)
+- semantics/core.k:124 | syntax | DECLARATION | attrs=- | syntax KItem ::= #loadAll(Module)
+- semantics/core.k:125 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>
+- semantics/core.k:126 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>
+- semantics/core.k:127 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> .Stmts => .K ... </k>
+- semantics/core.k:130 | syntax | DECLARATION | attrs=- | syntax KItem ::= #look(String, Int)
+- semantics/core.k:131 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>
+- semantics/core.k:132 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k> <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes> requires X in_keys(M)
+- semantics/core.k:145 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #look(X:String, L:Int) => V ... </k> <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes> <heap> ... H |-> cellV(V:Val) ... </heap> requires X in_keys(M) andBool "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool {M[X]}:>Val ==K cellRef(H) [priority(40)]
+- semantics/core.k:152 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #look(X:String, L:Int) => #look(X, P) ... </k> <scopes> ... L |-> scope(M:Map, parent(P:Int)) ... </scopes> requires notBool (X in_keys(M))
+- semantics/core.k:157 | syntax | DECLARATION | attrs=function,total | syntax Scope ::= "builtinsScope" [function, total]
+- semantics/core.k:158 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule builtinsScope => scope(.Map [ "len"    <- builtinV("len")    ] [ "set"    <- builtinV("set")    ] [ "sum"    <- builtinV("sum")    ] [ "abs"    <- builtinV("abs")    ] [ "min"    <- builtinV("min")    ] [ "max"    <- builtinV("max")    ] [ "ord"    <- builtinV("ord")    ] [ "chr"    <- builtinV("chr")    ] [ "range"  <- builtinV("range")  ] [ "all"    <- builtinV("all")    ] [ "any"    <- builtinV("any")    ] [ "zip"    <- builtinV("zip")    ] [ "isinstance" <- builtinV("isinstance") ] [ "sorted" <- builtinV("sorted") ] [ "list"   <- builtinV("list")   ] [ "round"  <- builtinV("round")  ] [ "bin"    <- builtinV("bin")    ] [ "enumerate" <- builtinV("enumerate") ] [ "map"    <- builtinV("map")    ] [ "eval"   <- builtinV("eval")   ] [ "int"    <- typeV("int")       ] [ "str"    <- typeV("str")       ] [ "float"  <- typeV("float")     ], root)
+- semantics/core.k:185 | syntax | DECLARATION | attrs=- | syntax ApplyK ::= toCall(Val)
+- semantics/core.k:186 | syntax | DECLARATION | attrs=- | syntax KItem  ::= #evalArgs(Exprs, Vals, ApplyK) | #evalArgCont(Exprs, Vals, ApplyK) | #applyK(ApplyK, Vals)
+- semantics/core.k:189 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>
+- semantics/core.k:190 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>
+- semantics/core.k:191 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>
+- semantics/core.k:194 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> Int(I:Int)   => I ... </k>
+- semantics/core.k:195 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Bool(B:Bool) => B ... </k>
+- semantics/core.k:196 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> NoneVal      => noneV ... </k>
+- semantics/core.k:199 | syntax | DECLARATION | attrs=function | syntax Bool ::= truthy(Val) [function]
+- semantics/core.k:200 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule truthy(B:Bool)          => B
+- semantics/core.k:201 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule truthy(noneV)           => false
+- semantics/core.k:202 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule truthy(I:Int)           => I =/=Int 0
+- semantics/core.k:203 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)
+- semantics/core.k:204 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)
+- semantics/core.k:205 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)
+- semantics/core.k:208 | syntax | DECLARATION | attrs=function | syntax Val  ::= applyUn(String, Val) [function]
+- semantics/core.k:209 | syntax | DECLARATION | attrs=function | syntax Val  ::= applyBin(String, Val, Val) [function]
+- semantics/core.k:210 | syntax | DECLARATION | attrs=function | syntax Bool ::= applyCmp(String, Val, Val) [function]
+- semantics/core.k:213 | syntax | DECLARATION | attrs=function,total | syntax Vals ::= appendVal(Vals, Val) [function, total]
+- semantics/core.k:214 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule appendVal(.Vals, V:Val)              => V , .Vals
+- semantics/core.k:215 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+- semantics/core.k:217 | syntax | DECLARATION | attrs=function,total | syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+- semantics/core.k:218 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule vals2valSeq(.Vals)            => .ValSeq
+- semantics/core.k:219 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+- semantics/core.k:223 | syntax | DECLARATION | attrs=function,total | syntax Int ::= vsLen(ValSeq) [function, total]
+- semantics/core.k:224 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule vsLen(.ValSeq)                => 0
+- semantics/core.k:225 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+- semantics/core.k:227 | syntax | DECLARATION | attrs=function,total | syntax Int ::= isLen(IntSeq) [function, total]
+- semantics/core.k:228 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule isLen(.IntSeq)                => 0
+- semantics/core.k:229 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+- semantics/core.k:233 | syntax | DECLARATION | attrs=function,total | syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]
+- semantics/core.k:234 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq
+- semantics/core.k:235 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val)    => vCons(V, S)
+- semantics/core.k:236 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V)) requires I >Int 0
+- semantics/core.k:238 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule setVSAt(VS:ValSeq, I:Int, _:Val)             => VS requires I <Int 0
+- semantics/core.k:240 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/dict.k:13 | module | DECLARATION | attrs=- | module MPY-DICT
+- semantics/dict.k:14 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/dict.k:15 | imports | DECLARATION | attrs=- | imports MPY-ITER
+- semantics/dict.k:16 | imports | DECLARATION | attrs=- | imports MPY-METHODS
+- semantics/dict.k:17 | imports | DECLARATION | attrs=- | imports MPY-LIST
+- semantics/dict.k:20 | syntax | DECLARATION | attrs=- | syntax Val ::= dictV(ValSeq, ValSeq)
+- semantics/dict.k:23 | syntax | DECLARATION | attrs=- | syntax KItem ::= #dictAcc(Entries, ValSeq, ValSeq) | #dictKey(Expr, Entries, ValSeq, ValSeq) | #dictVal(Val, Entries, ValSeq, ValSeq)
+- semantics/dict.k:26 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> DictExpr(ES:Entries) => #dictAcc(ES, .ValSeq, .ValSeq) ... </k>
+- semantics/dict.k:27 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #dictAcc(.Entries, KS:ValSeq, VS:ValSeq) => dictV(KS, VS) ... </k>
+- semantics/dict.k:28 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #dictAcc((Entry(K:Expr, V:Expr), REST:Entries), KS:ValSeq, VS:ValSeq) => K ~> #dictKey(V, REST, KS, VS) ... </k>
+- semantics/dict.k:30 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> KV:Val ~> #dictKey(V:Expr, REST:Entries, KS:ValSeq, VS:ValSeq) => V ~> #dictVal(KV, REST, KS, VS) ... </k>
+- semantics/dict.k:32 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> VV:Val ~> #dictVal(KV:Val, REST:Entries, KS:ValSeq, VS:ValSeq) => #dictAcc(REST, dPutK(KS, KV), dPutV(KS, VS, KV, VV)) ... </k>
+- semantics/dict.k:37 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= dHasKey(ValSeq, Val) [function, total]
+- semantics/dict.k:38 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dHasKey(.ValSeq, _:Val)                => false
+- semantics/dict.k:39 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dHasKey(vCons(A:Val, _:ValSeq), K:Val) => true          requires A ==K K
+- semantics/dict.k:40 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dHasKey(vCons(A:Val, R:ValSeq), K:Val) => dHasKey(R, K) requires notBool (A ==K K)
+- semantics/dict.k:43 | syntax | DECLARATION | attrs=function,total | syntax ValSeq ::= dPutK(ValSeq, Val) [function, total]
+- semantics/dict.k:44 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dPutK(KS:ValSeq, K:Val) => KS                                  requires dHasKey(KS, K)
+- semantics/dict.k:45 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dPutK(KS:ValSeq, K:Val) => valSeqConcat(KS, vCons(K, .ValSeq)) requires notBool dHasKey(KS, K)
+- semantics/dict.k:49 | syntax | DECLARATION | attrs=function,total | syntax ValSeq ::= dPutV(ValSeq, ValSeq, Val, Val) [function, total]
+- semantics/dict.k:50 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dPutV(vCons(A:Val, _:ValSeq), vCons(_:Val, VR:ValSeq), K:Val, V:Val)  => vCons(V, VR) requires A ==K K
+- semantics/dict.k:52 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dPutV(vCons(A:Val, KR:ValSeq), vCons(B:Val, VR:ValSeq), K:Val, V:Val) => vCons(B, dPutV(KR, VR, K, V)) requires notBool (A ==K K)
+- semantics/dict.k:54 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule dPutV(_KS:ValSeq, VS:ValSeq, _K:Val, V:Val) => valSeqConcat(VS, vCons(V, .ValSeq)) [owise]
+- semantics/dict.k:58 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #applyK(toCall(boundMethodV(dictV(KS:ValSeq, _:ValSeq), "keys")), .Vals) => #alloc(list(KS)) ... </k> [priority(40)]
+- semantics/dict.k:63 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyIndexD(dictV(KS:ValSeq, VS:ValSeq), K:Val) => dGet(KS, VS, K)
+- semantics/dict.k:64 | syntax | DECLARATION | attrs=function | syntax Val ::= applyIndexD(Val, Val) [function]
+- semantics/dict.k:65 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> Subscript(dictV(KS:ValSeq, VS:ValSeq), K:Val) => applyIndexD(dictV(KS, VS), K) ... </k> [priority(45)]
+- semantics/dict.k:70 | syntax | DECLARATION | attrs=function | syntax Val ::= dictSet(Val, Val, Val) [function]
+- semantics/dict.k:71 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dictSet(dictV(KS:ValSeq, VS:ValSeq), K:Val, V:Val) => dictV(dPutK(KS, K), dPutV(KS, VS, K, V))
+- semantics/dict.k:76 | syntax | DECLARATION | attrs=- | syntax KItem ::= #dsetK(String, Val)
+- semantics/dict.k:77 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Assign(Subscript(Name(X:String), K:Expr), VV:Val) => K ~> #dsetK(X, VV) ... </k>
+- semantics/dict.k:78 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- dictSet({M[X]}:>Val, KV, VV) ], _) ... </scopes> requires X in_keys(M) andBool notBool isRefV({M[X]}:>Val)
+- semantics/dict.k:82 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => #dsetV({M[X]}:>Val, KV, VV) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires X in_keys(M) andBool isRefV({M[X]}:>Val)
+- semantics/dict.k:86 | syntax | DECLARATION | attrs=- | syntax KItem ::= #dsetV(Val, Val, Val)
+- semantics/dict.k:87 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #dsetV(ref(H:Int), I:Int, VV:Val) => .K ... </k> <heap> ... H |-> list(VS:ValSeq => setVSAt(VS, normIdxD(I, vsLen(VS)), VV)) ... </heap>
+- semantics/dict.k:90 | syntax | DECLARATION | attrs=function,total | syntax Int ::= normIdxD(Int, Int) [function, total]
+- semantics/dict.k:91 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule normIdxD(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0
+- semantics/dict.k:92 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule normIdxD(I:Int, _:Int)   => I          requires I >=Int 0
+- semantics/dict.k:95 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("==", dictV(KS1:ValSeq, VS1:ValSeq), dictV(KS2:ValSeq, VS2:ValSeq)) => (vsLen(KS1) ==Int vsLen(KS2)) andBool dSubset(KS1, VS1, KS2, VS2)
+- semantics/dict.k:97 | syntax | DECLARATION | attrs=function | syntax Bool ::= dSubset(ValSeq, ValSeq, ValSeq, ValSeq) [function]
+- semantics/dict.k:98 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dSubset(.ValSeq, .ValSeq, _:ValSeq, _:ValSeq) => true
+- semantics/dict.k:99 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dSubset(vCons(K:Val, KR:ValSeq), vCons(V:Val, VR:ValSeq), KS2:ValSeq, VS2:ValSeq) => dHasKey(KS2, K) andBool (dGet(KS2, VS2, K) ==K V) andBool dSubset(KR, VR, KS2, VS2)
+- semantics/dict.k:101 | syntax | DECLARATION | attrs=function | syntax Val ::= dGet(ValSeq, ValSeq, Val) [function]
+- semantics/dict.k:102 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dGet(vCons(A:Val, _:ValSeq), vCons(B:Val, _:ValSeq), K:Val) => B                requires A ==K K
+- semantics/dict.k:103 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dGet(vCons(A:Val, KR:ValSeq), vCons(_:Val, VR:ValSeq), K:Val) => dGet(KR, VR, K) requires notBool (A ==K K)
+- semantics/dict.k:104 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/float.k:14 | module | DECLARATION | attrs=- | module MPY-FLOAT
+- semantics/float.k:15 | imports | DECLARATION | attrs=- | imports MPY-OPERATORS
+- semantics/float.k:16 | imports | DECLARATION | attrs=- | imports MPY-BUILTINS
+- semantics/float.k:17 | imports | DECLARATION | attrs=- | imports FLOAT
+- semantics/float.k:20 | syntax | DECLARATION | attrs=- | syntax Val ::= Float
+- semantics/float.k:21 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Float(F:Float) => F ... </k>
+- semantics/float.k:24 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Float ::= intFloatDiv(Int, Float) [function, total, symbol(intFloatDiv), no-evaluators]
+- semantics/float.k:25 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule intFloatDiv(I:Int, F:Float) => Int2Float(I, 53, 11) /Float F [concrete]
+- semantics/float.k:27 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("/", I:Int, F:Float) => intFloatDiv(I, F)
+- semantics/float.k:30 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Float ::= divII(Int, Int) [function, total, symbol(divII), no-evaluators]
+- semantics/float.k:31 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule divII(I1:Int, I2:Int) => Int2Float(I1, 53, 11) /Float Int2Float(I2, 53, 11) [concrete]
+- semantics/float.k:32 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("/", I1:Int, I2:Int) => divII(I1, I2)
+- semantics/float.k:37 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Float ::= floatMod(Float, Float) [function, total, symbol(floatMod), no-evaluators]
+- semantics/float.k:38 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule floatMod(F1:Float, F2:Float) => F1 -Float (floorFloat(F1 /Float F2) *Float F2) [concrete]
+- semantics/float.k:39 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("%", F1:Float, F2:Float) => floatMod(F1, F2)
+- semantics/float.k:43 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2
+- semantics/float.k:44 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2)
+- semantics/float.k:50 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Bool ::= floatLt(Float, Float) [function, total, symbol(floatLt), no-evaluators]
+- semantics/float.k:51 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule floatLt(F1:Float, F2:Float) => F1 <Float F2 [concrete]
+- semantics/float.k:52 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("<", F1:Float, F2:Float) => floatLt(F1, F2)
+- semantics/float.k:54 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Float ::= absF(Float) [function, total, symbol(absF), no-evaluators]
+- semantics/float.k:55 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule absF(F:Float) => absFloat(F) [concrete]
+- semantics/float.k:56 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("abs", F:Float, .Vals) => absF(F)
+- semantics/float.k:61 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Import(_:String) => .K ... </k>
+- semantics/float.k:65 | syntax | DECLARATION | attrs=- | syntax KItem ::= "#mathCeil"
+- semantics/float.k:66 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> Call(Attribute(Name("math"), "ceil"), (E:Expr, .Exprs)) => E ~> #mathCeil ... </k> [priority(40)]
+- semantics/float.k:67 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> V:Val ~> #mathCeil => ceilF(V) ... </k>
+- semantics/float.k:70 | syntax | DECLARATION | attrs=- | syntax KItem ::= "#mathFloor"
+- semantics/float.k:71 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> Call(Attribute(Name("math"), "floor"), (E:Expr, .Exprs)) => E ~> #mathFloor ... </k> [priority(40)]
+- semantics/float.k:72 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> V:Val ~> #mathFloor => floorFI(V) ... </k>
+- semantics/float.k:73 | syntax | DECLARATION | attrs=function,total | syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]
+- semantics/float.k:74 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule floorFI(I:Int)   => I                        [concrete]
+- semantics/float.k:75 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule floorFI(F:Float) => Float2Int(floorFloat(F)) [concrete]
+- semantics/float.k:78 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("floor", V:Val, .Vals) => floorFI(V)
+- semantics/float.k:79 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("ceil",  V:Val, .Vals) => ceilF(V)
+- semantics/float.k:82 | syntax | DECLARATION | attrs=- | syntax KItem ::= #mathPow1(Expr) | #mathPow2(Val)
+- semantics/float.k:83 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> Call(Attribute(Name("math"), "pow"), (E1:Expr, E2:Expr, .Exprs)) => E1 ~> #mathPow1(E2) ... </k> [priority(40)]
+- semantics/float.k:84 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> V1:Val ~> #mathPow1(E2:Expr) => E2 ~> #mathPow2(V1) ... </k>
+- semantics/float.k:85 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> V2:Val ~> #mathPow2(V1:Val) => powF(toF(V1), toF(V2)) ... </k>
+- semantics/float.k:86 | syntax | DECLARATION | attrs=function,total | syntax Float ::= toF(Val) [function, total, symbol(toF)]
+- semantics/float.k:87 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule toF(F:Float) => F        [concrete]
+- semantics/float.k:88 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule toF(I:Int)   => intToF(I) [concrete]
+- semantics/float.k:93 | syntax | DECLARATION | attrs=function,total | syntax Int ::= ceilF(Val) [function, total, symbol(ceilF)]
+- semantics/float.k:94 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule ceilF(I:Int)   => I                       [concrete]
+- semantics/float.k:95 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule ceilF(F:Float) => Float2Int(ceilFloat(F)) [concrete]
+- semantics/float.k:99 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyUn("-", F:Float) => 0.0 -Float F
+- semantics/float.k:103 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Float ::= subF(Float, Float) [function, total, symbol(subF), no-evaluators]
+- semantics/float.k:104 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule subF(F1:Float, F2:Float) => F1 -Float F2 [concrete]
+- semantics/float.k:105 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("-", F1:Float, F2:Float) => subF(F1, F2)
+- semantics/float.k:107 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Float ::= divF(Float, Float) [function, total, symbol(divF), no-evaluators]
+- semantics/float.k:108 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule divF(F1:Float, F2:Float) => F1 /Float F2 [concrete]
+- semantics/float.k:109 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("/", F1:Float, F2:Float) => divF(F1, F2)
+- semantics/float.k:111 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Float ::= addF(Float, Float) [function, total, symbol(addF), no-evaluators]
+- semantics/float.k:112 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule addF(F1:Float, F2:Float) => F1 +Float F2 [concrete]
+- semantics/float.k:113 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("+", F1:Float, F2:Float) => addF(F1, F2)
+- semantics/float.k:115 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Float ::= mulF(Float, Float) [function, total, symbol(mulF), no-evaluators]
+- semantics/float.k:116 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule mulF(F1:Float, F2:Float) => F1 *Float F2 [concrete]
+- semantics/float.k:117 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("*", F1:Float, F2:Float) => mulF(F1, F2)
+- semantics/float.k:119 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Float ::= powF(Float, Float) [function, total, symbol(powF), no-evaluators]
+- semantics/float.k:120 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule powF(F1:Float, F2:Float) => F1 ^Float F2 [concrete]
+- semantics/float.k:121 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("**", F1:Float, F2:Float) => powF(F1, F2)
+- semantics/float.k:125 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Bool ::= gtF(Float, Float) [function, total, symbol(gtF), no-evaluators]
+- semantics/float.k:126 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule gtF(F1:Float, F2:Float) => F1 >Float F2 [concrete]
+- semantics/float.k:127 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp(">",  F1:Float, F2:Float) => gtF(F1, F2)
+- semantics/float.k:128 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp(">=", F1:Float, F2:Float) => notBool floatLt(F1, F2)
+- semantics/float.k:129 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("<=", F1:Float, F2:Float) => notBool gtF(F1, F2)
+- semantics/float.k:132 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("**", I:Int, F:Float) => powF(intToF(I), F)
+- semantics/float.k:133 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("**", F:Float, I:Int) => powF(F, intToF(I))
+- semantics/float.k:134 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("-",  I:Int, F:Float) => subF(intToF(I), F)
+- semantics/float.k:135 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("-",  F:Float, I:Int) => subF(F, intToF(I))
+- semantics/float.k:136 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("+",  I:Int, F:Float) => addF(intToF(I), F)
+- semantics/float.k:137 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("+",  F:Float, I:Int) => addF(F, intToF(I))
+- semantics/float.k:138 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("*",  I:Int, F:Float) => mulF(intToF(I), F)
+- semantics/float.k:139 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("*",  F:Float, I:Int) => mulF(F, intToF(I))
+- semantics/float.k:142 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Bool ::= eqF(Float, Float) [function, total, symbol(eqF), no-evaluators]
+- semantics/float.k:143 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule eqF(F1:Float, F2:Float) => F1 ==Float F2 [concrete]
+- semantics/float.k:144 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("==", I:Int, F:Float) => eqF(intToF(I), F)
+- semantics/float.k:145 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("==", F:Float, I:Int) => eqF(F, intToF(I))
+- semantics/float.k:146 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("!=", I:Int, F:Float) => notBool eqF(intToF(I), F)
+- semantics/float.k:147 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("!=", F:Float, I:Int) => notBool eqF(F, intToF(I))
+- semantics/float.k:148 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("<",  I:Int, F:Float) => floatLt(intToF(I), F)
+- semantics/float.k:149 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("<",  F:Float, I:Int) => floatLt(F, intToF(I))
+- semantics/float.k:150 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp(">",  I:Int, F:Float) => gtF(intToF(I), F)
+- semantics/float.k:151 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp(">",  F:Float, I:Int) => gtF(F, intToF(I))
+- semantics/float.k:154 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("==", V:Val, noneV) => V ==K noneV
+- semantics/float.k:155 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("!=", V:Val, noneV) => notBool (V ==K noneV)
+- semantics/float.k:160 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Float ::= decStrToF(IntSeq) [function, total, symbol(decStrToF), no-evaluators]
+- semantics/float.k:161 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule decStrToF(iCons(45, CS:IntSeq)) => 0.0 -Float decStrToF(CS) [concrete]
+- semantics/float.k:162 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule decStrToF(CS:IntSeq) => intToF(intPart(CS)) +Float (intToF(fracPart(CS)) /Float intToF(fracScale(CS))) requires isLen(CS) >Int 0 andBool headIS(CS) =/=Int 45 [concrete]
+- semantics/float.k:165 | syntax | DECLARATION | attrs=function | syntax Int ::= headIS(IntSeq) [function]
+- semantics/float.k:166 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule headIS(iCons(C:Int, _:IntSeq)) => C
+- semantics/float.k:167 | syntax | DECLARATION | attrs=function,total | syntax Int ::= intPart(IntSeq) [function, total] | intPartAcc(IntSeq, Int) [function, total]
+- semantics/float.k:168 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule intPart(CS:IntSeq) => intPartAcc(CS, 0)
+- semantics/float.k:169 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule intPartAcc(.IntSeq, A:Int) => A
+- semantics/float.k:170 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule intPartAcc(iCons(46, _:IntSeq), A:Int) => A
+- semantics/float.k:171 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule intPartAcc(iCons(C:Int, R:IntSeq), A:Int) => intPartAcc(R, A *Int 10 +Int (C -Int 48)) requires C =/=Int 46
+- semantics/float.k:173 | syntax | DECLARATION | attrs=function,total | syntax Int ::= fracPart(IntSeq) [function, total] | fracAcc(IntSeq, Int) [function, total]
+- semantics/float.k:174 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule fracPart(.IntSeq) => 0
+- semantics/float.k:175 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule fracPart(iCons(46, R:IntSeq)) => fracAcc(R, 0)
+- semantics/float.k:176 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule fracPart(iCons(C:Int, R:IntSeq)) => fracPart(R) requires C =/=Int 46
+- semantics/float.k:177 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule fracAcc(.IntSeq, A:Int) => A
+- semantics/float.k:178 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule fracAcc(iCons(C:Int, R:IntSeq), A:Int) => fracAcc(R, A *Int 10 +Int (C -Int 48))
+- semantics/float.k:179 | syntax | DECLARATION | attrs=function,total | syntax Int ::= fracScale(IntSeq) [function, total] | fscAcc(IntSeq, Int) [function, total]
+- semantics/float.k:180 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule fracScale(.IntSeq) => 1
+- semantics/float.k:181 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule fracScale(iCons(46, R:IntSeq)) => fscAcc(R, 1)
+- semantics/float.k:182 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule fracScale(iCons(C:Int, R:IntSeq)) => fracScale(R) requires C =/=Int 46
+- semantics/float.k:183 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule fscAcc(.IntSeq, A:Int) => A
+- semantics/float.k:184 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule fscAcc(iCons(_:Int, R:IntSeq), A:Int) => fscAcc(R, A *Int 10)
+- semantics/float.k:185 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("float", str(CS:IntSeq), .Vals) => decStrToF(CS)
+- semantics/float.k:186 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("float", I:Int, .Vals)          => intToF(I)
+- semantics/float.k:187 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("float", F:Float, .Vals)        => F
+- semantics/float.k:190 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Float ::= divFloatIntV(Float, Int) [function, total, symbol(divFloatIntV), no-evaluators]
+- semantics/float.k:191 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule divFloatIntV(F:Float, I:Int) => F /Float Int2Float(I, 53, 11) [concrete]
+- semantics/float.k:192 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("/", F:Float, I:Int) => divFloatIntV(F, I)
+- semantics/float.k:195 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Float ::= intToF(Int) [function, total, symbol(intToF), no-evaluators]
+- semantics/float.k:196 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule intToF(I:Int) => Int2Float(I, 53, 11) [concrete]
+- semantics/float.k:197 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("+", I:Int, F:Float) => addF(intToF(I), F)
+- semantics/float.k:198 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("+", F:Float, I:Int) => addF(F, intToF(I))
+- semantics/float.k:199 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("-", I:Int, F:Float) => subF(intToF(I), F)
+- semantics/float.k:200 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("-", F:Float, I:Int) => subF(F, intToF(I))
+- semantics/float.k:201 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("*", I:Int, F:Float) => mulF(intToF(I), F)
+- semantics/float.k:202 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("*", F:Float, I:Int) => mulF(F, intToF(I))
+- semantics/float.k:203 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("<", I:Int, F:Float) => floatLt(intToF(I), F)
+- semantics/float.k:204 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("<", F:Float, I:Int) => floatLt(F, intToF(I))
+- semantics/float.k:205 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp(">", I:Int, F:Float) => gtF(intToF(I), F)
+- semantics/float.k:206 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp(">", F:Float, I:Int) => gtF(F, intToF(I))
+- semantics/float.k:209 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Int ::= truncF(Float) [function, total, symbol(truncF), no-evaluators]
+- semantics/float.k:210 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule truncF(F:Float) => #if F >=Float 0.0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi [concrete]
+- semantics/float.k:211 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("int", F:Float, .Vals) => truncF(F)
+- semantics/float.k:213 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("float", I:Int, .Vals)   => intToF(I)
+- semantics/float.k:214 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("float", F:Float, .Vals) => F
+- semantics/float.k:217 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Int ::= roundF(Float) [function, total, symbol(roundF), no-evaluators]
+- semantics/float.k:218 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule roundF(F:Float) => #if (F -Float floorFloat(F)) ==Float 0.5 #then (#if Float2Int(floorFloat(F)) %Int 2 ==Int 0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi) #else Float2Int(floorFloat(F +Float 0.5)) #fi [concrete]
+- semantics/float.k:223 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Float ::= roundFN(Float, Int) [function, total, symbol(roundFN), no-evaluators]
+- semantics/float.k:224 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule roundFN(F:Float, N:Int) => Int2Float(roundF(F *Float Int2Float(10 ^Int N, 53, 11)), 53, 11) /Float Int2Float(10 ^Int N, 53, 11) [concrete]
+- semantics/float.k:227 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("round", F:Float, .Vals)        => roundF(F)
+- semantics/float.k:228 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBuiltin("round", F:Float, N:Int, .Vals) => roundFN(F, N)
+- semantics/float.k:230 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax Float ::= sqrtF(Float) [function, total, symbol(sqrtF), no-evaluators]
+- semantics/float.k:231 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule sqrtF(F:Float) => sqrtFloat(F) [concrete]
+- semantics/float.k:232 | syntax | DECLARATION | attrs=- | syntax KItem ::= "#mathSqrt"
+- semantics/float.k:233 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> Call(Attribute(Name("math"), "sqrt"), (E:Expr, .Exprs)) => E ~> #mathSqrt ... </k> [priority(40)]
+- semantics/float.k:234 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> F:Float ~> #mathSqrt => sqrtF(F) ... </k>
+- semantics/float.k:235 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> I:Int ~> #mathSqrt => sqrtF(intToF(I)) ... </k>
+- semantics/float.k:243 | syntax | DECLARATION | attrs=- | syntax KItem ::= #maxAccF(Iterable, Float) | #maxContF(Float)
+- semantics/float.k:244 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAccF(R, {V}:>Float) ... </k> requires isFloat(V)
+- semantics/float.k:245 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #maxAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #maxContF(M) ... </k>
+- semantics/float.k:246 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterDone ~> #maxContF(M:Float) => M ... </k>
+- semantics/float.k:247 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, R:Iterable) ~> #maxContF(M:Float) => #maxAccF(R, maxFloat(M, {V}:>Float)) ... </k> requires isFloat(V)
+- semantics/float.k:250 | syntax | DECLARATION | attrs=- | syntax KItem ::= #minAccF(Iterable, Float) | #minContF(Float)
+- semantics/float.k:251 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAccF(R, {V}:>Float) ... </k> requires isFloat(V)
+- semantics/float.k:252 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #minAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #minContF(M) ... </k>
+- semantics/float.k:253 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterDone ~> #minContF(M:Float) => M ... </k>
+- semantics/float.k:254 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, R:Iterable) ~> #minContF(M:Float) => #minAccF(R, minFloat(M, {V}:>Float)) ... </k> requires isFloat(V)
+- semantics/float.k:261 | syntax | DECLARATION | attrs=- | syntax KItem ::= #sumAccF(Iterable, Float) | #sumContF(Float)
+- semantics/float.k:262 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int) => #sumAccF(R, addF(intToF(ACC), {V}:>Float)) ... </k> requires isFloat(V) andBool notBool (isInt(V) orBool isBool(V))
+- semantics/float.k:265 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #sumAccF(IT:Iterable, ACC:Float) => #iterNext(IT) ~> #sumContF(ACC) ... </k>
+- semantics/float.k:266 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterDone ~> #sumContF(ACC:Float) => ACC ... </k>
+- semantics/float.k:267 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float) => #sumAccF(R, addF(ACC, {V}:>Float)) ... </k> requires isFloat(V)
+- semantics/float.k:270 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float) => #sumAccF(R, addF(ACC, intToF(intOf(V)))) ... </k> requires isInt(V) orBool isBool(V)
+- semantics/float.k:273 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/functions.k:3 | module | DECLARATION | attrs=- | module MPY-FUNCTIONS
+- semantics/functions.k:4 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/functions.k:8 | syntax | DECLARATION | attrs=- | syntax KItem ::= frame(continuation: K, callerEnv: Int, savedLoc: Int) | #bindP(ParamNames, Vals) | "#pop" | "#endcall"
+- semantics/functions.k:14 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ F <- closureVal(PNS, BODY, L) ], _) ... </scopes>
+- semantics/functions.k:18 | syntax | DECLARATION | attrs=- | syntax Expr ::= closureExpr(ParamNames, Stmts)
+- semantics/functions.k:19 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> closureExpr(PNS:ParamNames, BODY:Stmts) => closureVal(PNS, BODY, L) ... </k> <env> L:Int </env>
+- semantics/functions.k:27 | syntax | DECLARATION | attrs=- | syntax Val ::= closureValC(ParamNames, ParamNames, Stmts, Map)
+- semantics/functions.k:31 | syntax | DECLARATION | attrs=- | syntax KItem ::= #mkClosure(String, ParamNames, ParamNames, ParamNames, Stmts, Map) | #mkLambda(ParamNames, ParamNames, ParamNames, Stmts, Map)
+- semantics/functions.k:33 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> FuncDef(F:String, Params(PNS:ParamNames), CellVars(CVS:ParamNames), FreeVars(FVS:ParamNames), BODY:Stmts) => #mkClosure(F, PNS, CVS, FVS, BODY, .Map) ... </k>
+- semantics/functions.k:36 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames, (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map) => #mkClosure(F, PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires FV in_keys(M)
+- semantics/functions.k:42 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ F <- closureValC(PNS, CVS, BODY, CM) ], _) ... </scopes>
+- semantics/functions.k:47 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Lambda(Params(PNS:ParamNames), E:Expr) => closureVal(PNS, Return(E) .Stmts, L) ... </k> <env> L:Int </env>
+- semantics/functions.k:50 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Lambda(Params(PNS:ParamNames), CellVars(CVS:ParamNames), FreeVars(FVS:ParamNames), E:Expr) => #mkLambda(PNS, CVS, FVS, Return(E) .Stmts, .Map) ... </k>
+- semantics/functions.k:53 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map) => #mkLambda(PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires FV in_keys(M)
+- semantics/functions.k:59 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map) => closureValC(PNS, CVS, BODY, CM) ... </k>
+- semantics/functions.k:63 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>
+- semantics/functions.k:64 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ P <- V ], _) ... </scopes>
+- semantics/functions.k:68 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #cellW({M[P]}:>Val, V) ~> #bindP(PS, VS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(P, cellsOf({M["$cells"]}:>Val)) andBool P in_keys(M) andBool isCellRef({M[P]}:>Val) [priority(40)]
+- semantics/functions.k:78 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> Return(V:Val) ~> _ => #pop </k> <ret> noRet => retV(V) </ret>
+- semantics/functions.k:80 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #endcall => #pop ... </k> <ret> noRet => retV(noneV) </ret>
+- semantics/functions.k:85 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #pop => V ~> CONT </k> <ret>   retV(V) => noRet </ret> <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack> <env>   L:Int => CALLERL </env> <scopes> SC:Map => SC [ L <- undef ] </scopes> <scopeLoc> _ => SAVEDL </scopeLoc>
+- semantics/functions.k:91 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/int.k:4 | module | DECLARATION | attrs=- | module MPY-INT
+- semantics/int.k:5 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/int.k:7 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyUn("-", I:Int) => 0 -Int I
+- semantics/int.k:9 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+- semantics/int.k:11 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+- semantics/int.k:12 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+- semantics/int.k:13 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+- semantics/int.k:14 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+- semantics/int.k:15 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+- semantics/int.k:16 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+- semantics/int.k:17 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+- semantics/int.k:19 | syntax | DECLARATION | attrs=function | syntax Int ::= pyMod(Int, Int) [function]
+- semantics/int.k:20 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+- semantics/int.k:22 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+- semantics/int.k:23 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+- semantics/int.k:24 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+- semantics/int.k:25 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+- semantics/int.k:26 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+- semantics/int.k:27 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+- semantics/int.k:28 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/iter.k:6 | module | DECLARATION | attrs=- | module MPY-ITER
+- semantics/iter.k:7 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/iter.k:8 | syntax | DECLARATION | attrs=- | syntax KItem ::= #iterNext(Iterable) | "#iterDone" | #iterYield(Val, Iterable)
+- semantics/iter.k:9 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/list.k:3 | module | DECLARATION | attrs=- | module MPY-LIST
+- semantics/list.k:4 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/list.k:5 | imports | DECLARATION | attrs=- | imports MPY-ITER
+- semantics/list.k:6 | imports | DECLARATION | attrs=- | imports MPY-OPERATORS
+- semantics/list.k:9 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterNext(list(.ValSeq))                => #iterDone ... </k>
+- semantics/list.k:10 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterNext(list(vCons(V:Val, R:ValSeq))) => #iterYield(V, list(R)) ... </k>
+- semantics/list.k:13 | syntax | DECLARATION | attrs=- | syntax ApplyK ::= "toList"
+- semantics/list.k:14 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>
+- semantics/list.k:15 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>
+- semantics/list.k:18 | syntax | DECLARATION | attrs=function,total | syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]
+- semantics/list.k:19 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule valSeqConcat(.ValSeq, T:ValSeq)                => T
+- semantics/list.k:20 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))
+- semantics/list.k:24 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k> [priority(45)]
+- semantics/list.k:27 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B
+- semantics/list.k:28 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B)
+- semantics/list.k:33 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= hasRefVS(ValSeq) [function, total]
+- semantics/list.k:34 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule hasRefVS(.ValSeq)                => false
+- semantics/list.k:35 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule hasRefVS(vCons(V:Val, R:ValSeq)) => isRefV(V) orBool hasRefVS(R)
+- semantics/list.k:37 | syntax | DECLARATION | attrs=function | syntax Bool ::= deepEqVS(ValSeq, ValSeq, Map) [function] | deepEqV(Val, Val, Map)        [function]
+- semantics/list.k:39 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule deepEqVS(.ValSeq, .ValSeq, _:Map)                   => true
+- semantics/list.k:40 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule deepEqVS(.ValSeq, vCons(_:Val, _:ValSeq), _:Map)    => false
+- semantics/list.k:41 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule deepEqVS(vCons(_:Val, _:ValSeq), .ValSeq, _:Map)    => false
+- semantics/list.k:42 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule deepEqVS(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq), HP:Map) => deepEqV(A, B, HP) andBool deepEqVS(As, Bs, HP)
+- semantics/list.k:45 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule deepEqV(ref(H:Int), B:Val, HP:Map) => deepEqV({HP[H]}:>Val, B, HP) requires H in_keys(HP)
+- semantics/list.k:47 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule deepEqV(A:Val, ref(H:Int), HP:Map) => deepEqV(A, {HP[H]}:>Val, HP) requires notBool isRefV(A) andBool H in_keys(HP)
+- semantics/list.k:49 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule deepEqV(list(A:ValSeq), list(B:ValSeq), HP:Map) => deepEqVS(A, B, HP)
+- semantics/list.k:50 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule deepEqV(A:Val, B:Val, _:Map) => A ==K B [owise]
+- semantics/list.k:53 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "append")), (V:Val, .Vals)) => noneV ... </k> <heap> ... H |-> list(VS:ValSeq => valSeqConcat(VS, vCons(V, .ValSeq))) ... </heap> [priority(40)]
+- semantics/list.k:58 | syntax | DECLARATION | attrs=- | syntax KItem ::= #memberAcc(Val, Iterable) | #memberCont(Val) | "#notB"
+- semantics/list.k:59 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Compare(LV:Val, CmpOp("in",     list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ... </k>
+- semantics/list.k:60 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Compare(LV:Val, CmpOp("not in", list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ~> #notB ... </k>
+- semantics/list.k:61 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #memberAcc(V:Val, IT:Iterable) => #iterNext(IT) ~> #memberCont(V) ... </k>
+- semantics/list.k:62 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterDone ~> #memberCont(_V:Val) => false ... </k>
+- semantics/list.k:63 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(E:Val, _:Iterable) ~> #memberCont(V:Val) => true ... </k> requires E ==K V
+- semantics/list.k:65 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterYield(E:Val, R:Iterable) ~> #memberCont(V:Val) => #memberAcc(V, R) ... </k> requires notBool (E ==K V)
+- semantics/list.k:67 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> B:Bool ~> #notB => notBool B ... </k>
+- semantics/list.k:68 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/methods.k:3 | module | DECLARATION | attrs=- | module MPY-METHODS
+- semantics/methods.k:4 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/methods.k:5 | imports | DECLARATION | attrs=- | imports K-EQUAL
+- semantics/methods.k:6 | imports | DECLARATION | attrs=- | imports MPY-STR
+- semantics/methods.k:7 | imports | DECLARATION | attrs=- | imports MPY-LIST
+- semantics/methods.k:10 | syntax | DECLARATION | attrs=function | syntax Val ::= applyMethod(Val, String, Vals) [function]
+- semantics/methods.k:13 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)
+- semantics/methods.k:14 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)
+- semantics/methods.k:15 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)
+- semantics/methods.k:16 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS)
+- semantics/methods.k:19 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(str(CS:IntSeq), "lower",    .Vals) => str(mapLower(CS))
+- semantics/methods.k:20 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(str(CS:IntSeq), "upper",    .Vals) => str(mapUpper(CS))
+- semantics/methods.k:21 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(str(CS:IntSeq), "swapcase", .Vals) => str(mapSwap(CS))
+- semantics/methods.k:26 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(str(SEP:IntSeq), "join", list(VS:ValSeq), .Vals) => str(joinCodes(SEP, VS))
+- semantics/methods.k:27 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]
+- semantics/methods.k:28 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule joinCodes(_:IntSeq, .ValSeq) => .IntSeq
+- semantics/methods.k:29 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule joinCodes(_:IntSeq, vCons(str(CS:IntSeq), .ValSeq)) => CS
+- semantics/methods.k:30 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule joinCodes(SEP:IntSeq, vCons(str(CS:IntSeq), vCons(V:Val, R:ValSeq))) => seqConcat(CS, seqConcat(SEP, joinCodes(SEP, vCons(V, R))))
+- semantics/methods.k:34 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)
+- semantics/methods.k:35 | syntax | DECLARATION | attrs=function | syntax Int ::= cntSub(IntSeq, IntSeq) [function]
+- semantics/methods.k:36 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule cntSub(.IntSeq, _:IntSeq) => 0
+- semantics/methods.k:37 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC) requires strPrefix(PC, iCons(C, R)) andBool isLen(PC) >Int 0
+- semantics/methods.k:39 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => cntSub(R, PC) requires notBool strPrefix(PC, iCons(C, R)) orBool isLen(PC) <=Int 0
+- semantics/methods.k:41 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= dropIS(IntSeq, Int) [function, total]
+- semantics/methods.k:42 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dropIS(S:IntSeq, N:Int) => S requires N <=Int 0
+- semantics/methods.k:43 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule dropIS(.IntSeq, _:Int) => .IntSeq [owise]
+- semantics/methods.k:44 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dropIS(iCons(_:Int, R:IntSeq), N:Int) => dropIS(R, N -Int 1) requires N >Int 0
+- semantics/methods.k:47 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(str(CS:IntSeq), "strip", .Vals) => str(revIS(trimWS(revIS(trimWS(CS)))))
+- semantics/methods.k:48 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= trimWS(IntSeq) [function, total]
+- semantics/methods.k:49 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule trimWS(.IntSeq) => .IntSeq
+- semantics/methods.k:50 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule trimWS(iCons(C:Int, R:IntSeq)) => trimWS(R) requires isWSC(C)
+- semantics/methods.k:51 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule trimWS(iCons(C:Int, R:IntSeq)) => iCons(C, R) requires notBool isWSC(C)
+- semantics/methods.k:52 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= revIS(IntSeq) [function, total] | revISAcc(IntSeq, IntSeq) [function, total]
+- semantics/methods.k:53 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule revIS(S:IntSeq) => revISAcc(S, .IntSeq)
+- semantics/methods.k:54 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule revISAcc(.IntSeq, A:IntSeq) => A
+- semantics/methods.k:55 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule revISAcc(iCons(C:Int, R:IntSeq), A:IntSeq) => revISAcc(R, iCons(C, A))
+- semantics/methods.k:58 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(str(CS:IntSeq), "encode", str(_:IntSeq), .Vals) => str(CS)
+- semantics/methods.k:61 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)
+- semantics/methods.k:64 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)
+- semantics/methods.k:65 | syntax | DECLARATION | attrs=function,total | syntax Int ::= cntOccVS(ValSeq, Val) [function, total]
+- semantics/methods.k:66 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule cntOccVS(.ValSeq, _:Val)                => 0
+- semantics/methods.k:67 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V
+- semantics/methods.k:68 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => cntOccVS(R, V)        requires notBool (A ==K V)
+- semantics/methods.k:72 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals) => #alloc(list(splitWS(CS, .IntSeq, .ValSeq))) ... </k> [priority(40)]
+- semantics/methods.k:75 | syntax | DECLARATION | attrs=function | syntax ValSeq ::= splitWS(IntSeq, IntSeq, ValSeq) [function]  // remaining, current token, result
+- semantics/methods.k:76 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule splitWS(.IntSeq, CUR:IntSeq, ACC:ValSeq) => flushTok(ACC, CUR)
+- semantics/methods.k:77 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, .IntSeq, flushTok(ACC, CUR)) requires isWSC(C)
+- semantics/methods.k:79 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, seqConcat(CUR, iCons(C, .IntSeq)), ACC) requires notBool isWSC(C)
+- semantics/methods.k:82 | syntax | DECLARATION | attrs=function | syntax ValSeq ::= flushTok(ValSeq, IntSeq) [function]
+- semantics/methods.k:83 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule flushTok(ACC:ValSeq, .IntSeq)            => ACC
+- semantics/methods.k:84 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule flushTok(ACC:ValSeq, iCons(C:Int, T:IntSeq)) => valSeqConcat(ACC, vCons(str(iCons(C, T)), .ValSeq))
+- semantics/methods.k:85 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= isWSC(Int) [function, total]
+- semantics/methods.k:86 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule isWSC(C:Int) => C ==Int 32 orBool C ==Int 9 orBool C ==Int 10 orBool C ==Int 13
+- semantics/methods.k:89 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (kwV("sep", str(S:IntSeq)), .Vals)) => #applyK(toCall(boundMethodV(str(CS), "split")), (str(S), .Vals)) ... </k> [priority(39)]
+- semantics/methods.k:94 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (str(iCons(SEP:Int, .IntSeq)), .Vals)) => #alloc(list(splitSep(CS, SEP, .IntSeq))) ... </k> [priority(40)]
+- semantics/methods.k:97 | syntax | DECLARATION | attrs=function | syntax ValSeq ::= splitSep(IntSeq, Int, IntSeq) [function]  // remaining, sep code, current token
+- semantics/methods.k:98 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule splitSep(.IntSeq, _SEP:Int, CUR:IntSeq)              => vCons(str(CUR), .ValSeq)
+- semantics/methods.k:99 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => vCons(str(CUR), splitSep(R, SEP, .IntSeq)) requires C ==Int SEP
+- semantics/methods.k:101 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => splitSep(R, SEP, seqConcat(CUR, iCons(C, .IntSeq))) requires notBool (C ==Int SEP)
+- semantics/methods.k:104 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(str(CS:IntSeq), "replace", str(iCons(A:Int, .IntSeq)), str(iCons(B:Int, .IntSeq)), .Vals) => str(replaceC(CS, A, B))
+- semantics/methods.k:106 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= replaceC(IntSeq, Int, Int) [function, total]
+- semantics/methods.k:107 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule replaceC(.IntSeq, _:Int, _:Int)             => .IntSeq
+- semantics/methods.k:108 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(B, replaceC(R, A, B)) requires C ==Int A
+- semantics/methods.k:109 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(C, replaceC(R, A, B)) requires notBool (C ==Int A)
+- semantics/methods.k:112 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= isUpperC(Int) [function, total]
+- semantics/methods.k:113 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90
+- semantics/methods.k:115 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= isLowerC(Int) [function, total]
+- semantics/methods.k:116 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122
+- semantics/methods.k:118 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= isAlphaC(Int) [function, total]
+- semantics/methods.k:119 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)
+- semantics/methods.k:121 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= isDigitC(Int) [function, total]
+- semantics/methods.k:122 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57
+- semantics/methods.k:124 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= hasUpper(IntSeq) [function, total]
+- semantics/methods.k:125 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule hasUpper(.IntSeq) => false
+- semantics/methods.k:126 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)
+- semantics/methods.k:128 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= hasLower(IntSeq) [function, total]
+- semantics/methods.k:129 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule hasLower(.IntSeq) => false
+- semantics/methods.k:130 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)
+- semantics/methods.k:132 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= allAlpha(IntSeq) [function, total]
+- semantics/methods.k:133 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule allAlpha(.IntSeq) => true
+- semantics/methods.k:134 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)
+- semantics/methods.k:136 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= allDigit(IntSeq) [function, total]
+- semantics/methods.k:137 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule allDigit(.IntSeq) => true
+- semantics/methods.k:138 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)
+- semantics/methods.k:140 | syntax | DECLARATION | attrs=function,total | syntax Int ::= lowerC(Int) [function, total]
+- semantics/methods.k:142 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)
+- semantics/methods.k:143 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule lowerC(C:Int) => C         [owise]
+- semantics/methods.k:145 | syntax | DECLARATION | attrs=function,total | syntax Int ::= upperC(Int) [function, total]
+- semantics/methods.k:146 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule upperC(C:Int) => C -Int 32 requires isLowerC(C)
+- semantics/methods.k:147 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule upperC(C:Int) => C         [owise]
+- semantics/methods.k:149 | syntax | DECLARATION | attrs=function,total | syntax Int ::= swapC(Int) [function, total]
+- semantics/methods.k:150 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule swapC(C:Int) => C +Int 32 requires isUpperC(C)
+- semantics/methods.k:151 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule swapC(C:Int) => C -Int 32 requires isLowerC(C)
+- semantics/methods.k:152 | rule | SUPPLIED_FIXED_UNREACHED | attrs=owise | rule swapC(C:Int) => C         [owise]
+- semantics/methods.k:154 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= mapLower(IntSeq) [function, total]
+- semantics/methods.k:155 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule mapLower(.IntSeq) => .IntSeq
+- semantics/methods.k:156 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule mapLower(iCons(C:Int, S:IntSeq)) => iCons(lowerC(C), mapLower(S))
+- semantics/methods.k:158 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= mapUpper(IntSeq) [function, total]
+- semantics/methods.k:159 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule mapUpper(.IntSeq) => .IntSeq
+- semantics/methods.k:160 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule mapUpper(iCons(C:Int, S:IntSeq)) => iCons(upperC(C), mapUpper(S))
+- semantics/methods.k:162 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= mapSwap(IntSeq) [function, total]
+- semantics/methods.k:163 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule mapSwap(.IntSeq) => .IntSeq
+- semantics/methods.k:164 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule mapSwap(iCons(C:Int, S:IntSeq)) => iCons(swapC(C), mapSwap(S))
+- semantics/methods.k:166 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= startsWith(IntSeq, IntSeq) [function, total]
+- semantics/methods.k:167 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule startsWith(.IntSeq, _:IntSeq)               => true
+- semantics/methods.k:168 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule startsWith(iCons(_:Int, _:IntSeq), .IntSeq) => false
+- semantics/methods.k:169 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule startsWith(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool startsWith(As, Bs)
+- semantics/methods.k:170 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/operators.k:6 | module | DECLARATION | attrs=- | module MPY-OPERATORS
+- semantics/operators.k:7 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/operators.k:8 | imports | DECLARATION | attrs=- | imports MPY-ITER
+- semantics/operators.k:10 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>
+- semantics/operators.k:12 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+- semantics/operators.k:15 | context | DECLARATION | attrs=- | context Compare(HOLE, _)
+- semantics/operators.k:16 | context | DECLARATION | attrs=- | context Compare(_:Val, CmpOp(_, HOLE))
+- semantics/operators.k:17 | rule | SUPPLIED_FIXED_REACHED | attrs=owise | rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]
+- semantics/operators.k:19 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("is",     V:Val, noneV) => V ==K noneV
+- semantics/operators.k:20 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)
+- semantics/operators.k:25 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]
+- semantics/operators.k:28 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(L) [priority(40)]
+- semantics/operators.k:34 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k> <heap> ... H |-> V:Val ... </heap> requires OP =/=String "in" andBool OP =/=String "not in" [priority(40)]
+- semantics/operators.k:38 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(L) orBool OP ==String "in" orBool OP ==String "not in" [priority(40)]
+- semantics/operators.k:44 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> UnaryOp(OP:String, ref(H:Int)) => UnaryOp(OP, V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]
+- semantics/operators.k:47 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/range.k:5 | module | DECLARATION | attrs=- | module MPY-RANGE
+- semantics/range.k:6 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/range.k:7 | imports | DECLARATION | attrs=- | imports MPY-ITER
+- semantics/range.k:9 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= inRange(Int, Int, Int) [function, total]
+- semantics/range.k:10 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule inRange(I:Int, HI:Int, ST:Int) => (ST >Int 0 andBool I <Int HI) orBool (ST <Int 0 andBool I >Int HI)
+- semantics/range.k:12 | syntax | DECLARATION | attrs=function | syntax Int ::= rangeLen(Int, Int, Int) [function]
+- semantics/range.k:13 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule rangeLen(LO:Int, HI:Int, ST:Int) => (HI -Int LO +Int ST -Int 1) /Int ST requires ST >Int 0 andBool HI >Int LO
+- semantics/range.k:15 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule rangeLen(LO:Int, HI:Int, ST:Int) => (LO -Int HI -Int ST -Int 1) /Int (0 -Int ST) requires ST <Int 0 andBool HI <Int LO
+- semantics/range.k:17 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule rangeLen(LO:Int, HI:Int, ST:Int) => 0 requires (ST >Int 0 andBool HI <=Int LO) orBool (ST <Int 0 andBool HI >=Int LO)
+- semantics/range.k:20 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterYield(I, rangeObj(I +Int ST, HI, ST)) ... </k> requires inRange(I, HI, ST)
+- semantics/range.k:23 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterDone ... </k> requires notBool inRange(I, HI, ST)
+- semantics/range.k:25 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/set.k:3 | module | DECLARATION | attrs=- | module MPY-SET
+- semantics/set.k:4 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/set.k:8 | syntax | DECLARATION | attrs=- | syntax Val ::= setV(IntSeq)
+- semantics/set.k:11 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= codeIn(Int, IntSeq) [function, total]
+- semantics/set.k:12 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule codeIn(_:Int, .IntSeq)                => false
+- semantics/set.k:13 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule codeIn(C:Int, iCons(H:Int, T:IntSeq)) => C ==Int H orBool codeIn(C, T)
+- semantics/set.k:16 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= dedupCodes(IntSeq)         [function, total] | dedupFrom(IntSeq, IntSeq)  [function, total]
+- semantics/set.k:18 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dedupCodes(CS:IntSeq) => dedupFrom(CS, .IntSeq)
+- semantics/set.k:19 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dedupFrom(.IntSeq, ACC:IntSeq) => ACC
+- semantics/set.k:20 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, ACC) requires codeIn(C, ACC)
+- semantics/set.k:22 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, snocCode(ACC, C)) requires notBool codeIn(C, ACC)
+- semantics/set.k:25 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= snocCode(IntSeq, Int) [function, total]
+- semantics/set.k:26 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule snocCode(.IntSeq, C:Int)                => iCons(C, .IntSeq)
+- semantics/set.k:27 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule snocCode(iCons(H:Int, T:IntSeq), C:Int) => iCons(H, snocCode(T, C))
+- semantics/set.k:31 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= subsetCodes(IntSeq, IntSeq) [function, total]
+- semantics/set.k:32 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule subsetCodes(.IntSeq, _:IntSeq)                => true
+- semantics/set.k:33 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule subsetCodes(iCons(C:Int, S:IntSeq), B:IntSeq) => codeIn(C, B) andBool subsetCodes(S, B)
+- semantics/set.k:35 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= sameSet(IntSeq, IntSeq) [function, total]
+- semantics/set.k:36 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule sameSet(A:IntSeq, B:IntSeq) => subsetCodes(A, B) andBool subsetCodes(B, A)
+- semantics/set.k:39 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("==", setV(A:IntSeq), setV(B:IntSeq)) => sameSet(A, B)
+- semantics/set.k:40 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/sort.k:10 | module | DECLARATION | attrs=- | module MPY-SORT
+- semantics/sort.k:11 | imports | DECLARATION | attrs=- | imports MPY-BUILTINS
+- semantics/sort.k:12 | imports | DECLARATION | attrs=- | imports MPY-SUBSCRIPT
+- semantics/sort.k:18 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax ValSeq ::= sortVS(ValSeq) [function, total, symbol(sortVS), no-evaluators]
+- semantics/sort.k:19 | syntax | DECLARATION | attrs=function | syntax ValSeq ::= insVS(Int, ValSeq) [function]
+- semantics/sort.k:20 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule sortVS(.ValSeq)                => .ValSeq          [concrete]
+- semantics/sort.k:21 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule sortVS(vCons(X:Int, R:ValSeq)) => insVS(X, sortVS(R)) [concrete]
+- semantics/sort.k:22 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule insVS(X:Int, .ValSeq)                => vCons(X, .ValSeq) [concrete]
+- semantics/sort.k:23 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]
+- semantics/sort.k:24 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X  >Int Y [concrete]
+- semantics/sort.k:26 | syntax | DECLARATION | attrs=function | syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]
+- semantics/sort.k:27 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]
+- semantics/sort.k:28 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]
+- semantics/sort.k:29 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(A), vCons(str(B), R)) requires strLt(A, B) orBool A ==K B [concrete]
+- semantics/sort.k:31 | rule | SUPPLIED_FIXED_UNREACHED | attrs=concrete | rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(B), insVSs(A, R)) requires notBool (strLt(A, B) orBool A ==K B) [concrete]
+- semantics/sort.k:36 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), .Vals)) => #alloc(list(sortVS(VS))) ... </k>
+- semantics/sort.k:40 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "sort")), .Vals) => noneV ... </k> <heap> ... H |-> list(VS:ValSeq => sortVS(VS)) ... </heap> [priority(40)]
+- semantics/sort.k:49 | syntax | DECLARATION | attrs=function,total,opaque/no-evaluators | syntax ValSeq ::= sortKeyVS(ValSeq, Val) [function, total, symbol(sortKeyVS), no-evaluators]
+- semantics/sort.k:51 | syntax | DECLARATION | attrs=function,total | syntax ValSeq ::= revVS(ValSeq) [function, total] | revVSAcc(ValSeq, ValSeq) [function, total]
+- semantics/sort.k:53 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule revVS(S:ValSeq) => revVSAcc(S, .ValSeq)
+- semantics/sort.k:54 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule revVSAcc(.ValSeq, A:ValSeq) => A
+- semantics/sort.k:55 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule revVSAcc(vCons(V:Val, R:ValSeq), A:ValSeq) => revVSAcc(R, vCons(V, A))
+- semantics/sort.k:57 | syntax | DECLARATION | attrs=function,total | syntax ValSeq ::= condRev(ValSeq, Bool) [function, total]
+- semantics/sort.k:58 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule condRev(S:ValSeq, false) => S
+- semantics/sort.k:59 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule condRev(S:ValSeq, true)  => revVS(S)
+- semantics/sort.k:61 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals)) => #alloc(list(sortKeyVS(VS, KV))) ... </k>
+- semantics/sort.k:63 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals)) => #alloc(list(condRev(sortKeyVS(VS, KV), RB))) ... </k>
+- semantics/sort.k:65 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("reverse", RB:Bool), .Vals)) => #alloc(list(condRev(sortVS(VS), RB))) ... </k>
+- semantics/sort.k:72 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/str.k:3 | module | DECLARATION | attrs=- | module MPY-STR
+- semantics/str.k:4 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/str.k:5 | imports | DECLARATION | attrs=- | imports MPY-ITER
+- semantics/str.k:8 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+- semantics/str.k:9 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #iterNext(str(iCons(C:Int, R:IntSeq))) => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+- semantics/str.k:13 | syntax | DECLARATION | attrs=function | syntax IntSeq ::= strToCodes(String) [function]
+- semantics/str.k:14 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+- semantics/str.k:15 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule strToCodes("") => .IntSeq
+- semantics/str.k:16 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S)))) requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+- semantics/str.k:20 | syntax | DECLARATION | attrs=function,total | syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+- semantics/str.k:21 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule seqConcat(.IntSeq, T:IntSeq)                => T
+- semantics/str.k:22 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+- semantics/str.k:24 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+- semantics/str.k:25 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+- semantics/str.k:26 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)
+- semantics/str.k:29 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)
+- semantics/str.k:30 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)
+- semantics/str.k:32 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]
+- semantics/str.k:33 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule strPrefix(.IntSeq, _:IntSeq)               => true
+- semantics/str.k:34 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false
+- semantics/str.k:35 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)
+- semantics/str.k:37 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]
+- semantics/str.k:38 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)
+- semantics/str.k:39 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)
+- semantics/str.k:40 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs) requires notBool strPrefix(P, iCons(C, Xs))
+- semantics/str.k:48 | syntax | DECLARATION | attrs=function,total | syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]
+- semantics/str.k:49 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule strLt(.IntSeq, .IntSeq)                => false
+- semantics/str.k:50 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true
+- semantics/str.k:51 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false
+- semantics/str.k:52 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true          requires A  <Int B
+- semantics/str.k:53 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false         requires A  >Int B
+- semantics/str.k:54 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B
+- semantics/str.k:56 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("<",  str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+- semantics/str.k:57 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp(">",  str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)
+- semantics/str.k:58 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)
+- semantics/str.k:59 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)
+- semantics/str.k:60 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/subscript.k:3 | module | DECLARATION | attrs=- | module MPY-SUBSCRIPT
+- semantics/subscript.k:4 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/subscript.k:11 | syntax | DECLARATION | attrs=function,total | syntax Val ::= valSeqAt(ValSeq, Int) [function, total]
+- semantics/subscript.k:12 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule valSeqAt(vCons(V:Val, _:ValSeq), 0)     => V
+- semantics/subscript.k:13 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule valSeqAt(vCons(_:Val, S:ValSeq), I:Int) => valSeqAt(S, I -Int 1) requires I >Int 0
+- semantics/subscript.k:16 | syntax | DECLARATION | attrs=function | syntax Int ::= intSeqAt(IntSeq, Int) [function]
+- semantics/subscript.k:17 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule intSeqAt(iCons(C:Int, _:IntSeq), 0)     => C
+- semantics/subscript.k:18 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule intSeqAt(iCons(_:Int, S:IntSeq), I:Int) => intSeqAt(S, I -Int 1) requires I >Int 0
+- semantics/subscript.k:21 | syntax | DECLARATION | attrs=function,total | syntax Int ::= normIdx(Int, Int) [function, total]
+- semantics/subscript.k:22 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule normIdx(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0
+- semantics/subscript.k:23 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule normIdx(I:Int, _:Int)   => I          requires I >=Int 0
+- semantics/subscript.k:27 | context | DECLARATION | attrs=- | context Subscript(HOLE, _)
+- semantics/subscript.k:28 | context | DECLARATION | attrs=- | context Subscript(_:Val, HOLE:Expr)
+- semantics/subscript.k:31 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> Subscript(ref(H:Int), IX:Index) => Subscript(V, IX) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]
+- semantics/subscript.k:35 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Subscript(OBJ:Val, I:Int) => applyIndex(OBJ, I) ... </k>
+- semantics/subscript.k:37 | syntax | DECLARATION | attrs=function | syntax Val ::= applyIndex(Val, Int) [function]
+- semantics/subscript.k:38 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyIndex(list(VS:ValSeq),  I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+- semantics/subscript.k:39 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyIndex(tuple(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+- semantics/subscript.k:40 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyIndex(str(IS:IntSeq),   I:Int) => str(iCons(intSeqAt(IS, normIdx(I, isLen(IS))), .IntSeq))
+- semantics/subscript.k:44 | syntax | DECLARATION | attrs=- | syntax KItem ::= #evalB(Bound) | "#toSome" | #slLo(Val, Bound, Bound) | #slHi(Val, OptInt, Bound) | #slStep(Val, OptInt, OptInt)
+- semantics/subscript.k:49 | syntax | DECLARATION | attrs=- | syntax OptInt ::= "noB" | someB(Int)
+- semantics/subscript.k:50 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #evalB(NoBound)  => noB ... </k>
+- semantics/subscript.k:51 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #evalB(E:Expr)   => E ~> #toSome ... </k>
+- semantics/subscript.k:52 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> I:Int ~> #toSome => someB(I) ... </k>
+- semantics/subscript.k:54 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Subscript(OBJ:Val, Slice(LO:Bound, HI:Bound, ST:Bound)) => #evalB(LO) ~> #slLo(OBJ, HI, ST) ... </k>
+- semantics/subscript.k:55 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> LO:OptInt ~> #slLo(OBJ:Val, HI:Bound, ST:Bound)   => #evalB(HI) ~> #slHi(OBJ, LO, ST) ... </k>
+- semantics/subscript.k:56 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> HI:OptInt ~> #slHi(OBJ:Val, LO:OptInt, ST:Bound)  => #evalB(ST) ~> #slStep(OBJ, LO, HI) ... </k>
+- semantics/subscript.k:58 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> ST:OptInt ~> #slStep(list(VS:ValSeq), LO:OptInt, HI:OptInt) => #alloc(doSlice(list(VS), LO, HI, ST)) ... </k> [priority(45)]
+- semantics/subscript.k:61 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> ST:OptInt ~> #slStep(OBJ:Val, LO:OptInt, HI:OptInt) => doSlice(OBJ, LO, HI, ST) ... </k>
+- semantics/subscript.k:63 | syntax | DECLARATION | attrs=function | syntax Val ::= doSlice(Val, OptInt, OptInt, OptInt) [function]
+- semantics/subscript.k:64 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule doSlice(list(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt) => list(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))
+- semantics/subscript.k:66 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule doSlice(tuple(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt) => tuple(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))
+- semantics/subscript.k:68 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule doSlice(str(IS:IntSeq), LO:OptInt, HI:OptInt, ST:OptInt) => str(buildIS(IS, slStart(LO, ST, isLen(IS)), slStop(HI, ST, isLen(IS)), slStep(ST)))
+- semantics/subscript.k:72 | syntax | DECLARATION | attrs=function,total | syntax Int ::= slStep(OptInt) [function, total]
+- semantics/subscript.k:73 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule slStep(noB)          => 1
+- semantics/subscript.k:74 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule slStep(someB(S:Int)) => S
+- semantics/subscript.k:76 | syntax | DECLARATION | attrs=function | syntax Int ::= slStart(OptInt, OptInt, Int) [function]
+- semantics/subscript.k:77 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule slStart(noB,          ST:OptInt, _LEN:Int) => 0 requires slStep(ST) >Int 0
+- semantics/subscript.k:79 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule slStart(noB,          ST:OptInt, LEN:Int)  => LEN -Int 1 requires slStep(ST) <Int 0
+- semantics/subscript.k:81 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule slStart(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))
+- semantics/subscript.k:83 | syntax | DECLARATION | attrs=function | syntax Int ::= slStop(OptInt, OptInt, Int) [function]
+- semantics/subscript.k:84 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule slStop(noB,          ST:OptInt, LEN:Int)  => LEN requires slStep(ST) >Int 0
+- semantics/subscript.k:86 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule slStop(noB,          ST:OptInt, _LEN:Int) => -1 requires slStep(ST) <Int 0
+- semantics/subscript.k:88 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule slStop(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))
+- semantics/subscript.k:90 | syntax | DECLARATION | attrs=function,total | syntax Int ::= slAdjust(Int, Int, Int) [function, total]
+- semantics/subscript.k:91 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampLo(I +Int LEN, STEP) requires I  <Int 0
+- semantics/subscript.k:93 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampHi(I, LEN, STEP) requires I >=Int 0
+- semantics/subscript.k:96 | syntax | DECLARATION | attrs=function,total | syntax Int ::= clampLo(Int, Int) [function, total]
+- semantics/subscript.k:97 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule clampLo(J:Int, _STEP:Int) => J requires J >=Int 0
+- semantics/subscript.k:99 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule clampLo(J:Int, STEP:Int)  => #if STEP <Int 0 #then -1 #else 0 #fi requires J <Int 0
+- semantics/subscript.k:102 | syntax | DECLARATION | attrs=function,total | syntax Int ::= clampHi(Int, Int, Int) [function, total]
+- semantics/subscript.k:103 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule clampHi(I:Int, LEN:Int, _STEP:Int) => I requires I  <Int LEN
+- semantics/subscript.k:105 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule clampHi(I:Int, LEN:Int, STEP:Int)  => #if STEP <Int 0 #then LEN -Int 1 #else LEN #fi requires I >=Int LEN
+- semantics/subscript.k:109 | syntax | DECLARATION | attrs=function | syntax ValSeq ::= buildVS(ValSeq, Int, Int, Int) [function]
+- semantics/subscript.k:110 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule buildVS(VS:ValSeq, I:Int, STOP:Int, STEP:Int) => vCons(valSeqAt(VS, I), buildVS(VS, I +Int STEP, STOP, STEP)) requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)
+- semantics/subscript.k:113 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule buildVS(_:ValSeq, I:Int, STOP:Int, STEP:Int) => .ValSeq requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))
+- semantics/subscript.k:116 | syntax | DECLARATION | attrs=function | syntax IntSeq ::= buildIS(IntSeq, Int, Int, Int) [function]
+- semantics/subscript.k:117 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule buildIS(IS:IntSeq, I:Int, STOP:Int, STEP:Int) => iCons(intSeqAt(IS, I), buildIS(IS, I +Int STEP, STOP, STEP)) requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)
+- semantics/subscript.k:120 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule buildIS(_:IntSeq, I:Int, STOP:Int, STEP:Int) => .IntSeq requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))
+- semantics/subscript.k:122 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/syntax.k:3 | module | DECLARATION | attrs=- | module MPY-SYNTAX
+- semantics/syntax.k:4 | imports | DECLARATION | attrs=- | imports INT-SYNTAX
+- semantics/syntax.k:5 | imports | DECLARATION | attrs=- | imports FLOAT-SYNTAX
+- semantics/syntax.k:6 | imports | DECLARATION | attrs=- | imports BOOL-SYNTAX
+- semantics/syntax.k:7 | imports | DECLARATION | attrs=- | imports STRING-SYNTAX
+- semantics/syntax.k:9 | syntax | DECLARATION | attrs=macro,strict | syntax Expr ::= "Int"      "(" Int ")" | "Float"    "(" Float ")" | "Bool"     "(" Bool ")" | "Name"     "(" String ")" | "Str"      "(" String ")" | "UnaryOp"  "(" String "," Expr ")" [strict(2)] | "BinOp"    "(" String "," Expr "," Expr ")" [seqstrict(2, 3)] | "BoolOp"    "(" String "," Exprs ")" | "ListExpr"  "(" Exprs ")" | "DictExpr"  "(" Entries ")" | "ListComp"  "(" Expr "," CompFors ")" [macro] | "GenExp"    "(" Expr "," CompFors ")" [macro] | "TupleExpr" "(" Exprs ")" | "Subscript" "(" Expr "," Index ")" | "IfExp"     "(" Expr "," Expr "," Expr ")" [strict(1)] | "Lambda"    "(" Params "," Expr ")" | "KwArg"     "(" String "," Expr ")" | "Lambda"    "(" Params "," CellVars "," FreeVars "," Expr ")" | "NoneVal" | "Call"      "(" Expr "," Exprs ")" | "Attribute" "(" Expr "," String ")" [strict(1)] | "Compare"   "(" Expr "," CmpOp ")"
+- semantics/syntax.k:32 | syntax | DECLARATION | attrs=- | syntax CmpOp    ::= "CmpOp" "(" String "," Expr ")"
+- semantics/syntax.k:33 | syntax | DECLARATION | attrs=- | syntax Entry    ::= "Entry" "(" Expr "," Expr ")"
+- semantics/syntax.k:34 | syntax | DECLARATION | attrs=- | syntax Entries  ::= List{Entry, ","}
+- semantics/syntax.k:35 | syntax | DECLARATION | attrs=- | syntax CompFor  ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+- semantics/syntax.k:36 | syntax | DECLARATION | attrs=- | syntax CompFors ::= List{CompFor, ""}
+- semantics/syntax.k:37 | syntax | DECLARATION | attrs=- | syntax Exprs    ::= List{Expr, ","}
+- semantics/syntax.k:38 | syntax | DECLARATION | attrs=- | syntax Index    ::= Expr | "Slice" "(" Bound "," Bound "," Bound ")"
+- semantics/syntax.k:39 | syntax | DECLARATION | attrs=- | syntax Bound    ::= Expr | "NoBound"
+- semantics/syntax.k:41 | syntax | DECLARATION | attrs=strict | syntax Stmt ::= "Assign"    "(" Expr "," Expr ")" [strict(2)] | "Import"    "(" String ")" | "ImportFrom" "(" String "," ParamNames ")" | "AugAssign" "(" Expr "," String "," Expr ")" [strict(3)] | "For"       "(" Expr "," Expr "," Stmts ")" [strict(2)] | "While"     "(" Expr "," Stmts ")" | "Break" | "Continue" | "If"        "(" Expr "," Stmts "," Stmts ")" [strict(1)] | "Return"    "(" Expr ")" [strict] | "Assert"    "(" Expr ")" [strict] | "Expr"      "(" Expr ")" [strict] | "FuncDef"   "(" String "," Params "," Stmts ")" | "FuncDef"   "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"
+- semantics/syntax.k:56 | syntax | DECLARATION | attrs=- | syntax Stmts      ::= List{Stmt, ""}
+- semantics/syntax.k:57 | syntax | DECLARATION | attrs=- | syntax Params     ::= "Params" "(" ParamNames ")"
+- semantics/syntax.k:58 | syntax | DECLARATION | attrs=- | syntax CellVars   ::= "CellVars" "(" ParamNames ")"
+- semantics/syntax.k:59 | syntax | DECLARATION | attrs=- | syntax FreeVars   ::= "FreeVars" "(" ParamNames ")"
+- semantics/syntax.k:60 | syntax | DECLARATION | attrs=- | syntax ParamNames ::= List{String, ","}
+- semantics/syntax.k:61 | syntax | DECLARATION | attrs=- | syntax Module     ::= "Module" "(" Stmts ")"
+- semantics/syntax.k:62 | endmodule | DECLARATION | attrs=- | endmodule
+- semantics/tuple.k:3 | module | DECLARATION | attrs=- | module MPY-TUPLE
+- semantics/tuple.k:4 | imports | DECLARATION | attrs=- | imports MPY-CORE
+- semantics/tuple.k:5 | imports | DECLARATION | attrs=- | imports MPY-ITER
+- semantics/tuple.k:6 | imports | DECLARATION | attrs=- | imports MPY-LIST
+- semantics/tuple.k:7 | imports | DECLARATION | attrs=- | imports MPY-METHODS
+- semantics/tuple.k:10 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterNext(tuple(.ValSeq))                => #iterDone ... </k>
+- semantics/tuple.k:11 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #iterNext(tuple(vCons(V:Val, R:ValSeq))) => #iterYield(V, tuple(R)) ... </k>
+- semantics/tuple.k:14 | syntax | DECLARATION | attrs=- | syntax ApplyK ::= "toTuple"
+- semantics/tuple.k:15 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> TupleExpr(ES:Exprs) => #evalArgs(ES, .Vals, toTuple) ... </k>
+- semantics/tuple.k:16 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #applyK(toTuple, ACC:Vals) => tuple(vals2valSeq(ACC)) ... </k>
+- semantics/tuple.k:18 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("==", tuple(A:ValSeq), tuple(B:ValSeq)) => A ==K B
+- semantics/tuple.k:20 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Compare(LV:Val, CmpOp("in",     tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ... </k>
+- semantics/tuple.k:21 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Compare(LV:Val, CmpOp("not in", tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ~> #notB ... </k>
+- semantics/tuple.k:23 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyMethod(tuple(VS:ValSeq), "index", V:Val, .Vals) => idxOfVS(VS, V, 0)
+- semantics/tuple.k:24 | syntax | DECLARATION | attrs=function | syntax Int ::= idxOfVS(ValSeq, Val, Int) [function]
+- semantics/tuple.k:25 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule idxOfVS(vCons(A:Val, _:ValSeq), V:Val, I:Int) => I requires A ==K V
+- semantics/tuple.k:26 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule idxOfVS(vCons(A:Val, R:ValSeq), V:Val, I:Int) => idxOfVS(R, V, I +Int 1) requires notBool (A ==K V)
+- semantics/tuple.k:28 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule applyCmp("!=", tuple(A:ValSeq), tuple(B:ValSeq)) => notBool (A ==K B)
+- semantics/tuple.k:31 | syntax | DECLARATION | attrs=- | syntax KItem ::= #bindTgt(Expr, Val)
+- semantics/tuple.k:32 | rule | SUPPLIED_FIXED_REACHED | attrs=- | rule <k> #bindTgt(Name(X:String), V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>
+- semantics/tuple.k:35 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #bindTgt(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool X in_keys(M) andBool isCellRef({M[X]}:>Val) [priority(40)]
+- semantics/tuple.k:42 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #bindTgt(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>
+- semantics/tuple.k:43 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #bindTgt(TupleExpr(TS:Exprs), list(VS:ValSeq))  => #unpackSeq(TS, VS) ... </k>
+- semantics/tuple.k:44 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> #bindTgt(TupleExpr(TS:Exprs), ref(H:Int)) => #bindTgt(TupleExpr(TS), V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]
+- semantics/tuple.k:49 | syntax | DECLARATION | attrs=- | syntax KItem ::= #unpackSeq(Exprs, ValSeq)
+- semantics/tuple.k:50 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Assign(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>
+- semantics/tuple.k:51 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> Assign(TupleExpr(TS:Exprs), list(VS:ValSeq))  => #unpackSeq(TS, VS) ... </k>
+- semantics/tuple.k:52 | rule | SUPPLIED_FIXED_UNREACHED | attrs=priority | rule <k> Assign(TupleExpr(TS:Exprs), ref(H:Int)) => Assign(TupleExpr(TS), V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]
+- semantics/tuple.k:55 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #unpackSeq((T:Expr, TS:Exprs), vCons(V:Val, VS:ValSeq)) => #bindTgt(T, V) ~> #unpackSeq(TS, VS) ... </k>
+- semantics/tuple.k:57 | rule | SUPPLIED_FIXED_UNREACHED | attrs=- | rule <k> #unpackSeq(.Exprs, .ValSeq) => .K ... </k>
+- semantics/tuple.k:58 | endmodule | DECLARATION | attrs=- | endmodule
+- candidate/verification.k:1 | requires | PROOF_LOCAL_EXTENSION | attrs=- | requires "reference-semantics/semantics.k"
+- candidate/verification.k:3 | module | PROOF_LOCAL_EXTENSION | attrs=- | module VERIFICATION
+- candidate/verification.k:4 | imports | PROOF_LOCAL_EXTENSION | attrs=- | imports MPY
+- candidate/verification.k:5 | imports | PROOF_LOCAL_EXTENSION | attrs=- | imports INT
+- candidate/verification.k:6 | imports | PROOF_LOCAL_EXTENSION | attrs=- | imports BOOL
+- candidate/verification.k:9 | syntax | PROOF_LOCAL_EXTENSION | attrs=function,total | syntax Int ::= nestedStep(Int, Int) [function, total]
+- candidate/verification.k:10 | rule | PROOF_LOCAL_EXTENSION | attrs=- | rule nestedStep(C, S) => S +Int 1 requires S <Int 2 andBool C ==Int 91
+- candidate/verification.k:12 | rule | PROOF_LOCAL_EXTENSION | attrs=- | rule nestedStep(C, S) => S requires S <Int 2 andBool C =/=Int 91
+- candidate/verification.k:14 | rule | PROOF_LOCAL_EXTENSION | attrs=- | rule nestedStep(C, S) => S +Int 1 requires S >=Int 2 andBool S <Int 4 andBool C ==Int 93
+- candidate/verification.k:16 | rule | PROOF_LOCAL_EXTENSION | attrs=- | rule nestedStep(C, S) => S requires S >=Int 2 andBool S <Int 4 andBool C =/=Int 93
+- candidate/verification.k:18 | rule | PROOF_LOCAL_EXTENSION | attrs=- | rule nestedStep(_C, S) => S requires S >=Int 4
+- candidate/verification.k:22 | syntax | PROOF_LOCAL_EXTENSION | attrs=function,total | syntax Int ::= nestedScan(IntSeq, Int) [function, total]
+- candidate/verification.k:23 | rule | PROOF_LOCAL_EXTENSION | attrs=- | rule nestedScan(.IntSeq, S) => S
+- candidate/verification.k:24 | rule | PROOF_LOCAL_EXTENSION | attrs=- | rule nestedScan(iCons(C, CS), S) => nestedScan(CS, nestedStep(C, S))
+- candidate/verification.k:28 | syntax | PROOF_LOCAL_EXTENSION | attrs=function,total | syntax Bool ::= bracketInput(IntSeq) [function, total]
+- candidate/verification.k:29 | rule | PROOF_LOCAL_EXTENSION | attrs=- | rule bracketInput(.IntSeq) => true
+- candidate/verification.k:30 | rule | PROOF_LOCAL_EXTENSION | attrs=- | rule bracketInput(iCons(C, CS)) => (C ==Int 91 orBool C ==Int 93) andBool bracketInput(CS)
+- candidate/verification.k:34 | syntax | PROOF_LOCAL_EXTENSION | attrs=function,total | syntax Bool ::= nestedResult(IntSeq) [function, total]
+- candidate/verification.k:35 | rule | PROOF_LOCAL_EXTENSION | attrs=- | rule nestedResult(CS) => nestedScan(CS, 0) ==Int 4
+- candidate/verification.k:36 | endmodule | PROOF_LOCAL_EXTENSION | attrs=- | endmodule
+- candidate/spec.k:1 | requires | TARGET_CLAIM | attrs=- | requires "verification.k"
+- candidate/spec.k:3 | module | TARGET_CLAIM | attrs=- | module SPEC
+- candidate/spec.k:4 | imports | TARGET_CLAIM | attrs=- | imports VERIFICATION
+- candidate/spec.k:6 | claim | TARGET_CLAIM | attrs=- | claim [loop]: <k> #loop( str(CS:IntSeq), Name("bracket"), If(Compare(Name("state"), CmpOp("<", Int(2))), If(Compare(Name("bracket"), CmpOp("==", Str("["))), AugAssign(Name("state"), "+", Int(1)), .Stmts), If(Compare(Name("state"), CmpOp("<", Int(4))), If(Compare(Name("bracket"), CmpOp("==", Str("]"))), AugAssign(Name("state"), "+", Int(1)), .Stmts), .Stmts)) .Stmts) => .K ... </k> <env> 1 </env> <scopes> ... 1 |-> scope( "state"   |-> (S:Int => nestedScan(CS, S)) "bracket" |-> (_BR:Val => ?BR:Val) "string"  |-> str(INPUT:IntSeq), parent(0)) ... </scopes> requires bracketInput(CS) andBool S >=Int 0 andBool S <=Int 4
+- candidate/spec.k:38 | claim | TARGET_CLAIM | attrs=- | claim [program]: <k> #loadAll(Module( FuncDef("is_nested", Params("string"), Assign(Name("state"), Int(0)) Assign(Name("bracket"), Str("")) For(Name("bracket"), Name("string"), If(Compare(Name("state"), CmpOp("<", Int(2))), If(Compare(Name("bracket"), CmpOp("==", Str("["))), AugAssign(Name("state"), "+", Int(1)), .Stmts), If(Compare(Name("state"), CmpOp("<", Int(4))), If(Compare(Name("bracket"), CmpOp("==", Str("]"))), AugAssign(Name("state"), "+", Int(1)), .Stmts), .Stmts)) .Stmts) Return(Compare(Name("state"), CmpOp("==", Int(4)))) .Stmts) .Stmts)) ~> Call(Name("is_nested"), str(CS:IntSeq)) => ?RESULT:Bool </k> <env> 0 </env> <scopes> -1 |-> builtinsScope 0  |-> scope( .Map => "is_nested" |-> closureVal( "string", .ParamNames, Assign(Name("state"), Int(0)) Assign(Name("bracket"), Str("")) For(Name("bracket"), Name("string"), If(Compare(Name("state"), CmpOp("<", Int(2))), If(Compare(Name("bracket"), CmpOp("==", Str("["))), AugAssign(Name("state"), "+", Int(1)), .Stmts), If(Compare(Name("state"), CmpOp("<", Int(4))), If(Compare(Name("bracket"), CmpOp("==", Str("]"))), AugAssign(Name("state"), "+", Int(1)), .Stmts), .Stmts)) .Stmts) Return(Compare(Name("state"), CmpOp("==", Int(4)))) .Stmts, 0), parent(-1)) </scopes> <scopeLoc> 1 </scopeLoc> <heap> .Map </heap> <heapLoc> 0 </heapLoc> <stack> .List </stack> <ret> noRet </ret> <exc> NoExc </exc> <exit-code> 0 </exit-code> requires bracketInput(CS) ensures ?RESULT ==Bool nestedResult(CS)
+- candidate/spec.k:96 | endmodule | TARGET_CLAIM | attrs=- | endmodule

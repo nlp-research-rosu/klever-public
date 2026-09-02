@@ -1,0 +1,188 @@
+Script started on 2026-07-30 22:31:05-05:00 [<not executed on terminal>]
+verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	endmodule
+
+prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 -m py_compile solution.py
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	python3 py2mpy.py smoke.py > smoke.mpy
+     7	
+     8	rg -Fq 'Return(BinOp("%", Name("number"), Float(1.0)))' solution.mpy
+     9	rg -Fq 'Return(BinOp("%", Name("number"), Float(1.0)))' spec.k
+    10	
+    11	python3 smoke.py
+    12	python3 test_solution.py
+    13	
+    14	kompile --backend llvm reference-semantics/semantics.k \
+    15	  --main-module MPY-KRUN \
+    16	  --syntax-module MPY-SYNTAX \
+    17	  --output-definition runtime-kompiled
+    18	krun solution.mpy --definition runtime-kompiled
+    19	krun smoke.mpy --definition runtime-kompiled
+    20	
+    21	kompile --backend haskell verification.k \
+    22	  --main-module VERIFICATION \
+    23	  --syntax-module MPY-SYNTAX \
+    24	  --output-definition verification-kompiled
+    25	kprove spec.k \
+    26	  --definition verification-kompiled \
+    27	  --spec-module SPEC
+    28	
+    29	expect_kprove_failure() {
+    30	  local label=$1
+    31	  shift
+    32	  if "$@"; then
+    33	    echo "ERROR: ${label} unexpectedly proved"
+    34	    return 1
+    35	  else
+    36	    local status=$?
+    37	    echo "EXPECTED_FAILURE: ${label} exit=${status}"
+    38	  fi
+    39	}
+    40	
+    41	expect_kprove_failure "false postcondition" \
+    42	  kprove spec-vacuity.k \
+    43	    --definition verification-kompiled \
+    44	    --spec-module SPEC-VACUITY
+    45	
+    46	expect_kprove_failure "changed function body" \
+    47	  kprove spec-body-mutation.k \
+    48	    --definition verification-kompiled \
+    49	    --spec-module SPEC-BODY-MUTATION
+
+spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [truncate-number]:
+     7	    <k> Call(Name("truncate_number"), (F:Float, .Exprs))
+     8	        => floatMod(F, 1.0)
+     9	    </k>
+    10	    <env> 0 </env>
+    11	    <scopes>
+    12	      0 |-> scope(
+    13	        .Map [
+    14	          "truncate_number" <-
+    15	            closureVal(
+    16	              ("number", .ParamNames),
+    17	              (Return(BinOp("%", Name("number"), Float(1.0))) .Stmts),
+    18	              0
+    19	            )
+    20	        ],
+    21	        parent(-1)
+    22	      )
+    23	      -1 |-> builtinsScope
+    24	    </scopes>
+    25	    <scopeLoc> 1 </scopeLoc>
+    26	    <heap> .Map </heap>
+    27	    <heapLoc> 0 </heapLoc>
+    28	    <stack> .List </stack>
+    29	    <ret> noRet </ret>
+    30	    <exc> NoExc </exc>
+    31	    <exit-code> 0 </exit-code>
+    32	endmodule
+
+solution.py
+     1	"""HumanEval solution for returning the fractional part of a float."""
+     2	
+     3	
+     4	def truncate_number(number: float) -> float:
+     5	    return number % 1.0
+
+solution.mpy
+     1	Module(
+     2	  Expr(
+     3	    Str(
+     4	      "HumanEval solution for returning the fractional part of a float."))
+     5	  FuncDef("truncate_number", Params("number"),
+     6	    Return(BinOp("%", Name("number"), Float(1.0)))))
+
+prompt.py
+     1	
+     2	
+     3	def truncate_number(number: float) -> float:
+     4	    """ Given a positive floating point number, it can be decomposed into
+     5	    and integer part (largest integer smaller than given number) and decimals
+     6	    (leftover part always smaller than 1).
+     7	
+     8	    Return the decimal part of the number.
+     9	    >>> truncate_number(3.5)
+    10	    0.5
+    11	    """
+
+spec mutation files
+     1	requires "verification.k"
+     2	
+     3	module SPEC-VACUITY
+     4	  imports VERIFICATION
+     5	
+     6	  claim [false-result]:
+     7	    <k> Call(Name("truncate_number"), (F:Float, .Exprs))
+     8	        => floatMod(F, 2.0)
+     9	    </k>
+    10	    <env> 0 </env>
+    11	    <scopes>
+    12	      0 |-> scope(
+    13	        .Map [
+    14	          "truncate_number" <-
+    15	            closureVal(
+    16	              ("number", .ParamNames),
+    17	              (Return(BinOp("%", Name("number"), Float(1.0))) .Stmts),
+    18	              0
+    19	            )
+    20	        ],
+    21	        parent(-1)
+    22	      )
+    23	      -1 |-> builtinsScope
+    24	    </scopes>
+    25	    <scopeLoc> 1 </scopeLoc>
+    26	    <heap> .Map </heap>
+    27	    <heapLoc> 0 </heapLoc>
+    28	    <stack> .List </stack>
+    29	    <ret> noRet </ret>
+    30	    <exc> NoExc </exc>
+    31	    <exit-code> 0 </exit-code>
+    32	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC-BODY-MUTATION
+     4	  imports VERIFICATION
+     5	
+     6	  claim [changed-body]:
+     7	    <k> Call(Name("truncate_number"), (F:Float, .Exprs))
+     8	        => floatMod(F, 1.0)
+     9	    </k>
+    10	    <env> 0 </env>
+    11	    <scopes>
+    12	      0 |-> scope(
+    13	        .Map [
+    14	          "truncate_number" <-
+    15	            closureVal(
+    16	              ("number", .ParamNames),
+    17	              (Return(BinOp("%", Name("number"), Float(2.0))) .Stmts),
+    18	              0
+    19	            )
+    20	        ],
+    21	        parent(-1)
+    22	      )
+    23	      -1 |-> builtinsScope
+    24	    </scopes>
+    25	    <scopeLoc> 1 </scopeLoc>
+    26	    <heap> .Map </heap>
+    27	    <heapLoc> 0 </heapLoc>
+    28	    <stack> .List </stack>
+    29	    <ret> noRet </ret>
+    30	    <exc> NoExc </exc>
+    31	    <exit-code> 0 </exit-code>
+    32	endmodule
+
+Script done on 2026-07-30 22:31:05-05:00 [COMMAND_EXIT_CODE="0"]

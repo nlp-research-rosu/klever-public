@@ -1,0 +1,126 @@
+set -o pipefail
+printf 'COMMAND: PYTHONPATH=/reference python3 independent hash, manifest, bijection, and null-target audit\n'
+PYTHONPATH=/reference python3 - <<'PY'
+import hashlib
+import json
+import os
+import re
+import stat
+from pathlib import Path
+
+from tools import klean_export
+from tools.k_rule_inventory import canonical_json_sha256, inventory_verification
+from tools.pipeline_contract import sha256_tree
+from tools.stage6_resolution_contract import canonical_json_sha256 as resolution_sha256
+
+def load(path):
+    return json.loads(Path(path).read_text())
+
+def file_sha(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+def source_hashes(root):
+    root = Path(root)
+    result = {}
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        for entry in os.scandir(directory):
+            path = Path(entry.path)
+            mode = entry.stat(follow_symlinks=False).st_mode
+            if stat.S_ISDIR(mode):
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                result[path.relative_to(root).as_posix()] = file_sha(path)
+            else:
+                raise RuntimeError(f'unsupported Stage 1 entry: {path}')
+    return dict(sorted(result.items()))
+
+audit_document = load('/audit-input.json')
+audit = audit_document['resolution']
+input_manifest = load('/reference/klean-generation/input-manifest.json')
+generator = load('/reference/klean-generation/generator-manifest.json')
+export_result = load('/reference/klean-generation/export-result.json')
+recorded_preflight = load('/reference/klean-generation/preflight.json')
+trust_inventory = load('/reference/klean-generation/trust-inventory.json')
+obligation_map = load('/reference/klean-generation/generated/obligation-map.json')
+discovery = load('/reference/lemma-discovery.json')
+toolchain_lock = load('/reference/klean-toolchain.lock.json')
+checker_lock_path = Path('/opt/humaneval/data/klean-audit-tools.lock.json')
+checker_lock = load(checker_lock_path)
+reconstructed = inventory_verification(Path('/reference/k-proof'))
+
+actual = {
+    'audit_resolution_sha256': resolution_sha256(audit),
+    'checker_lock_sha256': file_sha(checker_lock_path),
+    'discovery_manifest_sha256': file_sha('/reference/lemma-discovery.json'),
+    'generated_tree_sha256': klean_export.tree_digest(Path('/reference/klean-generation/generated')),
+    'generation_producer_sources_sha256': sha256_tree(Path('/reference/generation-tools')),
+    'k_audit_sha256': sha256_tree(Path('/reference/k-audit')),
+    'k_workspace_sha256': sha256_tree(Path('/reference/k-proof')),
+    'klean_generation_sha256': sha256_tree(Path('/reference/klean-generation')),
+    'obligation_map_sha256': file_sha('/reference/klean-generation/generated/obligation-map.json'),
+    'stage1_export_sha256': klean_export.tree_digest(Path('/reference/k-proof')),
+    'trust_inventory_sha256': file_sha('/reference/klean-generation/trust-inventory.json'),
+    'verification_sha256': file_sha('/reference/k-proof/verification.k'),
+}
+
+checker_actual_files = {
+    relative: file_sha(Path('/reference') / relative)
+    for relative in sorted(checker_lock['files'])
+}
+
+target_observed = klean_export.target_statement(Path('/reference/klean-generation/generated'))
+target_expected_definition = klean_export.expected_target_definition(obligation_map)
+raw_target_count = 0
+for path in Path('/reference/klean-generation/generated').rglob('*.lean'):
+    raw_target_count += len(re.findall(r'(?m)^\s*def\s+targetStatement\b', path.read_text()))
+
+checks = {
+    'audit_mode_classification_only': audit['mode'] == 'CLASSIFICATION_ONLY' and os.environ.get('AUDIT_MODE') == 'CLASSIFICATION_ONLY',
+    'audit_resolution_digest': actual['audit_resolution_sha256'] == audit_document['resolved_input_sha256'],
+    'mechanical_checker_lock_file_hash': actual['checker_lock_sha256'] == audit_document['audit']['mechanical_checker_lock_sha256'],
+    'mechanical_checker_files_match_lock': checker_actual_files == checker_lock['files'],
+    'stage1_all_source_file_hashes': source_hashes('/reference/k-proof') == audit['stage1_source_hashes'],
+    'stage1_pipeline_tree_hash': actual['k_workspace_sha256'] == audit['hashes']['k_workspace_sha256'],
+    'stage1_export_tree_hash': actual['stage1_export_sha256'] == audit['hashes']['stage1_export_sha256'],
+    'stage2_pipeline_tree_hash': actual['k_audit_sha256'] == audit['hashes']['k_audit_sha256'] == audit['selections']['k_audit']['artifact_sha256'],
+    'stage3_file_hash': actual['discovery_manifest_sha256'] == audit['hashes']['discovery_manifest_sha256'],
+    'stage4_pipeline_tree_hash': actual['klean_generation_sha256'] == audit['hashes']['klean_generation_sha256'] == audit['selections']['klean_generation']['artifact_sha256'],
+    'producer_bundle_tree_hash': actual['generation_producer_sources_sha256'] == audit['hashes']['generation_producer_sources_sha256'],
+    'generated_tree_hash': actual['generated_tree_sha256'] == audit['hashes']['generated_tree_sha256'],
+    'proof_hashes_null_and_candidate_absent': audit['hashes']['lean_invocation_sha256'] is None and audit['hashes']['lean_workspace_sha256'] is None and audit['stage5_result'] is None and not Path('/candidate').exists(),
+    'inventory_hash_recomputed': canonical_json_sha256(reconstructed['rules']) == discovery['inventory_sha256'],
+    'input_manifest_hash_bindings': input_manifest['frozen_input_sha256'] == actual['stage1_export_sha256'] and input_manifest['stage1_workspace_sha256'] == actual['stage1_export_sha256'] and input_manifest['stage3_discovery_manifest_sha256'] == actual['discovery_manifest_sha256'] and input_manifest['inventory_sha256'] == discovery['inventory_sha256'] and input_manifest['verification_sha256'] == actual['verification_sha256'],
+    'generator_hash_bindings': generator['generated_tree_sha256'] == actual['generated_tree_sha256'] and generator['obligation_map_sha256'] == actual['obligation_map_sha256'] and generator['provenance']['stage1_workspace_sha256'] == actual['stage1_export_sha256'] and generator['provenance']['stage3_discovery_manifest_sha256'] == actual['discovery_manifest_sha256'] and generator['provenance']['inventory_sha256'] == discovery['inventory_sha256'],
+    'generator_toolchain_lock_exact': generator['toolchain'] == toolchain_lock,
+    'export_result_hash_bindings': export_result['frozen_input_sha256'] == actual['stage1_export_sha256'] and export_result['stage3_discovery_manifest_sha256'] == actual['discovery_manifest_sha256'] and export_result['generated_tree_sha256'] == actual['generated_tree_sha256'] and export_result['trust_inventory_sha256'] == actual['trust_inventory_sha256'],
+    'recorded_preflight_hash_bindings': recorded_preflight['frozen_input_sha256'] == actual['stage1_export_sha256'] and recorded_preflight['stage1_workspace_sha256'] == actual['stage1_export_sha256'] and recorded_preflight['stage3_discovery_manifest_sha256'] == actual['discovery_manifest_sha256'] and recorded_preflight['generated_tree_sha256'] == actual['generated_tree_sha256'],
+    'recorded_preflight_diagnostic_hashes': all(hashlib.sha256(item['output_tail'].encode()).hexdigest() == item['output_sha256'] for item in recorded_preflight['diagnostics']),
+    'audit_preflight_exactly_recorded': audit['stage4_preflight'] == recorded_preflight,
+    'ordered_source_rule_bijection': reconstructed['rules'] == discovery['rules'] and input_manifest['source_rules'] == obligation_map['source_rules'] == [],
+    'ordered_obligation_bijection': obligation_map['obligations'] == [] and obligation_map['trust_parameters'] == [],
+    'obligation_counts_zero_everywhere': generator['obligation_count'] == export_result['obligation_count'] == recorded_preflight['obligation_count'] == audit['stage4_preflight']['obligation_count'] == 0,
+    'no_obligations_to_weaken_duplicate_or_make_vacuous': len(obligation_map['obligations']) == len({item.get('source_rule_id') for item in obligation_map['obligations']}) == 0,
+    'null_target_exact_everywhere': target_observed is None and target_expected_definition is None and raw_target_count == 0 and generator['target'] is None and recorded_preflight['target'] is None and audit['target'] is None,
+    'no_obligations_status_exact': audit['selections']['klean_generation']['status'] == export_result['status'] == recorded_preflight['status'] == 'KLEAN_NO_OBLIGATIONS',
+    'trust_inventory_hole_counts_zero': trust_inventory['designated_sorries'] == 0 and trust_inventory['other_sorries'] == 0,
+}
+
+report = {
+    'actual_hashes': actual,
+    'all_checks_pass': all(checks.values()),
+    'checks': checks,
+    'checker_file_hashes': checker_actual_files,
+    'classification_and_generation_counts': {
+        'reconstructed_rules': len(reconstructed['rules']),
+        'domain_source_rules': len(input_manifest['source_rules']),
+        'generated_obligations': len(obligation_map['obligations']),
+        'target_parameters': len(obligation_map['trust_parameters']),
+        'raw_target_declarations': raw_target_count,
+    },
+    'target_observed': target_observed,
+    'target_expected_definition': target_expected_definition,
+}
+print(json.dumps(report, indent=2, sort_keys=True))
+PY

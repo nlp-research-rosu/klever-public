@@ -1,0 +1,225 @@
+Script started on 2026-07-28 17:33:44-05:00 [<not executed on terminal>]
+     1	// reference/src/semantics/int.k — MPY-INT
+     2	// Int cases of the operator dispatch; Python // and % are floored (pyMod).
+     3	
+     4	module MPY-INT
+     5	  imports MPY-CORE
+     6	
+     7	  rule applyUn("-", I:Int) => 0 -Int I
+     8	
+     9	  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    10	  // Bool participates in int arithmetic (x += (a == b))
+    11	  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+    12	  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+    13	  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+    14	  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+    15	  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+    16	  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+    17	  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+    18	
+    19	  syntax Int ::= pyMod(Int, Int) [function]
+    20	  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+    21	
+    22	  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+    23	  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+    24	  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+    25	  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+    26	  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+    27	  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+    28	endmodule
+     1	// reference/src/semantics/subscript.k — MPY-SUBSCRIPT
+     2	
+     3	module MPY-SUBSCRIPT
+     4	  imports MPY-CORE
+     5	
+     6	  // ==== positional access + negative-index normalization (used only here) ===
+     7	  // valSeqAt is [total]: in-bounds vCons access reduces as usual; on an OPAQUE sequence (e.g.
+     8	  // a trusted sort's sortVS(VS)) or OOB it stays an abstract total value — so indexing the
+     9	  // opaque sorted list is DEFINED (no undischarged #Ceil), matching the old semantics' total
+    10	  // atK. K trusts the [total] annotation; valid programs index in-bounds.
+    11	  syntax Val ::= valSeqAt(ValSeq, Int) [function, total]
+    12	  rule valSeqAt(vCons(V:Val, _:ValSeq), 0)     => V
+    13	  rule valSeqAt(vCons(_:Val, S:ValSeq), I:Int) => valSeqAt(S, I -Int 1)
+    14	       requires I >Int 0
+    15	
+    16	  syntax Int ::= intSeqAt(IntSeq, Int) [function]
+    17	  rule intSeqAt(iCons(C:Int, _:IntSeq), 0)     => C
+    18	  rule intSeqAt(iCons(_:Int, S:IntSeq), I:Int) => intSeqAt(S, I -Int 1)
+    19	       requires I >Int 0
+    20	
+    21	  syntax Int ::= normIdx(Int, Int) [function, total]
+    22	  rule normIdx(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0
+    23	  rule normIdx(I:Int, _:Int)   => I          requires I >=Int 0
+    24	
+    25	  // ==== Subscript: indexing obj[i] (list / tuple / str) =====================
+    26	  // contexts (not strict attrs): the Index slot's Slice alternative must never heat
+    27	  context Subscript(HOLE, _)
+    28	  context Subscript(_:Val, HOLE:Expr)
+    29	
+    30	  // heap-object deref (covers both the index and slice forms via the Index slot)
+    31	  rule <k> Subscript(ref(H:Int), IX:Index) => Subscript(V, IX) ... </k>
+    32	       <heap> ... H |-> V:Val ... </heap>
+    33	       [priority(40)]
+    34	
+    35	  rule <k> Subscript(OBJ:Val, I:Int) => applyIndex(OBJ, I) ... </k>
+    36	
+    37	  syntax Val ::= applyIndex(Val, Int) [function]
+    38	  rule applyIndex(list(VS:ValSeq),  I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+    39	  rule applyIndex(tuple(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+    40	  rule applyIndex(str(IS:IntSeq),   I:Int)
+    41	    => str(iCons(intSeqAt(IS, normIdx(I, isLen(IS))), .IntSeq))
+    42	
+    43	  // ==== Slice: obj[lo:hi:step] (list / str) — CPython slice.indices ==========
+    44	  syntax KItem ::= #evalB(Bound) | "#toSome"
+    45	                 | #slLo(Val, Bound, Bound)
+    46	                 | #slHi(Val, OptInt, Bound)
+    47	                 | #slStep(Val, OptInt, OptInt)
+    48	
+    49	  syntax OptInt ::= "noB" | someB(Int)
+    50	  rule <k> #evalB(NoBound)  => noB ... </k>
+    51	  rule <k> #evalB(E:Expr)   => E ~> #toSome ... </k>
+    52	  rule <k> I:Int ~> #toSome => someB(I) ... </k>
+    53	
+    54	  rule <k> Subscript(OBJ:Val, Slice(LO:Bound, HI:Bound, ST:Bound)) => #evalB(LO) ~> #slLo(OBJ, HI, ST) ... </k>
+    55	  rule <k> LO:OptInt ~> #slLo(OBJ:Val, HI:Bound, ST:Bound)   => #evalB(HI) ~> #slHi(OBJ, LO, ST) ... </k>
+    56	  rule <k> HI:OptInt ~> #slHi(OBJ:Val, LO:OptInt, ST:Bound)  => #evalB(ST) ~> #slStep(OBJ, LO, HI) ... </k>
+    57	  // a list slice constructs a NEW object; a str slice stays a value
+    58	  rule <k> ST:OptInt ~> #slStep(list(VS:ValSeq), LO:OptInt, HI:OptInt)
+    59	        => #alloc(doSlice(list(VS), LO, HI, ST)) ... </k>
+    60	       [priority(45)]
+    61	  rule <k> ST:OptInt ~> #slStep(OBJ:Val, LO:OptInt, HI:OptInt) => doSlice(OBJ, LO, HI, ST) ... </k>
+    62	
+    63	  syntax Val ::= doSlice(Val, OptInt, OptInt, OptInt) [function]
+    64	  rule doSlice(list(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    65	    => list(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))
+    66	  rule doSlice(tuple(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    67	    => tuple(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))
+    68	  rule doSlice(str(IS:IntSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    69	    => str(buildIS(IS, slStart(LO, ST, isLen(IS)), slStop(HI, ST, isLen(IS)), slStep(ST)))
+    70	
+    71	  // ==== slice.indices: step / start / stop / clamp ==========================
+    72	  syntax Int ::= slStep(OptInt) [function, total]
+    73	  rule slStep(noB)          => 1
+    74	  rule slStep(someB(S:Int)) => S
+    75	
+    76	  syntax Int ::= slStart(OptInt, OptInt, Int) [function]
+    77	  rule slStart(noB,          ST:OptInt, _LEN:Int) => 0
+    78	       requires slStep(ST) >Int 0
+    79	  rule slStart(noB,          ST:OptInt, LEN:Int)  => LEN -Int 1
+    80	       requires slStep(ST) <Int 0
+    81	  rule slStart(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))
+    82	
+    83	  syntax Int ::= slStop(OptInt, OptInt, Int) [function]
+    84	  rule slStop(noB,          ST:OptInt, LEN:Int)  => LEN
+    85	       requires slStep(ST) >Int 0
+    86	  rule slStop(noB,          ST:OptInt, _LEN:Int) => -1
+    87	       requires slStep(ST) <Int 0
+    88	  rule slStop(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))
+    89	
+    90	  syntax Int ::= slAdjust(Int, Int, Int) [function, total]
+    91	  rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampLo(I +Int LEN, STEP)
+    92	       requires I  <Int 0
+    93	  rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampHi(I, LEN, STEP)
+    94	       requires I >=Int 0
+    95	
+    96	  syntax Int ::= clampLo(Int, Int) [function, total]
+    97	  rule clampLo(J:Int, _STEP:Int) => J
+    98	       requires J >=Int 0
+    99	  rule clampLo(J:Int, STEP:Int)  => #if STEP <Int 0 #then -1 #else 0 #fi
+   100	       requires J <Int 0
+   101	
+   102	  syntax Int ::= clampHi(Int, Int, Int) [function, total]
+   103	  rule clampHi(I:Int, LEN:Int, _STEP:Int) => I
+   104	       requires I  <Int LEN
+   105	  rule clampHi(I:Int, LEN:Int, STEP:Int)  => #if STEP <Int 0 #then LEN -Int 1 #else LEN #fi
+   106	       requires I >=Int LEN
+   107	
+   108	  // ==== build the strided sub-sequence (indices in range by construction) ====
+   109	  syntax ValSeq ::= buildVS(ValSeq, Int, Int, Int) [function]
+   110	  rule buildVS(VS:ValSeq, I:Int, STOP:Int, STEP:Int)
+   111	    => vCons(valSeqAt(VS, I), buildVS(VS, I +Int STEP, STOP, STEP))
+   112	       requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)
+   113	  rule buildVS(_:ValSeq, I:Int, STOP:Int, STEP:Int) => .ValSeq
+   114	       requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))
+   115	
+   116	  syntax IntSeq ::= buildIS(IntSeq, Int, Int, Int) [function]
+   117	  rule buildIS(IS:IntSeq, I:Int, STOP:Int, STEP:Int)
+   118	    => iCons(intSeqAt(IS, I), buildIS(IS, I +Int STEP, STOP, STEP))
+   119	       requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)
+   120	  rule buildIS(_:IntSeq, I:Int, STOP:Int, STEP:Int) => .IntSeq
+   121	       requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))
+   122	endmodule
+     1	// reference/src/semantics/sort.k — MPY-SORT
+     2	// Trusted sorted(): sorted(list) as an opaque ascending permutation `sortVS` — opaque symbolic
+     3	// for kprove (a trusted primitive, correctness/ordering proved in Lean / notes/sort-probe),
+     4	// and a concrete insertion sort for krun. Wrappers verify the logic AROUND the sort (index /
+     5	// slice / filter / dedup); indexing an opaque sortVS(VS) carries through as an opaque term, so
+     6	// no ordering lemma is needed in K — the trust (sortVS = real sorted) is discharged by each
+     7	// problem's differential test. Only int lists (compared by projectIntTotal); keyed / string
+     8	// sorts are separate. Fires only via the "sorted" builtin, so inert for non-sorting programs.
+     9	
+    10	module MPY-SORT
+    11	  imports MPY-BUILTINS
+    12	  imports MPY-SUBSCRIPT
+    13	
+    14	  // sortVS(VS): the ascending sort of the Val list VS. Opaque for symbolic VS (no-evaluators);
+    15	  // concrete insertion sort for krun.
+    16	  // Concrete sort matches Int-sorted elements directly (an int Val IS an Int); projectIntTotal
+    17	  // (lemmas-only) is not available in the semantics. Int and str lists.
+    18	  syntax ValSeq ::= sortVS(ValSeq) [function, total, symbol(sortVS), no-evaluators]
+    19	  syntax ValSeq ::= insVS(Int, ValSeq) [function]
+    20	  rule sortVS(.ValSeq)                => .ValSeq          [concrete]
+    21	  rule sortVS(vCons(X:Int, R:ValSeq)) => insVS(X, sortVS(R)) [concrete]
+    22	  rule insVS(X:Int, .ValSeq)                => vCons(X, .ValSeq) [concrete]
+    23	  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]
+    24	  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X  >Int Y [concrete]
+    25	  // str elements insert by the shared lexicographic strLt (methods.k)
+    26	  syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]
+    27	  rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]
+    28	  rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]
+    29	  rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(A), vCons(str(B), R))
+    30	       requires strLt(A, B) orBool A ==K B [concrete]
+    31	  rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(B), insVSs(A, R))
+    32	       requires notBool (strLt(A, B) orBool A ==K B) [concrete]
+    33	
+    34	  // sorted(list) constructs a NEW object: k-cell pre-dispatch (beats the [owise]
+    35	  // applyBuiltin routing in call.k) so the result allocates.
+    36	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), .Vals))
+    37	        => #alloc(list(sortVS(VS))) ... </k>
+    38	
+    39	  // mutator: xs.sort() — the in-place heap write over the same trusted sortVS
+    40	  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "sort")), .Vals) => noneV ... </k>
+    41	       <heap> ... H |-> list(VS:ValSeq => sortVS(VS)) ... </heap>
+    42	       [priority(40)]
+    43	
+    44	  // ==== keyed / reversed sorted() (WP2) =====================================
+    45	  // sortKeyVS(VS, KV): the stable ascending sort of VS by the key value KV
+    46	  // (a closure/builtin/type — anything callable). OPAQUE here; the concrete
+    47	  // leg (MPY-CONCRETE, llvm only) computes keys by REAL calls and stable-
+    48	  // inserts, at priority(40) over these.
+    49	  syntax ValSeq ::= sortKeyVS(ValSeq, Val) [function, total, symbol(sortKeyVS), no-evaluators]
+    50	
+    51	  syntax ValSeq ::= revVS(ValSeq) [function, total]
+    52	                  | revVSAcc(ValSeq, ValSeq) [function, total]
+    53	  rule revVS(S:ValSeq) => revVSAcc(S, .ValSeq)
+    54	  rule revVSAcc(.ValSeq, A:ValSeq) => A
+    55	  rule revVSAcc(vCons(V:Val, R:ValSeq), A:ValSeq) => revVSAcc(R, vCons(V, A))
+    56	
+    57	  syntax ValSeq ::= condRev(ValSeq, Bool) [function, total]
+    58	  rule condRev(S:ValSeq, false) => S
+    59	  rule condRev(S:ValSeq, true)  => revVS(S)
+    60	
+    61	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals))
+    62	        => #alloc(list(sortKeyVS(VS, KV))) ... </k>
+    63	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals))
+    64	        => #alloc(list(condRev(sortKeyVS(VS, KV), RB))) ... </k>
+    65	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("reverse", RB:Bool), .Vals))
+    66	        => #alloc(list(condRev(sortVS(VS), RB))) ... </k>
+    67	
+    68	  // Indexing the opaque sorted list: `valSeqAt(sortVS(VS), I)` is DEFINED because valSeqAt is
+    69	  // [total] (subscript.k) — it stays an abstract total value for a symbolic sort and reduces
+    70	  // over the concrete sort for krun. No separate sortedAt indirection is needed; wrappers write
+    71	  // their postcondition directly as valSeqAt(sortVS(VS), …).
+    72	endmodule
+
+Script done on 2026-07-28 17:33:44-05:00 [COMMAND_EXIT_CODE="0"]

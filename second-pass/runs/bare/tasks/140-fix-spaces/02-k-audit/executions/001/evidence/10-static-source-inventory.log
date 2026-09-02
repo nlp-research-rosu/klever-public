@@ -1,0 +1,489 @@
+WORKDIR: /tmp/audit-work/src
+COMMAND: bash -lc for\ file\ in\ semantic.k\ verification.k\ spec.k\ solution.mpy\;\ do\ echo\ SOURCE_FILE=\$file\;\ nl\ -ba\ \"\$file\"\;\ done\;\ echo\ LOCAL_DECLARATION_INDEX\;\ rg\ -n\ \'\^\[\[:space:\]\]\*\(syntax\|configuration\|rule\|claim\)\|\\\[\(function\|total\|functional\|simplification\|concrete\|owise\|priority\)\'\ semantic.k\ verification.k\ spec.k
+--- OUTPUT ---
+SOURCE_FILE=semantic.k
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports BOOL-SYNTAX
+     5	  imports INT-SYNTAX
+     6	  imports STRING-SYNTAX
+     7	
+     8	  syntax Program ::= "Module" "(" Stmts ")"
+     9	
+    10	  syntax Stmts ::= List{Stmt, ""}
+    11	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    12	                | "Return" "(" Expr ")"
+    13	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    14	
+    15	  syntax Ids ::= List{String, ","}
+    16	  syntax Params ::= "Params" "(" Ids ")"
+    17	
+    18	  syntax Exprs ::= List{Expr, ","}
+    19	  syntax Expr ::= "Name" "(" String ")"
+    20	                | "Str" "(" String ")"
+    21	                | "Int" "(" Int ")"
+    22	                | "BinOp" "(" String "," Expr "," Expr ")"
+    23	                | "Compare" "(" Expr "," CmpOps ")"
+    24	                | "Call" "(" Expr "," Exprs ")"
+    25	                | "Subscript" "(" Expr "," Index ")"
+    26	
+    27	  syntax CmpOps ::= List{CmpOp, ","}
+    28	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    29	
+    30	  syntax Index ::= Expr | Slice
+    31	  syntax Bound ::= Expr | "NoBound"
+    32	  syntax Slice ::= "Slice" "(" Bound "," Bound "," Bound ")"
+    33	endmodule
+    34	
+    35	module MPY-SEMANTIC
+    36	  imports MPY-SYNTAX
+    37	  imports BOOL
+    38	  imports INT
+    39	  imports STRING
+    40	
+    41	  // A Python string is represented as a sequence of semantic characters.
+    42	  // Space has its own constructor; ch(S) represents a non-space character.
+    43	  syntax PString ::= ".PString"
+    44	                   | "sp" PString
+    45	                   | "ch" "(" String ")" PString
+    46	
+    47	  syntax Val ::= pyStr(PString) | pyInt(Int) | pyBool(Bool)
+    48	  syntax Env ::= ".Env" | bind(String, Val, Env)
+    49	  syntax Funs ::= ".Funs" | fun(String, Params, Stmts, Funs)
+    50	  syntax Closure ::= closure(Params, Stmts)
+    51	
+    52	  configuration
+    53	    <py>
+    54	      <k> $PGM:Program </k>
+    55	      <input> $INPUT:String </input>
+    56	      <env> .Env </env>
+    57	      <funs> .Funs </funs>
+    58	      <result> .K </result>
+    59	    </py>
+    60	
+    61	  // Loading a translated module collects its definitions and invokes the
+    62	  // required HumanEval entry point on the command-line INPUT string.
+    63	  rule <k> Module(SS) => call("fix_spaces", pyStr(decode(INPUT))) </k>
+    64	       <input> INPUT </input>
+    65	       <funs> .Funs => collect(SS) </funs>
+    66	
+    67	  rule <k> pyStr(S) => .K </k>
+    68	       <funs> _ => .Funs </funs>
+    69	       <result> .K => encode(S) </result>
+    70	
+    71	  // Decode/encode connect concrete K String tokens to the structural string
+    72	  // model used by the semantics and by symbolic proofs.
+    73	  syntax PString ::= decode(String) [function]
+    74	  rule decode("") => .PString
+    75	  rule decode(S) => pconcat(decodeChar(substrString(S, 0, 1)), decode(substrString(S, 1, lengthString(S))))
+    76	    requires lengthString(S) >Int 0
+    77	
+    78	  syntax PString ::= decodeChar(String) [function]
+    79	  rule decodeChar(" ") => sp .PString
+    80	  rule decodeChar(C) => ch(C) .PString [owise]
+    81	
+    82	  syntax String ::= encode(PString) [function]
+    83	  rule encode(.PString) => ""
+    84	  rule encode(sp REST) => " " +String encode(REST)
+    85	  rule encode(ch(C) REST) => C +String encode(REST)
+    86	
+    87	  // Definition collection and lexical lookup.
+    88	  syntax Funs ::= collect(Stmts) [function]
+    89	  rule collect(.Stmts) => .Funs
+    90	  rule collect(FuncDef(F, P, BODY) REST) => fun(F, P, BODY, collect(REST))
+    91	
+    92	  syntax Closure ::= lookupFun(String, Funs) [function]
+    93	  rule lookupFun(F, fun(F, P, BODY, _REST)) => closure(P, BODY)
+    94	  rule lookupFun(F, fun(G, _P, _BODY, REST)) => lookupFun(F, REST)
+    95	    requires F =/=String G
+    96	
+    97	  syntax Val ::= lookup(String, Env) [function]
+    98	  rule lookup(X, bind(X, V, _REST)) => V
+    99	  rule lookup(X, bind(Y, _V, REST)) => lookup(X, REST)
+   100	    requires X =/=String Y
+   101	
+   102	  // Small-step evaluator.  Calls save the caller environment in a K
+   103	  // continuation, so recursive calls remain visible to circular proofs.
+   104	  syntax Val ::= pyLen(PString)
+   105	  syntax KItem ::= call(String, Val)
+   106	                 | enter(Closure, Val)
+   107	                 | finishCall(Env)
+   108	                 | exec(Stmts)
+   109	                 | choose(Stmts, Stmts, Stmts)
+   110	                 | eval(Expr)
+   111	                 | callArg(String)
+   112	                 | "lenResult"
+   113	                 | binRight(String, Expr)
+   114	                 | binApply(String, Val)
+   115	                 | cmpRight(String, Expr)
+   116	                 | cmpApply(String, Val)
+   117	                 | subApply(Index)
+   118	                 | decideEq(PString, PString)
+   119	                 | decideLonger(PString, Int)
+   120	
+   121	  rule <k> call(F, V) => enter(lookupFun(F, FUNS), V) ...</k>
+   122	       <funs> FUNS </funs>
+   123	  rule <k> enter(closure(Params(X), BODY), V)
+   124	              => exec(BODY) ~> finishCall(OLD) ...</k>
+   125	       <env> OLD => bind(X, V, .Env) </env>
+   126	  rule <k> V:Val ~> finishCall(OLD) => V ...</k>
+   127	       <env> _ => OLD </env>
+   128	
+   129	  syntax Stmts ::= sconcat(Stmts, Stmts) [function]
+   130	  rule sconcat(.Stmts, B) => B
+   131	  rule sconcat(S REST, B) => S sconcat(REST, B)
+   132	
+   133	  rule <k> exec(Return(E) _REST) => eval(E) ...</k>
+   134	  rule <k> exec(If(COND, THEN, ELSE) REST)
+   135	              => eval(COND) ~> choose(THEN, ELSE, REST) ...</k>
+   136	  rule <k> pyBool(true) ~> choose(THEN, _ELSE, REST)
+   137	              => exec(sconcat(THEN, REST)) ...</k>
+   138	  rule <k> pyBool(false) ~> choose(_THEN, ELSE, REST)
+   139	              => exec(sconcat(ELSE, REST)) ...</k>
+   140	
+   141	  // Expressions needed by solution.mpy.
+   142	  rule <k> eval(Name(X)) => lookup(X, ENV) ...</k> <env> ENV </env>
+   143	  rule <k> eval(Str(S)) => pyStr(decode(S)) ...</k>
+   144	  rule <k> eval(Int(I)) => pyInt(I) ...</k>
+   145	
+   146	  rule <k> eval(BinOp(OP, L, R)) => eval(L) ~> binRight(OP, R) ...</k>
+   147	  rule <k> V:Val ~> binRight(OP, R) => eval(R) ~> binApply(OP, V) ...</k>
+   148	  rule <k> pyStr(B) ~> binApply("+", pyStr(A)) => pyStr(pconcat(A, B)) ...</k>
+   149	
+   150	  rule <k> eval(Compare(L, CmpOp(OP, R)))
+   151	              => eval(L) ~> cmpRight(OP, R) ...</k>
+   152	  rule <k> V:Val ~> cmpRight(OP, R) => eval(R) ~> cmpApply(OP, V) ...</k>
+   153	  rule <k> pyStr(B) ~> cmpApply("==", pyStr(A)) => decideEq(A, B) ...</k>
+   154	  rule <k> pyInt(B) ~> cmpApply(">", pyInt(A)) => pyBool(A >Int B) ...</k>
+   155	  rule <k> pyInt(B) ~> cmpApply(">", pyLen(A)) => decideLonger(A, B) ...</k>
+   156	
+   157	  rule <k> eval(Call(Name("len"), ARG)) => eval(ARG) ~> lenResult ...</k>
+   158	  rule <k> pyStr(S) ~> lenResult => pyLen(S) ...</k>
+   159	  rule <k> eval(Call(Name(F), ARG)) => eval(ARG) ~> callArg(F) ...</k>
+   160	    requires F =/=String "len"
+   161	  rule <k> V:Val ~> callArg(F) => call(F, V) ...</k>
+   162	
+   163	  rule <k> eval(Subscript(BASE, INDEX)) => eval(BASE) ~> subApply(INDEX) ...</k>
+   164	  rule <k> pyStr(S) ~> subApply(Int(I)) => pyStr(pindex(S, I)) ...</k>
+   165	  rule <k> pyStr(S) ~> subApply(Slice(Int(L), NoBound, NoBound))
+   166	              => pyStr(pdrop(S, L)) ...</k>
+   167	  rule <k> pyStr(S) ~> subApply(Slice(Int(L), Int(U), NoBound))
+   168	              => pyStr(ptake(pdrop(S, L), U -Int L)) ...</k>
+   169	
+   170	  // Equality and length comparison are machines rather than opaque functions.
+   171	  // Consequently the prover can split a symbolic PString by its constructors.
+   172	  rule <k> decideEq(.PString, .PString) => pyBool(true) ...</k>
+   173	  rule <k> decideEq(.PString, sp _B) => pyBool(false) ...</k>
+   174	  rule <k> decideEq(.PString, ch(_C) _B) => pyBool(false) ...</k>
+   175	  rule <k> decideEq(sp _A, .PString) => pyBool(false) ...</k>
+   176	  rule <k> decideEq(ch(_C) _A, .PString) => pyBool(false) ...</k>
+   177	  rule <k> decideEq(sp A, sp B) => decideEq(A, B) ...</k>
+   178	  rule <k> decideEq(sp _A, ch(_C) _B) => pyBool(false) ...</k>
+   179	  rule <k> decideEq(ch(_C) _A, sp _B) => pyBool(false) ...</k>
+   180	  rule <k> decideEq(ch(C) A, ch(C) B) => decideEq(A, B) ...</k>
+   181	  rule <k> decideEq(ch(C) _A, ch(D) _B) => pyBool(false) ...</k>
+   182	    requires C =/=String D
+   183	
+   184	  rule <k> decideLonger(.PString, N) => pyBool(false) ...</k>
+   185	    requires N >=Int 0
+   186	  rule <k> decideLonger(sp _REST, 0) => pyBool(true) ...</k>
+   187	  rule <k> decideLonger(ch(_C) _REST, 0) => pyBool(true) ...</k>
+   188	  rule <k> decideLonger(sp REST, N) => decideLonger(REST, N -Int 1) ...</k>
+   189	    requires N >Int 0
+   190	  rule <k> decideLonger(ch(_C) REST, N) => decideLonger(REST, N -Int 1) ...</k>
+   191	    requires N >Int 0
+   192	
+   193	  syntax PString ::= pconcat(PString, PString) [function]
+   194	  rule pconcat(.PString, B) => B
+   195	  rule pconcat(sp A, B) => sp pconcat(A, B)
+   196	  rule pconcat(ch(C) A, B) => ch(C) pconcat(A, B)
+   197	
+   198	  syntax PString ::= pdrop(PString, Int) [function]
+   199	  rule pdrop(S, 0) => S
+   200	  rule pdrop(sp REST, N) => pdrop(REST, N -Int 1) requires N >Int 0
+   201	  rule pdrop(ch(_C) REST, N) => pdrop(REST, N -Int 1) requires N >Int 0
+   202	
+   203	  syntax PString ::= ptake(PString, Int) [function]
+   204	  rule ptake(_S, 0) => .PString
+   205	  rule ptake(.PString, N) => .PString requires N >Int 0
+   206	  rule ptake(sp REST, N) => sp ptake(REST, N -Int 1) requires N >Int 0
+   207	  rule ptake(ch(C) REST, N) => ch(C) ptake(REST, N -Int 1) requires N >Int 0
+   208	
+   209	  syntax PString ::= pindex(PString, Int) [function]
+   210	  rule pindex(sp _REST, 0) => sp .PString
+   211	  rule pindex(ch(C) _REST, 0) => ch(C) .PString
+   212	  rule pindex(sp REST, N) => pindex(REST, N -Int 1) requires N >Int 0
+   213	  rule pindex(ch(_C) REST, N) => pindex(REST, N -Int 1) requires N >Int 0
+   214	endmodule
+SOURCE_FILE=verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY-SEMANTIC
+     5	
+     6	  syntax Program ::= "Verify" "(" PString ")"
+     7	                   | "VerifyDrop" "(" PString ")"
+     8	
+     9	  rule <k> Verify(S) => call("fix_spaces", pyStr(S)) </k>
+    10	       <funs> .Funs => solutionFuns </funs>
+    11	  rule <k> VerifyDrop(S) => call("_drop_spaces", pyStr(S)) </k>
+    12	       <funs> .Funs => solutionFuns </funs>
+    13	
+    14	  // This is the exact constructor tree emitted in solution.mpy.  Keeping it
+    15	  // here as data lets the claims call the ordinary interpreter on symbolic
+    16	  // arguments; there is no special semantic rule for fix_spaces.
+    17	  syntax Funs ::= "solutionFuns" [function]
+    18	  rule solutionFuns => collect(
+    19	    FuncDef("_drop_spaces", Params("text"),
+    20	      If(Compare(Name("text"), CmpOp("==", Str(""))),
+    21	        Return(Str("")),
+    22	        .Stmts)
+    23	      If(Compare(Subscript(Name("text"), Int(0)), CmpOp("==", Str(" "))),
+    24	        Return(Call(Name("_drop_spaces"),
+    25	          Subscript(Name("text"), Slice(Int(1), NoBound, NoBound)))),
+    26	        .Stmts)
+    27	      Return(Call(Name("fix_spaces"), Name("text"))))
+    28	    FuncDef("fix_spaces", Params("text"),
+    29	      If(Compare(Name("text"), CmpOp("==", Str(""))),
+    30	        Return(Str("")),
+    31	        .Stmts)
+    32	      If(Compare(Subscript(Name("text"), Int(0)), CmpOp("==", Str(" "))),
+    33	        If(Compare(Call(Name("len"), Name("text")), CmpOp(">", Int(2))),
+    34	          If(Compare(
+    35	              Subscript(Name("text"), Slice(Int(0), Int(3), NoBound)),
+    36	              CmpOp("==", Str("   "))),
+    37	            Return(BinOp("+", Str("-"),
+    38	              Call(Name("_drop_spaces"),
+    39	                Subscript(Name("text"), Slice(Int(3), NoBound, NoBound))))),
+    40	            .Stmts),
+    41	          .Stmts)
+    42	        Return(BinOp("+", Str("_"),
+    43	          Call(Name("fix_spaces"),
+    44	            Subscript(Name("text"), Slice(Int(1), NoBound, NoBound))))),
+    45	        .Stmts)
+    46	      Return(BinOp("+", Subscript(Name("text"), Int(0)),
+    47	        Call(Name("fix_spaces"),
+    48	          Subscript(Name("text"), Slice(Int(1), NoBound, NoBound))))))
+    49	  )
+    50	
+    51	  // Independent structural statement of the prompt's contract.  Runs of one
+    52	  // or two spaces become underscores; a run beginning with at least three
+    53	  // spaces emits one hyphen and dropRef consumes the remainder of that run.
+    54	  syntax PString ::= fixRef(PString) [function]
+    55	  rule fixRef(.PString) => .PString
+    56	  rule fixRef(ch(C) REST) => ch(C) fixRef(REST)
+    57	  rule fixRef(sp .PString) => ch("_") .PString
+    58	  rule fixRef(sp ch(C) REST) => ch("_") ch(C) fixRef(REST)
+    59	  rule fixRef(sp sp .PString) => ch("_") ch("_") .PString
+    60	  rule fixRef(sp sp ch(C) REST) => ch("_") ch("_") ch(C) fixRef(REST)
+    61	  rule fixRef(sp sp sp REST) => ch("-") dropRef(REST)
+    62	
+    63	  syntax PString ::= dropRef(PString) [function]
+    64	  rule dropRef(.PString) => .PString
+    65	  rule dropRef(sp REST) => dropRef(REST)
+    66	  rule dropRef(ch(C) REST) => ch(C) fixRef(REST)
+    67	endmodule
+SOURCE_FILE=spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // The pair of mutually circular claims is structural induction over the
+     7	  // finite PString argument.  Together they cover every string and establish
+     8	  // that execution of both recursive Python functions equals the independent
+     9	  // reference relation above.
+    10	  claim
+    11	    <py>
+    12	      <k> call("fix_spaces", pyStr(S:PString)) ~> K:K
+    13	        => pyStr(fixRef(S)) ~> K
+    14	      </k>
+    15	      <input> _INPUT:String </input>
+    16	      <env> _ENV:Env </env>
+    17	      <funs> solutionFuns </funs>
+    18	      <result> _RESULT:K </result>
+    19	    </py>
+    20	
+    21	  claim
+    22	    <py>
+    23	      <k> call("_drop_spaces", pyStr(S:PString)) ~> K:K
+    24	        => pyStr(dropRef(S)) ~> K
+    25	      </k>
+    26	      <input> _INPUT:String </input>
+    27	      <env> _ENV:Env </env>
+    28	      <funs> solutionFuns </funs>
+    29	      <result> _RESULT:K </result>
+    30	    </py>
+    31	endmodule
+SOURCE_FILE=solution.mpy
+     1	Module(
+     2	  FuncDef("_drop_spaces", Params("text"),
+     3	    If(Compare(Name("text"), CmpOp("==", Str(""))),
+     4	      Return(Str("")),
+     5	      )
+     6	    If(Compare(Subscript(Name("text"), Int(0)), CmpOp("==", Str(" "))),
+     7	      Return(
+     8	        Call(
+     9	          Name("_drop_spaces"),
+    10	          Subscript(Name("text"), Slice(Int(1), NoBound, NoBound)))),
+    11	      )
+    12	    Return(Call(Name("fix_spaces"), Name("text"))))
+    13	  FuncDef("fix_spaces", Params("text"),
+    14	    If(Compare(Name("text"), CmpOp("==", Str(""))),
+    15	      Return(Str("")),
+    16	      )
+    17	    If(Compare(Subscript(Name("text"), Int(0)), CmpOp("==", Str(" "))),
+    18	      If(Compare(Call(Name("len"), Name("text")), CmpOp(">", Int(2))),
+    19	        If(Compare(
+    20	          Subscript(Name("text"), Slice(Int(0), Int(3), NoBound)),
+    21	          CmpOp("==", Str("   "))),
+    22	          Return(
+    23	            BinOp(
+    24	              "+",
+    25	              Str("-"),
+    26	              Call(
+    27	                Name("_drop_spaces"),
+    28	                Subscript(Name("text"), Slice(Int(3), NoBound, NoBound))))),
+    29	          ),
+    30	        )
+    31	      Return(
+    32	        BinOp(
+    33	          "+",
+    34	          Str("_"),
+    35	          Call(
+    36	            Name("fix_spaces"),
+    37	            Subscript(Name("text"), Slice(Int(1), NoBound, NoBound))))),
+    38	      )
+    39	    Return(
+    40	      BinOp(
+    41	        "+",
+    42	        Subscript(Name("text"), Int(0)),
+    43	        Call(
+    44	          Name("fix_spaces"),
+    45	          Subscript(Name("text"), Slice(Int(1), NoBound, NoBound)))))))
+LOCAL_DECLARATION_INDEX
+spec.k:10:  claim
+spec.k:21:  claim
+verification.k:6:  syntax Program ::= "Verify" "(" PString ")"
+verification.k:9:  rule <k> Verify(S) => call("fix_spaces", pyStr(S)) </k>
+verification.k:11:  rule <k> VerifyDrop(S) => call("_drop_spaces", pyStr(S)) </k>
+verification.k:17:  syntax Funs ::= "solutionFuns" [function]
+verification.k:18:  rule solutionFuns => collect(
+verification.k:54:  syntax PString ::= fixRef(PString) [function]
+verification.k:55:  rule fixRef(.PString) => .PString
+verification.k:56:  rule fixRef(ch(C) REST) => ch(C) fixRef(REST)
+verification.k:57:  rule fixRef(sp .PString) => ch("_") .PString
+verification.k:58:  rule fixRef(sp ch(C) REST) => ch("_") ch(C) fixRef(REST)
+verification.k:59:  rule fixRef(sp sp .PString) => ch("_") ch("_") .PString
+verification.k:60:  rule fixRef(sp sp ch(C) REST) => ch("_") ch("_") ch(C) fixRef(REST)
+verification.k:61:  rule fixRef(sp sp sp REST) => ch("-") dropRef(REST)
+verification.k:63:  syntax PString ::= dropRef(PString) [function]
+verification.k:64:  rule dropRef(.PString) => .PString
+verification.k:65:  rule dropRef(sp REST) => dropRef(REST)
+verification.k:66:  rule dropRef(ch(C) REST) => ch(C) fixRef(REST)
+semantic.k:8:  syntax Program ::= "Module" "(" Stmts ")"
+semantic.k:10:  syntax Stmts ::= List{Stmt, ""}
+semantic.k:11:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+semantic.k:15:  syntax Ids ::= List{String, ","}
+semantic.k:16:  syntax Params ::= "Params" "(" Ids ")"
+semantic.k:18:  syntax Exprs ::= List{Expr, ","}
+semantic.k:19:  syntax Expr ::= "Name" "(" String ")"
+semantic.k:27:  syntax CmpOps ::= List{CmpOp, ","}
+semantic.k:28:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+semantic.k:30:  syntax Index ::= Expr | Slice
+semantic.k:31:  syntax Bound ::= Expr | "NoBound"
+semantic.k:32:  syntax Slice ::= "Slice" "(" Bound "," Bound "," Bound ")"
+semantic.k:43:  syntax PString ::= ".PString"
+semantic.k:47:  syntax Val ::= pyStr(PString) | pyInt(Int) | pyBool(Bool)
+semantic.k:48:  syntax Env ::= ".Env" | bind(String, Val, Env)
+semantic.k:49:  syntax Funs ::= ".Funs" | fun(String, Params, Stmts, Funs)
+semantic.k:50:  syntax Closure ::= closure(Params, Stmts)
+semantic.k:52:  configuration
+semantic.k:63:  rule <k> Module(SS) => call("fix_spaces", pyStr(decode(INPUT))) </k>
+semantic.k:67:  rule <k> pyStr(S) => .K </k>
+semantic.k:73:  syntax PString ::= decode(String) [function]
+semantic.k:74:  rule decode("") => .PString
+semantic.k:75:  rule decode(S) => pconcat(decodeChar(substrString(S, 0, 1)), decode(substrString(S, 1, lengthString(S))))
+semantic.k:78:  syntax PString ::= decodeChar(String) [function]
+semantic.k:79:  rule decodeChar(" ") => sp .PString
+semantic.k:80:  rule decodeChar(C) => ch(C) .PString [owise]
+semantic.k:82:  syntax String ::= encode(PString) [function]
+semantic.k:83:  rule encode(.PString) => ""
+semantic.k:84:  rule encode(sp REST) => " " +String encode(REST)
+semantic.k:85:  rule encode(ch(C) REST) => C +String encode(REST)
+semantic.k:88:  syntax Funs ::= collect(Stmts) [function]
+semantic.k:89:  rule collect(.Stmts) => .Funs
+semantic.k:90:  rule collect(FuncDef(F, P, BODY) REST) => fun(F, P, BODY, collect(REST))
+semantic.k:92:  syntax Closure ::= lookupFun(String, Funs) [function]
+semantic.k:93:  rule lookupFun(F, fun(F, P, BODY, _REST)) => closure(P, BODY)
+semantic.k:94:  rule lookupFun(F, fun(G, _P, _BODY, REST)) => lookupFun(F, REST)
+semantic.k:97:  syntax Val ::= lookup(String, Env) [function]
+semantic.k:98:  rule lookup(X, bind(X, V, _REST)) => V
+semantic.k:99:  rule lookup(X, bind(Y, _V, REST)) => lookup(X, REST)
+semantic.k:104:  syntax Val ::= pyLen(PString)
+semantic.k:105:  syntax KItem ::= call(String, Val)
+semantic.k:121:  rule <k> call(F, V) => enter(lookupFun(F, FUNS), V) ...</k>
+semantic.k:123:  rule <k> enter(closure(Params(X), BODY), V)
+semantic.k:126:  rule <k> V:Val ~> finishCall(OLD) => V ...</k>
+semantic.k:129:  syntax Stmts ::= sconcat(Stmts, Stmts) [function]
+semantic.k:130:  rule sconcat(.Stmts, B) => B
+semantic.k:131:  rule sconcat(S REST, B) => S sconcat(REST, B)
+semantic.k:133:  rule <k> exec(Return(E) _REST) => eval(E) ...</k>
+semantic.k:134:  rule <k> exec(If(COND, THEN, ELSE) REST)
+semantic.k:136:  rule <k> pyBool(true) ~> choose(THEN, _ELSE, REST)
+semantic.k:138:  rule <k> pyBool(false) ~> choose(_THEN, ELSE, REST)
+semantic.k:142:  rule <k> eval(Name(X)) => lookup(X, ENV) ...</k> <env> ENV </env>
+semantic.k:143:  rule <k> eval(Str(S)) => pyStr(decode(S)) ...</k>
+semantic.k:144:  rule <k> eval(Int(I)) => pyInt(I) ...</k>
+semantic.k:146:  rule <k> eval(BinOp(OP, L, R)) => eval(L) ~> binRight(OP, R) ...</k>
+semantic.k:147:  rule <k> V:Val ~> binRight(OP, R) => eval(R) ~> binApply(OP, V) ...</k>
+semantic.k:148:  rule <k> pyStr(B) ~> binApply("+", pyStr(A)) => pyStr(pconcat(A, B)) ...</k>
+semantic.k:150:  rule <k> eval(Compare(L, CmpOp(OP, R)))
+semantic.k:152:  rule <k> V:Val ~> cmpRight(OP, R) => eval(R) ~> cmpApply(OP, V) ...</k>
+semantic.k:153:  rule <k> pyStr(B) ~> cmpApply("==", pyStr(A)) => decideEq(A, B) ...</k>
+semantic.k:154:  rule <k> pyInt(B) ~> cmpApply(">", pyInt(A)) => pyBool(A >Int B) ...</k>
+semantic.k:155:  rule <k> pyInt(B) ~> cmpApply(">", pyLen(A)) => decideLonger(A, B) ...</k>
+semantic.k:157:  rule <k> eval(Call(Name("len"), ARG)) => eval(ARG) ~> lenResult ...</k>
+semantic.k:158:  rule <k> pyStr(S) ~> lenResult => pyLen(S) ...</k>
+semantic.k:159:  rule <k> eval(Call(Name(F), ARG)) => eval(ARG) ~> callArg(F) ...</k>
+semantic.k:161:  rule <k> V:Val ~> callArg(F) => call(F, V) ...</k>
+semantic.k:163:  rule <k> eval(Subscript(BASE, INDEX)) => eval(BASE) ~> subApply(INDEX) ...</k>
+semantic.k:164:  rule <k> pyStr(S) ~> subApply(Int(I)) => pyStr(pindex(S, I)) ...</k>
+semantic.k:165:  rule <k> pyStr(S) ~> subApply(Slice(Int(L), NoBound, NoBound))
+semantic.k:167:  rule <k> pyStr(S) ~> subApply(Slice(Int(L), Int(U), NoBound))
+semantic.k:172:  rule <k> decideEq(.PString, .PString) => pyBool(true) ...</k>
+semantic.k:173:  rule <k> decideEq(.PString, sp _B) => pyBool(false) ...</k>
+semantic.k:174:  rule <k> decideEq(.PString, ch(_C) _B) => pyBool(false) ...</k>
+semantic.k:175:  rule <k> decideEq(sp _A, .PString) => pyBool(false) ...</k>
+semantic.k:176:  rule <k> decideEq(ch(_C) _A, .PString) => pyBool(false) ...</k>
+semantic.k:177:  rule <k> decideEq(sp A, sp B) => decideEq(A, B) ...</k>
+semantic.k:178:  rule <k> decideEq(sp _A, ch(_C) _B) => pyBool(false) ...</k>
+semantic.k:179:  rule <k> decideEq(ch(_C) _A, sp _B) => pyBool(false) ...</k>
+semantic.k:180:  rule <k> decideEq(ch(C) A, ch(C) B) => decideEq(A, B) ...</k>
+semantic.k:181:  rule <k> decideEq(ch(C) _A, ch(D) _B) => pyBool(false) ...</k>
+semantic.k:184:  rule <k> decideLonger(.PString, N) => pyBool(false) ...</k>
+semantic.k:186:  rule <k> decideLonger(sp _REST, 0) => pyBool(true) ...</k>
+semantic.k:187:  rule <k> decideLonger(ch(_C) _REST, 0) => pyBool(true) ...</k>
+semantic.k:188:  rule <k> decideLonger(sp REST, N) => decideLonger(REST, N -Int 1) ...</k>
+semantic.k:190:  rule <k> decideLonger(ch(_C) REST, N) => decideLonger(REST, N -Int 1) ...</k>
+semantic.k:193:  syntax PString ::= pconcat(PString, PString) [function]
+semantic.k:194:  rule pconcat(.PString, B) => B
+semantic.k:195:  rule pconcat(sp A, B) => sp pconcat(A, B)
+semantic.k:196:  rule pconcat(ch(C) A, B) => ch(C) pconcat(A, B)
+semantic.k:198:  syntax PString ::= pdrop(PString, Int) [function]
+semantic.k:199:  rule pdrop(S, 0) => S
+semantic.k:200:  rule pdrop(sp REST, N) => pdrop(REST, N -Int 1) requires N >Int 0
+semantic.k:201:  rule pdrop(ch(_C) REST, N) => pdrop(REST, N -Int 1) requires N >Int 0
+semantic.k:203:  syntax PString ::= ptake(PString, Int) [function]
+semantic.k:204:  rule ptake(_S, 0) => .PString
+semantic.k:205:  rule ptake(.PString, N) => .PString requires N >Int 0
+semantic.k:206:  rule ptake(sp REST, N) => sp ptake(REST, N -Int 1) requires N >Int 0
+semantic.k:207:  rule ptake(ch(C) REST, N) => ch(C) ptake(REST, N -Int 1) requires N >Int 0
+semantic.k:209:  syntax PString ::= pindex(PString, Int) [function]
+semantic.k:210:  rule pindex(sp _REST, 0) => sp .PString
+semantic.k:211:  rule pindex(ch(C) _REST, 0) => ch(C) .PString
+semantic.k:212:  rule pindex(sp REST, N) => pindex(REST, N -Int 1) requires N >Int 0
+semantic.k:213:  rule pindex(ch(_C) REST, N) => pindex(REST, N -Int 1) requires N >Int 0
+--- END OUTPUT ---
+EXIT_STATUS: 0

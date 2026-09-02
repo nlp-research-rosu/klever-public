@@ -1,0 +1,260 @@
+Script started on 2026-07-31 01:36:10-05:00 [<not executed on terminal>]
+=== frozen verification.k ===
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION-SYNTAX
+     4	  imports MPY-SYNTAX
+     5	  imports MPY-CORE
+     6	  imports BOOL
+     7	  imports INT
+     8	
+     9	  // Parse-time abbreviations for the loaded module binding and invocation.
+    10	  // They expand before the executable K definition is generated.
+    11	  syntax Expr ::= "AnyIntCall" "(" Val "," Val "," Val ")" [macro]
+    12	  rule AnyIntCall(X:Val, Y:Val, Z:Val)
+    13	    => Call(Name("any_int"), (X, Y, Z))
+    14	
+    15	  syntax Scope ::= "anyIntModuleScope" [macro]
+    16	  rule anyIntModuleScope
+    17	    => scope(
+    18	         "any_int" |->
+    19	           closureVal(
+    20	             ("x", "y", "z"),
+    21	             Return(
+    22	               BoolOp(
+    23	                 "and",
+    24	                 ( Call(Name("isinstance"), (Name("x"), Name("int")))
+    25	                 , Call(Name("isinstance"), (Name("y"), Name("int")))
+    26	                 , Call(Name("isinstance"), (Name("z"), Name("int")))
+    27	                 , BoolOp(
+    28	                     "or",
+    29	                     ( Compare(BinOp("+", Name("x"), Name("y")), CmpOp("==", Name("z")))
+    30	                     , Compare(BinOp("+", Name("x"), Name("z")), CmpOp("==", Name("y")))
+    31	                     , Compare(BinOp("+", Name("y"), Name("z")), CmpOp("==", Name("x")))
+    32	                     )
+    33	                   )
+    34	                 )
+    35	               )
+    36	             ) .Stmts,
+    37	             0
+    38	           ),
+    39	         parent(-1)
+    40	       )
+    41	
+    42	  // The mathematical predicate named by the HumanEval contract.
+    43	  syntax Bool ::= anySum(Int, Int, Int) [function, total]
+    44	endmodule
+    45	
+    46	module VERIFICATION
+    47	  imports MPY
+    48	  imports VERIFICATION-SYNTAX
+    49	
+    50	  // Derived from the two exhaustive fixed-semantics equations
+    51	  // boolAsInt(true) = 1 and boolAsInt(false) = 0.
+    52	  rule boolAsInt(B:Bool)
+    53	    => #if B #then 1 #else 0 #fi
+    54	    [simplification]
+    55	
+    56	  rule anySum(X:Int, Y:Int, Z:Int)
+    57	    => ((X +Int Y) ==Int Z)
+    58	       orBool ((X +Int Z) ==Int Y)
+    59	       orBool ((Y +Int Z) ==Int X)
+    60	endmodule
+=== supplied semantics boolAsInt ===
+   207	  // ==== extensible operator dispatch (cases added by the construct modules) ==
+   208	  syntax Val  ::= applyUn(String, Val) [function]
+   209	  syntax Val  ::= applyBin(String, Val, Val) [function]
+   210	  syntax Bool ::= applyCmp(String, Val, Val) [function]
+   211	
+   212	  // ==== bool-is-a-subtype-of-int: numeric promotion helpers =================
+   213	  // Python: `bool` derives from `int`; True/False act as 1/0 in arithmetic and
+   214	  // comparison. boolAsInt is the total 0/1 coercion; the op-class predicates gate
+   215	  // the generic Bool-operand promotion rules in int.k / bool.k / float.k (they
+   216	  // re-dispatch to the existing Int / Float cases after coercion, so no numeric
+   217	  // logic is duplicated). == and != over Bool x Bool stay in bool.k unchanged.
+   218	  syntax Int ::= boolAsInt(Bool) [function, total]
+   219	  rule boolAsInt(true)  => 1
+   220	  rule boolAsInt(false) => 0
+   221	
+   222	  syntax Bool ::= isArithOp(String) [function, total]
+   223	  rule isArithOp(OP:String)
+   224	    => OP ==String "+"  orBool OP ==String "-"  orBool OP ==String "*"
+   225	       orBool OP ==String "/" orBool OP ==String "//" orBool OP ==String "%"
+   226	       orBool OP ==String "**"
+=== supplied Bool/Int arithmetic ===
+     7	  rule applyUn("-", I:Int) => 0 -Int I
+     8	
+     9	  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    10	  // Bool participates in int arithmetic (x += (a == b))
+    11	  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+    12	  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+    13	  // bool is a subtype of int: any Bool operand promotes to 0/1 and re-dispatches
+    14	  // to the Int cases (the "+" mixed cases above are kept, so "+" is excluded here
+    15	  // to avoid a duplicate rule — Bool + Bool still promotes via the Bool x Bool rule).
+    16	  rule applyBin(OP:String, B1:Bool, B2:Bool) => applyBin(OP, boolAsInt(B1), boolAsInt(B2))
+    17	       requires isArithOp(OP)
+    18	  rule applyBin(OP:String, B:Bool, I:Int)    => applyBin(OP, boolAsInt(B), I)
+    19	       requires isArithOp(OP) andBool OP =/=String "+"
+    20	  rule applyBin(OP:String, I:Int, B:Bool)    => applyBin(OP, I, boolAsInt(B))
+    21	       requires isArithOp(OP) andBool OP =/=String "+"
+    22	  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+    23	  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+    24	  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+    25	  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+    26	  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+=== supplied isinstance int ===
+   286	
+   287	  // ==== isinstance(V, int|str) — an ordinary 2-arg builtin ===================
+   288	  // The type argument (int/str) is an ordinary name that resolves via the builtins frame to
+   289	  // typeV (see core.k's config); no Call-level special case. isIntV/isStrV mirror the old
+   290	  // owise-on-Val test (concrete-sort args decide; a symbolic Val stays owise, as before).
+   291	  rule applyBuiltin("isinstance", V:Val, typeV("int"), .Vals) => isIntV(V)
+   292	  rule applyBuiltin("isinstance", V:Val, typeV("str"), .Vals) => isStrV(V)
+   293	  syntax Bool ::= isIntV(Val) [function] | isStrV(Val) [function]
+   294	  rule isIntV(_:Int)         => true
+   295	  // bool is a subtype of int in Python: isinstance(True, int) is True
+   296	  rule isIntV(_:Bool)        => true
+   297	  rule isIntV(_:Val)         => false [owise]
+   298	  rule isStrV(str(_:IntSeq)) => true
+   299	  rule isStrV(_:Val)         => false [owise]
+   300	endmodule
+=== source solution ===
+     1	def any_int(x, y, z):
+     2	    return (
+     3	        isinstance(x, int)
+     4	        and isinstance(y, int)
+     5	        and isinstance(z, int)
+     6	        and (x + y == z or x + z == y or y + z == x)
+     7	    )
+=== generated target ===
+     1	import Klean92AnyInt.Inj
+     2	
+     3	/- K trust-boundary goals. The second-pass agent must replace every
+     4	   writable opaque stub with an honest definition and prove this
+     5	   immutable proposition in the separate Proof.lean workspace. -/
+     6	
+     7	namespace Klean92AnyInt.Lemmas
+     8	
+     9	def kite {α : Type} (c : SortBool) (t e : α) : α := cond c t e
+    10	
+    11	def targetStatement
+    12	    («boolAsInt(_)_MPY-CORE_Int_Bool» : SortBool → SortInt)
+    13	    : Prop :=
+    14	    (∀ (B : SortBool), («boolAsInt(_)_MPY-CORE_Int_Bool» B : SortInt) = (kite B 1 0 : SortInt))
+    15	
+    16	end Klean92AnyInt.Lemmas
+=== generated sort bindings ===
+    20	 -/
+    21	
+    22	-- Basic K types
+    23	abbrev SortBool         : Type := Bool
+    24	abbrev SortBytes        : Type := ByteArray
+    25	abbrev SortId           : Type := String
+    26	abbrev SortFloat        : Type := Float
+    27	abbrev SortInt          : Type := Int
+    28	abbrev SortString       : Type := String
+    29	abbrev SortStringBuffer : Type := String
+    30	
+=== obligation map ===
+{
+    "obligations": [
+        {
+            "discovery_manifest_sha256": "ffef71b4dd9b819a2ff822a640540f254d04beac44bf8e606b5401f7feedaf9a",
+            "inventory_sha256": "a8187743fcabaa841787ec6a8d9bc304dc4a1be6e3c03d3e3b0d7848487592b3",
+            "lean_conjunct": "\u2200 (B : SortBool), (\u00abboolAsInt(_)_MPY-CORE_Int_Bool\u00bb B : SortInt) = (kite B 1 0 : SortInt)",
+            "lean_conjunct_sha256": "ab8bf789704e92db7ff381e7f53d0eaa5835672f331b92327e2d057a965539f6",
+            "normalized_sha256": "2337b981dde3e7f5b878ce7ffbb3f2c1c87d9b3c9777edc1dbeab1aeeba99ca5",
+            "source_rule_id": "rule-2337b981dde3e7f5b878ce7ffbb3f2c1c87d9b3c9777edc1dbeab1aeeba99ca5",
+            "source_span": {
+                "end_line": 54,
+                "start_line": 52
+            }
+        }
+    ],
+    "schema_version": 3,
+    "source_rules": [
+        {
+            "attributes": [
+                "simplification"
+            ],
+            "classification": "DOMAIN_LEMMA",
+            "discovery_manifest_sha256": "ffef71b4dd9b819a2ff822a640540f254d04beac44bf8e606b5401f7feedaf9a",
+            "end_line": 54,
+            "inventory_sha256": "a8187743fcabaa841787ec6a8d9bc304dc4a1be6e3c03d3e3b0d7848487592b3",
+            "module": "VERIFICATION",
+            "normalized_sha256": "2337b981dde3e7f5b878ce7ffbb3f2c1c87d9b3c9777edc1dbeab1aeeba99ca5",
+            "rationale": "This simplification rule adds a reusable symbolic equality for the imported boolAsInt function; Stage 1 compiles it into the proof definition before kprove and never first proves its exact statement in a module that excludes it.",
+            "source_rule_id": "rule-2337b981dde3e7f5b878ce7ffbb3f2c1c87d9b3c9777edc1dbeab1aeeba99ca5",
+            "start_line": 52,
+            "text": "  rule boolAsInt(B:Bool)\n    => #if B #then 1 #else 0 #fi\n    [simplification]"
+        }
+    ],
+    "trust_parameters": [
+        {
+            "binding_sha256": "076354302ef4e76f7ac196cb92478e4710776f0430d06c6abaed6a10a5a8cd1b",
+            "kore_symbol": "LblboolAsInt'LParUndsRParUnds'MPY-CORE'Unds'Int'Unds'Bool",
+            "name": "\u00abboolAsInt(_)_MPY-CORE_Int_Bool\u00bb",
+            "source_rule_ids": [
+                "rule-2337b981dde3e7f5b878ce7ffbb3f2c1c87d9b3c9777edc1dbeab1aeeba99ca5"
+            ],
+            "type": "SortBool \u2192 SortInt"
+        }
+    ]
+}
+=== candidate proof ===
+     1	import Klean92AnyInt.Lemmas
+     2	
+     3	namespace Proof
+     4	
+     5	/- KORE symbol: LblboolAsInt'LParUndsRParUnds'MPY-CORE'Unds'Int'Unds'Bool; frozen source obligations: rule-2337b981dde3e7f5b878ce7ffbb3f2c1c87d9b3c9777edc1dbeab1aeeba99ca5. Replace this stub with its honest total meaning from the frozen K semantics. -/
+     6	def «boolAsInt(_)_MPY-CORE_Int_Bool» : SortBool → SortInt
+     7	  | true => 1
+     8	  | false => 0
+     9	
+    10	theorem final :
+    11	    Klean92AnyInt.Lemmas.targetStatement «boolAsInt(_)_MPY-CORE_Int_Bool» := by
+    12	  intro B
+    13	  cases B <;> rfl
+    14	
+    15	end Proof
+=== exact KORE boolAsInt rules ===
+ 13429	// rule `boolAsInt(_)_MPY-CORE_Int_Bool`(#token("false","Bool"))=>#token("0","Int") requires #token("true","Bool") ensures #token("true","Bool") [UNIQUE_ID(4b7fd3894ae588d81c1c5481a16892f1380e1c8da749cc11dc75a45028146ea6), org.kframework.attributes.Location(Location(220,8,220,29)), org.kframework.attributes.Source(Source(/workspace/reference-semantics/semantics/core.k)), org.kframework.definition.Production(syntax #RuleContent ::= #RuleBody [symbol(#ruleNoConditions)])]
+ 13430	  axiom{R} \implies{R} (
+ 13431	    \and{R}(
+ 13432	      \top{R}(),
+ 13433	      \and{R} (
+ 13434	          \in{SortBool{}, R} (
+ 13435	            X0:SortBool{},
+ 13436	            \dv{SortBool{}}("false")
+ 13437	          ),
+ 13438	          \top{R} ()
+ 13439	        )),
+ 13440	    \equals{SortInt{},R} (
+ 13441	      LblboolAsInt'LParUndsRParUnds'MPY-CORE'Unds'Int'Unds'Bool{}(X0:SortBool{}),
+ 13442	     \and{SortInt{}} (
+ 13443	       \dv{SortInt{}}("0"),
+ 13444	        \top{SortInt{}}())))
+ 13445	  [UNIQUE'Unds'ID{}("4b7fd3894ae588d81c1c5481a16892f1380e1c8da749cc11dc75a45028146ea6"), org'Stop'kframework'Stop'attributes'Stop'Location{}("Location(220,8,220,29)"), org'Stop'kframework'Stop'attributes'Stop'Source{}("Source(/workspace/reference-semantics/semantics/core.k)")]
+ 13446	
+ 13447	// rule `boolAsInt(_)_MPY-CORE_Int_Bool`(#token("true","Bool"))=>#token("1","Int") requires #token("true","Bool") ensures #token("true","Bool") [UNIQUE_ID(73f627adb9e163c135964ee740502b976031d75e394f0cb74e72777cca34620e), org.kframework.attributes.Location(Location(219,8,219,29)), org.kframework.attributes.Source(Source(/workspace/reference-semantics/semantics/core.k)), org.kframework.definition.Production(syntax #RuleContent ::= #RuleBody [symbol(#ruleNoConditions)])]
+ 13448	  axiom{R} \implies{R} (
+ 13449	    \and{R}(
+ 13450	      \top{R}(),
+ 13451	      \and{R} (
+ 13452	          \in{SortBool{}, R} (
+ 13453	            X0:SortBool{},
+ 13454	            \dv{SortBool{}}("true")
+ 13455	          ),
+ 13456	          \top{R} ()
+ 13457	        )),
+ 13458	    \equals{SortInt{},R} (
+ 13459	      LblboolAsInt'LParUndsRParUnds'MPY-CORE'Unds'Int'Unds'Bool{}(X0:SortBool{}),
+ 13460	     \and{SortInt{}} (
+ 13461	       \dv{SortInt{}}("1"),
+ 13462	        \top{SortInt{}}())))
+ 13463	  [UNIQUE'Unds'ID{}("73f627adb9e163c135964ee740502b976031d75e394f0cb74e72777cca34620e"), org'Stop'kframework'Stop'attributes'Stop'Location{}("Location(219,8,219,29)"), org'Stop'kframework'Stop'attributes'Stop'Source{}("Source(/workspace/reference-semantics/semantics/core.k)")]
+ 13464	
+ 13465	// rule `buildIS(_,_,_,_)_MPY-SUBSCRIPT_IntSeq_IntSeq_Int_Int_Int`(IS,I,STOP,STEP)=>`iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq`(`intSeqAt(_,_)_MPY-SUBSCRIPT_Int_IntSeq_Int`(IS,I),`buildIS(_,_,_,_)_MPY-SUBSCRIPT_IntSeq_IntSeq_Int_Int_Int`(IS,`_+Int_`(I,STEP),STOP,STEP)) requires `_orBool_`(`_andBool_`(`_>Int_`(STEP,#token("0","Int")),`_<Int_`(I,STOP)),`_andBool_`(`_<Int_`(STEP,#token("0","Int")),`_>Int_`(I,STOP))) ensures #token("true","Bool") [UNIQUE_ID(5bd0f0987e058d89691694bf0865b7aa6aab21a00f8f8931c313ab18e52f68d8), org.kframework.attributes.Location(Location(117,8,119,91)), org.kframework.attributes.Source(Source(/workspace/reference-semantics/semantics/subscript.k)), org.kframework.definition.Production(syntax #RuleContent ::= #RuleBody "requires" Bool [symbol(#ruleRequires)])]
+ 13466	  axiom{R} \implies{R} (
+
+Script done on 2026-07-31 01:36:10-05:00 [COMMAND_EXIT_CODE="0"]

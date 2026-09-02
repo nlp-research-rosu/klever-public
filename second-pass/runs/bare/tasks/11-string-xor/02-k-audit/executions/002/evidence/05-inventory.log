@@ -1,0 +1,360 @@
+COMMAND: bash /audit-output/evidence/05_inventory.sh
+FILE: semantic.k
+     1	module MPY-SYNTAX
+     2	  imports BOOL
+     3	  imports INT
+     4	  imports STRING
+     5	
+     6	  syntax Module ::= "Module" "(" Stmts ")"
+     7	  syntax Stmts ::= List{Stmt, ""}
+     8	
+     9	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    10	                | "Return" "(" Expr ")"
+    11	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    12	
+    13	  syntax Strings ::= List{String, ","}
+    14	  syntax Params ::= "Params" "(" Strings ")"
+    15	
+    16	  syntax Expr ::= "Name" "(" String ")"
+    17	                | "Str" "(" String ")"
+    18	                | "Int" "(" Int ")"
+    19	                | "BinOp" "(" String "," Expr "," Expr ")"
+    20	                | "Compare" "(" Expr "," CmpOp ")"
+    21	                | "Subscript" "(" Expr "," Index ")"
+    22	                | "Call" "(" Expr "," Expr "," Expr ")"
+    23	
+    24	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    25	  syntax Index ::= Expr
+    26	                 | "Slice" "(" Expr "," NoBound "," NoBound ")"
+    27	  syntax NoBound ::= "NoBound"
+    28	endmodule
+    29	
+    30	module XOR-SEMANTICS
+    31	  imports MPY-SYNTAX
+    32	
+    33	  // Text is either concrete (empty/cons) or a symbolic N-character segment.
+    34	  // A Stream denotes an arbitrary sequence of bits, least-significant bit
+    35	  // first.  The length is stored by segment, so leading zeroes are preserved.
+    36	  syntax Stream ::= "seed" "(" Int ")"
+    37	  syntax Stream ::= "next" "(" Stream ")" [function]
+    38	  syntax Bool ::= "head" "(" Stream ")" [function, total]
+    39	  syntax Text ::= "empty"
+    40	                | "cons" "(" Bool "," Text ")"
+    41	                | "segment" "(" Int "," Stream ")"
+    42	
+    43	  syntax Value ::= "str" "(" Text ")"
+    44	                 | "i" "(" Int ")"
+    45	                 | "truth" "(" Bool ")"
+    46	  syntax Args ::= "Args" "(" Value "," Value ")"
+    47	  syntax Env ::= "env" "(" Value "," Value ")"
+    48	  syntax ExecResult ::= "normal" "(" Env ")"
+    49	                      | "returned" "(" Value ")"
+    50	  syntax KResult ::= Value | ExecResult
+    51	  syntax Sem ::= Value | ExecResult
+    52	  syntax Sem ::= "eval" "(" Expr "," Env "," Stmts ")"
+    53	               | "equal" "(" Sem "," Sem ")" [strict]
+    54	               | "concat" "(" Sem "," Sem ")" [strict]
+    55	               | "index" "(" Sem "," Sem ")" [strict]
+    56	               | "tail" "(" Sem ")" [strict]
+    57	               | "call" "(" Sem "," Sem "," Stmts ")" [strict(1, 2)]
+    58	               | "returnValue" "(" Sem ")" [strict]
+    59	               | "makeReturn" "(" Sem ")" [strict]
+    60	               | "exec" "(" Stmts "," Env "," Stmts ")"
+    61	               | "decide" "(" Sem "," Stmts "," Stmts "," Stmts "," Env "," Stmts ")" [strict(1)]
+    62	               | "continue" "(" Sem "," Stmts "," Stmts ")" [strict(1)]
+    63	
+    64	  rule head(seed(I)) => (I modInt 2) ==Int 1
+    65	  rule next(seed(I)) => seed(I divInt 2)
+    66	
+    67	  configuration
+    68	    <k> $PGM:Module </k>
+    69	    <args> $ARGS:Args </args>
+    70	
+    71	  rule <k> Module(FuncDef("string_xor", Params("a", "b"), BODY))
+    72	        => exec(BODY, env(A, B), BODY) ... </k>
+    73	       <args> Args(A, B) </args>
+    74	
+    75	  rule eval(Name("a"), env(A, _), _) => A
+    76	  rule eval(Name("b"), env(_, B), _) => B
+    77	  rule eval(Str(""), _, _) => str(empty)
+    78	  rule eval(Str("0"), _, _) => str(cons(false, empty))
+    79	  rule eval(Str("1"), _, _) => str(cons(true, empty))
+    80	  rule eval(Int(I), _, _) => i(I)
+    81	
+    82	  rule eval(Compare(E1, CmpOp("==", E2)), ENV, BODY)
+    83	    => equal(eval(E1, ENV, BODY), eval(E2, ENV, BODY))
+    84	  rule eval(BinOp("+", E1, E2), ENV, BODY)
+    85	    => concat(eval(E1, ENV, BODY), eval(E2, ENV, BODY))
+    86	  rule eval(Subscript(E, I:Expr), ENV, BODY)
+    87	    => index(eval(E, ENV, BODY), eval(I, ENV, BODY))
+    88	  rule eval(Subscript(E, Slice(Int(1), NoBound, NoBound)), ENV, BODY)
+    89	    => tail(eval(E, ENV, BODY))
+    90	  rule eval(Call(Name("string_xor"), E1, E2), ENV, BODY)
+    91	    => call(eval(E1, ENV, BODY), eval(E2, ENV, BODY), BODY)
+    92	
+    93	  rule equal(str(empty), str(empty)) => truth(true)
+    94	  rule equal(str(cons(_, _)), str(empty)) => truth(false)
+    95	  rule equal(str(empty), str(cons(_, _))) => truth(false)
+    96	  rule equal(str(segment(N, _)), str(empty)) => truth(N ==Int 0)
+    97	  rule equal(str(empty), str(segment(N, _))) => truth(N ==Int 0)
+    98	  rule equal(str(cons(B1, empty)), str(cons(B2, empty)))
+    99	    => truth(B1 ==Bool B2)
+   100	
+   101	  rule concat(str(cons(B, empty)), str(T)) => str(cons(B, T))
+   102	  rule index(str(cons(B, _)), i(0)) => str(cons(B, empty))
+   103	  rule index(str(segment(N, S)), i(0)) => str(cons(head(S), empty))
+   104	    requires N >Int 0
+   105	  rule tail(str(cons(_, T))) => str(T)
+   106	  rule tail(str(segment(N, S))) => str(segment(N -Int 1, next(S)))
+   107	    requires N >Int 0
+   108	
+   109	  rule call(A, B, BODY) => returnValue(exec(BODY, env(A, B), BODY))
+   110	  rule returnValue(returned(V)) => V
+   111	
+   112	  rule exec(.Stmts, ENV, _) => normal(ENV)
+   113	  rule exec(Return(E) _REST, ENV, BODY) => makeReturn(eval(E, ENV, BODY))
+   114	  rule exec(If(E, THEN, ELSE) REST, ENV, BODY)
+   115	    => decide(eval(E, ENV, BODY), THEN, ELSE, REST, ENV, BODY)
+   116	  rule decide(truth(C), THEN, _, REST, ENV, BODY)
+   117	    => continue(exec(THEN, ENV, BODY), REST, BODY)
+   118	    requires C
+   119	  rule decide(truth(C), _, ELSE, REST, ENV, BODY)
+   120	    => continue(exec(ELSE, ENV, BODY), REST, BODY)
+   121	    requires notBool C
+   122	  rule makeReturn(V:Value) => returned(V)
+   123	  rule continue(returned(V), _, _) => returned(V)
+   124	  rule continue(normal(ENV), REST, BODY) => exec(REST, ENV, BODY)
+   125	endmodule
+   126	
+   127	module XOR
+   128	  imports XOR-SEMANTICS
+   129	endmodule
+FILE: verification.k
+     1	requires "semantic.k"
+     2	
+     3	module XOR-VERIFICATION
+     4	  imports XOR-SEMANTICS
+     5	
+     6	  // A named copy of the exact term emitted in solution.mpy.  This keeps the
+     7	  // claims readable; prove.sh checks equivalence, parsing, and execution.
+     8	  syntax Module ::= "solutionProgram" [macro]
+     9	  // BEGIN EXACT SOLUTION TERM
+    10	  rule solutionProgram =>
+    11	    Module(
+    12	      FuncDef("string_xor", Params("a", "b"),
+    13	        If(Compare(Name("a"), CmpOp("==", Str(""))),
+    14	          Return(Str("")),
+    15	          .Stmts)
+    16	        If(Compare(Name("b"), CmpOp("==", Str(""))),
+    17	          Return(Str("")),
+    18	          .Stmts)
+    19	        If(Compare(
+    20	          Subscript(Name("a"), Int(0)),
+    21	          CmpOp("==", Subscript(Name("b"), Int(0)))),
+    22	          Return(
+    23	            BinOp(
+    24	              "+",
+    25	              Str("0"),
+    26	              Call(
+    27	                Name("string_xor"),
+    28	                Subscript(Name("a"), Slice(Int(1), NoBound, NoBound)),
+    29	                Subscript(Name("b"), Slice(Int(1), NoBound, NoBound))))),
+    30	          .Stmts)
+    31	        Return(
+    32	          BinOp(
+    33	            "+",
+    34	            Str("1"),
+    35	            Call(
+    36	              Name("string_xor"),
+    37	              Subscript(Name("a"), Slice(Int(1), NoBound, NoBound)),
+    38	              Subscript(Name("b"), Slice(Int(1), NoBound, NoBound)))))))
+    39	  // END EXACT SOLUTION TERM
+    40	
+    41	  syntax Stmts ::= "solutionBody" [macro]
+    42	  rule solutionBody =>
+    43	    If(Compare(Name("a"), CmpOp("==", Str(""))),
+    44	      Return(Str("")),
+    45	      .Stmts)
+    46	    If(Compare(Name("b"), CmpOp("==", Str(""))),
+    47	      Return(Str("")),
+    48	      .Stmts)
+    49	    If(Compare(
+    50	      Subscript(Name("a"), Int(0)),
+    51	      CmpOp("==", Subscript(Name("b"), Int(0)))),
+    52	      Return(
+    53	        BinOp(
+    54	          "+",
+    55	          Str("0"),
+    56	          Call(
+    57	            Name("string_xor"),
+    58	            Subscript(Name("a"), Slice(Int(1), NoBound, NoBound)),
+    59	            Subscript(Name("b"), Slice(Int(1), NoBound, NoBound))))),
+    60	      .Stmts)
+    61	    Return(
+    62	      BinOp(
+    63	        "+",
+    64	        Str("1"),
+    65	        Call(
+    66	          Name("string_xor"),
+    67	          Subscript(Name("a"), Slice(Int(1), NoBound, NoBound)),
+    68	          Subscript(Name("b"), Slice(Int(1), NoBound, NoBound)))))
+    69	
+    70	  // Mathematical reference function, deliberately separate from the AST
+    71	  // evaluator above.  xorText consumes bits until either input is exhausted.
+    72	  syntax Text ::= "xorText" "(" Int "," Int "," Stream "," Stream ")" [function]
+    73	  rule xorText(N, _, _, _) => empty
+    74	    requires N ==Int 0
+    75	  rule xorText(N, M, _, _) => empty
+    76	    requires N >Int 0 andBool M ==Int 0
+    77	  rule xorText(N, M, S1, S2) =>
+    78	    cons(head(S1) xorBool head(S2),
+    79	         xorText(N -Int 1, M -Int 1, next(S1), next(S2)))
+    80	    requires N >Int 0 andBool M >Int 0
+    81	
+    82	  // A one-unfold symbolic acceleration of the operational rules.  Its first
+    83	  // argument is the exact translated body above, so changing the program
+    84	  // invalidates the match.  Recursive calls remain operational and therefore
+    85	  // require the circular claim in spec.k.
+    86	  syntax Sem ::= "prependResult" "(" Bool "," Sem ")" [strict(2)]
+    87	  rule prependResult(B, returned(str(T))) => returned(str(cons(B, T)))
+    88	
+    89	  rule exec(solutionBody,
+    90	            env(str(segment(N, _S1)), str(segment(_M, _S2))),
+    91	            solutionBody)
+    92	    => returned(str(empty))
+    93	    requires N ==Int 0
+    94	    [priority(40)]
+    95	
+    96	  rule exec(solutionBody,
+    97	            env(str(segment(N, _S1)), str(segment(M, _S2))),
+    98	            solutionBody)
+    99	    => returned(str(empty))
+   100	    requires N >Int 0 andBool M ==Int 0
+   101	    [priority(40)]
+   102	
+   103	  rule exec(solutionBody,
+   104	            env(str(segment(N, S1)), str(segment(M, S2))),
+   105	            solutionBody)
+   106	    => prependResult(
+   107	         head(S1) xorBool head(S2),
+   108	         exec(solutionBody,
+   109	              env(str(segment(N -Int 1, next(S1))),
+   110	                  str(segment(M -Int 1, next(S2)))),
+   111	              solutionBody))
+   112	    requires N >Int 0 andBool M >Int 0
+   113	    [priority(40)]
+   114	endmodule
+FILE: spec.k
+     1	requires "verification.k"
+     2	
+     3	module XOR-SPEC
+     4	  imports XOR-VERIFICATION
+     5	
+     6	  // Induction lemma at function entry.  The K-sequence ellipsis preserves
+     7	  // the caller continuation, so recursive calls can reuse this claim.
+     8	  claim
+     9	    <k> exec(solutionBody,
+    10	             env(str(segment(N, S1)), str(segment(M, S2))),
+    11	             solutionBody)
+    12	      => returned(str(xorText(N, M, S1, S2))) ... </k>
+    13	    <args> _ARGS </args>
+    14	    requires N >=Int 0 andBool M >=Int 0
+    15	
+    16	  // End-to-end theorem from the translated module's initial configuration.
+    17	  claim
+    18	    <k> solutionProgram => returned(str(xorText(N, M, S1, S2))) ... </k>
+    19	    <args> Args(str(segment(N, S1)), str(segment(M, S2))) </args>
+    20	    requires N >=Int 0 andBool M >=Int 0
+    21	endmodule
+DECLARATION/RULE INDEX
+/tmp/audit-work/11-string-xor/source/spec.k:4:  imports XOR-VERIFICATION
+/tmp/audit-work/11-string-xor/source/spec.k:8:  claim
+/tmp/audit-work/11-string-xor/source/spec.k:17:  claim
+/tmp/audit-work/11-string-xor/source/verification.k:4:  imports XOR-SEMANTICS
+/tmp/audit-work/11-string-xor/source/verification.k:8:  syntax Module ::= "solutionProgram" [macro]
+/tmp/audit-work/11-string-xor/source/verification.k:10:  rule solutionProgram =>
+/tmp/audit-work/11-string-xor/source/verification.k:41:  syntax Stmts ::= "solutionBody" [macro]
+/tmp/audit-work/11-string-xor/source/verification.k:42:  rule solutionBody =>
+/tmp/audit-work/11-string-xor/source/verification.k:72:  syntax Text ::= "xorText" "(" Int "," Int "," Stream "," Stream ")" [function]
+/tmp/audit-work/11-string-xor/source/verification.k:73:  rule xorText(N, _, _, _) => empty
+/tmp/audit-work/11-string-xor/source/verification.k:75:  rule xorText(N, M, _, _) => empty
+/tmp/audit-work/11-string-xor/source/verification.k:77:  rule xorText(N, M, S1, S2) =>
+/tmp/audit-work/11-string-xor/source/verification.k:86:  syntax Sem ::= "prependResult" "(" Bool "," Sem ")" [strict(2)]
+/tmp/audit-work/11-string-xor/source/verification.k:87:  rule prependResult(B, returned(str(T))) => returned(str(cons(B, T)))
+/tmp/audit-work/11-string-xor/source/verification.k:89:  rule exec(solutionBody,
+/tmp/audit-work/11-string-xor/source/verification.k:94:    [priority(40)]
+/tmp/audit-work/11-string-xor/source/verification.k:96:  rule exec(solutionBody,
+/tmp/audit-work/11-string-xor/source/verification.k:101:    [priority(40)]
+/tmp/audit-work/11-string-xor/source/verification.k:103:  rule exec(solutionBody,
+/tmp/audit-work/11-string-xor/source/verification.k:113:    [priority(40)]
+/tmp/audit-work/11-string-xor/source/semantic.k:2:  imports BOOL
+/tmp/audit-work/11-string-xor/source/semantic.k:3:  imports INT
+/tmp/audit-work/11-string-xor/source/semantic.k:4:  imports STRING
+/tmp/audit-work/11-string-xor/source/semantic.k:6:  syntax Module ::= "Module" "(" Stmts ")"
+/tmp/audit-work/11-string-xor/source/semantic.k:7:  syntax Stmts ::= List{Stmt, ""}
+/tmp/audit-work/11-string-xor/source/semantic.k:9:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+/tmp/audit-work/11-string-xor/source/semantic.k:13:  syntax Strings ::= List{String, ","}
+/tmp/audit-work/11-string-xor/source/semantic.k:14:  syntax Params ::= "Params" "(" Strings ")"
+/tmp/audit-work/11-string-xor/source/semantic.k:16:  syntax Expr ::= "Name" "(" String ")"
+/tmp/audit-work/11-string-xor/source/semantic.k:24:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+/tmp/audit-work/11-string-xor/source/semantic.k:25:  syntax Index ::= Expr
+/tmp/audit-work/11-string-xor/source/semantic.k:27:  syntax NoBound ::= "NoBound"
+/tmp/audit-work/11-string-xor/source/semantic.k:31:  imports MPY-SYNTAX
+/tmp/audit-work/11-string-xor/source/semantic.k:36:  syntax Stream ::= "seed" "(" Int ")"
+/tmp/audit-work/11-string-xor/source/semantic.k:37:  syntax Stream ::= "next" "(" Stream ")" [function]
+/tmp/audit-work/11-string-xor/source/semantic.k:38:  syntax Bool ::= "head" "(" Stream ")" [function, total]
+/tmp/audit-work/11-string-xor/source/semantic.k:39:  syntax Text ::= "empty"
+/tmp/audit-work/11-string-xor/source/semantic.k:43:  syntax Value ::= "str" "(" Text ")"
+/tmp/audit-work/11-string-xor/source/semantic.k:46:  syntax Args ::= "Args" "(" Value "," Value ")"
+/tmp/audit-work/11-string-xor/source/semantic.k:47:  syntax Env ::= "env" "(" Value "," Value ")"
+/tmp/audit-work/11-string-xor/source/semantic.k:48:  syntax ExecResult ::= "normal" "(" Env ")"
+/tmp/audit-work/11-string-xor/source/semantic.k:50:  syntax KResult ::= Value | ExecResult
+/tmp/audit-work/11-string-xor/source/semantic.k:51:  syntax Sem ::= Value | ExecResult
+/tmp/audit-work/11-string-xor/source/semantic.k:52:  syntax Sem ::= "eval" "(" Expr "," Env "," Stmts ")"
+/tmp/audit-work/11-string-xor/source/semantic.k:53:               | "equal" "(" Sem "," Sem ")" [strict]
+/tmp/audit-work/11-string-xor/source/semantic.k:54:               | "concat" "(" Sem "," Sem ")" [strict]
+/tmp/audit-work/11-string-xor/source/semantic.k:55:               | "index" "(" Sem "," Sem ")" [strict]
+/tmp/audit-work/11-string-xor/source/semantic.k:56:               | "tail" "(" Sem ")" [strict]
+/tmp/audit-work/11-string-xor/source/semantic.k:57:               | "call" "(" Sem "," Sem "," Stmts ")" [strict(1, 2)]
+/tmp/audit-work/11-string-xor/source/semantic.k:58:               | "returnValue" "(" Sem ")" [strict]
+/tmp/audit-work/11-string-xor/source/semantic.k:59:               | "makeReturn" "(" Sem ")" [strict]
+/tmp/audit-work/11-string-xor/source/semantic.k:61:               | "decide" "(" Sem "," Stmts "," Stmts "," Stmts "," Env "," Stmts ")" [strict(1)]
+/tmp/audit-work/11-string-xor/source/semantic.k:62:               | "continue" "(" Sem "," Stmts "," Stmts ")" [strict(1)]
+/tmp/audit-work/11-string-xor/source/semantic.k:64:  rule head(seed(I)) => (I modInt 2) ==Int 1
+/tmp/audit-work/11-string-xor/source/semantic.k:65:  rule next(seed(I)) => seed(I divInt 2)
+/tmp/audit-work/11-string-xor/source/semantic.k:67:  configuration
+/tmp/audit-work/11-string-xor/source/semantic.k:71:  rule <k> Module(FuncDef("string_xor", Params("a", "b"), BODY))
+/tmp/audit-work/11-string-xor/source/semantic.k:75:  rule eval(Name("a"), env(A, _), _) => A
+/tmp/audit-work/11-string-xor/source/semantic.k:76:  rule eval(Name("b"), env(_, B), _) => B
+/tmp/audit-work/11-string-xor/source/semantic.k:77:  rule eval(Str(""), _, _) => str(empty)
+/tmp/audit-work/11-string-xor/source/semantic.k:78:  rule eval(Str("0"), _, _) => str(cons(false, empty))
+/tmp/audit-work/11-string-xor/source/semantic.k:79:  rule eval(Str("1"), _, _) => str(cons(true, empty))
+/tmp/audit-work/11-string-xor/source/semantic.k:80:  rule eval(Int(I), _, _) => i(I)
+/tmp/audit-work/11-string-xor/source/semantic.k:82:  rule eval(Compare(E1, CmpOp("==", E2)), ENV, BODY)
+/tmp/audit-work/11-string-xor/source/semantic.k:84:  rule eval(BinOp("+", E1, E2), ENV, BODY)
+/tmp/audit-work/11-string-xor/source/semantic.k:86:  rule eval(Subscript(E, I:Expr), ENV, BODY)
+/tmp/audit-work/11-string-xor/source/semantic.k:88:  rule eval(Subscript(E, Slice(Int(1), NoBound, NoBound)), ENV, BODY)
+/tmp/audit-work/11-string-xor/source/semantic.k:90:  rule eval(Call(Name("string_xor"), E1, E2), ENV, BODY)
+/tmp/audit-work/11-string-xor/source/semantic.k:93:  rule equal(str(empty), str(empty)) => truth(true)
+/tmp/audit-work/11-string-xor/source/semantic.k:94:  rule equal(str(cons(_, _)), str(empty)) => truth(false)
+/tmp/audit-work/11-string-xor/source/semantic.k:95:  rule equal(str(empty), str(cons(_, _))) => truth(false)
+/tmp/audit-work/11-string-xor/source/semantic.k:96:  rule equal(str(segment(N, _)), str(empty)) => truth(N ==Int 0)
+/tmp/audit-work/11-string-xor/source/semantic.k:97:  rule equal(str(empty), str(segment(N, _))) => truth(N ==Int 0)
+/tmp/audit-work/11-string-xor/source/semantic.k:98:  rule equal(str(cons(B1, empty)), str(cons(B2, empty)))
+/tmp/audit-work/11-string-xor/source/semantic.k:101:  rule concat(str(cons(B, empty)), str(T)) => str(cons(B, T))
+/tmp/audit-work/11-string-xor/source/semantic.k:102:  rule index(str(cons(B, _)), i(0)) => str(cons(B, empty))
+/tmp/audit-work/11-string-xor/source/semantic.k:103:  rule index(str(segment(N, S)), i(0)) => str(cons(head(S), empty))
+/tmp/audit-work/11-string-xor/source/semantic.k:105:  rule tail(str(cons(_, T))) => str(T)
+/tmp/audit-work/11-string-xor/source/semantic.k:106:  rule tail(str(segment(N, S))) => str(segment(N -Int 1, next(S)))
+/tmp/audit-work/11-string-xor/source/semantic.k:109:  rule call(A, B, BODY) => returnValue(exec(BODY, env(A, B), BODY))
+/tmp/audit-work/11-string-xor/source/semantic.k:110:  rule returnValue(returned(V)) => V
+/tmp/audit-work/11-string-xor/source/semantic.k:112:  rule exec(.Stmts, ENV, _) => normal(ENV)
+/tmp/audit-work/11-string-xor/source/semantic.k:113:  rule exec(Return(E) _REST, ENV, BODY) => makeReturn(eval(E, ENV, BODY))
+/tmp/audit-work/11-string-xor/source/semantic.k:114:  rule exec(If(E, THEN, ELSE) REST, ENV, BODY)
+/tmp/audit-work/11-string-xor/source/semantic.k:116:  rule decide(truth(C), THEN, _, REST, ENV, BODY)
+/tmp/audit-work/11-string-xor/source/semantic.k:119:  rule decide(truth(C), _, ELSE, REST, ENV, BODY)
+/tmp/audit-work/11-string-xor/source/semantic.k:122:  rule makeReturn(V:Value) => returned(V)
+/tmp/audit-work/11-string-xor/source/semantic.k:123:  rule continue(returned(V), _, _) => returned(V)
+/tmp/audit-work/11-string-xor/source/semantic.k:124:  rule continue(normal(ENV), REST, BODY) => exec(REST, ENV, BODY)
+/tmp/audit-work/11-string-xor/source/semantic.k:128:  imports XOR-SEMANTICS
+EXIT_STATUS=0

@@ -1,0 +1,238 @@
+Script started on 2026-07-31 02:07:39-05:00 [<not executed on terminal>]
++ rg -n -C 4 syntax Val|isInt|intOf|#sumAcc|builtinV\("sum"\)|#applyK\(toCall\(builtinV\("sum"\)\)|pyMod|applyBin\("//" /reference/k-proof/reference-semantics/semantics/core.k /reference/k-proof/reference-semantics/semantics/builtins.k /reference/k-proof/reference-semantics/semantics/call.k /reference/k-proof/reference-semantics/semantics/int.k /reference/k-proof/reference-semantics/semantics/operators.k /reference/k-proof/reference-semantics/semantics/syntax.k
+/reference/k-proof/reference-semantics/semantics/int.k
+1-// reference/src/semantics/int.k — MPY-INT
+2:// Int cases of the operator dispatch; Python // and % are floored (pyMod).
+3-
+4-module MPY-INT
+5-  imports MPY-CORE
+6-
+--
+11-  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+12-  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+13-  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+14-  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+15:  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+16:  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+17-  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+18-
+19:  syntax Int ::= pyMod(Int, Int) [function]
+20:  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+21-
+22-  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+23-  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+24-  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+
+/reference/k-proof/reference-semantics/semantics/call.k
+22-
+23-  // ==== dispatch on the callee value ========================================
+24-  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>
+25-
+26:  rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>
+27-  rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ)    ... </k>
+28-  rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ)    ... </k>
+29-  rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ)   ... </k>
+30-  rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ)   ... </k>
+
+/reference/k-proof/reference-semantics/semantics/builtins.k
+13-
+14-  // Call routing + argument evaluation live in call.k, which also routes the fold
+15-  // builtins (sum/all/any/max/min) to the #_Acc folds below and everything else to
+16-  // applyBuiltin. This module owns applyBuiltin + the fold implementations.
+17:  syntax Val ::= applyBuiltin(String, Vals) [function]
+18-
+19-  // ==== len(obj) — O(1) per kind ============================================
+20-  syntax Int ::= seqLen(Val) [function]
+21-  rule applyBuiltin("len", OBJ:Val, .Vals) => seqLen(OBJ)
+--
+32-  rule <k> #applyK(toCall(builtinV("list")), (list(VS:ValSeq),  .Vals)) => #alloc(list(VS)) ... </k>
+33-  rule <k> #applyK(toCall(builtinV("list")), (tuple(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>
+34-  rule <k> #applyK(toCall(builtinV("list")), .Vals)                     => #alloc(list(.ValSeq)) ... </k>
+35-  rule <k> #applyK(toCall(builtinV("list")), (str(CS:IntSeq), .Vals))   => #alloc(list(charsOf(CS))) ... </k>
+36:  syntax ValSeq ::= charsOf(IntSeq) [function, total]
+37-  rule charsOf(.IntSeq)                => .ValSeq
+38-  rule charsOf(iCons(C:Int, R:IntSeq)) => vCons(str(iCons(C, .IntSeq)), charsOf(R))
+39-
+40-  // ==== set(str) — distinct character codes =================================
+--
+42-
+43-  // ==== abs(int) ============================================================
+44-  rule applyBuiltin("abs", I:Int, .Vals) => absInt(I)
+45-
+46:  // ==== sum(iterable) — one #iterNext fold; intOf = int value of an int/bool ==
+47:  syntax KItem ::= #sumAcc(Iterable, Int) | #sumCont(Int)
+48:  rule <k> #sumAcc(IT:Iterable, ACC:Int) => #iterNext(IT) ~> #sumCont(ACC) ... </k>
+49-  rule <k> #iterDone ~> #sumCont(ACC:Int) => ACC ... </k>
+50-  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int)
+51:        => #sumAcc(R, ACC +Int intOf(V)) ... </k>
+52:       requires isInt(V) orBool isBool(V)
+53-
+54:  syntax Int ::= intOf(Val) [function]
+55:  rule intOf(I:Int)  => I
+56:  rule intOf(B:Bool) => #if B #then 1 #else 0 #fi
+57-
+58-  // ==== all / any (short-circuiting #iterNext folds) ========================
+59-  syntax KItem ::= #allAcc(Iterable) | "#allCont"
+60-  rule <k> #allAcc(IT:Iterable) => #iterNext(IT) ~> #allCont ... </k>
+--
+75-  // ==== max / min over an iterable (#iterNext folds; first element seeds) ====
+76-  syntax KItem ::= #maxAcc0(Iterable) | "#maxCont0" | #maxAcc(Iterable, Int) | #maxCont(Int)
+77-  rule <k> #maxAcc0(IT:Iterable) => #iterNext(IT) ~> #maxCont0 ... </k>
+78-  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAcc(R, {V}:>Int) ... </k>
+79:       requires isInt(V)
+80-  rule <k> #maxAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #maxCont(M) ... </k>
+81-  rule <k> #iterDone ~> #maxCont(M:Int) => M ... </k>
+82-  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont(M:Int)
+83-        => #maxAcc(R, maxInt(M, {V}:>Int)) ... </k>
+84:       requires isInt(V)
+85-
+86-  syntax KItem ::= #minAcc0(Iterable) | "#minCont0" | #minAcc(Iterable, Int) | #minCont(Int)
+87-  rule <k> #minAcc0(IT:Iterable) => #iterNext(IT) ~> #minCont0 ... </k>
+88-  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAcc(R, {V}:>Int) ... </k>
+89:       requires isInt(V)
+90-  rule <k> #minAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #minCont(M) ... </k>
+91-  rule <k> #iterDone ~> #minCont(M:Int) => M ... </k>
+92-  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont(M:Int)
+93-        => #minAcc(R, minInt(M, {V}:>Int)) ... </k>
+94:       requires isInt(V)
+95-
+96-  // ==== variadic max / min (a Vals fold) ====================================
+97-  syntax Int ::= maxVals(Int, Vals) [function]
+98-  rule applyBuiltin("max", I:Int, REST:Vals) => maxVals(I, REST)
+--
+116-  rule binCodes(N:Int) => binAcc(N, .IntSeq) requires N >Int 0
+117-  syntax IntSeq ::= binAcc(Int, IntSeq) [function, total]
+118-  rule binAcc(0, ACC:IntSeq) => ACC
+119-  rule binAcc(N:Int, ACC:IntSeq)
+120:    => binAcc((N -Int pyMod(N, 2)) /Int 2, iCons(48 +Int pyMod(N, 2), ACC))
+121-       requires N >Int 0
+122-
+123-  // ==== enumerate(xs) — pairs (i, v); materialized eagerly over a list =========
+124-  rule <k> #applyK(toCall(builtinV("enumerate")), (list(VS:ValSeq), .Vals))
+125-        => #alloc(list(enumVS(VS, 0))) ... </k>
+126:  syntax ValSeq ::= enumVS(ValSeq, Int) [function, total]
+127-  rule enumVS(.ValSeq, _:Int) => .ValSeq
+128-  rule enumVS(vCons(V:Val, R:ValSeq), I:Int)
+129-    => vCons(tuple(vCons(I, vCons(V, .ValSeq))), enumVS(R, I +Int 1))
+130-
+131-  // ==== map(str, xs) — eager (only the str case is in the subset) =============
+132-  rule <k> #applyK(toCall(builtinV("map")), (typeV("str"), list(VS:ValSeq), .Vals))
+133-        => #alloc(list(mapStrVS(VS))) ... </k>
+134:  syntax ValSeq ::= mapStrVS(ValSeq) [function, total]
+135-  rule mapStrVS(.ValSeq) => .ValSeq
+136-  rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))
+137-  rule mapStrVS(vCons(str(CS:IntSeq), R:ValSeq)) => vCons(str(CS), mapStrVS(R))
+138-
+--
+279-  syntax KItem ::= "#md5"
+280-  rule <k> Call(Attribute(Name("hashlib"), "md5"), (E:Expr, .Exprs)) => E ~> #md5 ... </k>
+281-       [priority(40)]
+282-  rule <k> str(CS:IntSeq) ~> #md5 => md5Obj(CS) ... </k>
+283:  syntax Val ::= md5Obj(IntSeq)
+284-  rule applyMethod(md5Obj(CS:IntSeq), "hexdigest", .Vals) => str(md5hexCodes(CS))
+285-  syntax IntSeq ::= md5hexCodes(IntSeq) [function, total, symbol(md5hexCodes), no-evaluators]
+286-
+287-  // ==== isinstance(V, int|str) — an ordinary 2-arg builtin ===================
+288-  // The type argument (int/str) is an ordinary name that resolves via the builtins frame to
+289:  // typeV (see core.k's config); no Call-level special case. isIntV/isStrV mirror the old
+290-  // owise-on-Val test (concrete-sort args decide; a symbolic Val stays owise, as before).
+291:  rule applyBuiltin("isinstance", V:Val, typeV("int"), .Vals) => isIntV(V)
+292-  rule applyBuiltin("isinstance", V:Val, typeV("str"), .Vals) => isStrV(V)
+293:  syntax Bool ::= isIntV(Val) [function] | isStrV(Val) [function]
+294:  rule isIntV(_:Int)         => true
+295:  rule isIntV(_:Val)         => false [owise]
+296-  rule isStrV(str(_:IntSeq)) => true
+297-  rule isStrV(_:Val)         => false [owise]
+298-endmodule
+
+/reference/k-proof/reference-semantics/semantics/core.k
+10-  imports K-EQUAL
+11-
+12-  // ==== values, the algebraic lists, and the scope heap =====================
+13-  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+14:  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+15-  syntax Str    ::= str(IntSeq)
+16-
+17-  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+18-  syntax Iterable ::= list(ValSeq)
+--
+21-                    | rangeObj(Int, Int, Int)
+22-                    | zipObj(ValSeq, ValSeq)
+23-                    | zipObjS(IntSeq, IntSeq)
+24-
+25:  syntax Val      ::= Int
+26-                    | Bool
+27-                    | "noneV"
+28-                    | Iterable
+29-                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+--
+36-  syntax Parent   ::= "root" | parent(Int)
+37-  syntax Scope    ::= scope(Map, Parent)
+38-  syntax KResult  ::= Val
+39-  syntax Expr     ::= Val   // cooling puts results back into expression holes
+40:  syntax Vals     ::= List{Val, ","}
+41-  syntax Exc      ::= "NoExc" | "AssertionError"
+42-  syntax RetState ::= "noRet" | retV(Val)
+43-
+44-  // ==== configuration =======================================================
+--
+91-
+92-  // write through a cell (Assign / #bindP / #bindTgt dispatch here on
+93-  // cell-bound names)
+94-  // a keyword argument cools to a TAGGED value (consumed by kw-aware builtins)
+95:  syntax Val ::= kwV(String, Val)
+96-  syntax KItem ::= #kwTag(String)
+97-  rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>
+98-  rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k>
+99-       requires notBool isKwV(V)
+--
+102-  rule isKwV(_:Val)                => false [owise]
+103-
+104-  // the frame marker carries the CONCRETE cellvar list, so cell-write dispatch
+105-  // decides by pnMember even over an abstract frame rest (no prover branching)
+106:  syntax Val ::= cellsMark(ParamNames)
+107-  syntax ParamNames ::= cellsOf(Val) [function]
+108-  rule cellsOf(cellsMark(CVS:ParamNames)) => CVS
+109-  syntax Bool ::= pnMember(String, ParamNames) [function, total]
+110-  rule pnMember(_:String, .ParamNames) => false
+--
+157-  syntax Scope ::= "builtinsScope" [function, total]
+158-  rule builtinsScope
+159-    => scope(.Map [ "len"    <- builtinV("len")    ]
+160-                  [ "set"    <- builtinV("set")    ]
+161:                  [ "sum"    <- builtinV("sum")    ]
+162-                  [ "abs"    <- builtinV("abs")    ]
+163-                  [ "min"    <- builtinV("min")    ]
+164-                  [ "max"    <- builtinV("max")    ]
+165-                  [ "ord"    <- builtinV("ord")    ]
+--
+204-  rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)
+205-  rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)
+206-
+207-  // ==== extensible operator dispatch (cases added by the construct modules) ==
+208:  syntax Val  ::= applyUn(String, Val) [function]
+209:  syntax Val  ::= applyBin(String, Val, Val) [function]
+210-  syntax Bool ::= applyCmp(String, Val, Val) [function]
+211-
+212-  // ==== shared list helpers =================================================
+213:  syntax Vals ::= appendVal(Vals, Val) [function, total]
+214-  rule appendVal(.Vals, V:Val)              => V , .Vals
+215-  rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+216-
+217:  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+218-  rule vals2valSeq(.Vals)            => .ValSeq
+219-  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+220-
+221-  // ==== shared sequence length (len / summaries across many modules) ========
+--
+229-  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+230-
+231-  // in-bounds positional write (list subscript-assign); OOB leaves the seq unchanged
+232-  // (valid programs write in-bounds — mirrors valSeqAt's total-but-underspecified stance)
+233:  syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]
+234-  rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq
+235-  rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val)    => vCons(V, S)
+236-  rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V))
+237-       requires I >Int 0
+
+Script done on 2026-07-31 02:07:39-05:00 [COMMAND_EXIT_CODE="0"]

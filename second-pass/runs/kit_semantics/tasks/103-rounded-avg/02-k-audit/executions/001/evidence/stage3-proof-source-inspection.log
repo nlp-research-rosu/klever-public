@@ -1,0 +1,447 @@
+WORKDIR: /audit-output
+COMMAND: bash -lc cd\ /tmp/audit-work/reconstruction\;\ for\ p\ in\ verification-base.k\ verification.k\ spec.k\ arithmetic-verification.k\ arithmetic-spec.k\ connection-spec.k\ rounding-spec.k\ prove.sh\;\ do\ echo\ \"FILE\ \$p\"\;\ nl\ -ba\ \"\$p\"\;\ done
+FILE verification-base.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION-BASE
+     4	  imports MPY
+     5	
+     6	  syntax Int ::= roundedInt(Int, Int) [function, total]
+     7	  rule roundedInt(N, M)
+     8	    => (N +Int M -Int pyMod(N +Int M, 2)) /Int 2
+     9	       +Int pyMod(N +Int M, 2)
+    10	            *Int pyMod(
+    11	              (N +Int M -Int pyMod(N +Int M, 2)) /Int 2,
+    12	              2)
+    13	
+    14	  syntax Int ::= bitWeight(IntSeq) [function, total]
+    15	               | bitValue(IntSeq)  [function, total]
+    16	  rule bitWeight(.IntSeq) => 1
+    17	  rule bitWeight(iCons(_:Int, R:IntSeq)) => 2 *Int bitWeight(R)
+    18	  rule bitValue(.IntSeq) => 0
+    19	  rule bitValue(iCons(C:Int, R:IntSeq))
+    20	    => (C -Int 48) *Int bitWeight(R) +Int bitValue(R)
+    21	
+    22	  syntax Bool ::= allBits(IntSeq)   [function, total]
+    23	                | startsOne(IntSeq) [function, total]
+    24	  rule allBits(.IntSeq) => true
+    25	  rule allBits(iCons(C:Int, R:IntSeq))
+    26	    => (C ==Int 48 orBool C ==Int 49) andBool allBits(R)
+    27	  rule startsOne(iCons(49, _:IntSeq)) => true
+    28	  rule startsOne(_:IntSeq) => false [owise]
+    29	
+    30	  syntax IntSeq ::= loopDigits(Int, IntSeq)
+    31	    [function, total, symbol(loopDigits), no-evaluators]
+    32	  rule loopDigits(V, A) => A
+    33	    requires V <=Int 1
+    34	    [concrete]
+    35	  rule loopDigits(V, A)
+    36	    => loopDigits(
+    37	         (V -Int pyMod(V, 2)) /Int 2,
+    38	         iCons(48 +Int pyMod(V, 2), A))
+    39	    requires V >Int 1
+    40	    [concrete]
+    41	  rule loopDigits(V, A) => A
+    42	    requires V ==Int 1
+    43	    [simplification]
+    44	  rule loopDigits(Q, iCons(C, A))
+    45	    => loopDigits(2 *Int Q +Int (C -Int 48), A)
+    46	    requires Q >=Int 1
+    47	      andBool C >=Int 48
+    48	      andBool C <=Int 49
+    49	    [symbolic(Q), simplification(40)]
+    50	
+    51	  rule 2 *Int ((V -Int pyMod(V, 2)) /Int 2) +Int pyMod(V, 2) => V
+    52	    requires V >=Int 0
+    53	    [simplification]
+    54	  rule 2 *Int ((V -Int ((V %Int 2 +Int 2) %Int 2)) /Int 2)
+    55	       +Int ((V %Int 2 +Int 2) %Int 2)
+    56	    => V
+    57	    requires V >=Int 0
+    58	    [simplification]
+    59	endmodule
+FILE verification.k
+     1	requires "verification-base.k"
+     2	
+     3	module VERIFICATION
+     4	  imports VERIFICATION-BASE
+     5	
+     6	  // Operational bridge justified over this exact match domain by
+     7	  // LOOP-CONNECTION.binary-loop-exact in connection-spec.k.
+     8	  rule <k>
+     9	         #while(
+    10	           Compare(Name("value"), CmpOp(">", Int(1))),
+    11	           Assign(
+    12	             Name("digits"),
+    13	             BinOp(
+    14	               "+",
+    15	               Call(
+    16	                 Name("chr"),
+    17	                 BinOp("+", Int(48), BinOp("%", Name("value"), Int(2)))),
+    18	               Name("digits")))
+    19	           Assign(Name("value"), BinOp("//", Name("value"), Int(2))))
+    20	         => .K
+    21	         ...
+    22	       </k>
+    23	       <env> 1 </env>
+    24	       <scopes>
+    25	         -1 |-> BUILTINS:Scope
+    26	         0 |-> scope(MODULE:Map, parent(-1))
+    27	         1 |-> scope(
+    28	           "n" |-> NI:Int
+    29	           "m" |-> MI:Int
+    30	           "value" |-> (V:Int => 1)
+    31	           "digits" |-> (str(A:IntSeq) => str(loopDigits(V, A))),
+    32	           parent(0))
+    33	       </scopes>
+    34	    requires V >Int 0
+    35	      andBool allBits(A)
+    36	      andBool BUILTINS ==K builtinsScope
+    37	      andBool notBool ("chr" in_keys(MODULE))
+    38	    [priority(40)]
+    39	
+    40	  // Derived summary properties established by the same bridge-free theorem.
+    41	  rule bitWeight(loopDigits(V, A)) +Int bitValue(loopDigits(V, A))
+    42	    => V *Int bitWeight(A) +Int bitValue(A)
+    43	    requires V >Int 0 andBool allBits(A)
+    44	    [simplification]
+    45	  rule 1 *Int bitWeight(loopDigits(V, A)) +Int bitValue(loopDigits(V, A))
+    46	    => V *Int bitWeight(A) +Int bitValue(A)
+    47	    requires V >Int 0 andBool allBits(A)
+    48	    [simplification]
+    49	
+    50	  rule allBits(loopDigits(V, A)) => true
+    51	    requires V >Int 0 andBool allBits(A)
+    52	    [simplification]
+    53	endmodule
+FILE spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [rounded-avg-invalid]:
+     7	    <k>
+     8	      #loadAll(Module(
+     9	        FuncDef("rounded_avg", Params("n", "m"),
+    10	          If(Compare(Name("n"), CmpOp(">", Name("m"))),
+    11	            Return(UnaryOp("-", Int(1))),
+    12	            .Stmts)
+    13	          Assign(
+    14	            Name("value"),
+    15	            BinOp(
+    16	              "+",
+    17	              BinOp(
+    18	                "//",
+    19	                BinOp("+", Name("n"), Name("m")),
+    20	                Int(2)),
+    21	              BinOp(
+    22	                "*",
+    23	                BinOp(
+    24	                  "%",
+    25	                  BinOp("+", Name("n"), Name("m")),
+    26	                  Int(2)),
+    27	                BinOp(
+    28	                  "%",
+    29	                  BinOp(
+    30	                    "//",
+    31	                    BinOp("+", Name("n"), Name("m")),
+    32	                    Int(2)),
+    33	                  Int(2)))))
+    34	          Assign(Name("digits"), Str(""))
+    35	          While(
+    36	            Compare(Name("value"), CmpOp(">", Int(1))),
+    37	            Assign(
+    38	              Name("digits"),
+    39	              BinOp(
+    40	                "+",
+    41	                Call(
+    42	                  Name("chr"),
+    43	                  BinOp(
+    44	                    "+",
+    45	                    Int(48),
+    46	                    BinOp("%", Name("value"), Int(2)))),
+    47	                Name("digits")))
+    48	            Assign(
+    49	              Name("value"),
+    50	              BinOp("//", Name("value"), Int(2))))
+    51	          Assign(
+    52	            Name("digits"),
+    53	            BinOp("+", Str("1"), Name("digits")))
+    54	          Return(BinOp("+", Str("0b"), Name("digits"))))))
+    55	      ~> Call(Name("rounded_avg"), Int(N), Int(M))
+    56	      => -1
+    57	    </k>
+    58	    <env> 0 </env>
+    59	    <scopes>
+    60	      (0 |-> scope(.Map, parent(-1))
+    61	       -1 |-> builtinsScope)
+    62	      => ?FINALSCOPES:Map
+    63	    </scopes>
+    64	    <scopeLoc> 1 </scopeLoc>
+    65	    <heap> .Map </heap>
+    66	    <heapLoc> 0 </heapLoc>
+    67	    <stack> .List </stack>
+    68	    <ret> noRet </ret>
+    69	    <exc> NoExc </exc>
+    70	    <exit-code> 0 </exit-code>
+    71	    requires N >Int 0 andBool M >Int 0 andBool N >Int M
+    72	
+    73	  claim [rounded-avg-valid]:
+    74	    <k>
+    75	      #loadAll(Module(
+    76	        FuncDef("rounded_avg", Params("n", "m"),
+    77	          If(Compare(Name("n"), CmpOp(">", Name("m"))),
+    78	            Return(UnaryOp("-", Int(1))),
+    79	            .Stmts)
+    80	          Assign(
+    81	            Name("value"),
+    82	            BinOp(
+    83	              "+",
+    84	              BinOp(
+    85	                "//",
+    86	                BinOp("+", Name("n"), Name("m")),
+    87	                Int(2)),
+    88	              BinOp(
+    89	                "*",
+    90	                BinOp(
+    91	                  "%",
+    92	                  BinOp("+", Name("n"), Name("m")),
+    93	                  Int(2)),
+    94	                BinOp(
+    95	                  "%",
+    96	                  BinOp(
+    97	                    "//",
+    98	                    BinOp("+", Name("n"), Name("m")),
+    99	                    Int(2)),
+   100	                  Int(2)))))
+   101	          Assign(Name("digits"), Str(""))
+   102	          While(
+   103	            Compare(Name("value"), CmpOp(">", Int(1))),
+   104	            Assign(
+   105	              Name("digits"),
+   106	              BinOp(
+   107	                "+",
+   108	                Call(
+   109	                  Name("chr"),
+   110	                  BinOp(
+   111	                    "+",
+   112	                    Int(48),
+   113	                    BinOp("%", Name("value"), Int(2)))),
+   114	                Name("digits")))
+   115	            Assign(
+   116	              Name("value"),
+   117	              BinOp("//", Name("value"), Int(2))))
+   118	          Assign(
+   119	            Name("digits"),
+   120	            BinOp("+", Str("1"), Name("digits")))
+   121	          Return(BinOp("+", Str("0b"), Name("digits"))))))
+   122	      ~> Call(Name("rounded_avg"), Int(N), Int(M))
+   123	      =>
+   124	      str(iCons(
+   125	        48,
+   126	        iCons(98, ?D:IntSeq)))
+   127	    </k>
+   128	    <env> 0 </env>
+   129	    <scopes>
+   130	      (0 |-> scope(.Map, parent(-1))
+   131	       -1 |-> builtinsScope)
+   132	      => ?FINALSCOPES:Map
+   133	    </scopes>
+   134	    <scopeLoc> 1 </scopeLoc>
+   135	    <heap> .Map </heap>
+   136	    <heapLoc> 0 </heapLoc>
+   137	    <stack> .List </stack>
+   138	    <ret> noRet </ret>
+   139	    <exc> NoExc </exc>
+   140	    <exit-code> 0 </exit-code>
+   141	    requires N >Int 0 andBool M >Int 0 andBool N <=Int M
+   142	    ensures bitValue(?D) ==Int roundedInt(N, M)
+   143	      andBool allBits(?D)
+   144	      andBool startsOne(?D)
+   145	endmodule
+FILE arithmetic-verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module ARITHMETIC-VERIFICATION
+     4	  imports MPY
+     5	endmodule
+FILE arithmetic-spec.k
+     1	requires "arithmetic-verification.k"
+     2	
+     3	module ARITHMETIC-SPEC
+     4	  imports ARITHMETIC-VERIFICATION
+     5	
+     6	  claim [euclidean-reconstruction]:
+     7	    <k>
+     8	      2 *Int ((V -Int pyMod(V, 2)) /Int 2) +Int pyMod(V, 2)
+     9	      => V
+    10	    </k>
+    11	    requires V >=Int 0
+    12	
+    13	  claim [euclidean-reconstruction-normalized]:
+    14	    <k>
+    15	      2 *Int ((V -Int ((V %Int 2 +Int 2) %Int 2)) /Int 2)
+    16	        +Int ((V %Int 2 +Int 2) %Int 2)
+    17	      => V
+    18	    </k>
+    19	    requires V >=Int 0
+    20	endmodule
+FILE connection-spec.k
+     1	requires "verification-base.k"
+     2	
+     3	module LOOP-CONNECTION
+     4	  imports VERIFICATION-BASE
+     5	
+     6	  claim [binary-loop-exact]:
+     7	    <k>
+     8	      #while(
+     9	        Compare(Name("value"), CmpOp(">", Int(1))),
+    10	        Assign(
+    11	          Name("digits"),
+    12	          BinOp(
+    13	            "+",
+    14	            Call(
+    15	              Name("chr"),
+    16	              BinOp("+", Int(48), BinOp("%", Name("value"), Int(2)))),
+    17	            Name("digits")))
+    18	        Assign(Name("value"), BinOp("//", Name("value"), Int(2))))
+    19	      => .K
+    20	      ...
+    21	    </k>
+    22	    <env> 1 </env>
+    23	    <scopes>
+    24	      -1 |-> builtinsScope
+    25	      0 |-> scope(MODULE:Map, parent(-1))
+    26	      1 |-> scope(
+    27	        "n" |-> NI:Int
+    28	        "m" |-> MI:Int
+    29	        "value" |-> (V:Int => 1)
+    30	        "digits" |-> (str(A:IntSeq) => str(loopDigits(V, A))),
+    31	        parent(0))
+    32	    </scopes>
+    33	    requires V >Int 0
+    34	      andBool allBits(A)
+    35	      andBool notBool ("chr" in_keys(MODULE))
+    36	    ensures bitWeight(loopDigits(V, A))
+    37	              +Int bitValue(loopDigits(V, A))
+    38	            ==Int V *Int bitWeight(A) +Int bitValue(A)
+    39	      andBool allBits(loopDigits(V, A))
+    40	endmodule
+FILE rounding-spec.k
+     1	requires "verification-base.k"
+     2	
+     3	module ROUNDING-SPEC
+     4	  imports VERIFICATION-BASE
+     5	
+     6	  claim [rounded-even-sum]:
+     7	    <k>
+     8	      roundedInt(N, M)
+     9	      =>
+    10	      (N +Int M -Int pyMod(N +Int M, 2)) /Int 2
+    11	    </k>
+    12	    requires N >Int 0 andBool M >Int 0 andBool N <=Int M
+    13	      andBool pyMod(N +Int M, 2) ==Int 0
+    14	
+    15	  claim [rounded-odd-even-quotient]:
+    16	    <k>
+    17	      roundedInt(N, M)
+    18	      =>
+    19	      (N +Int M -Int pyMod(N +Int M, 2)) /Int 2
+    20	    </k>
+    21	    requires N >Int 0 andBool M >Int 0 andBool N <=Int M
+    22	      andBool pyMod(N +Int M, 2) ==Int 1
+    23	      andBool pyMod(
+    24	        (N +Int M -Int pyMod(N +Int M, 2)) /Int 2,
+    25	        2) ==Int 0
+    26	
+    27	  claim [rounded-odd-odd-quotient]:
+    28	    <k>
+    29	      roundedInt(N, M)
+    30	      =>
+    31	      (N +Int M -Int pyMod(N +Int M, 2)) /Int 2 +Int 1
+    32	    </k>
+    33	    requires N >Int 0 andBool M >Int 0 andBool N <=Int M
+    34	      andBool pyMod(N +Int M, 2) ==Int 1
+    35	      andBool pyMod(
+    36	        (N +Int M -Int pyMod(N +Int M, 2)) /Int 2,
+    37	        2) ==Int 1
+    38	endmodule
+FILE prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 test_solution.py
+     6	python3 py2mpy.py smoke.py > smoke.mpy
+     7	proof_tmp=$(mktemp -d)
+     8	trap 'rm -r -- "$proof_tmp"' EXIT
+     9	
+    10	kompile --backend llvm reference-semantics/semantics.k \
+    11	  --main-module MPY-KRUN \
+    12	  --syntax-module MPY-SYNTAX \
+    13	  --output-definition runtime-kompiled
+    14	krun smoke.mpy --definition runtime-kompiled > "$proof_tmp/fixed-smoke.out"
+    15	cat "$proof_tmp/fixed-smoke.out"
+    16	
+    17	kompile --backend haskell arithmetic-verification.k \
+    18	  --main-module ARITHMETIC-VERIFICATION \
+    19	  --syntax-module MPY-SYNTAX \
+    20	  --output-definition arithmetic-kompiled
+    21	kprove arithmetic-spec.k \
+    22	  --definition arithmetic-kompiled \
+    23	  --spec-module ARITHMETIC-SPEC
+    24	
+    25	kompile --backend haskell verification-base.k \
+    26	  --main-module VERIFICATION-BASE \
+    27	  --syntax-module MPY-SYNTAX \
+    28	  --output-definition connection-kompiled
+    29	kprove connection-spec.k \
+    30	  --definition connection-kompiled \
+    31	  --spec-module LOOP-CONNECTION
+    32	kprove rounding-spec.k \
+    33	  --definition connection-kompiled \
+    34	  --spec-module ROUNDING-SPEC
+    35	
+    36	kompile --backend haskell verification.k \
+    37	  --main-module VERIFICATION \
+    38	  --syntax-module MPY-SYNTAX \
+    39	  --output-definition verification-kompiled
+    40	krun smoke.mpy --definition verification-kompiled > "$proof_tmp/bridged-smoke.out"
+    41	cmp "$proof_tmp/fixed-smoke.out" "$proof_tmp/bridged-smoke.out"
+    42	kprove spec.k \
+    43	  --definition verification-kompiled \
+    44	  --spec-module SPEC \
+    45	  --claims SPEC.rounded-avg-invalid
+    46	kprove spec.k \
+    47	  --definition verification-kompiled \
+    48	  --spec-module SPEC \
+    49	  --claims SPEC.rounded-avg-valid
+    50	
+    51	expect_failure() {
+    52	  local label=$1
+    53	  shift
+    54	  set +e
+    55	  "$@"
+    56	  local status=$?
+    57	  set -e
+    58	  echo "${label}_EXIT:${status}"
+    59	  if [[ ${status} -eq 0 ]]; then
+    60	    echo "${label}: unexpected success" >&2
+    61	    exit 1
+    62	  fi
+    63	}
+    64	
+    65	expect_failure VACUITY \
+    66	  kprove spec-vacuity.k \
+    67	    --definition verification-kompiled \
+    68	    --spec-module SPEC-VACUITY
+    69	expect_failure BODY_MUTATION \
+    70	  kprove spec-body-mutation.k \
+    71	    --definition verification-kompiled \
+    72	    --spec-module SPEC-BODY-MUTATION
+    73	expect_failure CONNECTION_MUTATION \
+    74	  kprove connection-body-mutation.k \
+    75	    --definition connection-kompiled \
+    76	    --spec-module LOOP-CONNECTION-MUTATION
+EXIT STATUS: 0

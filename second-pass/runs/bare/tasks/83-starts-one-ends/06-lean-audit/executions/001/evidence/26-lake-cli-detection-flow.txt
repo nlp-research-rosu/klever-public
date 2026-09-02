@@ -1,0 +1,102 @@
+21-open System
+22-open Lean (Json toJson fromJson? NameMap)
+23-
+24-namespace Lake
+25-
+26-/-! ## General options for top-level `lake` -/
+27-
+28-structure LakeOptions where
+29-  args : List String := []
+30-  rootDir : FilePath := "."
+31-  configFile : FilePath := defaultConfigFile
+32-  elanInstall? : Option ElanInstall := none
+33:  leanInstall? : Option LeanInstall := none
+34-  lakeInstall? : Option LakeInstall := none
+35-  configOpts : NameMap String := {}
+36-  packageOverrides : Array PackageEntry := #[]
+37-  subArgs : List String := []
+38-  wantsHelp : Bool := false
+39-  verbosity : Verbosity := .normal
+40-  updateDeps : Bool := false
+41-  updateToolchain : Bool := true
+42-  reconfigure : Bool := false
+43-  oldMode : Bool := false
+44-  trustHash : Bool := true
+45-  noBuild : Bool := false
+46-  noCache : Option Bool := none
+47-  failLv : LogLevel := .error
+48-  outLv? : Option LogLevel := .none
+49-  ansiMode : AnsiMode := .auto
+50-  outFormat : OutFormat := .text
+51-
+52-def LakeOptions.outLv (opts : LakeOptions) : LogLevel :=
+53-  opts.outLv?.getD opts.verbosity.minLogLv
+54-
+55-/-- Get the Lean installation. Error if missing. -/
+56-def LakeOptions.getLeanInstall (opts : LakeOptions) : Except CliError LeanInstall :=
+57:  match opts.leanInstall? with
+58-  | none => .error CliError.unknownLeanInstall
+59-  | some lean => .ok lean
+60-
+61-/-- Get the Lake installation. Error if missing. -/
+62-def LakeOptions.getLakeInstall (opts : LakeOptions) : Except CliError LakeInstall :=
+63-  match opts.lakeInstall? with
+64-  | none => .error CliError.unknownLakeInstall
+65-  | some lake => .ok lake
+66-
+67-/-- Get the Lean and Lake installation. Error if either is missing. -/
+68-def LakeOptions.getInstall (opts : LakeOptions) : Except CliError (LeanInstall × LakeInstall) := do
+69-  return (← opts.getLeanInstall, ← opts.getLakeInstall)
+--
+101-  ansiMode := opts.ansiMode
+102-  out := out
+103-
+104-export LakeOptions (mkLoadConfig mkBuildConfig)
+105-
+106-/-! ## Monad -/
+107-
+108-abbrev CliMainM := ExceptT CliError MainM
+109-abbrev CliStateM := StateT LakeOptions CliMainM
+110-abbrev CliM := ArgsT CliStateM
+111-
+112-def CliM.run (self : CliM α) (args : List String) : BaseIO ExitCode := do
+113:  let (elanInstall?, leanInstall?, lakeInstall?) ← findInstall?
+114:  let main := self.run' args |>.run' {args, elanInstall?, leanInstall?, lakeInstall?}
+115-  let main := main.run >>= fun | .ok a => pure a | .error e => error e.toString
+116-  main.run
+117-
+118-@[inline] def CliStateM.runLogIO (x : LogIO α) : CliStateM α := do
+119-  let opts ← get
+120-  MainM.runLogIO x opts.outLv opts.ansiMode
+121-
+122-instance (priority := low) : MonadLift LogIO CliStateM := ⟨CliStateM.runLogIO⟩
+123-
+124-@[inline] def CliStateM.runLoggerIO (x : LoggerIO α) : CliStateM α := do
+125-  let opts ← get
+126-  MainM.runLoggerIO x opts.outLv opts.ansiMode
+--
+230-  }
+231-
+232-/-! ## Actions -/
+233-
+234-/-- Verify the Lean version Lake was built with matches that of the give Lean installation. -/
+235-def verifyLeanVersion (leanInstall : LeanInstall) : Except CliError PUnit := do
+236-  unless leanInstall.githash == Lean.githash do
+237-    throw <| CliError.leanRevMismatch Lean.githash leanInstall.githash
+238-
+239-/-- Output the detected installs and verify the Lean version. -/
+240-def verifyInstall (opts : LakeOptions) : ExceptT CliError MainM PUnit := do
+241-  IO.println s!"Elan:\n{repr <| opts.elanInstall?}"
+242:  IO.println s!"Lean:\n{repr <| opts.leanInstall?}"
+243-  IO.println s!"Lake:\n{repr <| opts.lakeInstall?}"
+244-  let (leanInstall, _) ← opts.getInstall
+245-  verifyLeanVersion leanInstall
+246-
+247-def parseScriptSpec (ws : Workspace) (spec : String) : Except CliError Script :=
+248-  match spec.splitOn "/" with
+249-  | [scriptName] =>
+250-    match ws.findScript? (stringToLegalOrSimpleName scriptName) with
+251-    | some script => return script
+252-    | none => throw <| CliError.unknownScript spec
+253-  | [pkg, scriptName] => do
+254-    let pkg ← parsePackageSpec ws pkg

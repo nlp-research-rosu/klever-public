@@ -1,0 +1,137 @@
+$ python3 -c 'import hashlib,re; from pathlib import Path; v=Path("/reference/k-proof/verification.k").read_text(); l=Path("/reference/k-proof/loop-spec.k").read_text(); vr=re.search(r"(?ms)^  rule\s*(.*?)\s*\[priority\(40\)\]\s*^endmodule",v).group(1); lc=re.search(r"(?ms)^  claim \[loop\]:\s*(.*?)\s*^endmodule",l).group(1); n=lambda s:" ".join(s.split()); print("normalized_core_equal=",n(vr)==n(lc)); print("verification_core_sha256=",hashlib.sha256(n(vr).encode()).hexdigest()); print("loop_claim_core_sha256=",hashlib.sha256(n(lc).encode()).hexdigest()); print("verification_core_chars=",len(n(vr))); print("loop_claim_core_chars=",len(n(lc)))'
+rg -n '^(requires|module|  imports)|#loop\(str|scanResult\(' /reference/k-proof/verification-base.k /reference/k-proof/loop-spec.k /reference/k-proof/verification.k /reference/k-proof/spec.k
+sha256sum /reference/k-proof/verification-base.k /reference/k-proof/loop-spec.k /reference/k-proof/verification.k /reference/k-proof/spec.k /reference/k-proof/prove.sh
+sed -n '1,120p' /reference/k-proof/prove.sh
+normalized_core_equal= True
+verification_core_sha256= d3d6e3d6d75a51568c7927c2e6dab9de5d5f0f28007aa99d9256e3fecdd21fd9
+loop_claim_core_sha256= d3d6e3d6d75a51568c7927c2e6dab9de5d5f0f28007aa99d9256e3fecdd21fd9
+verification_core_chars= 809
+loop_claim_core_chars= 809
+/reference/k-proof/spec.k:1:requires "verification.k"
+/reference/k-proof/spec.k:3:module SPEC
+/reference/k-proof/spec.k:4:  imports VERIFICATION
+/reference/k-proof/spec.k:10:      #loop(str(IS:IntSeq), Name("c"), BORED-LOOP-BODY)
+/reference/k-proof/spec.k:18:      => scanResult(IS, N:Int, A:Bool, P:Bool)
+/reference/k-proof/verification.k:1:requires "verification-base.k"
+/reference/k-proof/verification.k:3:module VERIFICATION
+/reference/k-proof/verification.k:4:  imports VERIFICATION-BASE
+/reference/k-proof/verification.k:10:      #loop(str(IS:IntSeq), Name("c"), BORED-LOOP-BODY)
+/reference/k-proof/verification.k:18:      => scanResult(IS, N:Int, A:Bool, P:Bool)
+/reference/k-proof/loop-spec.k:1:requires "verification-base.k"
+/reference/k-proof/loop-spec.k:3:module LOOP-SPEC
+/reference/k-proof/loop-spec.k:4:  imports VERIFICATION-BASE
+/reference/k-proof/loop-spec.k:10:      #loop(str(IS:IntSeq), Name("c"), BORED-LOOP-BODY)
+/reference/k-proof/loop-spec.k:18:      => scanResult(IS, N:Int, A:Bool, P:Bool)
+/reference/k-proof/verification-base.k:1:requires "reference-semantics/semantics.k"
+/reference/k-proof/verification-base.k:3:module VERIFICATION-BASE
+/reference/k-proof/verification-base.k:4:  imports MPY
+/reference/k-proof/verification-base.k:5:  imports INT
+/reference/k-proof/verification-base.k:6:  imports BOOL
+/reference/k-proof/verification-base.k:191:  syntax Int ::= scanResult(IntSeq, Int, Bool, Bool) [function, total]
+/reference/k-proof/verification-base.k:192:  rule scanResult(IS, N, A, P)
+/reference/k-proof/verification-base.k:196:  rule boredoms(IS) => scanResult(IS, 0, true, false)
+d2fa1ba663661a43d1c0545474d0480338dbb84d532e83edec72c070d59c97f4  /reference/k-proof/verification-base.k
+abd70dc92dfe2975607a6ef1b88d5245e0cacc8b1e91d99b66b5b7dd510ebb33  /reference/k-proof/loop-spec.k
+962ef4e4b4ab2682ef282d60294bb2512cf4c020db1016e709bed5cb0e34e53f  /reference/k-proof/verification.k
+ad65a99dd9209aa10f65b5ebe2c1dc62c8f7282f7bb1ec3517dfff5ea57c8303  /reference/k-proof/spec.k
+f144c02043c8de7ab0c6e5cfbc0ac54df9db5ac09e11d89e09e088ce21344add  /reference/k-proof/prove.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+python3 py2mpy.py solution.py > solution.mpy
+python3 py2mpy.py smoke.py > smoke.mpy
+python3 py2mpy.py model-boundary.py > model-boundary.mpy
+
+kompile reference-semantics/semantics.k \
+  --backend llvm \
+  --main-module MPY-KRUN \
+  --syntax-module MPY-SYNTAX \
+  --output-definition runtime-kompiled
+
+krun smoke.mpy --definition runtime-kompiled > krun-smoke.out
+python3 differential.py
+
+python3 -c 'from solution import is_bored; value = is_bored("I\vwork"); assert value == 1; print(f"cpython vertical-tab result={value}")'
+krun model-boundary.mpy --definition runtime-kompiled \
+  > krun-model-boundary.out
+
+kompile --backend haskell connection.k \
+  --main-module CONNECTION \
+  --syntax-module MPY-SYNTAX \
+  --output-definition connection-kompiled
+kprove connection-spec.k \
+  --definition connection-kompiled \
+  --spec-module CONNECTION-SPEC \
+  | tee connection-proof.out
+
+kompile --backend haskell verification-base.k \
+  --main-module VERIFICATION-BASE \
+  --syntax-module MPY-SYNTAX \
+  --output-definition verification-base-kompiled
+kprove loop-spec.k \
+  --definition verification-base-kompiled \
+  --spec-module LOOP-SPEC \
+  | tee loop-proof.out
+
+kompile --backend haskell verification.k \
+  --main-module VERIFICATION \
+  --syntax-module MPY-SYNTAX \
+  --output-definition verification-kompiled
+
+kast solution.mpy \
+  --definition verification-kompiled \
+  --module VERIFICATION \
+  --sort Module \
+  --output kore \
+  > solution.kore
+kast proof-program.mpy \
+  --definition verification-kompiled \
+  --module VERIFICATION \
+  --sort Module \
+  --output kore \
+  > proof-program.kore
+cmp solution.kore proof-program.kore
+
+kprove spec.k \
+  --definition verification-kompiled \
+  --spec-module SPEC \
+  | tee target-proof.out
+
+if kprove spec-vacuity.k \
+     --definition verification-kompiled \
+     --spec-module SPEC-VACUITY \
+     > vacuity-mutation.out 2>&1; then
+  echo "ERROR: off-by-one mutation unexpectedly proved" >&2
+  exit 1
+else
+  rg -q 'WarnStuckClaimState' vacuity-mutation.out
+  echo "EXPECTED FAILURE: off-by-one result mutation"
+fi
+
+kompile --backend haskell mutation.k \
+  --main-module MUTATION \
+  --syntax-module MPY-SYNTAX \
+  --output-definition mutation-kompiled
+if kprove mutation-spec.k \
+     --definition mutation-kompiled \
+     --spec-module MUTATION-SPEC \
+     > body-mutation.out 2>&1; then
+  echo "ERROR: empty-loop-body mutation unexpectedly proved" >&2
+  exit 1
+else
+  rg -q 'WarnStuckClaimState' body-mutation.out
+  echo "EXPECTED FAILURE: material loop-body mutation"
+fi
+
+if kprove connection-mutation-spec.k \
+     --definition connection-kompiled \
+     --spec-module CONNECTION-MUTATION-SPEC \
+     > connection-mutation.out 2>&1; then
+  echo "ERROR: strip-to-upper mutation unexpectedly proved" >&2
+  exit 1
+else
+  rg -q 'WarnStuckClaimState' connection-mutation.out
+  echo "EXPECTED FAILURE: strip-to-upper connection mutation"
+fi
+EXIT_CODE=0
+

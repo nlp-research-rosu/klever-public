@@ -1,0 +1,174 @@
+Script started on 2026-07-31 11:56:12-05:00 [<not executed on terminal>]
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // The exact translated program and its two statement blocks.  Keeping these
+     7	  // as constructor-valued functions makes the invocation claim bind the real
+     8	  // function body while keeping the loop circularity readable.
+     9	  syntax Stmts ::= "nextSmallestLoopBody" [function]
+    10	  rule nextSmallestLoopBody =>
+    11	    Assign(Name("x"), BinOp("+", Name("x"), Int(0)))
+    12	    If(UnaryOp("not", Name("found_smallest")),
+    13	      Assign(Name("smallest"), Name("x"))
+    14	      Assign(Name("found_smallest"), Bool(true)),
+    15	      If(Compare(Name("x"), CmpOp("<", Name("smallest"))),
+    16	        Assign(Name("second"), Name("smallest"))
+    17	        Assign(Name("found_second"), Bool(true))
+    18	        Assign(Name("smallest"), Name("x")),
+    19	        If(BoolOp(
+    20	          "and",
+    21	          Compare(Name("x"), CmpOp("!=", Name("smallest"))),
+    22	          BoolOp(
+    23	            "or",
+    24	            UnaryOp("not", Name("found_second")),
+    25	            Compare(Name("x"), CmpOp("<", Name("second"))))),
+    26	          Assign(Name("second"), Name("x"))
+    27	          Assign(Name("found_second"), Bool(true)),
+    28	          .Stmts)))
+    29	
+    30	  syntax Stmts ::= "nextSmallestBody" [function]
+    31	  rule nextSmallestBody =>
+    32	    Expr(Str("\n    Return the second-smallest distinct integer in lst, or None when it\n    does not exist.\n    "))
+    33	    Assign(Name("found_smallest"), Bool(false))
+    34	    Assign(Name("found_second"), Bool(false))
+    35	    Assign(Name("smallest"), Int(0))
+    36	    Assign(Name("second"), Int(0))
+    37	    Assign(Name("x"), Int(0))
+    38	    For(Name("x"), Name("lst"), nextSmallestLoopBody)
+    39	    If(Name("found_second"), Return(Name("second")), .Stmts)
+    40	    Return(NoneVal)
+    41	
+    42	  syntax Module ::= "solutionProgram" [function]
+    43	  rule solutionProgram =>
+    44	    Module(FuncDef("next_smallest", Params("lst"), nextSmallestBody))
+    45	
+    46	  // Domain predicate for the prompt's list-of-integers contract.
+    47	  syntax Bool ::= allInts(ValSeq) [function, total]
+    48	  rule allInts(.ValSeq) => true
+    49	  rule allInts(vCons(V:Val, REST:ValSeq)) => isInt(V) andBool allInts(REST)
+    50	
+    51	  // Guarded total projection from the dynamic Val sort to Int.  It is opaque
+    52	  // outside isInt; on the guarded domain it is merely the semantics' built-in
+    53	  // partial injection, exposed in a solver-friendly form.
+    54	  syntax Bool ::= definedProjectInt(Val) [function, total]
+    55	  rule definedProjectInt(V:Val) => isInt(V)
+    56	
+    57	  syntax Int ::= projectIntTotal(Val)
+    58	    [function, total, symbol(projectIntTotal), no-evaluators]
+    59	
+    60	  rule #Ceil({@V:Val}:>Int)
+    61	    => ({ definedProjectInt(@V) #Equals true } #And #Ceil(@V))
+    62	    [simplification]
+    63	
+    64	  rule projectIntTotal(V:Val) => {V}:>Int
+    65	    requires definedProjectInt(V)
+    66	    [concrete, simplification(10), preserves-definedness]
+    67	
+    68	  rule {V:Val}:>Int => projectIntTotal(V)
+    69	    requires definedProjectInt(V)
+    70	    [symbolic(V), simplification, preserves-definedness]
+    71	
+    72	  rule projectIntTotal(I:Int) => I [simplification]
+    73	  rule projectIntTotal(projectIntTotal(V:Val)) => projectIntTotal(V)
+    74	    [simplification]
+    75	
+    76	  // Guarded dispatch twins of the frozen integer rules.  They do not replace
+    77	  // program execution; they restate the same equations after sort refinement.
+    78	  rule applyBin("+", V:Val, W:Val)
+    79	    => projectIntTotal(V) +Int projectIntTotal(W)
+    80	    requires isInt(V) andBool isInt(W)
+    81	    [simplification]
+    82	
+    83	  rule applyCmp("<", V:Val, W:Val)
+    84	    => projectIntTotal(V) <Int projectIntTotal(W)
+    85	    requires isInt(V) andBool isInt(W)
+    86	    [simplification]
+    87	
+    88	  rule applyCmp("!=", V:Val, W:Val)
+    89	    => projectIntTotal(V) =/=Int projectIntTotal(W)
+    90	    requires isInt(V) andBool isInt(W)
+    91	    [simplification]
+    92	
+    93	  // Exact mathematical fold of the program's accumulator state.
+    94	  syntax ScanState ::= scanState(Int, Bool, Int, Bool)
+    95	  syntax ScanState ::= scanStep(Int, Int, Bool, Int, Bool) [function, total]
+    96	
+    97	  rule scanStep(X:Int, A:Int, false, B:Int, HB:Bool)
+    98	    => scanState(X, true, B, HB)
+    99	    [simplification]
+   100	
+   101	  rule scanStep(X:Int, A:Int, true, B:Int, HB:Bool)
+   102	    => scanState(X, true, A, true)
+   103	    requires X <Int A
+   104	    [simplification]
+   105	
+   106	  rule scanStep(X:Int, A:Int, true, B:Int, HB:Bool)
+   107	    => scanState(A, true, B, HB)
+   108	    requires X ==Int A
+   109	    [simplification]
+   110	
+   111	  rule scanStep(X:Int, A:Int, true, B:Int, false)
+   112	    => scanState(A, true, X, true)
+   113	    requires X >Int A
+   114	    [simplification]
+   115	
+   116	  rule scanStep(X:Int, A:Int, true, B:Int, true)
+   117	    => scanState(A, true, X, true)
+   118	    requires X >Int A andBool X <Int B
+   119	    [simplification]
+   120	
+   121	  rule scanStep(X:Int, A:Int, true, B:Int, true)
+   122	    => scanState(A, true, B, true)
+   123	    requires X >Int A andBool X >=Int B
+   124	    [simplification]
+   125	
+   126	  syntax ScanState ::= scanAfter(ValSeq, ScanState) [function, total]
+   127	  rule scanAfter(REST:ValSeq, scanState(A:Int, HA:Bool, B:Int, HB:Bool))
+   128	    => scanVS(REST, A, HA, B, HB)
+   129	    [simplification]
+   130	
+   131	  syntax ScanState ::= scanVS(ValSeq, Int, Bool, Int, Bool) [function, total]
+   132	  rule scanVS(.ValSeq, A:Int, HA:Bool, B:Int, HB:Bool)
+   133	    => scanState(A, HA, B, HB)
+   134	    [simplification]
+   135	  rule scanVS(vCons(V:Val, REST:ValSeq), A:Int, HA:Bool, B:Int, HB:Bool)
+   136	    => scanAfter(REST, scanStep(projectIntTotal(V), A, HA, B, HB))
+   137	    requires isInt(V)
+   138	    [simplification]
+   139	  rule scanVS(vCons(V:Val, _:ValSeq), A:Int, HA:Bool, B:Int, HB:Bool)
+   140	    => scanState(A, HA, B, HB)
+   141	    requires notBool isInt(V)
+   142	    [simplification]
+   143	
+   144	  syntax Int ::= scanSmallest(ScanState) [function, total]
+   145	  syntax Bool ::= scanFoundSmallest(ScanState) [function, total]
+   146	  syntax Int ::= scanSecond(ScanState) [function, total]
+   147	  syntax Bool ::= scanFoundSecond(ScanState) [function, total]
+   148	
+   149	  rule scanSmallest(scanState(A:Int, _:Bool, _:Int, _:Bool)) => A [simplification]
+   150	  rule scanFoundSmallest(scanState(_:Int, HA:Bool, _:Int, _:Bool)) => HA [simplification]
+   151	  rule scanSecond(scanState(_:Int, _:Bool, B:Int, _:Bool)) => B [simplification]
+   152	  rule scanFoundSecond(scanState(_:Int, _:Bool, _:Int, HB:Bool)) => HB [simplification]
+   153	
+   154	  syntax Int ::= lastInt(ValSeq, Int) [function, total]
+   155	  rule lastInt(.ValSeq, X0:Int) => X0 [simplification]
+   156	  rule lastInt(vCons(V:Val, REST:ValSeq), _:Int)
+   157	    => lastInt(REST, projectIntTotal(V))
+   158	    requires isInt(V)
+   159	    [simplification]
+   160	  rule lastInt(vCons(V:Val, _:ValSeq), X0:Int) => X0
+   161	    requires notBool isInt(V)
+   162	    [simplification]
+   163	
+   164	  syntax Val ::= nextSmallestSpec(ValSeq) [function, total]
+   165	  rule nextSmallestSpec(VS:ValSeq)
+   166	    => #if scanFoundSecond(scanVS(VS, 0, false, 0, false))
+   167	       #then scanSecond(scanVS(VS, 0, false, 0, false))
+   168	       #else noneV
+   169	       #fi
+   170	    [simplification]
+   171	endmodule
+
+Script done on 2026-07-31 11:56:12-05:00 [COMMAND_EXIT_CODE="0"]

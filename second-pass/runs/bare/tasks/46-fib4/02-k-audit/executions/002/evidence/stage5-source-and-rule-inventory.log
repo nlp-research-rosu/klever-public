@@ -1,0 +1,322 @@
+COMMAND: nl -ba semantic.k verification.k spec.k
+     1	requires "verification.k"
+     2	
+     3	module SEMANTIC-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports BOOL-SYNTAX
+     6	  imports STRING-SYNTAX
+     7	
+     8	  syntax Program ::= Module(Stmts)
+     9	                   | "solutionProgram"
+    10	
+    11	  syntax Stmts ::= List{Stmt, ""}
+    12	  syntax Stmt  ::= FuncDef(String, Params, Stmts)
+    13	                 | Return(Exp)
+    14	                 | Assign(Exp, Exp)
+    15	                 | If(Exp, Stmts, Stmts)
+    16	                 | While(Exp, Stmts)
+    17	
+    18	  syntax Params ::= Params(String)
+    19	
+    20	  syntax Exp ::= Int(Int)
+    21	               | Name(String)
+    22	               | BinOp(String, Exp, Exp)
+    23	               | Compare(Exp, CmpOp)
+    24	  syntax CmpOp ::= CmpOp(String, Exp)
+    25	endmodule
+    26	
+    27	module SEMANTIC
+    28	  imports SEMANTIC-SYNTAX
+    29	  imports VERIFICATION
+    30	  imports MAP
+    31	  imports BOOL
+    32	
+    33	  syntax Result ::= "noResult" | "result" "(" Int ")"
+    34	  syntax KItem ::= "exec" "(" Stmts ")"
+    35	
+    36	  configuration
+    37	    <fib4>
+    38	      <k> $PGM:Program </k>
+    39	      <arg> $ARG:Int </arg>
+    40	      <env> .Map </env>
+    41	      <result> noResult </result>
+    42	    </fib4>
+    43	
+    44	  // Exact constructor tree emitted by py2mpy.py for solution.py.  The proof
+    45	  // claims use this name; concrete krun commands consume solution.mpy itself.
+    46	  rule solutionProgram =>
+    47	    Module(
+    48	      FuncDef("fib4", Params("n"),
+    49	        If(Compare(Name("n"), CmpOp("==", Int(0))),
+    50	          Return(Int(0)), .Stmts)
+    51	        If(Compare(Name("n"), CmpOp("==", Int(1))),
+    52	          Return(Int(0)), .Stmts)
+    53	        If(Compare(Name("n"), CmpOp("==", Int(2))),
+    54	          Return(Int(2)), .Stmts)
+    55	        If(Compare(Name("n"), CmpOp("==", Int(3))),
+    56	          Return(Int(0)), .Stmts)
+    57	        Assign(Name("a"), Int(0))
+    58	        Assign(Name("b"), Int(0))
+    59	        Assign(Name("c"), Int(2))
+    60	        Assign(Name("d"), Int(0))
+    61	        Assign(Name("e"), Int(0))
+    62	        Assign(Name("i"), Int(4))
+    63	        While(Compare(Name("i"), CmpOp("<=", Name("n"))),
+    64	          Assign(Name("e"),
+    65	            BinOp("+", BinOp("+", BinOp("+", Name("a"), Name("b")),
+    66	                                      Name("c")), Name("d")))
+    67	          Assign(Name("a"), Name("b"))
+    68	          Assign(Name("b"), Name("c"))
+    69	          Assign(Name("c"), Name("d"))
+    70	          Assign(Name("d"), Name("e"))
+    71	          Assign(Name("i"), BinOp("+", Name("i"), Int(1))))
+    72	        Return(Name("d"))))
+    73	
+    74	  // The module contains one entry point.  Loading it binds its sole argument
+    75	  // and schedules the function body.
+    76	  rule <k> Module(FuncDef(_, Params(X), BODY)) => exec(BODY) ... </k>
+    77	       <arg> N </arg>
+    78	       <env> .Map => X |-> N </env>
+    79	
+    80	  rule <k> exec(.Stmts) => .K ... </k>
+    81	
+    82	  rule <k> exec(Assign(Name(X), E) REST) => exec(REST) ... </k>
+    83	       <env> M => M [ X <- evalInt(E, M) ] </env>
+    84	
+    85	  rule <k> exec(If(Compare(Name(X), CmpOp("==", Int(J))), THEN, _) REST)
+    86	        => exec(THEN) ~> exec(REST) ... </k>
+    87	       <env> (X |-> I) _ </env>
+    88	    requires I ==Int J
+    89	  rule <k> exec(If(Compare(Name(X), CmpOp("==", Int(J))), _, ELSE) REST)
+    90	        => exec(ELSE) ~> exec(REST) ... </k>
+    91	       <env> (X |-> I) _ </env>
+    92	    requires I =/=Int J
+    93	
+    94	  rule <k> exec(While(Compare(Name(X), CmpOp("<=", Name(Y))), BODY) REST)
+    95	        => exec(BODY)
+    96	        ~> exec(While(Compare(Name(X), CmpOp("<=", Name(Y))), BODY) REST) ... </k>
+    97	       <env> (X |-> I) (Y |-> J) _ </env>
+    98	    requires I <=Int J
+    99	  rule <k> exec(While(Compare(Name(X), CmpOp("<=", Name(Y))), _) REST)
+   100	        => exec(REST) ... </k>
+   101	       <env> (X |-> I) (Y |-> J) _ </env>
+   102	    requires I >Int J
+   103	
+   104	  rule <k> exec(Return(E) _REST) ~> _:K => .K </k>
+   105	       <env> M </env>
+   106	       <result> noResult => result(evalInt(E, M)) </result>
+   107	
+   108	  syntax Int ::= "evalInt" "(" Exp "," Map ")" [function, total]
+   109	  rule evalInt(Int(I), _) => I
+   110	  rule evalInt(Name(X), (X |-> I) _M) => I
+   111	  rule evalInt(BinOp("+", L, R), M) => evalInt(L, M) +Int evalInt(R, M)
+   112	
+   113	  syntax Bool ::= "evalBool" "(" Exp "," Map ")" [function, total]
+   114	  rule evalBool(Compare(L, CmpOp("==", R)), M)
+   115	    => evalInt(L, M) ==Int evalInt(R, M)
+   116	  rule evalBool(Compare(L, CmpOp("<=", R)), M)
+   117	    => evalInt(L, M) <=Int evalInt(R, M)
+   118	endmodule
+   119	module VERIFICATION
+   120	  imports INT
+   121	
+   122	  // Mathematical result of rolling the window from loop index I through N.
+   123	  // This is separate from the Python AST semantics: it is the functional
+   124	  // specification used by the loop invariant.
+   125	  syntax Int ::= "advanceTo" "(" Int "," Int "," Int "," Int "," Int "," Int ")"
+   126	                 [function, total]
+   127	  rule advanceTo(_A, _B, _C, D, I, N) => D
+   128	    requires I >Int N
+   129	  rule advanceTo(A, B, C, D, I, N)
+   130	    => advanceTo(B, C, D, A +Int B +Int C +Int D, I +Int 1, N)
+   131	    requires I <=Int N
+   132	
+   133	  // The HumanEval recurrence, expressed by the rolling mathematical model.
+   134	  // Index 4 is the first update from the base window at indices 0..3.
+   135	  syntax Int ::= "fib4Spec" "(" Int ")" [function, total]
+   136	  rule fib4Spec(0) => 0
+   137	  rule fib4Spec(1) => 0
+   138	  rule fib4Spec(2) => 2
+   139	  rule fib4Spec(3) => 0
+   140	  rule fib4Spec(N) => advanceTo(0, 0, 2, 0, 4, N)
+   141	    requires N >=Int 4
+   142	endmodule
+   143	requires "semantic.k"
+   144	
+   145	module SPEC
+   146	  imports SEMANTIC
+   147	
+   148	  // The recurrence model used below has this definitional form on n >= 4.
+   149	  // This small claim makes the link used when composing initialization with
+   150	  // loop-correct explicit in the proof suite.
+   151	  claim [fib4-spec-link]:
+   152	    <fib4>
+   153	      <k> .K </k>
+   154	      <arg> N </arg>
+   155	      <env> _M:Map </env>
+   156	      <result>
+   157	        result(fib4Spec(N)) => result(advanceTo(0, 0, 2, 0, 4, N))
+   158	      </result>
+   159	    </fib4>
+   160	    requires N >=Int 4
+   161	
+   162	  claim [loop-correct]:
+   163	    <fib4>
+   164	      <k>
+   165	        exec(
+   166	          While(Compare(Name("i"), CmpOp("<=", Name("n"))),
+   167	            Assign(Name("e"),
+   168	              BinOp("+", BinOp("+", BinOp("+", Name("a"), Name("b")),
+   169	                                        Name("c")), Name("d")))
+   170	            Assign(Name("a"), Name("b"))
+   171	            Assign(Name("b"), Name("c"))
+   172	            Assign(Name("c"), Name("d"))
+   173	            Assign(Name("d"), Name("e"))
+   174	            Assign(Name("i"), BinOp("+", Name("i"), Int(1))))
+   175	          Return(Name("d")))
+   176	        => .K
+   177	      </k>
+   178	      <arg> N </arg>
+   179	      <env>
+   180	          "n" |-> N
+   181	          "a" |-> A
+   182	          "b" |-> B
+   183	          "c" |-> C
+   184	          "d" |-> D
+   185	          "e" |-> _E
+   186	          "i" |-> I
+   187	        => ?_FINAL:Map
+   188	      </env>
+   189	      <result>
+   190	        noResult => result(advanceTo(A, B, C, D, I, N))
+   191	      </result>
+   192	    </fib4>
+   193	    requires N >=Int 4 andBool I >=Int 4
+   194	         andBool (I <=Int N orBool I ==Int N +Int 1)
+   195	    [circularity]
+   196	
+   197	  // The finite initialization half of the n >= 4 proof.  Its target is exactly
+   198	  // the A=0,B=0,C=2,D=0,I=4 instance of loop-correct above.  Thus these two
+   199	  // reachability claims compose to result(fib4Spec(N)).
+   200	  claim [fib4-inductive-init]:
+   201	    <fib4>
+   202	      <k>
+   203	        solutionProgram
+   204	        => exec(
+   205	             While(Compare(Name("i"), CmpOp("<=", Name("n"))),
+   206	               Assign(Name("e"),
+   207	                 BinOp("+", BinOp("+", BinOp("+", Name("a"), Name("b")),
+   208	                                           Name("c")), Name("d")))
+   209	               Assign(Name("a"), Name("b"))
+   210	               Assign(Name("b"), Name("c"))
+   211	               Assign(Name("c"), Name("d"))
+   212	               Assign(Name("d"), Name("e"))
+   213	               Assign(Name("i"), BinOp("+", Name("i"), Int(1))))
+   214	             Return(Name("d")))
+   215	      </k>
+   216	      <arg> N </arg>
+   217	      <env>
+   218	        .Map
+   219	        => "n" |-> N
+   220	           "a" |-> 0
+   221	           "b" |-> 0
+   222	           "c" |-> 2
+   223	           "d" |-> 0
+   224	           "e" |-> 0
+   225	           "i" |-> 4
+   226	      </env>
+   227	      <result> noResult </result>
+   228	    </fib4>
+   229	    requires N >=Int 4
+   230	
+   231	  claim [fib4-base-0]:
+   232	    <fib4>
+   233	      <k> solutionProgram => .K </k>
+   234	      <arg> 0 </arg>
+   235	      <env> .Map => ?_FINAL:Map </env>
+   236	      <result> noResult => result(fib4Spec(0)) </result>
+   237	    </fib4>
+   238	
+   239	  claim [fib4-base-1]:
+   240	    <fib4>
+   241	      <k> solutionProgram => .K </k>
+   242	      <arg> 1 </arg>
+   243	      <env> .Map => ?_FINAL:Map </env>
+   244	      <result> noResult => result(fib4Spec(1)) </result>
+   245	    </fib4>
+   246	
+   247	  claim [fib4-base-2]:
+   248	    <fib4>
+   249	      <k> solutionProgram => .K </k>
+   250	      <arg> 2 </arg>
+   251	      <env> .Map => ?_FINAL:Map </env>
+   252	      <result> noResult => result(fib4Spec(2)) </result>
+   253	    </fib4>
+   254	
+   255	  claim [fib4-base-3]:
+   256	    <fib4>
+   257	      <k> solutionProgram => .K </k>
+   258	      <arg> 3 </arg>
+   259	      <env> .Map => ?_FINAL:Map </env>
+   260	      <result> noResult => result(fib4Spec(3)) </result>
+   261	    </fib4>
+   262	
+   263	  claim [fib4-seven]:
+   264	    <fib4>
+   265	      <k> solutionProgram => .K </k>
+   266	      <arg> 7 </arg>
+   267	      <env> .Map => ?_FINAL:Map </env>
+   268	      <result> noResult => result(14) </result>
+   269	    </fib4>
+   270	endmodule
+COMMAND: rg -n syntax|configuration|rule|claim|function|total|simplification|priority|opaque|circularity semantic.k verification.k spec.k
+semantic.k:8:  syntax Program ::= Module(Stmts)
+semantic.k:11:  syntax Stmts ::= List{Stmt, ""}
+semantic.k:12:  syntax Stmt  ::= FuncDef(String, Params, Stmts)
+semantic.k:18:  syntax Params ::= Params(String)
+semantic.k:20:  syntax Exp ::= Int(Int)
+semantic.k:24:  syntax CmpOp ::= CmpOp(String, Exp)
+semantic.k:33:  syntax Result ::= "noResult" | "result" "(" Int ")"
+semantic.k:34:  syntax KItem ::= "exec" "(" Stmts ")"
+semantic.k:36:  configuration
+semantic.k:45:  // claims use this name; concrete krun commands consume solution.mpy itself.
+semantic.k:46:  rule solutionProgram =>
+semantic.k:75:  // and schedules the function body.
+semantic.k:76:  rule <k> Module(FuncDef(_, Params(X), BODY)) => exec(BODY) ... </k>
+semantic.k:80:  rule <k> exec(.Stmts) => .K ... </k>
+semantic.k:82:  rule <k> exec(Assign(Name(X), E) REST) => exec(REST) ... </k>
+semantic.k:85:  rule <k> exec(If(Compare(Name(X), CmpOp("==", Int(J))), THEN, _) REST)
+semantic.k:89:  rule <k> exec(If(Compare(Name(X), CmpOp("==", Int(J))), _, ELSE) REST)
+semantic.k:94:  rule <k> exec(While(Compare(Name(X), CmpOp("<=", Name(Y))), BODY) REST)
+semantic.k:99:  rule <k> exec(While(Compare(Name(X), CmpOp("<=", Name(Y))), _) REST)
+semantic.k:104:  rule <k> exec(Return(E) _REST) ~> _:K => .K </k>
+semantic.k:108:  syntax Int ::= "evalInt" "(" Exp "," Map ")" [function, total]
+semantic.k:109:  rule evalInt(Int(I), _) => I
+semantic.k:110:  rule evalInt(Name(X), (X |-> I) _M) => I
+semantic.k:111:  rule evalInt(BinOp("+", L, R), M) => evalInt(L, M) +Int evalInt(R, M)
+semantic.k:113:  syntax Bool ::= "evalBool" "(" Exp "," Map ")" [function, total]
+semantic.k:114:  rule evalBool(Compare(L, CmpOp("==", R)), M)
+semantic.k:116:  rule evalBool(Compare(L, CmpOp("<=", R)), M)
+spec.k:7:  // This small claim makes the link used when composing initialization with
+spec.k:9:  claim [fib4-spec-link]:
+spec.k:20:  claim [loop-correct]:
+spec.k:53:    [circularity]
+spec.k:57:  // reachability claims compose to result(fib4Spec(N)).
+spec.k:58:  claim [fib4-inductive-init]:
+spec.k:89:  claim [fib4-base-0]:
+spec.k:97:  claim [fib4-base-1]:
+spec.k:105:  claim [fib4-base-2]:
+spec.k:113:  claim [fib4-base-3]:
+spec.k:121:  claim [fib4-seven]:
+verification.k:5:  // This is separate from the Python AST semantics: it is the functional
+verification.k:7:  syntax Int ::= "advanceTo" "(" Int "," Int "," Int "," Int "," Int "," Int ")"
+verification.k:8:                 [function, total]
+verification.k:9:  rule advanceTo(_A, _B, _C, D, I, N) => D
+verification.k:11:  rule advanceTo(A, B, C, D, I, N)
+verification.k:17:  syntax Int ::= "fib4Spec" "(" Int ")" [function, total]
+verification.k:18:  rule fib4Spec(0) => 0
+verification.k:19:  rule fib4Spec(1) => 0
+verification.k:20:  rule fib4Spec(2) => 2
+verification.k:21:  rule fib4Spec(3) => 0
+verification.k:22:  rule fib4Spec(N) => advanceTo(0, 0, 2, 0, 4, N)
+EXIT_STATUS=0

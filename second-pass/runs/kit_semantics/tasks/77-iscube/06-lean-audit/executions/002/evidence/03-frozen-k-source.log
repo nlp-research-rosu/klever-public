@@ -1,0 +1,264 @@
+CWD: /audit-output
+COMMAND: sed -n 1,260p /reference/k-proof/verification.k /reference/k-proof/verification-base.k /reference/k-proof/connection-rule.k /reference/k-proof/spec.k /reference/k-proof/solution.py /reference/k-proof/solution.mpy /reference/k-proof/prompt.py /reference/k-proof/prove.sh /reference/lemma-discovery.json
+EXIT: 0
+OUTPUT:
+requires "connection-rule.k"
+
+module VERIFICATION
+  imports CONNECTION-RULE
+endmodule
+requires "reference-semantics/semantics.k"
+
+module VERIFICATION-SYNTAX
+  imports MPY-SYNTAX
+
+  syntax Int  ::= cubeOf(Int)              [function, total]
+  syntax Bool ::= cubeSearch(Int, Int)     [function, total]
+                | isCubeInt(Int)           [function, total]
+  syntax Val  ::= "iscubeClosure"          [function, total]
+endmodule
+
+module VERIFICATION-BASE
+  imports MPY
+  imports VERIFICATION-SYNTAX
+
+  // The mathematical cube used by the specification predicate.
+  rule cubeOf(I) => (I *Int I) *Int I
+
+  // Search nonnegative candidates in increasing order.  The three guards are
+  // disjoint and exhaustive for mathematical integers.
+  rule cubeSearch(A, I) => true
+    requires cubeOf(I) ==Int A
+  rule cubeSearch(A, I) => false
+    requires cubeOf(I) >Int A
+  rule cubeSearch(A, I) => cubeSearch(A, I +Int 1)
+    requires cubeOf(I) <Int A
+
+  // At loop exit, the Python equality is exactly the search result: if the
+  // cube is not below A, it is either equal (both true) or above (both false).
+  rule ((I *Int I) *Int I ==Int A) => cubeSearch(A, I)
+    requires notBool ((I *Int I) *Int I <Int A)
+    [simplification]
+
+  // The function-frame pop in the fixed semantics deletes scope key 1.
+  // Normalize that exact symbolic Map update after proving the key is absent
+  // from the preserved remainder.
+  rule ((1 |-> S:Scope) REST:Map) [ 1 <- undef ] => REST
+    requires notBool 1 in_keys(REST)
+    [simplification]
+
+  // Cubeness is invariant under sign, so search the nonnegative magnitude.
+  rule isCubeInt(A) => cubeSearch(0 -Int A, 0)
+    requires A <Int 0
+  rule isCubeInt(A) => cubeSearch(A, 0)
+    requires A >=Int 0
+
+  // Exact closure produced when solution.mpy is loaded in module scope 0.
+  // This is a definitional abbreviation, not an execution shortcut.
+  rule iscubeClosure
+    => closureVal(
+         "a",
+         If(
+           Compare(Name("a"), CmpOp("<", Int(0))),
+           Assign(Name("a"), UnaryOp("-", Name("a"))),
+           .Stmts)
+         Assign(Name("candidate"), Int(0))
+         While(
+           Compare(
+             BinOp(
+               "*",
+               BinOp("*", Name("candidate"), Name("candidate")),
+               Name("candidate")),
+             CmpOp("<", Name("a"))),
+           AugAssign(Name("candidate"), "+", Int(1)))
+         Return(
+           Compare(
+             BinOp(
+               "*",
+               BinOp("*", Name("candidate"), Name("candidate")),
+               Name("candidate")),
+             CmpOp("==", Name("a")))),
+         0)
+endmodule
+requires "verification-base.k"
+
+module CONNECTION-RULE
+  imports VERIFICATION-BASE
+
+  // Exact executable form of the separately proved
+  // CONNECTION.search-loop reachability theorem.
+  rule
+    <k>
+      #while(
+        Compare(
+          BinOp(
+            "*",
+            BinOp("*", Name("candidate"), Name("candidate")),
+            Name("candidate")),
+          CmpOp("<", Name("a"))),
+        AugAssign(Name("candidate"), "+", Int(1)))
+      ~> (Return(
+           Compare(
+             BinOp(
+               "*",
+               BinOp("*", Name("candidate"), Name("candidate")),
+               Name("candidate")),
+             CmpOp("==", Name("a")))) .Stmts)
+      ~> #endcall
+      =>
+      cubeSearch(A, C)
+    </k>
+    <env> 1 => 0 </env>
+    <scopes>
+      ( SC:Map
+        1 |-> scope(
+               "a"         |-> A:Int
+               "candidate" |-> C:Int,
+               parent(0))
+      =>
+        SC
+      )
+    </scopes>
+    <scopeLoc> 2 => 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> ListItem(frame(.K, 0, 1)) => .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    [priority(40)]
+endmodule
+requires "verification.k"
+
+module SPEC
+  imports VERIFICATION
+
+  // Call the exact solution closure through ordinary Python name lookup.
+  claim [iscube-entry]:
+    <k>
+      Call(Name("iscube"), Int(INPUT:Int))
+      =>
+      isCubeInt(INPUT)
+    </k>
+    <env> 0 </env>
+    <scopes>
+      -1 |-> builtinsScope
+       0 |-> scope("iscube" |-> iscubeClosure, parent(-1))
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+endmodule
+def iscube(a):
+    if a < 0:
+        a = -a
+
+    candidate = 0
+    while candidate * candidate * candidate < a:
+        candidate += 1
+
+    return candidate * candidate * candidate == a
+Module(
+  FuncDef("iscube", Params("a"),
+    If(Compare(Name("a"), CmpOp("<", Int(0))),
+      Assign(Name("a"), UnaryOp("-", Name("a"))),
+      )
+    Assign(Name("candidate"), Int(0))
+    While(Compare(
+      BinOp(
+        "*",
+        BinOp("*", Name("candidate"), Name("candidate")),
+        Name("candidate")),
+      CmpOp("<", Name("a"))),
+      AugAssign(Name("candidate"), "+", Int(1)))
+    Return(
+      Compare(
+        BinOp(
+          "*",
+          BinOp("*", Name("candidate"), Name("candidate")),
+          Name("candidate")),
+        CmpOp("==", Name("a"))))))
+
+def iscube(a):
+    '''
+    Write a function that takes an integer a and returns True 
+    if this ingeger is a cube of some integer number.
+    Note: you may assume the input is always valid.
+    Examples:
+    iscube(1) ==> True
+    iscube(2) ==> False
+    iscube(-1) ==> True
+    iscube(64) ==> True
+    iscube(0) ==> True
+    iscube(180) ==> False
+    '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+python3 -m py_compile solution.py
+python3 py2mpy.py solution.py > solution.mpy
+python3 py2mpy.py solution.py | diff -u solution.mpy -
+
+python3 py2mpy.py concrete_tests.py > concrete_tests.mpy
+sed -n '1,9p' concrete_tests.py | diff -u solution.py -
+
+kompile --backend llvm reference-semantics/semantics.k \
+  --main-module MPY-KRUN \
+  --syntax-module MPY-SYNTAX \
+  --output-definition runtime-kompiled
+
+krun concrete_tests.mpy --definition runtime-kompiled
+
+kompile --backend haskell verification-base.k \
+  --main-module VERIFICATION-BASE \
+  --syntax-module VERIFICATION-SYNTAX \
+  --output-definition verification-base-kompiled
+
+kprove identity-spec.k \
+  --definition verification-base-kompiled \
+  --spec-module IDENTITY
+
+kprove connection-spec.k \
+  --definition verification-base-kompiled \
+  --spec-module CONNECTION
+
+kompile --backend haskell connection-rule.k \
+  --main-module CONNECTION-RULE \
+  --syntax-module VERIFICATION-SYNTAX \
+  --output-definition connection-rule-kompiled
+
+kprove source-connection-spec.k \
+  --definition connection-rule-kompiled \
+  --spec-module SOURCE-CONNECTION
+
+kompile --backend haskell verification.k \
+  --main-module VERIFICATION \
+  --syntax-module VERIFICATION-SYNTAX \
+  --output-definition verification-kompiled
+
+kprove spec.k \
+  --definition verification-kompiled \
+  --spec-module SPEC
+
+kprove ground-value-spec.k \
+  --definition verification-kompiled \
+  --spec-module GROUND-VALUES
+
+# Fixed-semantics versus bridge-enabled comparisons over the bridge domains.
+kprove connection-spec.k \
+  --definition verification-kompiled \
+  --spec-module CONNECTION \
+  --depth 1
+
+if kprove identity-mutation-spec.k \
+     --definition verification-base-kompiled \
+     --spec-module IDENTITY-MUTATION \
+     > identity-mutation.log 2>&1; then
+  echo "UNEXPECTED SUCCESS: identity mutation"
+  exit 1
+else
+  identity_status=$?

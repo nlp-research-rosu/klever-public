@@ -1,0 +1,4858 @@
+OpenAI Codex v0.144.6
+--------
+workdir: /work
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019f8d09-24be-79c2-bbb6-2da14d9aa7d4
+--------
+user
+# Implement and prove a HumanEval task correct in K — using the provided reference semantics
+
+You are working entirely inside the current directory. Everything you produce
+must be written here. The K toolchain (`kompile`, `krun`, `kprove`) and
+`python3` are on PATH.
+
+## Inputs
+
+- `prompt.py` — the exact original HumanEval task prompt. It contains the
+  required entry-point signature, natural-language contract, examples, and any
+  helper code intentionally supplied with the task. It contains no completed
+  implementation of the target function. Do not modify it.
+- `py2mpy.py` — the fixed CPython-AST to K-constructor translator. Do not
+  modify it.
+- `reference-semantics/` — the supplied read-only K semantics for Python. It
+  is not a full Python semantics. Read it, but do not modify any file in it.
+
+## Required work
+
+1. Read `prompt.py`, then create `solution.py` and implement the requested
+   entry point yourself. Preserve the signature. You may reuse helper or setup
+   code that the prompt intentionally supplies.
+2. Keep `solution.py` within the subset accepted by `py2mpy.py` and generate
+   `solution.mpy` with `python3 py2mpy.py solution.py > solution.mpy`.
+3. Write `verification.k` and `spec.k`.
+4. Exercise the program with `krun`, prove every claim in `spec.k` with
+   `kprove`, and record exact commands in `prove.sh`.
+
+- For concrete LLVM execution, compile `reference-semantics/semantics.k` with
+  `--main-module MPY-KRUN --syntax-module MPY-SYNTAX`.
+- For symbolic proof definitions, import the supplied `MPY` modules without
+  modifying files under `reference-semantics/`.
+
+## Deliverables
+
+`solution.py`, `solution.mpy`, `verification.k`, `spec.k`, and `prove.sh`.
+
+The container has 8 GB of memory. Keep working while a concrete path remains;
+if the proof cannot close, preserve the best artifacts and explain the blocker
+in `NOTES.md`.
+
+End your final message with exactly one line and nothing after it:
+RESULT: <KPROVE_PASSED|PARTIAL|BLOCKED> — <one sentence>
+
+Choose exactly one marker using this ordered decision; stop at the first
+matching case.
+
+1. `KPROVE_PASSED` iff every required positive target-proof command (commands
+   intended to close the task's proof claims) printed `#Top` and exited 0.
+   Expected-failure mutation probes and other negative validation probes are
+   judged by their expected non-zero result and do not disqualify this marker.
+2. Otherwise, `BLOCKED` iff a concrete hard blocker—such as a missing required
+   input, capability, tool, or semantic support—prevented completion. Name it.
+3. Otherwise, `PARTIAL`: the positive proof condition was not met; preserve and
+   report the best artifacts or progress available.
+
+This ordered precedence is total and mutually exclusive. Incomplete
+deliverables or a later Gate status do not create a second marker. This runner
+marker reports positive proof execution only, not a `VALIDATED` judgment.
+codex
+I’ll inspect the task prompt, translator constraints, and the supplied K modules first. Then I’ll implement the smallest semantics-friendly solution and build the concrete and symbolic harnesses around the exact supported constructs.
+  → Inspect prompt and supplied semantics/translator
+  • Implement solution.py and generate solution.mpy
+  • Create K execution and proof definitions
+  • Compile, exercise with krun, and prove with kprove
+  • Finalize prove.sh and validate all deliverables
+exec
+/bin/bash -lc "pwd && rg --files -g '"'!*kompiled*'"' | sort && sed -n '1,240p' prompt.py && sed -n '1,280p' py2mpy.py" in /work
+ succeeded in 0ms:
+/work
+prompt.py
+py2mpy.py
+reference-semantics/semantics.k
+reference-semantics/semantics/assert.k
+reference-semantics/semantics/bool.k
+reference-semantics/semantics/builtins.k
+reference-semantics/semantics/call.k
+reference-semantics/semantics/comprehension.k
+reference-semantics/semantics/concrete.k
+reference-semantics/semantics/controls.k
+reference-semantics/semantics/core.k
+reference-semantics/semantics/dict.k
+reference-semantics/semantics/float.k
+reference-semantics/semantics/functions.k
+reference-semantics/semantics/int.k
+reference-semantics/semantics/iter.k
+reference-semantics/semantics/list.k
+reference-semantics/semantics/methods.k
+reference-semantics/semantics/operators.k
+reference-semantics/semantics/range.k
+reference-semantics/semantics/set.k
+reference-semantics/semantics/sort.k
+reference-semantics/semantics/str.k
+reference-semantics/semantics/subscript.k
+reference-semantics/semantics/syntax.k
+reference-semantics/semantics/tuple.k
+run-input.json
+
+
+def flip_case(string: str) -> str:
+    """ For a given string, flip lowercase characters to uppercase and uppercase to lowercase.
+    >>> flip_case('Hello')
+    'hELLO'
+    """
+#!/usr/bin/env python3
+"""py2mpy — a *pure* CPython-AST -> K-constructor transliterator.
+
+Reads a .py file and prints the matching `.mpy` term: a Lisp-indented tree of K
+constructors that a (future) K semantics will parse. The design rule is strict:
+
+    PURE TRANSLITERATION. Every Python AST node maps to exactly one K
+    constructor with the same structure. The front-end makes NO semantic
+    decisions — it does not desugar, simplify, normalize, or "interpret"
+    anything. All meaning lives in the K semantics that consumes the term.
+
+Consequences of that rule (vs. a "helpful" front-end):
+
+  * `is` / `is not` transliterate to `CmpOp("is", ...)` / `CmpOp("is not", ...)`
+    — NOT to `==` / `!=`. K decides what identity means.
+  * a chained comparison `a < b < c` stays a single `Compare` carrying the
+    chain (`Compare(a, CmpOp("<", b), CmpOp("<", c))`) — it is NOT pre-expanded
+    into `a < b and b < c`.
+  * a method call `x.append(v)` stays `Call(Attribute(Name("x"), "append"), v)`
+    — there is no special `MethodCall` constructor folding the receiver in.
+  * `a[i] = v` stays `Assign(Subscript(Name("a"), Name("i")), v)` — the target
+    is just an expression in store position; no special `SubscriptAssign`.
+
+The only choices the transliterator makes are unavoidably *syntactic* — e.g. a
+`bool` literal becomes `Bool(...)` not `Int(...)`, because that is the literal's
+actual Python type as read off the AST, not a semantic judgement.
+
+Anything outside the covered subset raises `Unsupported`, naming the node, so
+coverage gaps fail loudly instead of being silently dropped.
+
+Usage:
+    python scripts/py2mpy.py FILE.py          # print the .mpy term (default)
+    python scripts/py2mpy.py FILE.py --ast    # print the Python AST (ast.dump)
+"""
+from __future__ import annotations
+
+import argparse
+import symtable
+import ast
+import json
+import sys
+
+
+class Unsupported(Exception):
+    """Raised for any AST node the transliterator does not cover."""
+
+
+# ---------------------------------------------------------------------------
+# Term model: a .mpy term is a tree of these three node kinds.
+#   Ctor(name, *args)  -> `name(arg, arg, ...)`  (comma-separated args)
+#   Seq([item, ...])   -> a statement list: juxtaposed, no parens, no commas
+#   str                -> a leaf token already in K surface form
+#                         (a quoted string `"op"`, a number `0`, `true`, `Break`)
+# ---------------------------------------------------------------------------
+class Ctor:
+    __slots__ = ("name", "args")
+
+    def __init__(self, name: str, *args):
+        self.name = name
+        self.args = list(args)
+
+
+class Seq:
+    __slots__ = ("items",)
+
+    def __init__(self, items):
+        self.items = list(items)
+
+
+def q(s: str) -> str:
+    """A Python string as a K String token (double-quoted, escaped)."""
+    return json.dumps(s)
+
+
+# --- Operator spellings (string tokens carried inside constructors) ----------
+# These are transliterations of the operator *symbol*, not its meaning.
+_BINOP = {
+    ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
+    ast.FloorDiv: "//", ast.Mod: "%", ast.Pow: "**",
+    ast.BitOr: "|", ast.BitAnd: "&", ast.BitXor: "^",
+    ast.LShift: "<<", ast.RShift: ">>", ast.MatMult: "@",
+}
+_UNARY = {ast.USub: "-", ast.UAdd: "+", ast.Not: "not", ast.Invert: "~"}
+_BOOLOP = {ast.And: "and", ast.Or: "or"}
+_CMPOP = {
+    ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
+    ast.Gt: ">", ast.GtE: ">=", ast.Is: "is", ast.IsNot: "is not",
+    ast.In: "in", ast.NotIn: "not in",
+}
+
+
+# ---------------------------------------------------------------------------
+# Closure scopes (Python's own symtable, faithfully exposed)
+# ---------------------------------------------------------------------------
+# (name, lineno) -> (cellvars, freevars, nested). A def/lambda gets the
+# ANNOTATED node form iff it is nested inside a function or has cells/frees;
+# module-level capture-free defs keep the old shape (zero churn).
+SCOPES: dict = {}
+
+
+def _frees(table):
+    return set(table.get_frees()) if isinstance(table, symtable.Function) else set()
+
+
+def _deep_frees(table):
+    out = _frees(table)
+    for g in table.get_children():
+        out |= _deep_frees(g) - set(table.get_locals())
+    return out
+
+
+def _walk_symtable(table, depth=0):
+    for child in table.get_children():
+        if child.get_type() in ("function", "lambda"):
+            frees = sorted(_frees(child))
+            cells = sorted(
+                s for s in child.get_locals()
+                if any(s in _deep_frees(g) for g in child.get_children())
+            )
+            SCOPES[(child.get_name(), child.get_lineno())] = (
+                cells, frees, depth > 0 or table.get_type() != "module")
+        _walk_symtable(child, depth + (1 if child.get_type() in ("function", "lambda") else 0))
+
+
+def scope_info(name, lineno):
+    return SCOPES.get((name, lineno))
+
+
+# ---------------------------------------------------------------------------
+# Expressions
+# ---------------------------------------------------------------------------
+def emit_expr(node: ast.expr):
+    if isinstance(node, ast.Constant):
+        v = node.value
+        if v is None:
+            return "NoneVal"
+        if isinstance(v, bool):                 # MUST precede int (bool ⊂ int)
+            return Ctor("Bool", "true" if v else "false")
+        if isinstance(v, int):
+            return Ctor("Int", str(v))
+        if isinstance(v, float):
+            return Ctor("Float", repr(v))
+        if isinstance(v, str):
+            return Ctor("Str", q(v))
+        raise Unsupported(f"Constant {type(v).__name__}")
+
+    if isinstance(node, ast.Name):
+        return Ctor("Name", q(node.id))
+
+    if isinstance(node, ast.Lambda):
+        a = node.args
+        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+            raise Unsupported("complex lambda signature")
+        names = [p.arg for p in (a.posonlyargs + a.args)]
+        params = Ctor("Params", *(q(n) for n in names))
+        info = scope_info("lambda", node.lineno)
+        if info and (info[0] or info[1] or info[2]):
+            cells, frees, _ = info
+            return Ctor("Lambda", params,
+                        Ctor("CellVars", *(q(n) for n in cells)),
+                        Ctor("FreeVars", *(q(n) for n in frees)),
+                        emit_expr(node.body))
+        return Ctor("Lambda", params, emit_expr(node.body))
+
+    if isinstance(node, ast.BinOp):
+        op = _BINOP.get(type(node.op))
+        if op is None:
+            raise Unsupported(f"BinOp {type(node.op).__name__}")
+        return Ctor("BinOp", q(op), emit_expr(node.left), emit_expr(node.right))
+
+    if isinstance(node, ast.UnaryOp):
+        op = _UNARY.get(type(node.op))
+        if op is None:
+            raise Unsupported(f"UnaryOp {type(node.op).__name__}")
+        return Ctor("UnaryOp", q(op), emit_expr(node.operand))
+
+    if isinstance(node, ast.BoolOp):
+        op = _BOOLOP[type(node.op)]
+        return Ctor("BoolOp", q(op), *(emit_expr(v) for v in node.values))
+
+    if isinstance(node, ast.Compare):
+        # Faithful, non-desugared: left operand + a chain of (op, comparator).
+        # Single comparison => one CmpOp; `a < b < c` => two CmpOps.
+        chain = [
+            Ctor("CmpOp", q(_op_or_raise(_CMPOP, op, "Compare")), emit_expr(c))
+            for op, c in zip(node.ops, node.comparators)
+        ]
+        return Ctor("Compare", emit_expr(node.left), *chain)
+
+    if isinstance(node, ast.List):
+        return Ctor("ListExpr", *(emit_expr(e) for e in node.elts))
+
+    if isinstance(node, ast.Tuple):
+        return Ctor("TupleExpr", *(emit_expr(e) for e in node.elts))
+
+    if isinstance(node, ast.Set):
+        return Ctor("SetExpr", *(emit_expr(e) for e in node.elts))
+
+    if isinstance(node, ast.Dict):
+        entries = []
+        for k, v in zip(node.keys, node.values):
+            if k is None:
+                raise Unsupported("dict unpacking {**x}")
+            entries.append(Ctor("Entry", emit_expr(k), emit_expr(v)))
+        return Ctor("DictExpr", *entries)
+
+    if isinstance(node, ast.Subscript):
+        return Ctor("Subscript", emit_expr(node.value), emit_index(node.slice))
+
+    if isinstance(node, ast.Attribute):
+        return Ctor("Attribute", emit_expr(node.value), q(node.attr))
+
+    if isinstance(node, ast.Call):
+        if any(isinstance(a, ast.Starred) for a in node.args):
+            raise Unsupported("*args unpacking")
+        if any(kw.arg is None for kw in node.keywords):
+            raise Unsupported("**kwargs unpacking")
+        # Call grammar is `Call(Expr, Exprs)` — the comma is mandatory, so a zero-arg
+        # call must render as `Call(f, )` (empty Exprs), NOT `Call(f)` (which won't parse).
+        args = [emit_expr(a) for a in node.args]
+        args += [Ctor("KwArg", q(kw.arg), emit_expr(kw.value)) for kw in node.keywords]
+        args = args or [""]
+        return Ctor("Call", emit_expr(node.func), *args)
+
+    if isinstance(node, ast.IfExp):
+        # AST field order: test, body, orelse — kept verbatim.
+        return Ctor("IfExp", emit_expr(node.test),
+                    emit_expr(node.body), emit_expr(node.orelse))
+
+    if isinstance(node, ast.ListComp):
+        return Ctor("ListComp", emit_expr(node.elt), _gens(node.generators))
+    if isinstance(node, ast.SetComp):
+        return Ctor("SetComp", emit_expr(node.elt), _gens(node.generators))
+    if isinstance(node, ast.GeneratorExp):
+        return Ctor("GenExp", emit_expr(node.elt), _gens(node.generators))
+    if isinstance(node, ast.DictComp):
+        return Ctor("DictComp", emit_expr(node.key), emit_expr(node.value),
+                    _gens(node.generators))
+
+    raise Unsupported(f"Expr {type(node).__name__}")
+
+
+def _op_or_raise(table, op, label):
+    spelled = table.get(type(op))
+    if spelled is None:
+        raise Unsupported(f"{label} {type(op).__name__}")
+    return spelled
+
+
+def _compfor(g):
+    """A single generator -> CompFor(target, iter, <ifs as Exprs; .Exprs if none>)."""
+    if getattr(g, "is_async", 0):
+        raise Unsupported("async comprehension")
+    ifs = [emit_expr(c) for c in g.ifs] or [Ctor("Bool", "true")]
+    return Ctor("CompFor", emit_expr(g.target), emit_expr(g.iter), *ifs)
+
+
+def _gens(generators):
+    """The generator list -> a juxtaposed CompFors (a Seq of CompFor)."""
+    return Seq([_compfor(g) for g in generators])
+
+
+def emit_index(node: ast.expr):
+    """Subscript index position: an `ast.Slice` -> `Slice(...)`, else the expr."""
+    # Python <3.9 wrapped the index in ast.Index; unwrap if present.
+    inner = getattr(ast, "Index", None)
+    if inner is not None and isinstance(node, inner):
+        node = node.value
+    if isinstance(node, ast.Slice):
+        def bound(b):
+            # omitted bound (absent field) OR an explicit None constant -> NoBound.
+            # Python treats `a[None:5]` exactly like `a[:5]`; only a *value* None
+            # (Constant(None) outside a slice) becomes NoneVal. Keeping the two
+            # distinct lets NoneVal be a real value without perturbing slices.
+            if b is None or (isinstance(b, ast.Constant) and b.value is None):
+                return "NoBound"
+            return emit_expr(b)
+        return Ctor("Slice", bound(node.lower), bound(node.upper), bound(node.step))
+    return emit_expr(node)
+
+
+exec
+/bin/bash -lc "sed -n '280,680p' py2mpy.py && sed -n '1,260p' reference-semantics/semantics.k && for f in reference-semantics/semantics/{syntax,core,functions,controls,iter,str,operators,call,concrete}.k; do echo \"===== "'$f"; sed -n '"'1,320p' \""'$f"; done' in /work
+ succeeded in 0ms:
+
+
+# ---------------------------------------------------------------------------
+# Statements
+# ---------------------------------------------------------------------------
+def emit_stmt(node: ast.stmt):
+    if isinstance(node, ast.FunctionDef):
+        a = node.args
+        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+            raise Unsupported("complex function signature (defaults/varargs/kwonly)")
+        if node.decorator_list:
+            raise Unsupported("decorators")
+        names = [p.arg for p in (a.posonlyargs + a.args)]  # type annotations ignored
+        params = Ctor("Params", *(q(n) for n in names))
+        info = scope_info(node.name, node.lineno)
+        if info and (info[0] or info[1] or info[2]):
+            cells, frees, _ = info
+            return Ctor("FuncDef", q(node.name), params,
+                        Ctor("CellVars", *(q(n) for n in cells)),
+                        Ctor("FreeVars", *(q(n) for n in frees)),
+                        emit_stmts(node.body))
+        return Ctor("FuncDef", q(node.name), params, emit_stmts(node.body))
+
+    if isinstance(node, ast.Return):
+        if node.value is None:
+            return Ctor("Return")
+        return Ctor("Return", emit_expr(node.value))
+
+    if isinstance(node, ast.Assign):
+        if len(node.targets) != 1:
+            raise Unsupported("chained assignment (a = b = ...)")
+        # Target is just an expression in store position (Name / Tuple / Subscript / Attribute).
+        return Ctor("Assign", emit_expr(node.targets[0]), emit_expr(node.value))
+
+    if isinstance(node, ast.AugAssign):
+        op = _BINOP.get(type(node.op))
+        if op is None:
+            raise Unsupported(f"AugAssign {type(node.op).__name__}")
+        return Ctor("AugAssign", emit_expr(node.target), q(op), emit_expr(node.value))
+
+    if isinstance(node, ast.If):
+        return Ctor("If", emit_expr(node.test),
+                    emit_stmts(node.body), emit_stmts(node.orelse))
+
+    if isinstance(node, ast.For):
+        if node.orelse:
+            raise Unsupported("for-else")
+        return Ctor("For", emit_expr(node.target), emit_expr(node.iter),
+                    emit_stmts(node.body))
+
+    if isinstance(node, ast.While):
+        if node.orelse:
+            raise Unsupported("while-else")
+        return Ctor("While", emit_expr(node.test), emit_stmts(node.body))
+
+    if isinstance(node, ast.Break):
+        return "Break"
+    if isinstance(node, ast.Continue):
+        return "Continue"
+    if isinstance(node, ast.Pass):
+        return "Pass"
+
+    if isinstance(node, ast.Assert):
+        if node.msg is not None:
+            return Ctor("Assert", emit_expr(node.test), emit_expr(node.msg))
+        return Ctor("Assert", emit_expr(node.test))
+
+    if isinstance(node, ast.Expr):
+        return Ctor("Expr", emit_expr(node.value))
+
+    if isinstance(node, ast.Import):
+        return Ctor("Import", *(q(n.name) for n in node.names))
+    if isinstance(node, ast.ImportFrom):
+        mod = node.module if node.module is not None else ""
+        return Ctor("ImportFrom", q(mod), *(q(n.name) for n in node.names))
+
+    raise Unsupported(f"Stmt {type(node).__name__}")
+
+
+def emit_stmts(stmts) -> Seq:
+    return Seq([emit_stmt(s) for s in stmts])
+
+
+def emit_module(tree: ast.Module) -> Ctor:
+    return Ctor("Module", emit_stmts(tree.body))
+
+
+# ---------------------------------------------------------------------------
+# Lisp-style pretty printer
+# ---------------------------------------------------------------------------
+WIDTH = 72  # an expression constructor wider than this breaks onto its own lines
+
+
+def render(node, ind: int = 0) -> str:
+    if isinstance(node, str):
+        return node
+
+    if isinstance(node, Seq):
+        if not node.items:
+            return ""
+        pad = "  " * ind
+        return ("\n" + pad).join(render(it, ind) for it in node.items)
+
+    # Ctor
+    cind = ind + 1
+    cpad = "  " * cind
+    has_block = any(isinstance(a, Seq) for a in node.args)
+
+    if not has_block:
+        inline = node.name + "(" + ", ".join(render(a, ind) for a in node.args) + ")"
+        if "\n" not in inline and len("  " * ind) + len(inline) <= WIDTH:
+            return inline
+        parts = [render(a, cind) for a in node.args]
+        return node.name + "(\n" + cpad + (",\n" + cpad).join(parts) + ")"
+
+    # Has a statement block: inline the args before the first block, then put
+    # each remaining arg (blocks included) on its own indented line.
+    first = next(i for i, a in enumerate(node.args) if isinstance(a, Seq))
+    head = node.args[:first]
+    rest = node.args[first:]
+    open_line = node.name + "(" + ", ".join(render(a, ind) for a in head) + ("," if head else "")
+    lines = []
+    for k, a in enumerate(rest):
+        comma = "," if k < len(rest) - 1 else ""
+        lines.append(cpad + render(a, cind) + comma)
+    return open_line + "\n" + "\n".join(lines) + ")"
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(
+        prog="py2mpy",
+        description="Pure CPython-AST -> K-constructor transliterator.",
+    )
+    ap.add_argument("file", help="Python source file")
+    ap.add_argument("--ast", action="store_true",
+                    help="print the Python AST (ast.dump) instead of the .mpy term")
+    args = ap.parse_args(argv)
+
+    with open(args.file, "r", encoding="utf-8") as fh:
+        src = fh.read()
+    tree = ast.parse(src, filename=args.file)
+    _walk_symtable(symtable.symtable(src, args.file, "exec"))
+
+    if args.ast:
+        print(ast.dump(tree, indent=2))
+    else:
+        print(render(emit_module(tree)))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+// reference/src/semantics.k — the supplied `.mpy` semantics, ASSEMBLED.
+//
+//   kompile reference-semantics/semantics.k --backend llvm \
+//     --main-module MPY-KRUN --syntax-module MPY-SYNTAX \
+//     --output-definition runtime-kompiled
+//
+// Concrete-only legs are included through MPY-KRUN. Proof definitions import
+// MPY and any explicit proof extensions supplied by the task author.
+//
+// Files (dependency order — everything imports MPY-CORE):
+//   semantics/syntax.k         MPY-SYNTAX       AST productions
+//   semantics/core.k           MPY-CORE         values, config, load, lookup, shared helpers   [required]
+//   semantics/iter.k           MPY-ITER         the iterator protocol (#iterNext/#iterYield/#iterDone) decl
+//   semantics/range.k          MPY-RANGE        rangeObj: inRange / rangeLen / its #iterNext
+//   semantics/operators.k      MPY-OPERATORS    operator DISPATCH (UnaryOp/BinOp/Compare/BoolOp) — domain files own the cases
+//   semantics/int.k            MPY-INT          Int operator cases; floored // and % (pyMod)
+//   semantics/bool.k           MPY-BOOL         Bool operator cases + truthy not/and/or (BoolOp)
+//   semantics/float.k          MPY-FLOAT        Float Val: literal + opaque float ops ([concrete] for krun)
+//   semantics/str.k            MPY-STR          str(IntSeq): literal, +, ==, in
+//   semantics/set.k            MPY-SET          set(str): distinct char codes (len / membership)
+//   semantics/list.k           MPY-LIST         ListExpr, list(ValSeq): +, ==, in
+//   semantics/tuple.k          MPY-TUPLE        TupleExpr, tuple ==, target-binding + unpacking
+//   semantics/subscript.k      MPY-SUBSCRIPT    Subscript indexing + Slice
+//   semantics/comprehension.k  MPY-COMPREHENSION  list comprehensions [ELT for T in ITER if COND]
+//   semantics/methods.k        MPY-METHODS      pure str methods: is*/lower/upper/swapcase/startswith
+//   semantics/controls.k       MPY-CONTROLS     Assign/AugAssign, If, IfExp, For, While, break/continue
+//   semantics/functions.k      MPY-FUNCTIONS    def / call / return (frame stack)
+//   semantics/builtins.k       MPY-BUILTINS     builtins as calls: len/sum/abs/min/max/ord/chr/str
+//   semantics/call.k           MPY-CALL         ALL Call routing + argument evaluation
+//   semantics/sort.k           MPY-SORT         trusted sorted(): opaque sortVS + concrete insertion sort
+//   semantics/assert.k         MPY-ASSERT       Assert oracle (smoke programs only)
+//   semantics/dict.k           MPY-DICT         order-preserving dictV(KS,VS) + .keys() + list()
+
+requires "semantics/syntax.k"
+requires "semantics/core.k"
+requires "semantics/iter.k"
+requires "semantics/range.k"
+requires "semantics/operators.k"
+requires "semantics/int.k"
+requires "semantics/bool.k"
+requires "semantics/float.k"
+requires "semantics/str.k"
+requires "semantics/set.k"
+requires "semantics/list.k"
+requires "semantics/tuple.k"
+requires "semantics/subscript.k"
+requires "semantics/comprehension.k"
+requires "semantics/methods.k"
+requires "semantics/controls.k"
+requires "semantics/functions.k"
+requires "semantics/builtins.k"
+requires "semantics/call.k"
+requires "semantics/sort.k"
+requires "semantics/assert.k"
+requires "semantics/dict.k"
+requires "semantics/concrete.k"
+
+module MPY
+  imports MPY-CORE
+  imports MPY-ITER
+  imports MPY-RANGE
+  imports MPY-OPERATORS
+  imports MPY-INT
+  imports MPY-BOOL
+  imports MPY-FLOAT
+  imports MPY-STR
+  imports MPY-SET
+  imports MPY-LIST
+  imports MPY-TUPLE
+  imports MPY-SUBSCRIPT
+  imports MPY-COMPREHENSION
+  imports MPY-METHODS
+  imports MPY-CONTROLS
+  imports MPY-FUNCTIONS
+  imports MPY-BUILTINS
+  imports MPY-CALL
+  imports MPY-SORT
+  imports MPY-ASSERT
+  imports MPY-DICT
+endmodule
+
+// The krun (llvm) main module: MPY plus the concrete-only legs (keyed sort's
+// real key calls, deep list equality). Verification builds import MPY and
+// never see MPY-CONCRETE. The llvm kompile MUST use --main-module MPY-KRUN —
+// with plain MPY the concrete legs are silently absent (this was live for a
+// while: sorted-key stuck and comprehension asserted wrong under krun).
+module MPY-KRUN
+  imports MPY
+  imports MPY-CONCRETE
+endmodule
+===== reference-semantics/semantics/syntax.k
+// reference/src/semantics/syntax.k — MPY-SYNTAX
+
+module MPY-SYNTAX
+  imports INT-SYNTAX
+  imports FLOAT-SYNTAX
+  imports BOOL-SYNTAX
+  imports STRING-SYNTAX
+
+  syntax Expr ::= "Int"      "(" Int ")"
+                | "Float"    "(" Float ")"
+                | "Bool"     "(" Bool ")"
+                | "Name"     "(" String ")"
+                | "Str"      "(" String ")"
+                | "UnaryOp"  "(" String "," Expr ")" [strict(2)]
+                | "BinOp"    "(" String "," Expr "," Expr ")" [seqstrict(2, 3)]
+                | "BoolOp"    "(" String "," Exprs ")"
+                | "ListExpr"  "(" Exprs ")"
+                | "DictExpr"  "(" Entries ")"
+                | "ListComp"  "(" Expr "," CompFors ")" [macro]
+                | "GenExp"    "(" Expr "," CompFors ")" [macro]
+                | "TupleExpr" "(" Exprs ")"
+                | "Subscript" "(" Expr "," Index ")"
+                | "IfExp"     "(" Expr "," Expr "," Expr ")" [strict(1)]
+                | "Lambda"    "(" Params "," Expr ")"
+                | "KwArg"     "(" String "," Expr ")"
+                | "Lambda"    "(" Params "," CellVars "," FreeVars "," Expr ")"
+                | "NoneVal"
+                | "Call"      "(" Expr "," Exprs ")"
+                | "Attribute" "(" Expr "," String ")" [strict(1)]
+                | "Compare"   "(" Expr "," CmpOp ")"
+
+  syntax CmpOp    ::= "CmpOp" "(" String "," Expr ")"
+  syntax Entry    ::= "Entry" "(" Expr "," Expr ")"
+  syntax Entries  ::= List{Entry, ","}
+  syntax CompFor  ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+  syntax CompFors ::= List{CompFor, ""}
+  syntax Exprs    ::= List{Expr, ","}
+  syntax Index    ::= Expr | "Slice" "(" Bound "," Bound "," Bound ")"
+  syntax Bound    ::= Expr | "NoBound"
+
+  syntax Stmt ::= "Assign"    "(" Expr "," Expr ")" [strict(2)]
+                | "Import"    "(" String ")"
+                | "ImportFrom" "(" String "," ParamNames ")"
+                | "AugAssign" "(" Expr "," String "," Expr ")" [strict(3)]
+                | "For"       "(" Expr "," Expr "," Stmts ")" [strict(2)]
+                | "While"     "(" Expr "," Stmts ")"
+                | "Break"
+                | "Continue"
+                | "If"        "(" Expr "," Stmts "," Stmts ")" [strict(1)]
+                | "Return"    "(" Expr ")" [strict]
+                | "Assert"    "(" Expr ")" [strict]
+                | "Expr"      "(" Expr ")" [strict]
+                | "FuncDef"   "(" String "," Params "," Stmts ")"
+                | "FuncDef"   "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"
+
+  syntax Stmts      ::= List{Stmt, ""}
+  syntax Params     ::= "Params" "(" ParamNames ")"
+  syntax CellVars   ::= "CellVars" "(" ParamNames ")"
+  syntax FreeVars   ::= "FreeVars" "(" ParamNames ")"
+  syntax ParamNames ::= List{String, ","}
+  syntax Module     ::= "Module" "(" Stmts ")"
+endmodule
+===== reference-semantics/semantics/core.k
+// reference/src/semantics/core.k — MPY-CORE
+
+module MPY-CORE
+  imports MPY-SYNTAX
+  imports INT
+  imports BOOL
+  imports STRING
+  imports MAP
+  imports LIST
+  imports K-EQUAL
+
+  // ==== values, the algebraic lists, and the scope heap =====================
+  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+  syntax Str    ::= str(IntSeq)
+
+  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+  syntax Iterable ::= list(ValSeq)
+                    | tuple(ValSeq)
+                    | Str
+                    | rangeObj(Int, Int, Int)
+                    | zipObj(ValSeq, ValSeq)
+                    | zipObjS(IntSeq, IntSeq)
+
+  syntax Val      ::= Int
+                    | Bool
+                    | "noneV"
+                    | Iterable
+                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+                    | closureVal(ParamNames, Stmts, Int)
+                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+
+  syntax Parent   ::= "root" | parent(Int)
+  syntax Scope    ::= scope(Map, Parent)
+  syntax KResult  ::= Val
+  syntax Expr     ::= Val   // cooling puts results back into expression holes
+  syntax Vals     ::= List{Val, ","}
+  syntax Exc      ::= "NoExc" | "AssertionError"
+  syntax RetState ::= "noRet" | retV(Val)
+
+  // ==== configuration =======================================================
+  // The builtins namespace is a real scope at reserved location -1 (the bottom of every
+  // chain; scopeLoc only allocates >=1, so -1 never collides). The module scope (loc 0)
+  // has it as parent, so an unbound name resolves there last — exactly LEGB. `int`/`str`
+  // resolve to their type objects; any local/global binding shadows them via normal lookup.
+  configuration
+    <k>       #loadAll($PGM:Module) </k>
+    <env>     0 </env>
+    <scopes>   0     |-> scope(.Map, parent(-1))
+              -1    |-> builtinsScope </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap>    .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack>   .List </stack>
+    <ret>     noRet </ret>
+    <exc>     NoExc </exc>
+    <exit-code exit=""> 0 </exit-code>
+
+  // ==== heap allocation (constructed lists become objects) ==================
+  // Cons-form emission with a freshness guard (the heap-list-probe discipline:
+  // an update-form H[N <- _] never re-normalizes symbolically). heapLoc is
+  // monotonic — it does NOT wind back at #pop: returned lists escape by ref.
+  // A bare list(VS) Val stays legal (read-only inputs in claims flow unboxed);
+  // only CONSTRUCTORS in program syntax allocate.
+  syntax Bool ::= isRefV(Val) [function, total]
+  rule isRefV(ref(_:Int)) => true
+  rule isRefV(_:Val)      => false [owise]
+
+  // closure cells (Python-faithful capture): the heap holds cellV(V); a
+  // cellRef surfacing as the k-redex reads through (lookup is the only use —
+  // cellRefs never escape to user-visible values)
+  syntax HeapVal ::= cellV(Val)
+  syntax Bool ::= isCellRef(Val) [function, total]
+  rule isCellRef(cellRef(_:Int)) => true
+  rule isCellRef(_:Val)          => false [owise]
+  // k-top deref for cell-bound reads surfacing INSIDE the annotated frame
+  // (AugAssign's in-place read and friends). The "$cells" guard keeps this
+  // DECIDABLY inapplicable in plain frames — an unguarded rule lets the
+  // prover narrow abstract k-top values into cellRef junk (probed on
+  // 26-remove-duplicates). Cross-frame reads (a comprehension closure
+  // reading the enclosing function's cellvar) deref inside #look instead.
+  rule <k> cellRef(H:Int) => V ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       <heap> ... H |-> cellV(V:Val) ... </heap>
+       requires "$cells" in_keys(M)
+       [priority(40)]
+
+  // write through a cell (Assign / #bindP / #bindTgt dispatch here on
+  // cell-bound names)
+  // a keyword argument cools to a TAGGED value (consumed by kw-aware builtins)
+  syntax Val ::= kwV(String, Val)
+  syntax KItem ::= #kwTag(String)
+  rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>
+  rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k>
+       requires notBool isKwV(V)
+  syntax Bool ::= isKwV(Val) [function, total]
+  rule isKwV(kwV(_:String, _:Val)) => true
+  rule isKwV(_:Val)                => false [owise]
+
+  // the frame marker carries the CONCRETE cellvar list, so cell-write dispatch
+  // decides by pnMember even over an abstract frame rest (no prover branching)
+  syntax Val ::= cellsMark(ParamNames)
+  syntax ParamNames ::= cellsOf(Val) [function]
+  rule cellsOf(cellsMark(CVS:ParamNames)) => CVS
+  syntax Bool ::= pnMember(String, ParamNames) [function, total]
+  rule pnMember(_:String, .ParamNames) => false
+  rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)
+
+  syntax KItem ::= #cellW(Val, Val)
+  rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k>
+       <heap> ... H |-> cellV(_:Val => V) ... </heap>
+
+  syntax KItem ::= #alloc(Val)
+  rule <k> #alloc(V:Val) => ref(N) ... </k>
+       <heap>    H:Map => (N |-> V) H </heap>
+       <heapLoc> N:Int => N +Int 1 </heapLoc>
+       requires notBool N in_keys(H)
+
+  // ==== module load + statement sequencing ==================================
+  syntax KItem ::= #loadAll(Module)
+  rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>
+  rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>
+  rule <k> .Stmts => .K ... </k>
+
+  // ==== Name lookup (walk the scope chain; builtins live in the -1 scope) ====
+  syntax KItem ::= #look(String, Int)
+  rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>
+  rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k>
+       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+       requires X in_keys(M)
+  // a SYNTACTICALLY cell-bound name reads through the heap cell AT THE
+  // LOOKUP (higher priority beats the plain return above on concrete cell
+  // bindings; abstract claim values take the plain rule unchanged) — this
+  // covers cross-frame cell reads (a comprehension closure reading the
+  // enclosing function's cellvar) without a narrowing-prone k-top redex
+  // guarded on the FOUND frame's DECLARED cellvars (pnMember over the
+  // cellsMark): decidable for every concrete frame pin — plain frames and
+  // non-cell names prune outright, so an abstract looked-up value never
+  // drags a narrowing cellV heap match along (probed on 5-intersperse and
+  // Q4's abstract `numbers` in the annotated frame)
+  rule <k> #look(X:String, L:Int) => V ... </k>
+       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+       <heap> ... H |-> cellV(V:Val) ... </heap>
+       requires X in_keys(M) andBool "$cells" in_keys(M)
+        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+        andBool {M[X]}:>Val ==K cellRef(H)
+       [priority(40)]
+  rule <k> #look(X:String, L:Int) => #look(X, P) ... </k>
+       <scopes> ... L |-> scope(M:Map, parent(P:Int)) ... </scopes>
+       requires notBool (X in_keys(M))
+
+  // the ONE predefined builtins scope (the -1 frame; claims write `-1 |-> builtinsScope`)
+  syntax Scope ::= "builtinsScope" [function, total]
+  rule builtinsScope
+    => scope(.Map [ "len"    <- builtinV("len")    ]
+                  [ "set"    <- builtinV("set")    ]
+                  [ "sum"    <- builtinV("sum")    ]
+                  [ "abs"    <- builtinV("abs")    ]
+                  [ "min"    <- builtinV("min")    ]
+                  [ "max"    <- builtinV("max")    ]
+                  [ "ord"    <- builtinV("ord")    ]
+                  [ "chr"    <- builtinV("chr")    ]
+                  [ "range"  <- builtinV("range")  ]
+                  [ "all"    <- builtinV("all")    ]
+                  [ "any"    <- builtinV("any")    ]
+                  [ "zip"    <- builtinV("zip")    ]
+                  [ "isinstance" <- builtinV("isinstance") ]
+                  [ "sorted" <- builtinV("sorted") ]
+                  [ "list"   <- builtinV("list")   ]
+                  [ "round"  <- builtinV("round")  ]
+                  [ "bin"    <- builtinV("bin")    ]
+                  [ "enumerate" <- builtinV("enumerate") ]
+                  [ "map"    <- builtinV("map")    ]
+                  [ "eval"   <- builtinV("eval")   ]
+                  [ "int"    <- typeV("int")       ]
+                  [ "str"    <- typeV("str")       ]
+                  [ "float"  <- typeV("float")     ], root)
+
+  // ==== argument/element evaluation: ONE left-to-right loop, tagged by destination ==
+  // (list/tuple literals and calls all use it; modules extend ApplyK with their tags)
+  syntax ApplyK ::= toCall(Val)
+  syntax KItem  ::= #evalArgs(Exprs, Vals, ApplyK)
+                  | #evalArgCont(Exprs, Vals, ApplyK)
+                  | #applyK(ApplyK, Vals)
+  rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>
+  rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>
+  rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>
+
+  // ==== Int / Bool / None literals ==========================================
+  rule <k> Int(I:Int)   => I ... </k>
+  rule <k> Bool(B:Bool) => B ... </k>
+  rule <k> NoneVal      => noneV ... </k>
+
+  // ==== truthy (If, Assert, BoolOp, IfExp, not, While) ======================
+  syntax Bool ::= truthy(Val) [function]
+  rule truthy(B:Bool)          => B
+  rule truthy(noneV)           => false
+  rule truthy(I:Int)           => I =/=Int 0
+  rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)
+  rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)
+  rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)
+
+  // ==== extensible operator dispatch (cases added by the construct modules) ==
+  syntax Val  ::= applyUn(String, Val) [function]
+  syntax Val  ::= applyBin(String, Val, Val) [function]
+  syntax Bool ::= applyCmp(String, Val, Val) [function]
+
+  // ==== shared list helpers =================================================
+  syntax Vals ::= appendVal(Vals, Val) [function, total]
+  rule appendVal(.Vals, V:Val)              => V , .Vals
+  rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+
+  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+  rule vals2valSeq(.Vals)            => .ValSeq
+  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+
+  // ==== shared sequence length (len / summaries across many modules) ========
+  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+  syntax Int ::= vsLen(ValSeq) [function, total]
+  rule vsLen(.ValSeq)                => 0
+  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+
+  syntax Int ::= isLen(IntSeq) [function, total]
+  rule isLen(.IntSeq)                => 0
+  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+
+  // in-bounds positional write (list subscript-assign); OOB leaves the seq unchanged
+  // (valid programs write in-bounds — mirrors valSeqAt's total-but-underspecified stance)
+  syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]
+  rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq
+  rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val)    => vCons(V, S)
+  rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V))
+       requires I >Int 0
+  rule setVSAt(VS:ValSeq, I:Int, _:Val)             => VS
+       requires I <Int 0
+endmodule
+===== reference-semantics/semantics/functions.k
+// reference/src/semantics/functions.k — MPY-FUNCTIONS
+
+module MPY-FUNCTIONS
+  imports MPY-CORE
+
+  // call routing + callee/arg evaluation (#callee/#args/#argCont) live in call.k;
+  // this module owns the frame lifecycle (bind params, return, pop).
+  syntax KItem ::= frame(continuation: K, callerEnv: Int, savedLoc: Int)
+                 | #bindP(ParamNames, Vals)
+                 | "#pop"
+                 | "#endcall"
+
+  // ==== def / anonymous closure =============================================
+  rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ F <- closureVal(PNS, BODY, L) ], _) ... </scopes>
+
+  syntax Expr ::= closureExpr(ParamNames, Stmts)
+  rule <k> closureExpr(PNS:ParamNames, BODY:Stmts) => closureVal(PNS, BODY, L) ... </k>
+       <env> L:Int </env>
+
+  // ==== annotated def/lambda (closure cells; spec 2.3) ======================
+  // closureValC(params, cellvars, body, captured-cells). No frame anchor: all
+  // enclosing-local reads are freevars (symtable-complete) and go through the
+  // captured cells; everything else is global/builtin, so the callee frame's
+  // parent is the module scope (0) — sound after the defining frame dies.
+  syntax Val ::= closureValC(ParamNames, ParamNames, Stmts, Map)
+
+  // capture: resolve each freevar to the enclosing frame's cellRef, then bind
+  // (FuncDef) or yield (Lambda) the closure value.
+  syntax KItem ::= #mkClosure(String, ParamNames, ParamNames, ParamNames, Stmts, Map)
+                 | #mkLambda(ParamNames, ParamNames, ParamNames, Stmts, Map)
+  rule <k> FuncDef(F:String, Params(PNS:ParamNames), CellVars(CVS:ParamNames),
+                   FreeVars(FVS:ParamNames), BODY:Stmts)
+        => #mkClosure(F, PNS, CVS, FVS, BODY, .Map) ... </k>
+  rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames,
+                      (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map)
+        => #mkClosure(F, PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires FV in_keys(M)
+  rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames,
+                      .ParamNames, BODY:Stmts, CM:Map) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ F <- closureValC(PNS, CVS, BODY, CM) ], _) ... </scopes>
+
+  rule <k> Lambda(Params(PNS:ParamNames), E:Expr)
+        => closureVal(PNS, Return(E) .Stmts, L) ... </k>
+       <env> L:Int </env>
+  rule <k> Lambda(Params(PNS:ParamNames), CellVars(CVS:ParamNames),
+                  FreeVars(FVS:ParamNames), E:Expr)
+        => #mkLambda(PNS, CVS, FVS, Return(E) .Stmts, .Map) ... </k>
+  rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames,
+                     (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map)
+        => #mkLambda(PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires FV in_keys(M)
+  rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map)
+        => closureValC(PNS, CVS, BODY, CM) ... </k>
+
+  // ==== bind params ========================================================
+  rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>
+  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ P <- V ], _) ... </scopes>
+  // a param that is a cellvar was pre-bound to its cell at frame entry
+  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals))
+        => #cellW({M[P]}:>Val, V) ~> #bindP(PS, VS) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires "$cells" in_keys(M)
+        andBool pnMember(P, cellsOf({M["$cells"]}:>Val))
+        andBool P in_keys(M) andBool isCellRef({M[P]}:>Val)
+       [priority(40)]
+
+  // ==== return / pop the frame (the returned expr evaluates by strictness) ==
+  rule <k> Return(V:Val) ~> _ => #pop </k>
+       <ret> noRet => retV(V) </ret>
+  rule <k> #endcall => #pop ... </k>
+       <ret> noRet => retV(noneV) </ret>
+  // pop: restore env, DEALLOCATE the callee frame, and wind scopeLoc back (LIFO allocation
+  // makes the saved loc the callee frame's own loc). Sound because no closureVal outlives its
+  // defining frame (frontend subset: no returned/stored closures; module defs live in loc 0).
+  rule <k> #pop => V ~> CONT </k>
+       <ret>   retV(V) => noRet </ret>
+       <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack>
+       <env>   L:Int => CALLERL </env>
+       <scopes> SC:Map => SC [ L <- undef ] </scopes>
+       <scopeLoc> _ => SAVEDL </scopeLoc>
+endmodule
+===== reference-semantics/semantics/controls.k
+// reference/src/semantics/controls.k — MPY-CONTROLS
+
+module MPY-CONTROLS
+  imports MPY-CORE
+  imports MPY-TUPLE
+  imports MPY-ITER
+
+  // ==== Assign / AugAssign (write the current scope; RHS evaluated by strictness) ==
+  rule <k> Assign(Name(X:String), V:Val) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>
+  rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires "$cells" in_keys(M)
+        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+        andBool X in_keys(M) andBool isCellRef({M[X]}:>Val)
+       [priority(40)]
+
+  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes>
+       requires X in_keys(M)
+  // `lst += [..]` where lst is a heap ref: the generic rule leaves applyBin(OP, ref, V) — but the
+  // ref-deref preemption is BinOp-level (operators.k), so applyBin never derefs and it sticks. Route
+  // the ref case through BinOp so the deref + list-concat + #alloc path fires (result is a fresh ref).
+  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires X in_keys(M) andBool isRefV({M[X]}:>Val)
+       [priority(40)]
+
+  // ==== import trivia: `from math import floor, ceil` binds the supported
+  // names as builtins in the current scope; every other import is a no-op
+  rule <k> ImportFrom("math", NS:ParamNames) => #bindImports(NS) ... </k>
+  rule <k> ImportFrom(_:String, _:ParamNames) => .K ... </k> [owise]
+  syntax KItem ::= #bindImports(ParamNames)
+  rule <k> #bindImports(.ParamNames) => .K ... </k>
+  rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ N <- builtinV(N) ], _) ... </scopes>
+       requires N ==String "floor" orBool N ==String "ceil"
+  rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>
+       requires notBool (N ==String "floor" orBool N ==String "ceil")
+
+  // ==== Expr statement: evaluate for effect, discard the value ===============
+  // (bare calls — mutator methods, docstrings; the WP0 statement-trivia rung)
+  rule <k> Expr(_:Val) => .K ... </k>
+
+  // ==== If (condition evaluated by strictness) ==============================
+  syntax KItem ::= #branch(Bool, Stmts, Stmts)
+  rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>
+  rule <k> #branch(true,  T:Stmts, _:Stmts) => T ... </k>
+  rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>
+
+  // ==== IfExp: ternary T if C else E ========================================
+  rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k>
+       requires truthy(V)
+  rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k>
+       requires notBool truthy(V)
+
+  // ==== For: one loop, in-cell continuation, over #iterNext =================
+  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+  // circularities anchor on #loop and narrowing substitutes the structure)
+  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+                 | #loopLbl(K) | "#cont" | "#brk"
+
+  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+
+  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+
+  // ==== While ==============================================================
+  rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>
+  rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>
+  rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k>
+       requires truthy(V)
+  rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k>
+       requires notBool truthy(V)
+
+  // ==== loop control (break / continue) =====================================
+  rule <k> #loopLbl(NEXT:K) => NEXT ... </k>
+  rule <k> Continue => #cont ... </k>
+  rule <k> Break => #brk ... </k>
+  rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>
+  rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]
+  rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>
+  rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]
+
+  // ==== heap-object deref at the truthiness/iteration consumers ==============
+  // (priority(40) preempts the generic Val rules so truthy/#loop never see a ref)
+  rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  // For derefs its iterable ONCE at loop start (iteration is over the snapshot;
+  // mutating the iterated list inside its own loop is outside the subset)
+  rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+endmodule
+===== reference-semantics/semantics/iter.k
+// reference/src/semantics/iter.k — MPY-ITER
+// The iterator protocol, DECLARATION ONLY. Each iterable's #iterNext case lives in that
+// iterable's own module (list/tuple/str in their modules, rangeObj in range.k, zip in
+// builtins.k). Consumers (the for-loop, `x in _`, sum/all/any/max/min) import this.
+
+module MPY-ITER
+  imports MPY-CORE
+  syntax KItem ::= #iterNext(Iterable) | "#iterDone" | #iterYield(Val, Iterable)
+endmodule
+===== reference-semantics/semantics/str.k
+// reference/src/semantics/str.k — MPY-STR
+
+module MPY-STR
+  imports MPY-CORE
+  imports MPY-ITER
+
+  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+
+  // ==== str literal (ASCII-only) ============================================
+  syntax IntSeq ::= strToCodes(String) [function]
+  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+  rule strToCodes("") => .IntSeq
+  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+
+  // ==== operators: + / == / != / in =========================================
+  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+  rule seqConcat(.IntSeq, T:IntSeq)                => T
+  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+
+  rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+  rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+  rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)
+
+  // substring membership: `P in X` iff the code-seq P occurs contiguously in X
+  rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)
+  rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)
+
+  syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]
+  rule strPrefix(.IntSeq, _:IntSeq)               => true
+  rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false
+  rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)
+
+  syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]
+  rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)
+  rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)
+  rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs)
+       requires notBool strPrefix(P, iCons(C, Xs))
+
+  // ==== lexicographic order: < / <= / > / >= by code point (= Python str order on the code
+  // model). strLt reduces on GROUND code-seqs (krun) but is inert/OPAQUE on symbolic ones
+  // (a proof's codesProj(V) is an abstract IntSeq — no constructor rule matches), so a symbolic
+  // str `<` stays a trusted opaque term the way sortVS / intFloatDiv do. Additive: fires only on
+  // str </<=/>/>= comparisons.
+  syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]
+  rule strLt(.IntSeq, .IntSeq)                => false
+  rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true
+  rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true          requires A  <Int B
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false         requires A  >Int B
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B
+
+  rule applyCmp("<",  str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+  rule applyCmp(">",  str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)
+  rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)
+  rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)
+endmodule
+===== reference-semantics/semantics/operators.k
+// reference/src/semantics/operators.k — MPY-OPERATORS
+// The operator DISPATCH layer: operands evaluate by strictness (heat/cool over KResult=Val),
+// the cooled node hands to applyUn/applyBin/applyCmp (declared in core.k; each domain file
+// owns its cases — bool.k, int.k, float.k, str.k, list.k, tuple.k, set.k, dict.k).
+
+module MPY-OPERATORS
+  imports MPY-CORE
+  imports MPY-ITER
+
+  rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>
+
+  rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+
+  // Compare's right operand sits under the CmpOp wrapper — contexts instead of attributes
+  context Compare(HOLE, _)
+  context Compare(_:Val, CmpOp(_, HOLE))
+  rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]
+
+  rule applyCmp("is",     V:Val, noneV) => V ==K noneV
+  rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)
+
+  // ==== operand deref: heap objects combine/compare by STRUCTURE ============
+  // (Python: list == is structural; identity only via `is`.) priority(40)
+  // preempts the generic dispatch so applyUn/applyBin/applyCmp never see a ref.
+  rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isRefV(L)
+       [priority(40)]
+
+  // the left operand of `in`/`not in` is an ELEMENT (compares by ==K) — never deref'd
+  rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires OP =/=String "in" andBool OP =/=String "not in"
+       [priority(40)]
+  rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isRefV(L)
+        orBool OP ==String "in" orBool OP ==String "not in"
+       [priority(40)]
+
+  rule <k> UnaryOp(OP:String, ref(H:Int)) => UnaryOp(OP, V) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+endmodule
+===== reference-semantics/semantics/call.k
+// reference/src/semantics/call.k — MPY-CALL
+// ONE call route for every callable: evaluate the callee to a VALUE (name lookup reaches
+// builtins at the root; a cooled Attribute is a bound method), evaluate the args (the shared
+// #evalArgs loop in core.k), then dispatch on the callee value:
+//   closureVal    -> bind params, push a frame (user function)
+//   boundMethodV  -> applyMethod
+//   builtinV      -> the #iterNext folds (sum/all/any/max/min) or applyBuiltin
+//   typeV         -> callable type objects: int(...) / str(...)
+
+module MPY-CALL
+  imports MPY-METHODS
+  imports MPY-BUILTINS
+  imports MPY-FUNCTIONS
+
+  // a cooled attribute is a bound method value
+  rule <k> Attribute(V:Val, M:String) => boundMethodV(V, M) ... </k>
+
+  // evaluate callee, then args ([owise]: problem-local Call interceptions beat this)
+  syntax KItem ::= #callee(Exprs)
+  rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]
+  rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>
+
+  // ==== dispatch on the callee value ========================================
+  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>
+
+  rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>
+  rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ)    ... </k>
+  rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ)    ... </k>
+  rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ)   ... </k>
+  rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ)   ... </k>
+  rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]
+  rule <k> #applyK(toCall(typeV(T:String)),     ACC:Vals) => applyBuiltin(T, ACC)  ... </k>
+
+  // ==== heap-object arguments/receivers =====================================
+  // Builtins and type calls READ structure — deref the first two arg positions
+  // (covers len/sum/all/any/max/min/sorted/list/set + zip's pair). Mutating list
+  // methods take the ref itself; every other method receiver is deref'd.
+  rule <k> #applyK(toCall(builtinV(BN:String)), (ref(H:Int), REST:Vals))
+        => #applyK(toCall(builtinV(BN)), (V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> #applyK(toCall(builtinV(BN:String)), (A:Val, ref(H:Int), REST:Vals))
+        => #applyK(toCall(builtinV(BN)), (A, V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isRefV(A)
+       [priority(40)]
+  rule <k> #applyK(toCall(typeV(T:String)), (ref(H:Int), REST:Vals))
+        => #applyK(toCall(typeV(T)), (V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+
+  syntax Bool ::= isMutMethod(String) [function, total]
+  rule isMutMethod(M:String)
+    => M ==String "append" orBool M ==String "sort" orBool M ==String "extend"
+       orBool M ==String "insert" orBool M ==String "pop" orBool M ==String "remove"
+  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), M:String)), ACC:Vals)
+        => #applyK(toCall(boundMethodV(V, M)), ACC) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isMutMethod(M)
+       [priority(40)]
+  // non-mutating methods READ their heap-object arguments too (join's list);
+  // mutators keep refs (append of a list into a list-of-lists stays aliased)
+  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), (ref(H:Int), REST:Vals))
+        => #applyK(toCall(boundMethodV(OBJ, M)), (V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isMutMethod(M) andBool notBool isRefV(OBJ)
+       [priority(40)]
+
+  rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT
+        => #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+       <env>     CALLERL:Int => NEWL </env>
+       <scopes>   STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes>
+       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+       <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+
+  // annotated closure: the frame starts with the captured freevar cells, its
+  // parent is the module scope (all enclosing-local reads go through cells),
+  // and the cellvars' fresh cells allocate before params bind (a cellvar param
+  // then writes through its cell in #bindP).
+  rule <k> #applyK(toCall(closureValC(PNS:ParamNames, CVS:ParamNames, BODY:Stmts, CM:Map)), ACC:Vals) ~> CONT
+        => #allocCells(CVS) ~> #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+       <env>     CALLERL:Int => NEWL </env>
+       <scopes>   STORE:Map => STORE [ NEWL <- scope(CM [ "$cells" <- cellsMark(CVS) ], parent(0)) ] </scopes>
+       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+       <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+
+  syntax KItem ::= #allocCells(ParamNames)
+  rule <k> #allocCells(.ParamNames) => .K ... </k>
+  rule <k> #allocCells((CV:String, R:ParamNames)) => #allocCells(R) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ CV <- cellRef(N) ], _) ... </scopes>
+       <heap>    H:Map => (N |-> cellV(noneV)) H </heap>
+       <heapLoc> N:Int => N +Int 1 </heapLoc>
+       requires notBool N in_keys(H)
+endmodule
+===== reference-semantics/semantics/concrete.k
+// reference/src/semantics/concrete.k — MPY-CONCRETE
+// Concrete-execution-only rules, visible ONLY to the llvm build (run.sh kompiles
+// MPY-CONCRETE; verification builds import MPY and never see these). Rationale:
+// a k-cell rule matching value constructors NARROWS abstract Vals in the haskell
+// backend ([concrete] is not respected on rewrite rules) — probed on
+// 26-remove-duplicates, where element compares branched into deepEqVS.
+
+module MPY-CONCRETE
+  imports MPY
+
+  // deep equality for list compares whose elements are heap objects
+  // (list-of-lists): Python == is structural at every depth.
+  rule <k> Compare(list(A:ValSeq), CmpOp("==", list(B:ValSeq))) => deepEqVS(A, B, HP) ... </k>
+       <heap> HP:Map </heap>
+       requires hasRefVS(A) orBool hasRefVS(B)
+  rule <k> Compare(list(A:ValSeq), CmpOp("!=", list(B:ValSeq))) => notBool deepEqVS(A, B, HP) ... </k>
+       <heap> HP:Map </heap>
+       requires hasRefVS(A) orBool hasRefVS(B)
+
+  // ==== keyed sort, concrete leg ============================================
+  // Computes each key by a REAL call through the uniform #callee machinery
+  // (closures, len, type objects all work), stable-inserts on the key, and
+  // allocates the result. priority(40) beats sort.k's opaque rules, so krun
+  // runs this and proofs (which never see MPY-CONCRETE) keep sortKeyVS.
+  syntax Val ::= kvP(Val, Val)
+  syntax KItem ::= #ksort(ValSeq, Val, ValSeq, Bool)
+                 | #ksIns(Val, ValSeq, Val, ValSeq, Bool)
+  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals))
+        => #ksort(VS, KV, .ValSeq, false) ... </k>
+       [priority(40)]
+  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals))
+        => #ksort(VS, KV, .ValSeq, RB) ... </k>
+       [priority(40)]
+  rule <k> #ksort(.ValSeq, _:Val, ACC:ValSeq, RB:Bool)
+        => #alloc(list(condRev(unpairVS(ACC), RB))) ... </k>
+  rule <k> #ksort(vCons(V:Val, R:ValSeq), KV:Val, ACC:ValSeq, RB:Bool)
+        => KV ~> #callee((V, .Exprs)) ~> #ksIns(V, R, KV, ACC, RB) ... </k>
+  rule <k> K:Val ~> #ksIns(V:Val, R:ValSeq, KV:Val, ACC:ValSeq, RB:Bool)
+        => #ksort(R, KV, insPair(ACC, K, V), RB) ... </k>
+       requires notBool isKwV(K)
+
+  syntax ValSeq ::= insPair(ValSeq, Val, Val) [function]
+  rule insPair(.ValSeq, K:Val, V:Val) => vCons(kvP(K, V), .ValSeq)
+  rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val)
+    => vCons(kvP(K, V), vCons(kvP(K2, V2), R))
+       requires kLt(K, K2)
+  rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val)
+    => vCons(kvP(K2, V2), insPair(R, K, V))
+       requires notBool kLt(K, K2)
+
+  syntax Bool ::= kLt(Val, Val) [function]
+  rule kLt(I1:Int, I2:Int)             => I1 <Int I2
+  rule kLt(F1:Float, F2:Float)         => F1 <Float F2
+  rule kLt(str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+
+  syntax ValSeq ::= unpairVS(ValSeq) [function, total]
+  rule unpairVS(.ValSeq) => .ValSeq
+  rule unpairVS(vCons(kvP(_:Val, V:Val), R:ValSeq)) => vCons(V, unpairVS(R))
+  rule unpairVS(vCons(V:Val, R:ValSeq)) => vCons(V, unpairVS(R)) [owise]
+endmodule
+
+codex
+The semantics already provides a pure `str.swapcase()` rule, so the implementation can stay extremely small: `return string.swapcase()`. I’m now checking how its character transformation is represented symbolically so the proof claim can state the full contract over arbitrary supported strings, not just examples.
+exec
+/bin/bash -lc "sed -n '1,360p' reference-semantics/semantics/methods.k && sed -n '1,360p' reference-semantics/semantics/functions.k && sed -n '1,360p' reference-semantics/semantics/core.k && sed -n '1,260p' reference-semantics/semantics/bool.k && kompile --version && kprove --version && krun --version" in /work
+ succeeded in 0ms:
+// reference/src/semantics/methods.k — MPY-METHODS
+
+module MPY-METHODS
+  imports MPY-CORE
+  imports K-EQUAL
+  imports MPY-STR
+  imports MPY-LIST
+
+  // method-call routing + arg-eval live in call.k; this module owns applyMethod.
+  syntax Val ::= applyMethod(Val, String, Vals) [function]
+
+  // ==== string predicates (Python semantics) =================================
+  rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)
+  rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)
+  rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)
+  rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS)
+
+  // ==== case maps ============================================================
+  rule applyMethod(str(CS:IntSeq), "lower",    .Vals) => str(mapLower(CS))
+  rule applyMethod(str(CS:IntSeq), "upper",    .Vals) => str(mapUpper(CS))
+  rule applyMethod(str(CS:IntSeq), "swapcase", .Vals) => str(mapSwap(CS))
+
+  // ==== join / count / strip / encode ========================================
+  // S.join(list-of-str): fold with separator codes (receiver + arg deref'd by
+  // the call layer; the result str is a value)
+  rule applyMethod(str(SEP:IntSeq), "join", list(VS:ValSeq), .Vals) => str(joinCodes(SEP, VS))
+  syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]
+  rule joinCodes(_:IntSeq, .ValSeq) => .IntSeq
+  rule joinCodes(_:IntSeq, vCons(str(CS:IntSeq), .ValSeq)) => CS
+  rule joinCodes(SEP:IntSeq, vCons(str(CS:IntSeq), vCons(V:Val, R:ValSeq)))
+    => seqConcat(CS, seqConcat(SEP, joinCodes(SEP, vCons(V, R))))
+
+  // S.count(sub): non-overlapping window scan (Python str.count)
+  rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)
+  syntax Int ::= cntSub(IntSeq, IntSeq) [function]
+  rule cntSub(.IntSeq, _:IntSeq) => 0
+  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC)
+       requires strPrefix(PC, iCons(C, R)) andBool isLen(PC) >Int 0
+  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => cntSub(R, PC)
+       requires notBool strPrefix(PC, iCons(C, R)) orBool isLen(PC) <=Int 0
+  syntax IntSeq ::= dropIS(IntSeq, Int) [function, total]
+  rule dropIS(S:IntSeq, N:Int) => S requires N <=Int 0
+  rule dropIS(.IntSeq, _:Int) => .IntSeq [owise]
+  rule dropIS(iCons(_:Int, R:IntSeq), N:Int) => dropIS(R, N -Int 1) requires N >Int 0
+
+  // S.strip(): trim whitespace runs from both ends
+  rule applyMethod(str(CS:IntSeq), "strip", .Vals) => str(revIS(trimWS(revIS(trimWS(CS)))))
+  syntax IntSeq ::= trimWS(IntSeq) [function, total]
+  rule trimWS(.IntSeq) => .IntSeq
+  rule trimWS(iCons(C:Int, R:IntSeq)) => trimWS(R) requires isWSC(C)
+  rule trimWS(iCons(C:Int, R:IntSeq)) => iCons(C, R) requires notBool isWSC(C)
+  syntax IntSeq ::= revIS(IntSeq) [function, total] | revISAcc(IntSeq, IntSeq) [function, total]
+  rule revIS(S:IntSeq) => revISAcc(S, .IntSeq)
+  rule revISAcc(.IntSeq, A:IntSeq) => A
+  rule revISAcc(iCons(C:Int, R:IntSeq), A:IntSeq) => revISAcc(R, iCons(C, A))
+
+  // S.encode('ascii'): identity on the code-sequence model (bytes == codes)
+  rule applyMethod(str(CS:IntSeq), "encode", str(_:IntSeq), .Vals) => str(CS)
+
+  // ==== prefix ===============================================================
+  rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)
+
+  // ==== list.count(v) — number of occurrences of v in the list (concrete for krun) ==========
+  rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)
+  syntax Int ::= cntOccVS(ValSeq, Val) [function, total]
+  rule cntOccVS(.ValSeq, _:Val)                => 0
+  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V
+  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => cntOccVS(R, V)        requires notBool (A ==K V)
+
+  // ==== split (no-arg: on whitespace runs, dropping empty tokens) + replace (single char) ==========
+  // Concrete string ops for krun. A proof over a symbolic string intercepts the split problem-locally.
+  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals)
+        => #alloc(list(splitWS(CS, .IntSeq, .ValSeq))) ... </k>
+       [priority(40)]
+  syntax ValSeq ::= splitWS(IntSeq, IntSeq, ValSeq) [function]  // remaining, current token, result
+  rule splitWS(.IntSeq, CUR:IntSeq, ACC:ValSeq) => flushTok(ACC, CUR)
+  rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, .IntSeq, flushTok(ACC, CUR))
+       requires isWSC(C)
+  rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, seqConcat(CUR, iCons(C, .IntSeq)), ACC)
+       requires notBool isWSC(C)
+  // flush the current token to the result list iff non-empty.
+  syntax ValSeq ::= flushTok(ValSeq, IntSeq) [function]
+  rule flushTok(ACC:ValSeq, .IntSeq)            => ACC
+  rule flushTok(ACC:ValSeq, iCons(C:Int, T:IntSeq)) => valSeqConcat(ACC, vCons(str(iCons(C, T)), .ValSeq))
+  syntax Bool ::= isWSC(Int) [function, total]
+  rule isWSC(C:Int) => C ==Int 32 orBool C ==Int 9 orBool C ==Int 10 orBool C ==Int 13
+
+  // split(sep='x') keyword form delegates to the positional k-cell rule
+  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (kwV("sep", str(S:IntSeq)), .Vals))
+        => #applyK(toCall(boundMethodV(str(CS), "split")), (str(S), .Vals)) ... </k>
+       [priority(39)]
+
+  // str.split(sep) — single-char separator, KEEPING empty parts (Python's sep-split; len == #sep + 1).
+  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (str(iCons(SEP:Int, .IntSeq)), .Vals))
+        => #alloc(list(splitSep(CS, SEP, .IntSeq))) ... </k>
+       [priority(40)]
+  syntax ValSeq ::= splitSep(IntSeq, Int, IntSeq) [function]  // remaining, sep code, current token
+  rule splitSep(.IntSeq, _SEP:Int, CUR:IntSeq)              => vCons(str(CUR), .ValSeq)
+  rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => vCons(str(CUR), splitSep(R, SEP, .IntSeq))
+       requires C ==Int SEP
+  rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => splitSep(R, SEP, seqConcat(CUR, iCons(C, .IntSeq)))
+       requires notBool (C ==Int SEP)
+
+  rule applyMethod(str(CS:IntSeq), "replace", str(iCons(A:Int, .IntSeq)), str(iCons(B:Int, .IntSeq)), .Vals)
+    => str(replaceC(CS, A, B))
+  syntax IntSeq ::= replaceC(IntSeq, Int, Int) [function, total]
+  rule replaceC(.IntSeq, _:Int, _:Int)             => .IntSeq
+  rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(B, replaceC(R, A, B)) requires C ==Int A
+  rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(C, replaceC(R, A, B)) requires notBool (C ==Int A)
+
+  // ==== char helpers =========================================================
+  syntax Bool ::= isUpperC(Int) [function, total]
+  rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90
+
+  syntax Bool ::= isLowerC(Int) [function, total]
+  rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122
+
+  syntax Bool ::= isAlphaC(Int) [function, total]
+  rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)
+
+  syntax Bool ::= isDigitC(Int) [function, total]
+  rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57
+
+  syntax Bool ::= hasUpper(IntSeq) [function, total]
+  rule hasUpper(.IntSeq) => false
+  rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)
+
+  syntax Bool ::= hasLower(IntSeq) [function, total]
+  rule hasLower(.IntSeq) => false
+  rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)
+
+  syntax Bool ::= allAlpha(IntSeq) [function, total]
+  rule allAlpha(.IntSeq) => true
+  rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)
+
+  syntax Bool ::= allDigit(IntSeq) [function, total]
+  rule allDigit(.IntSeq) => true
+  rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)
+
+  syntax Int ::= lowerC(Int) [function, total]
+
+  rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)
+  rule lowerC(C:Int) => C         [owise]
+
+  syntax Int ::= upperC(Int) [function, total]
+  rule upperC(C:Int) => C -Int 32 requires isLowerC(C)
+  rule upperC(C:Int) => C         [owise]
+
+  syntax Int ::= swapC(Int) [function, total]
+  rule swapC(C:Int) => C +Int 32 requires isUpperC(C)
+  rule swapC(C:Int) => C -Int 32 requires isLowerC(C)
+  rule swapC(C:Int) => C         [owise]
+
+  syntax IntSeq ::= mapLower(IntSeq) [function, total]
+  rule mapLower(.IntSeq) => .IntSeq
+  rule mapLower(iCons(C:Int, S:IntSeq)) => iCons(lowerC(C), mapLower(S))
+
+  syntax IntSeq ::= mapUpper(IntSeq) [function, total]
+  rule mapUpper(.IntSeq) => .IntSeq
+  rule mapUpper(iCons(C:Int, S:IntSeq)) => iCons(upperC(C), mapUpper(S))
+
+  syntax IntSeq ::= mapSwap(IntSeq) [function, total]
+  rule mapSwap(.IntSeq) => .IntSeq
+  rule mapSwap(iCons(C:Int, S:IntSeq)) => iCons(swapC(C), mapSwap(S))
+
+  syntax Bool ::= startsWith(IntSeq, IntSeq) [function, total]
+  rule startsWith(.IntSeq, _:IntSeq)               => true
+  rule startsWith(iCons(_:Int, _:IntSeq), .IntSeq) => false
+  rule startsWith(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool startsWith(As, Bs)
+endmodule
+// reference/src/semantics/functions.k — MPY-FUNCTIONS
+
+module MPY-FUNCTIONS
+  imports MPY-CORE
+
+  // call routing + callee/arg evaluation (#callee/#args/#argCont) live in call.k;
+  // this module owns the frame lifecycle (bind params, return, pop).
+  syntax KItem ::= frame(continuation: K, callerEnv: Int, savedLoc: Int)
+                 | #bindP(ParamNames, Vals)
+                 | "#pop"
+                 | "#endcall"
+
+  // ==== def / anonymous closure =============================================
+  rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ F <- closureVal(PNS, BODY, L) ], _) ... </scopes>
+
+  syntax Expr ::= closureExpr(ParamNames, Stmts)
+  rule <k> closureExpr(PNS:ParamNames, BODY:Stmts) => closureVal(PNS, BODY, L) ... </k>
+       <env> L:Int </env>
+
+  // ==== annotated def/lambda (closure cells; spec 2.3) ======================
+  // closureValC(params, cellvars, body, captured-cells). No frame anchor: all
+  // enclosing-local reads are freevars (symtable-complete) and go through the
+  // captured cells; everything else is global/builtin, so the callee frame's
+  // parent is the module scope (0) — sound after the defining frame dies.
+  syntax Val ::= closureValC(ParamNames, ParamNames, Stmts, Map)
+
+  // capture: resolve each freevar to the enclosing frame's cellRef, then bind
+  // (FuncDef) or yield (Lambda) the closure value.
+  syntax KItem ::= #mkClosure(String, ParamNames, ParamNames, ParamNames, Stmts, Map)
+                 | #mkLambda(ParamNames, ParamNames, ParamNames, Stmts, Map)
+  rule <k> FuncDef(F:String, Params(PNS:ParamNames), CellVars(CVS:ParamNames),
+                   FreeVars(FVS:ParamNames), BODY:Stmts)
+        => #mkClosure(F, PNS, CVS, FVS, BODY, .Map) ... </k>
+  rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames,
+                      (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map)
+        => #mkClosure(F, PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires FV in_keys(M)
+  rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames,
+                      .ParamNames, BODY:Stmts, CM:Map) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ F <- closureValC(PNS, CVS, BODY, CM) ], _) ... </scopes>
+
+  rule <k> Lambda(Params(PNS:ParamNames), E:Expr)
+        => closureVal(PNS, Return(E) .Stmts, L) ... </k>
+       <env> L:Int </env>
+  rule <k> Lambda(Params(PNS:ParamNames), CellVars(CVS:ParamNames),
+                  FreeVars(FVS:ParamNames), E:Expr)
+        => #mkLambda(PNS, CVS, FVS, Return(E) .Stmts, .Map) ... </k>
+  rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames,
+                     (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map)
+        => #mkLambda(PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires FV in_keys(M)
+  rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map)
+        => closureValC(PNS, CVS, BODY, CM) ... </k>
+
+  // ==== bind params ========================================================
+  rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>
+  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ P <- V ], _) ... </scopes>
+  // a param that is a cellvar was pre-bound to its cell at frame entry
+  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals))
+        => #cellW({M[P]}:>Val, V) ~> #bindP(PS, VS) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires "$cells" in_keys(M)
+        andBool pnMember(P, cellsOf({M["$cells"]}:>Val))
+        andBool P in_keys(M) andBool isCellRef({M[P]}:>Val)
+       [priority(40)]
+
+  // ==== return / pop the frame (the returned expr evaluates by strictness) ==
+  rule <k> Return(V:Val) ~> _ => #pop </k>
+       <ret> noRet => retV(V) </ret>
+  rule <k> #endcall => #pop ... </k>
+       <ret> noRet => retV(noneV) </ret>
+  // pop: restore env, DEALLOCATE the callee frame, and wind scopeLoc back (LIFO allocation
+  // makes the saved loc the callee frame's own loc). Sound because no closureVal outlives its
+  // defining frame (frontend subset: no returned/stored closures; module defs live in loc 0).
+  rule <k> #pop => V ~> CONT </k>
+       <ret>   retV(V) => noRet </ret>
+       <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack>
+       <env>   L:Int => CALLERL </env>
+       <scopes> SC:Map => SC [ L <- undef ] </scopes>
+       <scopeLoc> _ => SAVEDL </scopeLoc>
+endmodule
+// reference/src/semantics/core.k — MPY-CORE
+
+module MPY-CORE
+  imports MPY-SYNTAX
+  imports INT
+  imports BOOL
+  imports STRING
+  imports MAP
+  imports LIST
+  imports K-EQUAL
+
+  // ==== values, the algebraic lists, and the scope heap =====================
+  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+  syntax Str    ::= str(IntSeq)
+
+  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+  syntax Iterable ::= list(ValSeq)
+                    | tuple(ValSeq)
+                    | Str
+                    | rangeObj(Int, Int, Int)
+                    | zipObj(ValSeq, ValSeq)
+                    | zipObjS(IntSeq, IntSeq)
+
+  syntax Val      ::= Int
+                    | Bool
+                    | "noneV"
+                    | Iterable
+                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+                    | closureVal(ParamNames, Stmts, Int)
+                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+
+  syntax Parent   ::= "root" | parent(Int)
+  syntax Scope    ::= scope(Map, Parent)
+  syntax KResult  ::= Val
+  syntax Expr     ::= Val   // cooling puts results back into expression holes
+  syntax Vals     ::= List{Val, ","}
+  syntax Exc      ::= "NoExc" | "AssertionError"
+  syntax RetState ::= "noRet" | retV(Val)
+
+  // ==== configuration =======================================================
+  // The builtins namespace is a real scope at reserved location -1 (the bottom of every
+  // chain; scopeLoc only allocates >=1, so -1 never collides). The module scope (loc 0)
+  // has it as parent, so an unbound name resolves there last — exactly LEGB. `int`/`str`
+  // resolve to their type objects; any local/global binding shadows them via normal lookup.
+  configuration
+    <k>       #loadAll($PGM:Module) </k>
+    <env>     0 </env>
+    <scopes>   0     |-> scope(.Map, parent(-1))
+              -1    |-> builtinsScope </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap>    .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack>   .List </stack>
+    <ret>     noRet </ret>
+    <exc>     NoExc </exc>
+    <exit-code exit=""> 0 </exit-code>
+
+  // ==== heap allocation (constructed lists become objects) ==================
+  // Cons-form emission with a freshness guard (the heap-list-probe discipline:
+  // an update-form H[N <- _] never re-normalizes symbolically). heapLoc is
+  // monotonic — it does NOT wind back at #pop: returned lists escape by ref.
+  // A bare list(VS) Val stays legal (read-only inputs in claims flow unboxed);
+  // only CONSTRUCTORS in program syntax allocate.
+  syntax Bool ::= isRefV(Val) [function, total]
+  rule isRefV(ref(_:Int)) => true
+  rule isRefV(_:Val)      => false [owise]
+
+  // closure cells (Python-faithful capture): the heap holds cellV(V); a
+  // cellRef surfacing as the k-redex reads through (lookup is the only use —
+  // cellRefs never escape to user-visible values)
+  syntax HeapVal ::= cellV(Val)
+  syntax Bool ::= isCellRef(Val) [function, total]
+  rule isCellRef(cellRef(_:Int)) => true
+  rule isCellRef(_:Val)          => false [owise]
+  // k-top deref for cell-bound reads surfacing INSIDE the annotated frame
+  // (AugAssign's in-place read and friends). The "$cells" guard keeps this
+  // DECIDABLY inapplicable in plain frames — an unguarded rule lets the
+  // prover narrow abstract k-top values into cellRef junk (probed on
+  // 26-remove-duplicates). Cross-frame reads (a comprehension closure
+  // reading the enclosing function's cellvar) deref inside #look instead.
+  rule <k> cellRef(H:Int) => V ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       <heap> ... H |-> cellV(V:Val) ... </heap>
+       requires "$cells" in_keys(M)
+       [priority(40)]
+
+  // write through a cell (Assign / #bindP / #bindTgt dispatch here on
+  // cell-bound names)
+  // a keyword argument cools to a TAGGED value (consumed by kw-aware builtins)
+  syntax Val ::= kwV(String, Val)
+  syntax KItem ::= #kwTag(String)
+  rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>
+  rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k>
+       requires notBool isKwV(V)
+  syntax Bool ::= isKwV(Val) [function, total]
+  rule isKwV(kwV(_:String, _:Val)) => true
+  rule isKwV(_:Val)                => false [owise]
+
+  // the frame marker carries the CONCRETE cellvar list, so cell-write dispatch
+  // decides by pnMember even over an abstract frame rest (no prover branching)
+  syntax Val ::= cellsMark(ParamNames)
+  syntax ParamNames ::= cellsOf(Val) [function]
+  rule cellsOf(cellsMark(CVS:ParamNames)) => CVS
+  syntax Bool ::= pnMember(String, ParamNames) [function, total]
+  rule pnMember(_:String, .ParamNames) => false
+  rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)
+
+  syntax KItem ::= #cellW(Val, Val)
+  rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k>
+       <heap> ... H |-> cellV(_:Val => V) ... </heap>
+
+  syntax KItem ::= #alloc(Val)
+  rule <k> #alloc(V:Val) => ref(N) ... </k>
+       <heap>    H:Map => (N |-> V) H </heap>
+       <heapLoc> N:Int => N +Int 1 </heapLoc>
+       requires notBool N in_keys(H)
+
+  // ==== module load + statement sequencing ==================================
+  syntax KItem ::= #loadAll(Module)
+  rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>
+  rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>
+  rule <k> .Stmts => .K ... </k>
+
+  // ==== Name lookup (walk the scope chain; builtins live in the -1 scope) ====
+  syntax KItem ::= #look(String, Int)
+  rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>
+  rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k>
+       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+       requires X in_keys(M)
+  // a SYNTACTICALLY cell-bound name reads through the heap cell AT THE
+  // LOOKUP (higher priority beats the plain return above on concrete cell
+  // bindings; abstract claim values take the plain rule unchanged) — this
+  // covers cross-frame cell reads (a comprehension closure reading the
+  // enclosing function's cellvar) without a narrowing-prone k-top redex
+  // guarded on the FOUND frame's DECLARED cellvars (pnMember over the
+  // cellsMark): decidable for every concrete frame pin — plain frames and
+  // non-cell names prune outright, so an abstract looked-up value never
+  // drags a narrowing cellV heap match along (probed on 5-intersperse and
+  // Q4's abstract `numbers` in the annotated frame)
+  rule <k> #look(X:String, L:Int) => V ... </k>
+       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+       <heap> ... H |-> cellV(V:Val) ... </heap>
+       requires X in_keys(M) andBool "$cells" in_keys(M)
+        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+        andBool {M[X]}:>Val ==K cellRef(H)
+       [priority(40)]
+  rule <k> #look(X:String, L:Int) => #look(X, P) ... </k>
+       <scopes> ... L |-> scope(M:Map, parent(P:Int)) ... </scopes>
+       requires notBool (X in_keys(M))
+
+  // the ONE predefined builtins scope (the -1 frame; claims write `-1 |-> builtinsScope`)
+  syntax Scope ::= "builtinsScope" [function, total]
+  rule builtinsScope
+    => scope(.Map [ "len"    <- builtinV("len")    ]
+                  [ "set"    <- builtinV("set")    ]
+                  [ "sum"    <- builtinV("sum")    ]
+                  [ "abs"    <- builtinV("abs")    ]
+                  [ "min"    <- builtinV("min")    ]
+                  [ "max"    <- builtinV("max")    ]
+                  [ "ord"    <- builtinV("ord")    ]
+                  [ "chr"    <- builtinV("chr")    ]
+                  [ "range"  <- builtinV("range")  ]
+                  [ "all"    <- builtinV("all")    ]
+                  [ "any"    <- builtinV("any")    ]
+                  [ "zip"    <- builtinV("zip")    ]
+                  [ "isinstance" <- builtinV("isinstance") ]
+                  [ "sorted" <- builtinV("sorted") ]
+                  [ "list"   <- builtinV("list")   ]
+                  [ "round"  <- builtinV("round")  ]
+                  [ "bin"    <- builtinV("bin")    ]
+                  [ "enumerate" <- builtinV("enumerate") ]
+                  [ "map"    <- builtinV("map")    ]
+                  [ "eval"   <- builtinV("eval")   ]
+                  [ "int"    <- typeV("int")       ]
+                  [ "str"    <- typeV("str")       ]
+                  [ "float"  <- typeV("float")     ], root)
+
+  // ==== argument/element evaluation: ONE left-to-right loop, tagged by destination ==
+  // (list/tuple literals and calls all use it; modules extend ApplyK with their tags)
+  syntax ApplyK ::= toCall(Val)
+  syntax KItem  ::= #evalArgs(Exprs, Vals, ApplyK)
+                  | #evalArgCont(Exprs, Vals, ApplyK)
+                  | #applyK(ApplyK, Vals)
+  rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>
+  rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>
+  rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>
+
+  // ==== Int / Bool / None literals ==========================================
+  rule <k> Int(I:Int)   => I ... </k>
+  rule <k> Bool(B:Bool) => B ... </k>
+  rule <k> NoneVal      => noneV ... </k>
+
+  // ==== truthy (If, Assert, BoolOp, IfExp, not, While) ======================
+  syntax Bool ::= truthy(Val) [function]
+  rule truthy(B:Bool)          => B
+  rule truthy(noneV)           => false
+  rule truthy(I:Int)           => I =/=Int 0
+  rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)
+  rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)
+  rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)
+
+  // ==== extensible operator dispatch (cases added by the construct modules) ==
+  syntax Val  ::= applyUn(String, Val) [function]
+  syntax Val  ::= applyBin(String, Val, Val) [function]
+  syntax Bool ::= applyCmp(String, Val, Val) [function]
+
+  // ==== shared list helpers =================================================
+  syntax Vals ::= appendVal(Vals, Val) [function, total]
+  rule appendVal(.Vals, V:Val)              => V , .Vals
+  rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+
+  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+  rule vals2valSeq(.Vals)            => .ValSeq
+  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+
+  // ==== shared sequence length (len / summaries across many modules) ========
+  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+  syntax Int ::= vsLen(ValSeq) [function, total]
+  rule vsLen(.ValSeq)                => 0
+  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+
+  syntax Int ::= isLen(IntSeq) [function, total]
+  rule isLen(.IntSeq)                => 0
+  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+
+  // in-bounds positional write (list subscript-assign); OOB leaves the seq unchanged
+  // (valid programs write in-bounds — mirrors valSeqAt's total-but-underspecified stance)
+  syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]
+  rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq
+  rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val)    => vCons(V, S)
+  rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V))
+       requires I >Int 0
+  rule setVSAt(VS:ValSeq, I:Int, _:Val)             => VS
+       requires I <Int 0
+endmodule
+// reference/src/semantics/bool.k — MPY-BOOL
+// Bool operator cases + the truthy boolean operations (not / and / or; and-or are
+// value-returning short-circuit over any Vals, per Python).
+
+module MPY-BOOL
+  imports MPY-CORE
+
+  rule applyUn("not", V:Val) => notBool truthy(V)
+
+  rule applyCmp("==", B1:Bool, B2:Bool) => B1 ==Bool B2
+  rule applyCmp("!=", B1:Bool, B2:Bool) => B1 =/=Bool B2
+
+  // ==== BoolOp: short-circuit, value-returning and / or =====================
+  // the node is its own accumulator: heat the HEAD element only, then either return it
+  // (short-circuit) or drop it and continue
+  context BoolOp(_, (HOLE:Expr, _:Exprs))
+  rule <k> BoolOp(_:String, (V:Val, .Exprs)) => V ... </k>
+  rule <k> BoolOp("and", (V:Val, A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>
+       requires truthy(V)
+  rule <k> BoolOp("and", (V:Val, _:Expr, _:Exprs)) => V ... </k>
+       requires notBool truthy(V)
+  rule <k> BoolOp("or",  (V:Val, _:Expr, _:Exprs)) => V ... </k>
+       requires truthy(V)
+  rule <k> BoolOp("or",  (V:Val, A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>
+       requires notBool truthy(V)
+
+  // ==== heap-object head: decide truthiness THROUGH the heap, never rewrite the
+  // operand — and/or return the OBJECT itself (Python identity), not its structure
+  rule <k> BoolOp(_:String, (ref(H:Int), .Exprs)) => ref(H) ... </k>
+       [priority(40)]
+  rule <k> BoolOp("and", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires truthy(V)
+       [priority(40)]
+  rule <k> BoolOp("and", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool truthy(V)
+       [priority(40)]
+  rule <k> BoolOp("or", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires truthy(V)
+       [priority(40)]
+  rule <k> BoolOp("or", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool truthy(V)
+       [priority(40)]
+endmodule
+K version:    v7.1.293
+Build date:   Fri Oct 03 13:32:35 CDT 2025
+K version:    v7.1.293
+Build date:   Fri Oct 03 13:32:35 CDT 2025
+K version:    v7.1.293
+Build date:   Fri Oct 03 13:32:35 CDT 2025
+
+apply patch
+patch: completed
+/work/concrete-tests.mpy
+/work/solution.py
+/work/spec.k
+/work/verification.k
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b232af8854dd8562e554078d67f7aa61ade1f09
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,9 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..b9e877f29f0ad86f5c11b708cbc596299066abe8
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,20 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor term generated in solution.mpy.
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           Return(Call(Attribute(Name("string"), "swapcase"), ))))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b232af8854dd8562e554078d67f7aa61ade1f09
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,9 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..b9e877f29f0ad86f5c11b708cbc596299066abe8
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,20 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor term generated in solution.mpy.
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           Return(Call(Attribute(Name("string"), "swapcase"), ))))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+exec
+/bin/bash -lc "python3 py2mpy.py solution.py > solution.mpy && sed -n '1,120p' solution.mpy && diff -u <(sed -n '/=> Module(/,"'$p'"' verification.k | sed -n '1,7p') solution.mpy || true && python3 -m py_compile solution.py && python3 - <<'PY'
+from solution import flip_case
+cases = {
+    'Hello': 'hELLO',
+    'Python 3.11': 'pYTHON 3.11',
+    '': '',
+    'Straße Σ': 'sTRASSE σ',
+}
+for value, expected in cases.items():
+    actual = flip_case(value)
+    assert actual == expected, (value, actual, expected)
+print('CPython checks passed:', len(cases))
+PY" in /work
+ succeeded in 0ms:
+Module(
+  FuncDef("flip_case", Params("string"),
+    Return(Call(Attribute(Name("string"), "swapcase"), ))))
+--- /dev/fd/63	2026-07-22 22:34:50.648555759 -0500
++++ solution.mpy	2026-07-22 22:34:50.645555615 -0500
+@@ -1,7 +1,3 @@
+-    => Module(
+-         FuncDef(
+-           "flip_case",
+-           Params("string"),
+-           Return(Call(Attribute(Name("string"), "swapcase"), ))))
+-
+-  // Load the submitted module, then call its required entry point.
++Module(
++  FuncDef("flip_case", Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), ))))
+CPython checks passed: 4
+
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b232af8854dd8562e554078d67f7aa61ade1f09
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,9 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..b9e877f29f0ad86f5c11b708cbc596299066abe8
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,20 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor term generated in solution.mpy.
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           Return(Call(Attribute(Name("string"), "swapcase"), ))))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+codex
+The translated program matches the verification macro structurally, and CPython checks pass (including a Unicode case that exercises Python’s native `swapcase`). Next I’m compiling the untouched reference semantics for LLVM exactly as requested, then I’ll run the constructor-level tests through `krun`.
+The task is a direct use of the supplied symbolic swapcase operation; implementation and translation are complete.
+  ✓ Inspect prompt and supplied semantics/translator
+  ✓ Implement solution.py and generate solution.mpy
+  → Create K execution and proof definitions
+  • Compile, exercise with krun, and prove with kprove
+  • Finalize prove.sh and validate all deliverables
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b232af8854dd8562e554078d67f7aa61ade1f09
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,9 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..b9e877f29f0ad86f5c11b708cbc596299066abe8
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,20 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor term generated in solution.mpy.
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           Return(Call(Attribute(Name("string"), "swapcase"), ))))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+exec
+/bin/bash -lc 'kompile reference-semantics/semantics.k --backend llvm --main-module MPY-KRUN --syntax-module MPY-SYNTAX --output-definition runtime-kompiled' in /work
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b232af8854dd8562e554078d67f7aa61ade1f09
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,9 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..b9e877f29f0ad86f5c11b708cbc596299066abe8
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,20 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor term generated in solution.mpy.
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           Return(Call(Attribute(Name("string"), "swapcase"), ))))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+ succeeded in 8869ms:
+[Warning] Compiler: Non exhaustive match detected:
+`mapStrVS(_)_MPY-BUILTINS_ValSeq_ValSeq`(`vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq`(`cellsMark(_)_MPY-CORE_Val_ParamNames`(_),_))
+	Source(/work/reference-semantics/semantics/builtins.k)
+	Location(134,21,134,55)
+	134 |	  syntax ValSeq ::= mapStrVS(ValSeq) [function, total]
+	    .	                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[Warning] Compiler: Non exhaustive match detected:
+floorFI(`cellsMark(_)_MPY-CORE_Val_ParamNames`(_))
+	Source(/work/reference-semantics/semantics/float.k)
+	Location(73,18,73,65)
+	73 |	  syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]
+	   .	                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[Warning] Compiler: Non exhaustive match detected:
+toF(`cellsMark(_)_MPY-CORE_Val_ParamNames`(_))
+	Source(/work/reference-semantics/semantics/float.k)
+	Location(86,20,86,59)
+	86 |	  syntax Float ::= toF(Val) [function, total, symbol(toF)]
+	   .	                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[Warning] Compiler: Non exhaustive match detected:
+ceilF(`cellsMark(_)_MPY-CORE_Val_ParamNames`(_))
+	Source(/work/reference-semantics/semantics/float.k)
+	Location(93,18,93,61)
+	93 |	  syntax Int ::= ceilF(Val) [function, total, symbol(ceilF)]
+	   .	                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[Warning] Compiler: Non exhaustive match detected:
+`joinCodes(_,_)_MPY-METHODS_IntSeq_IntSeq_ValSeq`(_,`vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq`(`cellsMark(_)_MPY-CORE_Val_ParamNames`(_),_))
+	Source(/work/reference-semantics/semantics/methods.k)
+	Location(27,21,27,64)
+	27 |	  syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]
+	   .	                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,27,52,29)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,52,52,54)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                                                   ^~
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,27,53,29)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,52,53,54)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                                                   ^~
+[Warning] Compiler: Non exhaustive match detected:
+`valSeqAt(_,_)_MPY-SUBSCRIPT_Val_ValSeq_Int`(`.ValSeq_MPY-CORE_ValSeq`(.KList),_)
+	Source(/work/reference-semantics/semantics/subscript.k)
+	Location(11,18,11,57)
+	11 |	  syntax Val ::= valSeqAt(ValSeq, Int) [function, total]
+	   .	                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+exec
+/bin/bash -lc 'krun solution.mpy --definition runtime-kompiled && krun concrete-tests.mpy --definition runtime-kompiled' in /work
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b232af8854dd8562e554078d67f7aa61ade1f09
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,9 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..b9e877f29f0ad86f5c11b708cbc596299066abe8
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,20 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor term generated in solution.mpy.
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           Return(Call(Attribute(Name("string"), "swapcase"), ))))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+ succeeded in 1706ms:
+<generatedTop>
+  <k>
+    .K
+  </k>
+  <env>
+    0
+  </env>
+  <scopes>
+    -1 |-> scope ( "abs" |-> builtinV ( "abs" )
+    "all" |-> builtinV ( "all" )
+    "any" |-> builtinV ( "any" )
+    "bin" |-> builtinV ( "bin" )
+    "chr" |-> builtinV ( "chr" )
+    "enumerate" |-> builtinV ( "enumerate" )
+    "eval" |-> builtinV ( "eval" )
+    "float" |-> typeV ( "float" )
+    "int" |-> typeV ( "int" )
+    "isinstance" |-> builtinV ( "isinstance" )
+    "len" |-> builtinV ( "len" )
+    "list" |-> builtinV ( "list" )
+    "map" |-> builtinV ( "map" )
+    "max" |-> builtinV ( "max" )
+    "min" |-> builtinV ( "min" )
+    "ord" |-> builtinV ( "ord" )
+    "range" |-> builtinV ( "range" )
+    "round" |-> builtinV ( "round" )
+    "set" |-> builtinV ( "set" )
+    "sorted" |-> builtinV ( "sorted" )
+    "str" |-> typeV ( "str" )
+    "sum" |-> builtinV ( "sum" )
+    "zip" |-> builtinV ( "zip" ) , root )
+    0 |-> scope ( "flip_case" |-> closureVal ( "string" , .ParamNames , Return ( Call ( Attribute ( Name ( "string" ) , "swapcase" ) , .Exprs ) )  .Stmts , 0 ) , parent ( -1 ) )
+  </scopes>
+  <scopeLoc>
+    1
+  </scopeLoc>
+  <heap>
+    .Map
+  </heap>
+  <heapLoc>
+    0
+  </heapLoc>
+  <stack>
+    .List
+  </stack>
+  <ret>
+    noRet
+  </ret>
+  <exc>
+    NoExc
+  </exc>
+  <exit-code>
+    0
+  </exit-code>
+</generatedTop>
+<generatedTop>
+  <k>
+    .K
+  </k>
+  <env>
+    0
+  </env>
+  <scopes>
+    -1 |-> scope ( "abs" |-> builtinV ( "abs" )
+    "all" |-> builtinV ( "all" )
+    "any" |-> builtinV ( "any" )
+    "bin" |-> builtinV ( "bin" )
+    "chr" |-> builtinV ( "chr" )
+    "enumerate" |-> builtinV ( "enumerate" )
+    "eval" |-> builtinV ( "eval" )
+    "float" |-> typeV ( "float" )
+    "int" |-> typeV ( "int" )
+    "isinstance" |-> builtinV ( "isinstance" )
+    "len" |-> builtinV ( "len" )
+    "list" |-> builtinV ( "list" )
+    "map" |-> builtinV ( "map" )
+    "max" |-> builtinV ( "max" )
+    "min" |-> builtinV ( "min" )
+    "ord" |-> builtinV ( "ord" )
+    "range" |-> builtinV ( "range" )
+    "round" |-> builtinV ( "round" )
+    "set" |-> builtinV ( "set" )
+    "sorted" |-> builtinV ( "sorted" )
+    "str" |-> typeV ( "str" )
+    "sum" |-> builtinV ( "sum" )
+    "zip" |-> builtinV ( "zip" ) , root )
+    0 |-> scope ( "flip_case" |-> closureVal ( "string" , .ParamNames , Return ( Call ( Attribute ( Name ( "string" ) , "swapcase" ) , .Exprs ) )  .Stmts , 0 ) , parent ( -1 ) )
+  </scopes>
+  <scopeLoc>
+    1
+  </scopeLoc>
+  <heap>
+    .Map
+  </heap>
+  <heapLoc>
+    0
+  </heapLoc>
+  <stack>
+    .List
+  </stack>
+  <ret>
+    noRet
+  </ret>
+  <exc>
+    NoExc
+  </exc>
+  <exit-code>
+    0
+  </exit-code>
+</generatedTop>
+
+codex
+Both LLVM runs terminate cleanly with `.K`, `NoExc`, and exit code 0; the second run invokes the function on the prompt example, mixed alphanumerics, and the empty string. I’m moving to the universal symbolic claim now.
+exec
+/bin/bash -lc 'kompile verification.k --backend haskell --main-module VERIFICATION --syntax-module VERIFICATION --output-definition verification-kompiled' in /work
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b232af8854dd8562e554078d67f7aa61ade1f09
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,9 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..b9e877f29f0ad86f5c11b708cbc596299066abe8
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,20 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor term generated in solution.mpy.
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           Return(Call(Attribute(Name("string"), "swapcase"), ))))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+ exited 113 in 2791ms:
+[Error] Inner Parser: Parse error: unexpected token ')' following token ','.
+	Source(/work/verification.k)
+	Location(13,63,13,64)
+	13 |	           Return(Call(Attribute(Name("string"), "swapcase"), ))))
+	   .	                                                              ^
+[Error] Compiler: Had 1 parsing errors.
+
+apply patch
+patch: completed
+/work/verification.k
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b232af8854dd8562e554078d67f7aa61ade1f09
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,9 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..79145ecf4dbd17d372b4ebe930cb5872538be548
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,21 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           Return(Call(Attribute(Name("string"), "swapcase"), .Exprs))))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b232af8854dd8562e554078d67f7aa61ade1f09
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,9 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..79145ecf4dbd17d372b4ebe930cb5872538be548
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,21 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           Return(Call(Attribute(Name("string"), "swapcase"), .Exprs))))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+exec
+/bin/bash -lc 'kompile verification.k --backend haskell --main-module VERIFICATION --syntax-module VERIFICATION --output-definition verification-kompiled' in /work
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b232af8854dd8562e554078d67f7aa61ade1f09
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,9 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..79145ecf4dbd17d372b4ebe930cb5872538be548
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,21 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           Return(Call(Attribute(Name("string"), "swapcase"), .Exprs))))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+ succeeded in 5067ms:
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,27,52,29)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,52,52,54)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                                                   ^~
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,27,53,29)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,52,53,54)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                                                   ^~
+
+exec
+/bin/bash -lc 'kprove spec.k --definition verification-kompiled --module SPEC' in /work
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b232af8854dd8562e554078d67f7aa61ade1f09
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,9 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..79145ecf4dbd17d372b4ebe930cb5872538be548
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,21 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           Return(Call(Attribute(Name("string"), "swapcase"), .Exprs))))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+ exited 1 in 182ms:
+[Error] Critical: Only one main parameter allowed but found several: "spec.k"
+and "--module"
+
+exec
+/bin/bash -lc "kprove --help | sed -n '1,240p'" in /work
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b232af8854dd8562e554078d67f7aa61ade1f09
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,9 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..79145ecf4dbd17d372b4ebe930cb5872538be548
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,21 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           Return(Call(Attribute(Name("string"), "swapcase"), .Exprs))))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+ succeeded in 178ms:
+Usage: kprove [options] <file>
+  Options:
+    --branching-allowed <number>
+      Number of branching events allowed before a forcible stop.
+      Default: 2147483647
+    --claims <labels>
+      Only keep this comma separated list of claims
+    --color <mode>
+      Use colors in output. Default is on.
+      Possible Values: [OFF, ON, EXTENDED]
+    --debug
+      Print debugging output messages and error stack traces
+      Default: false
+    --debug-script <file>
+      Run script passed in specified file when the debugger starts. Used with 
+      --debugger. 
+    --debug-warnings
+      Print debugging output messages and error/warning stack traces
+      Default: false
+    --debugger
+      Launch proof in an interactive debugger. Currently only supported by the 
+      Haskell backend.
+      Default: false
+    --default-claim-type <type>
+      Default type for claims. Values: [all-path|one-path].
+      Default: ALL_PATH
+      Possible Values: [REWRITE_RULE, ONE_PATH, ALL_PATH]
+    --definition <path>, -d <path>
+      Exact path to the kompiled directory.
+    --depth <number>
+      The maximum number of computational steps to prove
+    --dry-run
+      Compile program into KORE format but do not run. Only used in Haskell 
+      and LLVM backend.
+      Default: false
+    --emit-json
+      Emit JSON serialized main definition for proving.
+      Default: false
+    --emit-json-spec <file>
+      If set, emit the JSON serialization of the spec module to the specified 
+      file. 
+    --exclude <labels>
+      Exclude this comma separated list of claims
+    --help, -h
+      Print this help message
+    --help-hidden, -hh
+      Print advanced options help message
+    --md-selector <expression>
+      Preprocessor: for .md files, select only the md code blocks that match 
+      the selector expression. Ex:'k&(!a|b)'.
+      Default: k
+    --no-alpha-renaming
+      Do not alpha rename anonymous variables in output.
+      Default: false
+    --no-sort-collections
+      Do not sort collections before printing (for speed).
+      Default: false
+    --no-substitution-filtering
+      Do not remove conjuncts of anonymous variables from substitution in 
+      output. 
+      Default: false
+    --output <mode>, -o <mode>
+      How to display krun results. <mode> is either 
+      [pretty|program|kast|binary|json|kore|none]. 
+      Default: PRETTY
+      Possible Values: [PRETTY, PROGRAM, KAST, JSON, KORE, NONE]
+    --output-file <file>
+      Store output in the file instead of displaying it.
+    --output-flatten <KLabels>
+      (Assoc) KLabels to flatten into one list.
+      Default: []
+    --output-omit <KLabels>
+      KLabels to omit from the output.
+      Default: []
+    --output-tokast <KLabels>
+      KLabels to output as KAST tokens.
+      Default: []
+    --output-tokenize <KLabels>
+      KLabels to tokenize underneath (reducing output size).
+      Default: []
+    --spec-module <name>, -sm <name>
+      Name of module containing specification to prove
+    --temp-dir <path>
+      Put temp files in this location. Default is /tmp/.<tool>-xxx
+    --trusted <labels>
+      Mark this comma separated list of claims as [trusted]
+    --verbose, -v
+      Print verbose output messages
+      Default: false
+    --version
+      Print version information
+      Default: false
+    --warnings <level>, -w <level>
+      Warning level. Values: [all|normal|none]
+      Default: NORMAL
+      Possible Values: [ALL, NORMAL, NONE]
+    --warnings-to-errors, -w2e
+      Convert warnings to errors.
+      Default: false
+    -I <path>
+      Add a directory to the search path for requires statements.
+      Default: []
+    -W <warning>
+      Enable specific warning categories. Values: [non-exhaustive-match|undeleted-temp-dir|missing-hook-java|missing-syntax-module|invalid-exit-code|deprecated-backend|invalid-config-var|future-error|unused-var|proof-lint|useless-rule|unresolved-function-symbol|malformed-markdown|invalidated-cache|unused-symbol|removed-anywhere]
+      Default: []
+    -Wno <warning>
+      Disable specific warning categories.
+      Default: []
+
+
+exec
+/bin/bash -lc 'kprove --definition verification-kompiled --spec-module SPEC spec.k' in /work
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b232af8854dd8562e554078d67f7aa61ade1f09
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,9 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..79145ecf4dbd17d372b4ebe930cb5872538be548
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,21 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           Return(Call(Attribute(Name("string"), "swapcase"), .Exprs))))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+ exited 1 in 3381ms:
+kore-exec: [962200] Warning (WarnStuckClaimState):
+    The configuration's term doesn't unify with the destination's term and the configuration cannot be rewritten further. Location: /work/spec.k:8:9-8:59
+Context:
+    (InfoReachability) while checking the implication
+kore-exec: [965227] Warning (WarnUnexploredBranches):
+    1 branches were still unexplored when the action failed.
+  #Not ( #Exists _DotVar2 . #Exists _Gen0 . #Exists M . {
+      _Gen11
+    #Equals
+      _DotVar2
+      _Gen10:Int |-> scope ( M , _Gen0 )
+    }
+  #And
+    {
+      false
+    #Equals
+      _Gen10:Int in_keys ( _DotVar2 )
+    } )
+#And
+  <generatedTop>
+    <k>
+      FuncDef ( "flip_case" , Params ( "string" , .ParamNames ) , Return ( Call ( Attribute ( Name ( "string" ) , "swapcase" ) , .Exprs ) )  .Stmts ) ~> .Stmts ~> Call ( Name ( "flip_case" ) , str ( S ) , .Exprs ) ~> .K
+    </k>
+    <env>
+      _Gen10
+    </env>
+    <scopes>
+      _Gen11
+    </scopes>
+    <scopeLoc>
+      _Gen12
+    </scopeLoc>
+    <heap>
+      _Gen13
+    </heap>
+    <heapLoc>
+      _Gen14
+    </heapLoc>
+    <stack>
+      _Gen15
+    </stack>
+    <ret>
+      _Gen16
+    </ret>
+    <exc>
+      _Gen17
+    </exc>
+    <exit-code>
+      _Gen18
+    </exit-code>
+  </generatedTop>
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,27,52,29)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,52,52,54)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                                                   ^~
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,27,53,29)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,52,53,54)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                                                   ^~
+[Error] Prover: backend terminated because the configuration cannot be
+rewritten further. See output for more details.
+
+codex
+The first proof attempt exposed a harness issue, not a program issue: a claim containing only `<k>` leaves the other configuration cells unconstrained, so function-definition lookup cannot proceed. I’m tightening the claim to the semantics’ actual initial configuration and its exact final module scope; that also makes the proof stronger by checking clean frame/return/exception state.
+apply patch
+patch: completed
+/work/spec.k
+/work/verification.k
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..6597316c10f7b5ef54fce3cb466eb92fc94f0866
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,31 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim
++    <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++    <env> 0 </env>
++    <scopes>
++        0  |-> scope(.Map, parent(-1))
++        -1 |-> builtinsScope
++      =>
++        0  |-> scope(
++                 "flip_case" |->
++                   closureVal(
++                     ("string", .ParamNames),
++                     flipCaseBody,
++                     0),
++                 parent(-1))
++        -1 |-> builtinsScope
++    </scopes>
++    <scopeLoc> 1 </scopeLoc>
++    <heap> .Map </heap>
++    <heapLoc> 0 </heapLoc>
++    <stack> .List </stack>
++    <ret> noRet </ret>
++    <exc> NoExc </exc>
++    <exit-code> 0 </exit-code>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..0acee961ec8dbdf05b05ecdbdf767e4e03ea6fd6
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,25 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Stmts ::= "flipCaseBody" [macro]
++  rule flipCaseBody
++    => Return(Call(Attribute(Name("string"), "swapcase"), .Exprs)) .Stmts
++
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           flipCaseBody))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..6597316c10f7b5ef54fce3cb466eb92fc94f0866
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,31 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim
++    <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++    <env> 0 </env>
++    <scopes>
++        0  |-> scope(.Map, parent(-1))
++        -1 |-> builtinsScope
++      =>
++        0  |-> scope(
++                 "flip_case" |->
++                   closureVal(
++                     ("string", .ParamNames),
++                     flipCaseBody,
++                     0),
++                 parent(-1))
++        -1 |-> builtinsScope
++    </scopes>
++    <scopeLoc> 1 </scopeLoc>
++    <heap> .Map </heap>
++    <heapLoc> 0 </heapLoc>
++    <stack> .List </stack>
++    <ret> noRet </ret>
++    <exc> NoExc </exc>
++    <exit-code> 0 </exit-code>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..0acee961ec8dbdf05b05ecdbdf767e4e03ea6fd6
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,25 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Stmts ::= "flipCaseBody" [macro]
++  rule flipCaseBody
++    => Return(Call(Attribute(Name("string"), "swapcase"), .Exprs)) .Stmts
++
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           flipCaseBody))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+exec
+/bin/bash -lc 'kompile verification.k --backend haskell --main-module VERIFICATION --syntax-module VERIFICATION --output-definition verification-kompiled && kprove --definition verification-kompiled --spec-module SPEC spec.k' in /work
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..6597316c10f7b5ef54fce3cb466eb92fc94f0866
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,31 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim
++    <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++    <env> 0 </env>
++    <scopes>
++        0  |-> scope(.Map, parent(-1))
++        -1 |-> builtinsScope
++      =>
++        0  |-> scope(
++                 "flip_case" |->
++                   closureVal(
++                     ("string", .ParamNames),
++                     flipCaseBody,
++                     0),
++                 parent(-1))
++        -1 |-> builtinsScope
++    </scopes>
++    <scopeLoc> 1 </scopeLoc>
++    <heap> .Map </heap>
++    <heapLoc> 0 </heapLoc>
++    <stack> .List </stack>
++    <ret> noRet </ret>
++    <exc> NoExc </exc>
++    <exit-code> 0 </exit-code>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..0acee961ec8dbdf05b05ecdbdf767e4e03ea6fd6
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,25 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Stmts ::= "flipCaseBody" [macro]
++  rule flipCaseBody
++    => Return(Call(Attribute(Name("string"), "swapcase"), .Exprs)) .Stmts
++
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           flipCaseBody))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+ succeeded in 8603ms:
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,27,52,29)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,52,52,54)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                                                   ^~
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,27,53,29)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,52,53,54)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                                                   ^~
+#Top
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,27,52,29)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,52,52,54)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                                                   ^~
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,27,53,29)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,52,53,54)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                                                   ^~
+
+codex
+The universal claim now closes with `#Top`. It proves, for arbitrary `S:IntSeq`, that the loaded submitted function returns `str(mapSwap(S))` and restores the call stack/return state without exceptions. I’m packaging the exact successful pipeline in `prove.sh` and rerunning it end to end.
+apply patch
+patch: completed
+/work/prove.sh
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/prove.sh b/prove.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..379c8325d6f9e82518755aa8e10958113d6be965
+--- /dev/null
++++ b/prove.sh
+@@ -0,0 +1,24 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++python3 py2mpy.py solution.py > solution.mpy
++
++kompile reference-semantics/semantics.k \
++  --backend llvm \
++  --main-module MPY-KRUN \
++  --syntax-module MPY-SYNTAX \
++  --output-definition runtime-kompiled
++
++krun solution.mpy --definition runtime-kompiled
++krun concrete-tests.mpy --definition runtime-kompiled
++
++kompile verification.k \
++  --backend haskell \
++  --main-module VERIFICATION \
++  --syntax-module VERIFICATION \
++  --output-definition verification-kompiled
++
++kprove \
++  --definition verification-kompiled \
++  --spec-module SPEC \
++  spec.k
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..6597316c10f7b5ef54fce3cb466eb92fc94f0866
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,31 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim
++    <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++    <env> 0 </env>
++    <scopes>
++        0  |-> scope(.Map, parent(-1))
++        -1 |-> builtinsScope
++      =>
++        0  |-> scope(
++                 "flip_case" |->
++                   closureVal(
++                     ("string", .ParamNames),
++                     flipCaseBody,
++                     0),
++                 parent(-1))
++        -1 |-> builtinsScope
++    </scopes>
++    <scopeLoc> 1 </scopeLoc>
++    <heap> .Map </heap>
++    <heapLoc> 0 </heapLoc>
++    <stack> .List </stack>
++    <ret> noRet </ret>
++    <exc> NoExc </exc>
++    <exit-code> 0 </exit-code>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..0acee961ec8dbdf05b05ecdbdf767e4e03ea6fd6
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,25 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Stmts ::= "flipCaseBody" [macro]
++  rule flipCaseBody
++    => Return(Call(Attribute(Name("string"), "swapcase"), .Exprs)) .Stmts
++
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           flipCaseBody))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/prove.sh b/prove.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..379c8325d6f9e82518755aa8e10958113d6be965
+--- /dev/null
++++ b/prove.sh
+@@ -0,0 +1,24 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++python3 py2mpy.py solution.py > solution.mpy
++
++kompile reference-semantics/semantics.k \
++  --backend llvm \
++  --main-module MPY-KRUN \
++  --syntax-module MPY-SYNTAX \
++  --output-definition runtime-kompiled
++
++krun solution.mpy --definition runtime-kompiled
++krun concrete-tests.mpy --definition runtime-kompiled
++
++kompile verification.k \
++  --backend haskell \
++  --main-module VERIFICATION \
++  --syntax-module VERIFICATION \
++  --output-definition verification-kompiled
++
++kprove \
++  --definition verification-kompiled \
++  --spec-module SPEC \
++  spec.k
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..6597316c10f7b5ef54fce3cb466eb92fc94f0866
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,31 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim
++    <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++    <env> 0 </env>
++    <scopes>
++        0  |-> scope(.Map, parent(-1))
++        -1 |-> builtinsScope
++      =>
++        0  |-> scope(
++                 "flip_case" |->
++                   closureVal(
++                     ("string", .ParamNames),
++                     flipCaseBody,
++                     0),
++                 parent(-1))
++        -1 |-> builtinsScope
++    </scopes>
++    <scopeLoc> 1 </scopeLoc>
++    <heap> .Map </heap>
++    <heapLoc> 0 </heapLoc>
++    <stack> .List </stack>
++    <ret> noRet </ret>
++    <exc> NoExc </exc>
++    <exit-code> 0 </exit-code>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..0acee961ec8dbdf05b05ecdbdf767e4e03ea6fd6
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,25 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Stmts ::= "flipCaseBody" [macro]
++  rule flipCaseBody
++    => Return(Call(Attribute(Name("string"), "swapcase"), .Exprs)) .Stmts
++
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           flipCaseBody))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+exec
+/bin/bash -lc 'chmod +x prove.sh && ./prove.sh' in /work
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/prove.sh b/prove.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..379c8325d6f9e82518755aa8e10958113d6be965
+--- /dev/null
++++ b/prove.sh
+@@ -0,0 +1,24 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++python3 py2mpy.py solution.py > solution.mpy
++
++kompile reference-semantics/semantics.k \
++  --backend llvm \
++  --main-module MPY-KRUN \
++  --syntax-module MPY-SYNTAX \
++  --output-definition runtime-kompiled
++
++krun solution.mpy --definition runtime-kompiled
++krun concrete-tests.mpy --definition runtime-kompiled
++
++kompile verification.k \
++  --backend haskell \
++  --main-module VERIFICATION \
++  --syntax-module VERIFICATION \
++  --output-definition verification-kompiled
++
++kprove \
++  --definition verification-kompiled \
++  --spec-module SPEC \
++  spec.k
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..6597316c10f7b5ef54fce3cb466eb92fc94f0866
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,31 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim
++    <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++    <env> 0 </env>
++    <scopes>
++        0  |-> scope(.Map, parent(-1))
++        -1 |-> builtinsScope
++      =>
++        0  |-> scope(
++                 "flip_case" |->
++                   closureVal(
++                     ("string", .ParamNames),
++                     flipCaseBody,
++                     0),
++                 parent(-1))
++        -1 |-> builtinsScope
++    </scopes>
++    <scopeLoc> 1 </scopeLoc>
++    <heap> .Map </heap>
++    <heapLoc> 0 </heapLoc>
++    <stack> .List </stack>
++    <ret> noRet </ret>
++    <exc> NoExc </exc>
++    <exit-code> 0 </exit-code>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..0acee961ec8dbdf05b05ecdbdf767e4e03ea6fd6
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,25 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Stmts ::= "flipCaseBody" [macro]
++  rule flipCaseBody
++    => Return(Call(Attribute(Name("string"), "swapcase"), .Exprs)) .Stmts
++
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           flipCaseBody))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+ succeeded in 19075ms:
+[Warning] Compiler: Non exhaustive match detected:
+`mapStrVS(_)_MPY-BUILTINS_ValSeq_ValSeq`(`vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq`(`cellsMark(_)_MPY-CORE_Val_ParamNames`(_),_))
+	Source(/work/reference-semantics/semantics/builtins.k)
+	Location(134,21,134,55)
+	134 |	  syntax ValSeq ::= mapStrVS(ValSeq) [function, total]
+	    .	                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[Warning] Compiler: Non exhaustive match detected:
+floorFI(`cellsMark(_)_MPY-CORE_Val_ParamNames`(_))
+	Source(/work/reference-semantics/semantics/float.k)
+	Location(73,18,73,65)
+	73 |	  syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]
+	   .	                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[Warning] Compiler: Non exhaustive match detected:
+toF(`cellsMark(_)_MPY-CORE_Val_ParamNames`(_))
+	Source(/work/reference-semantics/semantics/float.k)
+	Location(86,20,86,59)
+	86 |	  syntax Float ::= toF(Val) [function, total, symbol(toF)]
+	   .	                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[Warning] Compiler: Non exhaustive match detected:
+ceilF(`cellsMark(_)_MPY-CORE_Val_ParamNames`(_))
+	Source(/work/reference-semantics/semantics/float.k)
+	Location(93,18,93,61)
+	93 |	  syntax Int ::= ceilF(Val) [function, total, symbol(ceilF)]
+	   .	                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[Warning] Compiler: Non exhaustive match detected:
+`joinCodes(_,_)_MPY-METHODS_IntSeq_IntSeq_ValSeq`(_,`vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq`(`cellsMark(_)_MPY-CORE_Val_ParamNames`(_),_))
+	Source(/work/reference-semantics/semantics/methods.k)
+	Location(27,21,27,64)
+	27 |	  syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]
+	   .	                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,27,52,29)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,52,52,54)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                                                   ^~
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,27,53,29)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,52,53,54)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                                                   ^~
+[Warning] Compiler: Non exhaustive match detected:
+`valSeqAt(_,_)_MPY-SUBSCRIPT_Val_ValSeq_Int`(`.ValSeq_MPY-CORE_ValSeq`(.KList),_)
+	Source(/work/reference-semantics/semantics/subscript.k)
+	Location(11,18,11,57)
+	11 |	  syntax Val ::= valSeqAt(ValSeq, Int) [function, total]
+	   .	                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+<generatedTop>
+  <k>
+    .K
+  </k>
+  <env>
+    0
+  </env>
+  <scopes>
+    -1 |-> scope ( "abs" |-> builtinV ( "abs" )
+    "all" |-> builtinV ( "all" )
+    "any" |-> builtinV ( "any" )
+    "bin" |-> builtinV ( "bin" )
+    "chr" |-> builtinV ( "chr" )
+    "enumerate" |-> builtinV ( "enumerate" )
+    "eval" |-> builtinV ( "eval" )
+    "float" |-> typeV ( "float" )
+    "int" |-> typeV ( "int" )
+    "isinstance" |-> builtinV ( "isinstance" )
+    "len" |-> builtinV ( "len" )
+    "list" |-> builtinV ( "list" )
+    "map" |-> builtinV ( "map" )
+    "max" |-> builtinV ( "max" )
+    "min" |-> builtinV ( "min" )
+    "ord" |-> builtinV ( "ord" )
+    "range" |-> builtinV ( "range" )
+    "round" |-> builtinV ( "round" )
+    "set" |-> builtinV ( "set" )
+    "sorted" |-> builtinV ( "sorted" )
+    "str" |-> typeV ( "str" )
+    "sum" |-> builtinV ( "sum" )
+    "zip" |-> builtinV ( "zip" ) , root )
+    0 |-> scope ( "flip_case" |-> closureVal ( "string" , .ParamNames , Return ( Call ( Attribute ( Name ( "string" ) , "swapcase" ) , .Exprs ) )  .Stmts , 0 ) , parent ( -1 ) )
+  </scopes>
+  <scopeLoc>
+    1
+  </scopeLoc>
+  <heap>
+    .Map
+  </heap>
+  <heapLoc>
+    0
+  </heapLoc>
+  <stack>
+    .List
+  </stack>
+  <ret>
+    noRet
+  </ret>
+  <exc>
+    NoExc
+  </exc>
+  <exit-code>
+    0
+  </exit-code>
+</generatedTop>
+<generatedTop>
+  <k>
+    .K
+  </k>
+  <env>
+    0
+  </env>
+  <scopes>
+    -1 |-> scope ( "abs" |-> builtinV ( "abs" )
+    "all" |-> builtinV ( "all" )
+    "any" |-> builtinV ( "any" )
+    "bin" |-> builtinV ( "bin" )
+    "chr" |-> builtinV ( "chr" )
+    "enumerate" |-> builtinV ( "enumerate" )
+    "eval" |-> builtinV ( "eval" )
+    "float" |-> typeV ( "float" )
+    "int" |-> typeV ( "int" )
+    "isinstance" |-> builtinV ( "isinstance" )
+    "len" |-> builtinV ( "len" )
+    "list" |-> builtinV ( "list" )
+    "map" |-> builtinV ( "map" )
+    "max" |-> builtinV ( "max" )
+    "min" |-> builtinV ( "min" )
+    "ord" |-> builtinV ( "ord" )
+    "range" |-> builtinV ( "range" )
+    "round" |-> builtinV ( "round" )
+    "set" |-> builtinV ( "set" )
+    "sorted" |-> builtinV ( "sorted" )
+    "str" |-> typeV ( "str" )
+    "sum" |-> builtinV ( "sum" )
+    "zip" |-> builtinV ( "zip" ) , root )
+    0 |-> scope ( "flip_case" |-> closureVal ( "string" , .ParamNames , Return ( Call ( Attribute ( Name ( "string" ) , "swapcase" ) , .Exprs ) )  .Stmts , 0 ) , parent ( -1 ) )
+  </scopes>
+  <scopeLoc>
+    1
+  </scopeLoc>
+  <heap>
+    .Map
+  </heap>
+  <heapLoc>
+    0
+  </heapLoc>
+  <stack>
+    .List
+  </stack>
+  <ret>
+    noRet
+  </ret>
+  <exc>
+    NoExc
+  </exc>
+  <exit-code>
+    0
+  </exit-code>
+</generatedTop>
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,27,52,29)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,52,52,54)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                                                   ^~
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,27,53,29)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,52,53,54)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                                                   ^~
+#Top
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,27,52,29)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(52,52,52,54)
+	52 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true   
+      requires A  <Int B
+	   .	                                                   ^~
+[Warning] Compiler: Variable 'As' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,27,53,29)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                          ^~
+[Warning] Compiler: Variable 'Bs' defined but not used. Prefix variable name
+with underscore if this is intentional.
+	Source(/work/reference-semantics/semantics/str.k)
+	Location(53,52,53,54)
+	53 |	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false  
+      requires A  >Int B
+	   .	                                                   ^~
+
+exec
+/bin/bash -lc 'set -e
+for f in solution.py solution.mpy verification.k spec.k prove.sh; do test -s "$f"; done
+test -x prove.sh
+cmp -s solution.mpy <(python3 py2mpy.py solution.py)
+rg -n '"'"'^'"\\s*claim\\b|"'^def flip_case|''^kprove'"\\b|mapSwap|#runFlipCase' solution.py verification.k spec.k prove.sh
+stat -c '%A %s %n' solution.py solution.mpy verification.k spec.k prove.sh concrete-tests.mpy" in /work
+ succeeded in 0ms:
+prove.sh:21:kprove \
+verification.k:21:  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
+verification.k:22:  rule <k> #runFlipCase(S:IntSeq)
+solution.py:1:def flip_case(string: str) -> str:
+spec.k:8:  claim
+spec.k:9:    <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
+-rw-r--r-- 64 solution.py
+-rw-r--r-- 109 solution.mpy
+-rw-r--r-- 796 verification.k
+-rw-r--r-- 819 spec.k
+-rwxr-xr-x 583 prove.sh
+-rw-r--r-- 426 concrete-tests.mpy
+
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/prove.sh b/prove.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..379c8325d6f9e82518755aa8e10958113d6be965
+--- /dev/null
++++ b/prove.sh
+@@ -0,0 +1,24 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++python3 py2mpy.py solution.py > solution.mpy
++
++kompile reference-semantics/semantics.k \
++  --backend llvm \
++  --main-module MPY-KRUN \
++  --syntax-module MPY-SYNTAX \
++  --output-definition runtime-kompiled
++
++krun solution.mpy --definition runtime-kompiled
++krun concrete-tests.mpy --definition runtime-kompiled
++
++kompile verification.k \
++  --backend haskell \
++  --main-module VERIFICATION \
++  --syntax-module VERIFICATION \
++  --output-definition verification-kompiled
++
++kprove \
++  --definition verification-kompiled \
++  --spec-module SPEC \
++  spec.k
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..6597316c10f7b5ef54fce3cb466eb92fc94f0866
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,31 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim
++    <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++    <env> 0 </env>
++    <scopes>
++        0  |-> scope(.Map, parent(-1))
++        -1 |-> builtinsScope
++      =>
++        0  |-> scope(
++                 "flip_case" |->
++                   closureVal(
++                     ("string", .ParamNames),
++                     flipCaseBody,
++                     0),
++                 parent(-1))
++        -1 |-> builtinsScope
++    </scopes>
++    <scopeLoc> 1 </scopeLoc>
++    <heap> .Map </heap>
++    <heapLoc> 0 </heapLoc>
++    <stack> .List </stack>
++    <ret> noRet </ret>
++    <exc> NoExc </exc>
++    <exit-code> 0 </exit-code>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..0acee961ec8dbdf05b05ecdbdf767e4e03ea6fd6
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,25 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Stmts ::= "flipCaseBody" [macro]
++  rule flipCaseBody
++    => Return(Call(Attribute(Name("string"), "swapcase"), .Exprs)) .Stmts
++
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           flipCaseBody))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+The complete recorded pipeline was rerun successfully: both krun executions completed cleanly, and the sole universal claim printed #Top with exit status 0.
+  ✓ Inspect prompt and supplied semantics/translator
+  ✓ Implement solution.py and generate solution.mpy
+  ✓ Create K execution and proof definitions
+  ✓ Compile, exercise with krun, and prove with kprove
+  ✓ Finalize prove.sh and validate all deliverables
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/prove.sh b/prove.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..379c8325d6f9e82518755aa8e10958113d6be965
+--- /dev/null
++++ b/prove.sh
+@@ -0,0 +1,24 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++python3 py2mpy.py solution.py > solution.mpy
++
++kompile reference-semantics/semantics.k \
++  --backend llvm \
++  --main-module MPY-KRUN \
++  --syntax-module MPY-SYNTAX \
++  --output-definition runtime-kompiled
++
++krun solution.mpy --definition runtime-kompiled
++krun concrete-tests.mpy --definition runtime-kompiled
++
++kompile verification.k \
++  --backend haskell \
++  --main-module VERIFICATION \
++  --syntax-module VERIFICATION \
++  --output-definition verification-kompiled
++
++kprove \
++  --definition verification-kompiled \
++  --spec-module SPEC \
++  spec.k
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..6597316c10f7b5ef54fce3cb466eb92fc94f0866
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,31 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim
++    <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++    <env> 0 </env>
++    <scopes>
++        0  |-> scope(.Map, parent(-1))
++        -1 |-> builtinsScope
++      =>
++        0  |-> scope(
++                 "flip_case" |->
++                   closureVal(
++                     ("string", .ParamNames),
++                     flipCaseBody,
++                     0),
++                 parent(-1))
++        -1 |-> builtinsScope
++    </scopes>
++    <scopeLoc> 1 </scopeLoc>
++    <heap> .Map </heap>
++    <heapLoc> 0 </heapLoc>
++    <stack> .List </stack>
++    <ret> noRet </ret>
++    <exc> NoExc </exc>
++    <exit-code> 0 </exit-code>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..0acee961ec8dbdf05b05ecdbdf767e4e03ea6fd6
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,25 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Stmts ::= "flipCaseBody" [macro]
++  rule flipCaseBody
++    => Return(Call(Attribute(Name("string"), "swapcase"), .Exprs)) .Stmts
++
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           flipCaseBody))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+codex
+Implemented and verified the task.
+
+- [solution.py](/work/solution.py) and generated [solution.mpy](/work/solution.mpy)
+- [verification.k](/work/verification.k) and universal [spec.k](/work/spec.k)
+- Reproducible commands in executable [prove.sh](/work/prove.sh)
+- Concrete `krun` tests completed with `NoExc`
+- Full pipeline exited 0; the universal `kprove` claim printed `#Top`
+
+RESULT: KPROVE_PASSED — Every required proof claim closed with #Top and exited successfully.
+diff --git a/concrete-tests.mpy b/concrete-tests.mpy
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6df67e0bdb7b0e59e7e5f9dd695a7b0e7fdc6dd
+--- /dev/null
++++ b/concrete-tests.mpy
+@@ -0,0 +1,17 @@
++Module(
++  FuncDef(
++    "flip_case",
++    Params("string"),
++    Return(Call(Attribute(Name("string"), "swapcase"), )))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Hello")),
++      CmpOp("==", Str("hELLO"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("Python 3.11")),
++      CmpOp("==", Str("pYTHON 3.11"))))
++  Assert(
++    Compare(
++      Call(Name("flip_case"), Str("")),
++      CmpOp("==", Str("")))))
+diff --git a/prove.sh b/prove.sh
+new file mode 100644
+index 0000000000000000000000000000000000000000..379c8325d6f9e82518755aa8e10958113d6be965
+--- /dev/null
++++ b/prove.sh
+@@ -0,0 +1,24 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++python3 py2mpy.py solution.py > solution.mpy
++
++kompile reference-semantics/semantics.k \
++  --backend llvm \
++  --main-module MPY-KRUN \
++  --syntax-module MPY-SYNTAX \
++  --output-definition runtime-kompiled
++
++krun solution.mpy --definition runtime-kompiled
++krun concrete-tests.mpy --definition runtime-kompiled
++
++kompile verification.k \
++  --backend haskell \
++  --main-module VERIFICATION \
++  --syntax-module VERIFICATION \
++  --output-definition verification-kompiled
++
++kprove \
++  --definition verification-kompiled \
++  --spec-module SPEC \
++  spec.k
+diff --git a/solution.py b/solution.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..132269eb546b2742d8337f2957a2667922720ed2
+--- /dev/null
++++ b/solution.py
+@@ -0,0 +1,2 @@
++def flip_case(string: str) -> str:
++    return string.swapcase()
+diff --git a/spec.k b/spec.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..6597316c10f7b5ef54fce3cb466eb92fc94f0866
+--- /dev/null
++++ b/spec.k
+@@ -0,0 +1,31 @@
++requires "verification.k"
++
++module SPEC
++  imports VERIFICATION
++
++  // For every string in the supplied code-sequence model, flip_case returns
++  // exactly the semantics' pointwise case swap.
++  claim
++    <k> #runFlipCase(S:IntSeq) => str(mapSwap(S)) </k>
++    <env> 0 </env>
++    <scopes>
++        0  |-> scope(.Map, parent(-1))
++        -1 |-> builtinsScope
++      =>
++        0  |-> scope(
++                 "flip_case" |->
++                   closureVal(
++                     ("string", .ParamNames),
++                     flipCaseBody,
++                     0),
++                 parent(-1))
++        -1 |-> builtinsScope
++    </scopes>
++    <scopeLoc> 1 </scopeLoc>
++    <heap> .Map </heap>
++    <heapLoc> 0 </heapLoc>
++    <stack> .List </stack>
++    <ret> noRet </ret>
++    <exc> NoExc </exc>
++    <exit-code> 0 </exit-code>
++endmodule
+diff --git a/verification.k b/verification.k
+new file mode 100644
+index 0000000000000000000000000000000000000000..0acee961ec8dbdf05b05ecdbdf767e4e03ea6fd6
+--- /dev/null
++++ b/verification.k
+@@ -0,0 +1,25 @@
++requires "reference-semantics/semantics.k"
++
++module VERIFICATION
++  imports MPY
++
++  // This macro is the exact constructor tree generated in solution.mpy
++  // (the generated empty argument list is written explicitly as .Exprs here).
++  syntax Stmts ::= "flipCaseBody" [macro]
++  rule flipCaseBody
++    => Return(Call(Attribute(Name("string"), "swapcase"), .Exprs)) .Stmts
++
++  syntax Module ::= "solutionModule" [macro]
++  rule solutionModule
++    => Module(
++         FuncDef(
++           "flip_case",
++           Params("string"),
++           flipCaseBody))
++
++  // Load the submitted module, then call its required entry point.
++  syntax KItem ::= "#runFlipCase" "(" IntSeq ")"
++  rule <k> #runFlipCase(S:IntSeq)
++        => #loadAll(solutionModule)
++        ~> Call(Name("flip_case"), str(S)) ... </k>
++endmodule
+
+tokens used
+68,390
+Implemented and verified the task.
+
+- [solution.py](/work/solution.py) and generated [solution.mpy](/work/solution.mpy)
+- [verification.k](/work/verification.k) and universal [spec.k](/work/spec.k)
+- Reproducible commands in executable [prove.sh](/work/prove.sh)
+- Concrete `krun` tests completed with `NoExc`
+- Full pipeline exited 0; the universal `kprove` claim printed `#Top`
+
+RESULT: KPROVE_PASSED — Every required proof claim closed with #Top and exited successfully.

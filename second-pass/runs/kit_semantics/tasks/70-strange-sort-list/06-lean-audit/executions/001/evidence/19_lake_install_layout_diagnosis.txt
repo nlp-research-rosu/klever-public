@@ -1,0 +1,178 @@
++ rg -n 'structure LakeInstall|namespace LakeInstall|def ofLean|def home|def libDir|leanArgs' /opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean
++ head -n 120
+133:structure LakeInstall where
++ nl -ba /opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake/Lake/Config/InstallPath.lean
++ sed -n 1,170p
+     1	/-
+     2	Copyright (c) 2021 Mac Malone. All rights reserved.
+     3	Released under Apache 2.0 license as described in the file LICENSE.
+     4	Authors: Mac Malone
+     5	-/
+     6	
+     7	prelude
+     8	import Init.Control.Option
+     9	import Init.Data.Option.Coe
+    10	import Lean.Compiler.FFI
+    11	import Lake.Config.Dynlib
+    12	import Lake.Util.NativeLib
+    13	import Lake.Config.Defaults
+    14	
+    15	open System Lean.Compiler.FFI
+    16	
+    17	namespace Lake
+    18	
+    19	/-- Convert the string value of an environment variable to a boolean. -/
+    20	def envToBool? (o : String) : Option Bool :=
+    21	  if ["y", "yes", "t", "true", "on", "1"].contains o.toLower then true
+    22	  else if ["n", "no", "f", "false", "off", "0"].contains o.toLower then false
+    23	  else none
+    24	
+    25	/-! ## Data Structures -/
+    26	
+    27	/-- Information about the local Elan setup. -/
+    28	structure ElanInstall where
+    29	  home : FilePath
+    30	  elan : FilePath
+    31	  binDir := home / "bin"
+    32	  toolchainsDir := home / "toolchains"
+    33	  deriving Inhabited, Repr
+    34	
+    35	/-- Convert an Elan toolchain name to an Elan toolchain directory name. -/
+    36	@[inline] partial def toolchain2Dir (toolchain : String) : FilePath :=
+    37	  go "" 0
+    38	where
+    39	  go (acc : String) (pos : String.Pos) : FilePath :=
+    40	    if h : toolchain.atEnd pos then
+    41	      FilePath.mk acc
+    42	    else
+    43	      let c := toolchain.get' pos h
+    44	      let pos' := toolchain.next' pos h
+    45	      if c = '/' then
+    46	        go (acc ++ "--") pos'
+    47	      else if c = ':'  then
+    48	        go (acc ++ "---") pos'
+    49	      else
+    50	        go (acc.push c) pos'
+    51	
+    52	@[inline] def ElanInstall.toolchainDir (toolchain : String) (elan : ElanInstall) : FilePath :=
+    53	  elan.toolchainsDir / toolchain2Dir toolchain
+    54	
+    55	/-- Standard path of `lean` in a Lean installation. -/
+    56	def leanExe (sysroot : FilePath) :=
+    57	  sysroot / "bin" / "lean" |>.addExtension FilePath.exeExtension
+    58	
+    59	/-- Standard path of `leanc` in a Lean installation. -/
+    60	def leancExe (sysroot : FilePath) :=
+    61	  sysroot / "bin" / "leanc" |>.addExtension FilePath.exeExtension
+    62	
+    63	/-- Standard path of `llvm-ar` in a Lean installation. -/
+    64	def leanArExe (sysroot : FilePath) :=
+    65	  sysroot / "bin" / "llvm-ar" |>.addExtension FilePath.exeExtension
+    66	
+    67	/-- Standard path of `clang` in a Lean installation. -/
+    68	def leanCcExe (sysroot : FilePath) :=
+    69	  sysroot / "bin" / "clang" |>.addExtension FilePath.exeExtension
+    70	
+    71	/-- Standard path of shared libraries in a Lean installation. -/
+    72	def leanSharedLibDir (sysroot : FilePath) :=
+    73	  if Platform.isWindows then
+    74	    sysroot / "bin"
+    75	  else
+    76	    sysroot / "lib" / "lean"
+    77	
+    78	/-- `libleanshared` file name. -/
+    79	def leanSharedLib  :=
+    80	  FilePath.addExtension "libleanshared" sharedLibExt
+    81	
+    82	/-- `Init` shared library file name. -/
+    83	def initSharedLib : FilePath :=
+    84	  FilePath.addExtension "libInit_shared" sharedLibExt
+    85	
+    86	/-- Path information about the local Lean installation. -/
+    87	structure LeanInstall where
+    88	  sysroot : FilePath
+    89	  githash : String := ""
+    90	  srcDir := sysroot / "src" / "lean"
+    91	  leanLibDir := sysroot / "lib" / "lean"
+    92	  includeDir := sysroot / "include"
+    93	  systemLibDir := sysroot / "lib"
+    94	  binDir := sysroot / "bin"
+    95	  lean := leanExe sysroot
+    96	  leanc := leancExe sysroot
+    97	  sharedLib := leanSharedLibDir sysroot / leanSharedLib
+    98	  initSharedLib := leanSharedLibDir sysroot / initSharedLib
+    99	  ar : FilePath := "ar"
+   100	  cc : FilePath := "cc"
+   101	  customCc : Bool := true
+   102	  cFlags := getCFlags'.push "-Wno-unused-command-line-argument"
+   103	  linkStaticFlags := getLinkerFlags' (linkStatic := true)
+   104	  linkSharedFlags := getLinkerFlags' (linkStatic := false)
+   105	  ccFlags := cFlags
+   106	  ccLinkStaticFlags := linkStaticFlags
+   107	  ccLinkSharedFlags := linkSharedFlags
+   108	  deriving Inhabited, Repr
+   109	
+   110	/--
+   111	A `SearchPath` including the Lean installation's shared library directories
+   112	(i.e., the system library and Lean library directories).
+   113	-/
+   114	def LeanInstall.sharedLibPath (self : LeanInstall) : SearchPath :=
+   115	  if Platform.isWindows then
+   116	    [self.binDir]
+   117	  else
+   118	    [self.leanLibDir, self.systemLibDir]
+   119	
+   120	/-- The `LEAN_CC` of the Lean installation. -/
+   121	def LeanInstall.leanCc? (self : LeanInstall) : Option String :=
+   122	  if self.customCc then self.cc.toString else none
+   123	
+   124	/-- The link-time flags for the C compiler of the Lean installation. -/
+   125	def LeanInstall.ccLinkFlags (shared : Bool) (self : LeanInstall) : Array String :=
+   126	  if shared then self.ccLinkSharedFlags else self.ccLinkStaticFlags
+   127	
+   128	/-- Lake executable file name. -/
+   129	def lakeExe : FilePath :=
+   130	  FilePath.addExtension "lake" FilePath.exeExtension
+   131	
+   132	/-- Path information about the local Lake installation. -/
+   133	structure LakeInstall where
+   134	  home : FilePath
+   135	  srcDir := home
+   136	  binDir := home / defaultBuildDir / defaultBinDir
+   137	  libDir := home / defaultBuildDir / defaultLeanLibDir
+   138	  sharedDynlib : Dynlib := {
+   139	    name := "Lake"
+   140	    path := libDir / nameToSharedLib "Lake"
+   141	  }
+   142	  lake := binDir / lakeExe
+   143	  deriving Inhabited, Repr
+   144	
+   145	@[inline] def LakeInstall.sharedLib (self : LakeInstall) : FilePath :=
+   146	  self.sharedDynlib.path
+   147	
+   148	/-- Construct a Lake installation co-located with the specified Lean installation. -/
+   149	def LakeInstall.ofLean (lean : LeanInstall) : LakeInstall where
+   150	  home := lean.sysroot
+   151	  srcDir := lean.srcDir / "lake"
+   152	  binDir := lean.binDir
+   153	  libDir := lean.leanLibDir
+   154	  sharedDynlib :=
+   155	    let lib := s!"libLake_shared.{sharedLibExt}"
+   156	    let path := if Platform.isWindows then lean.binDir / lib else lean.leanLibDir / lib
+   157	    {name := "Lake_shared", path}
+   158	  lake := lean.binDir / lakeExe
+   159	
+   160	/-! ## Detection Functions -/
+   161	
+   162	/--
+   163	Attempt to detect an Elan installation by checking the `ELAN` and `ELAN_HOME`
+   164	environment variables. If `ELAN` is set but empty, Elan is considered disabled.
+   165	-/
+   166	def findElanInstall? : BaseIO (Option ElanInstall) := do
+   167	  if let some home ← IO.getEnv "ELAN_HOME" then
+   168	    let elan := (← IO.getEnv "ELAN").getD "elan"
+   169	    if elan.trim.isEmpty then
+   170	      return none
++ cd /reference/klean-generation/generated
++ env LAKE_HOME=/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/lake LEAN_SYSROOT=/opt/elan/toolchains/leanprover--lean4---v4.22.0 LEAN=/opt/elan/toolchains/leanprover--lean4---v4.22.0/bin/lean PATH=/opt/elan/toolchains/leanprover--lean4---v4.22.0/bin:/usr/local/bin:/usr/bin:/bin /opt/elan/toolchains/leanprover--lean4---v4.22.0/bin/lake env /opt/elan/toolchains/leanprover--lean4---v4.22.0/bin/lean --version
+error: failed to locate application

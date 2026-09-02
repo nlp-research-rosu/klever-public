@@ -1,0 +1,265 @@
+Script started on 2026-07-28 17:11:31-05:00 [<not executed on terminal>]
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // The mathematical result of finishing the source loop from END to STOP,
+     7	  // starting with accumulator ACC.  doSlice is the reference semantics'
+     8	  // definition of Python slicing, so this definition also covers empty and
+     9	  // out-of-range slice bounds without an extra assumption.
+    10	  syntax ValSeq ::= prefixesAcc(IntSeq, Int, Int, ValSeq) [function]
+    11	  rule prefixesAcc(S:IntSeq, END:Int, STOP:Int, ACC:ValSeq)
+    12	    => prefixesAcc(
+    13	         S,
+    14	         END +Int 1,
+    15	         STOP,
+    16	         valSeqConcat(
+    17	           ACC,
+    18	           vCons(doSlice(str(S), noB, someB(END), noB), .ValSeq)))
+    19	    requires END <Int STOP
+    20	  rule prefixesAcc(_:IntSeq, END:Int, STOP:Int, ACC:ValSeq) => ACC
+    21	    requires END >=Int STOP
+    22	
+    23	  syntax ValSeq ::= allPrefixes(IntSeq) [function]
+    24	  rule allPrefixes(S:IntSeq)
+    25	    => prefixesAcc(S, 1, isLen(S) +Int 1, .ValSeq)
+    26	
+    27	  // Constructor terms copied exactly from solution.mpy.  Keeping them named
+    28	  // makes the claims readable while still executing the translated program.
+    29	  syntax Stmts ::= allPrefixesLoopBody() [function, total]
+    30	  rule allPrefixesLoopBody()
+    31	    => Expr(Call(
+    32	         Attribute(Name("prefixes"), "append"),
+    33	         Subscript(
+    34	           Name("string"),
+    35	           Slice(NoBound, Name("end"), NoBound))))
+    36	       .Stmts
+    37	
+    38	  syntax Stmts ::= allPrefixesBody() [function, total]
+    39	  rule allPrefixesBody()
+    40	    => Expr(Str("Return all nonempty prefixes of string, shortest first."))
+    41	       Assign(Name("prefixes"), ListExpr(.Exprs))
+    42	       For(
+    43	         Name("end"),
+    44	         Call(
+    45	           Name("range"),
+    46	           Int(1),
+    47	           BinOp("+", Call(Name("len"), Name("string")), Int(1))),
+    48	         allPrefixesLoopBody())
+    49	       Return(Name("prefixes"))
+    50	       .Stmts
+    51	
+    52	  syntax Stmt ::= allPrefixesDef() [function, total]
+    53	  rule allPrefixesDef()
+    54	    => FuncDef("all_prefixes", Params("string"), allPrefixesBody())
+    55	
+    56	  syntax Module ::= solutionModule() [function, total]
+    57	  rule solutionModule()
+    58	    => Module(ImportFrom("typing", "List") allPrefixesDef())
+    59	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Loop invariant.  The loop may update its local `end` binding; the observed
+     7	  // heap list is the specified fold from END through STOP - 1.
+     8	  claim
+     9	    <k>
+    10	      #loop(
+    11	        rangeObj(END:Int, STOP:Int, 1),
+    12	        Name("end"),
+    13	        allPrefixesLoopBody()) ~> CONT:K
+    14	      => CONT
+    15	    </k>
+    16	    <env> L:Int </env>
+    17	    <scopes>
+    18	      SC:Map
+    19	      L |-> scope(
+    20	        "end" |-> _PREV:Int
+    21	        "prefixes" |-> ref(H:Int)
+    22	        "string" |-> str(S:IntSeq),
+    23	        P:Parent)
+    24	      => SC
+    25	         L |-> scope(
+    26	           "end" |-> ?FINAL:Int
+    27	           "prefixes" |-> ref(H)
+    28	           "string" |-> str(S),
+    29	           P)
+    30	    </scopes>
+    31	    <heap>
+    32	      HP:Map H |-> list(ACC:ValSeq)
+    33	      => HP H |-> list(prefixesAcc(S, END, STOP, ACC))
+    34	    </heap>
+    35	    requires END <=Int STOP
+    36	
+    37	  // End-to-end functional correctness for every string value S.  The claim
+    38	  // loads the exact translated definition, calls it, and observes both the
+    39	  // returned list reference and the list stored in the semantics' heap.
+    40	  claim
+    41	    <k>
+    42	      #loadAll(solutionModule())
+    43	      ~> Call(Name("all_prefixes"), (str(S:IntSeq), .Exprs))
+    44	      => ref(0)
+    45	    </k>
+    46	    <env> 0 </env>
+    47	    <scopes>
+    48	      0 |-> scope(.Map, parent(-1))
+    49	      -1 |-> builtinsScope
+    50	      => 0 |-> scope(
+    51	           "all_prefixes" |-> closureVal(
+    52	             "string", .ParamNames, allPrefixesBody(), 0),
+    53	           parent(-1))
+    54	         -1 |-> builtinsScope
+    55	    </scopes>
+    56	    <scopeLoc> 1 </scopeLoc>
+    57	    <heap>
+    58	      .Map => 0 |-> list(allPrefixes(S))
+    59	    </heap>
+    60	    <heapLoc> 0 => 1 </heapLoc>
+    61	    <stack> .List </stack>
+    62	    <ret> noRet </ret>
+    63	    <exc> NoExc </exc>
+    64	    <exit-code> 0 </exit-code>
+    65	endmodule
+     1	from typing import List
+     2	
+     3	
+     4	def all_prefixes(string: str) -> List[str]:
+     5	    """Return all nonempty prefixes of string, shortest first."""
+     6	    prefixes = []
+     7	    for end in range(1, len(string) + 1):
+     8	        prefixes.append(string[:end])
+     9	    return prefixes
+     1	Module(
+     2	  ImportFrom("typing", "List")
+     3	  FuncDef("all_prefixes", Params("string"),
+     4	    Expr(Str("Return all nonempty prefixes of string, shortest first."))
+     5	    Assign(Name("prefixes"), ListExpr())
+     6	    For(Name("end"), Call(
+     7	      Name("range"),
+     8	      Int(1),
+     9	      BinOp("+", Call(Name("len"), Name("string")), Int(1))),
+    10	      Expr(
+    11	        Call(
+    12	          Attribute(Name("prefixes"), "append"),
+    13	          Subscript(
+    14	            Name("string"),
+    15	            Slice(NoBound, Name("end"), NoBound)))))
+    16	    Return(Name("prefixes"))))
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py smoke.py > smoke.mpy
+     6	
+     7	kompile reference-semantics/semantics.k \
+     8	  --backend llvm \
+     9	  --main-module MPY-KRUN \
+    10	  --syntax-module MPY-SYNTAX \
+    11	  --output-definition runtime-kompiled
+    12	
+    13	krun smoke.mpy --definition runtime-kompiled
+    14	
+    15	kompile verification.k \
+    16	  --backend haskell \
+    17	  --main-module VERIFICATION \
+    18	  --syntax-module MPY-SYNTAX \
+    19	  --output-definition verification-kompiled
+    20	
+    21	kprove spec.k \
+    22	  --definition verification-kompiled \
+    23	  --spec-module SPEC
+     1	// reference/src/semantics.k — the supplied `.mpy` semantics, ASSEMBLED.
+     2	//
+     3	//   kompile reference-semantics/semantics.k --backend llvm \
+     4	//     --main-module MPY-KRUN --syntax-module MPY-SYNTAX \
+     5	//     --output-definition runtime-kompiled
+     6	//
+     7	// Concrete-only legs are included through MPY-KRUN. Proof definitions import
+     8	// MPY and any explicit proof extensions supplied by the task author.
+     9	//
+    10	// Files (dependency order — everything imports MPY-CORE):
+    11	//   semantics/syntax.k         MPY-SYNTAX       AST productions
+    12	//   semantics/core.k           MPY-CORE         values, config, load, lookup, shared helpers   [required]
+    13	//   semantics/iter.k           MPY-ITER         the iterator protocol (#iterNext/#iterYield/#iterDone) decl
+    14	//   semantics/range.k          MPY-RANGE        rangeObj: inRange / rangeLen / its #iterNext
+    15	//   semantics/operators.k      MPY-OPERATORS    operator DISPATCH (UnaryOp/BinOp/Compare/BoolOp) — domain files own the cases
+    16	//   semantics/int.k            MPY-INT          Int operator cases; floored // and % (pyMod)
+    17	//   semantics/bool.k           MPY-BOOL         Bool operator cases + truthy not/and/or (BoolOp)
+    18	//   semantics/float.k          MPY-FLOAT        Float Val: literal + opaque float ops ([concrete] for krun)
+    19	//   semantics/str.k            MPY-STR          str(IntSeq): literal, +, ==, in
+    20	//   semantics/set.k            MPY-SET          set(str): distinct char codes (len / membership)
+    21	//   semantics/list.k           MPY-LIST         ListExpr, list(ValSeq): +, ==, in
+    22	//   semantics/tuple.k          MPY-TUPLE        TupleExpr, tuple ==, target-binding + unpacking
+    23	//   semantics/subscript.k      MPY-SUBSCRIPT    Subscript indexing + Slice
+    24	//   semantics/comprehension.k  MPY-COMPREHENSION  list comprehensions [ELT for T in ITER if COND]
+    25	//   semantics/methods.k        MPY-METHODS      pure str methods: is*/lower/upper/swapcase/startswith
+    26	//   semantics/controls.k       MPY-CONTROLS     Assign/AugAssign, If, IfExp, For, While, break/continue
+    27	//   semantics/functions.k      MPY-FUNCTIONS    def / call / return (frame stack)
+    28	//   semantics/builtins.k       MPY-BUILTINS     builtins as calls: len/sum/abs/min/max/ord/chr/str
+    29	//   semantics/call.k           MPY-CALL         ALL Call routing + argument evaluation
+    30	//   semantics/sort.k           MPY-SORT         trusted sorted(): opaque sortVS + concrete insertion sort
+    31	//   semantics/assert.k         MPY-ASSERT       Assert oracle (smoke programs only)
+    32	//   semantics/dict.k           MPY-DICT         order-preserving dictV(KS,VS) + .keys() + list()
+    33	
+    34	requires "semantics/syntax.k"
+    35	requires "semantics/core.k"
+    36	requires "semantics/iter.k"
+    37	requires "semantics/range.k"
+    38	requires "semantics/operators.k"
+    39	requires "semantics/int.k"
+    40	requires "semantics/bool.k"
+    41	requires "semantics/float.k"
+    42	requires "semantics/str.k"
+    43	requires "semantics/set.k"
+    44	requires "semantics/list.k"
+    45	requires "semantics/tuple.k"
+    46	requires "semantics/subscript.k"
+    47	requires "semantics/comprehension.k"
+    48	requires "semantics/methods.k"
+    49	requires "semantics/controls.k"
+    50	requires "semantics/functions.k"
+    51	requires "semantics/builtins.k"
+    52	requires "semantics/call.k"
+    53	requires "semantics/sort.k"
+    54	requires "semantics/assert.k"
+    55	requires "semantics/dict.k"
+    56	requires "semantics/concrete.k"
+    57	
+    58	module MPY
+    59	  imports MPY-CORE
+    60	  imports MPY-ITER
+    61	  imports MPY-RANGE
+    62	  imports MPY-OPERATORS
+    63	  imports MPY-INT
+    64	  imports MPY-BOOL
+    65	  imports MPY-FLOAT
+    66	  imports MPY-STR
+    67	  imports MPY-SET
+    68	  imports MPY-LIST
+    69	  imports MPY-TUPLE
+    70	  imports MPY-SUBSCRIPT
+    71	  imports MPY-COMPREHENSION
+    72	  imports MPY-METHODS
+    73	  imports MPY-CONTROLS
+    74	  imports MPY-FUNCTIONS
+    75	  imports MPY-BUILTINS
+    76	  imports MPY-CALL
+    77	  imports MPY-SORT
+    78	  imports MPY-ASSERT
+    79	  imports MPY-DICT
+    80	endmodule
+    81	
+    82	// The krun (llvm) main module: MPY plus the concrete-only legs (keyed sort's
+    83	// real key calls, deep list equality). Verification builds import MPY and
+    84	// never see MPY-CONCRETE. The llvm kompile MUST use --main-module MPY-KRUN —
+    85	// with plain MPY the concrete legs are silently absent (this was live for a
+    86	// while: sorted-key stuck and comprehension asserted wrong under krun).
+    87	module MPY-KRUN
+    88	  imports MPY
+    89	  imports MPY-CONCRETE
+    90	endmodule
+
+Script done on 2026-07-28 17:11:31-05:00 [COMMAND_EXIT_CODE="0"]

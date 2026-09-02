@@ -1,0 +1,486 @@
+WORKDIR: /tmp/audit-work/116-sort-array/candidate-src
+COMMAND: bash -lc $'printf "COUNTS\\n"\nprintf "semantic rules: "; rg -c "^\\\\s*rule " semantic.k\nprintf "verification rules: "; rg -c "^\\\\s*rule " verification.k\nprintf "spec claims: "; rg -c "^\\\\s*claim " spec.k\nprintf "local function declarations: "; rg -o "\\\\[function\\\\]" semantic.k verification.k | wc -l\nprintf "SPECIAL ATTRIBUTES\\n"\nrg -n "\\\\[(total|functional|simplification|concrete|owise|priority|priorities|opaque|anywhere)" semantic.k verification.k spec.k || true\nprintf "SEMANTIC.K LINE NUMBERED\\n"\nnl -ba semantic.k\nprintf "VERIFICATION.K LINE NUMBERED\\n"\nnl -ba verification.k\nprintf "SPEC.K LINE NUMBERED\\n"\nnl -ba spec.k\nprintf "SOLUTION.MPY LINE NUMBERED\\n"\nnl -ba solution.mpy'
+START_UTC: 2026-07-23T18:08:21Z
+COUNTS
+semantic rules: 57
+verification rules: 19
+spec claims: 22
+local function declarations: 32
+SPECIAL ATTRIBUTES
+SEMANTIC.K LINE NUMBERED
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports BOOL-SYNTAX
+     6	  imports STRING-SYNTAX
+     7	
+     8	  syntax Pgm ::= "Module" "(" Stmts ")"
+     9	
+    10	  syntax Stmts ::= List{Stmt, ""}
+    11	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    12	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    13	                | "Return" "(" Expr ")"
+    14	
+    15	  syntax Params ::= "Params" "(" Strings ")"
+    16	  syntax Strings ::= List{String, ","}
+    17	
+    18	  syntax Exprs ::= List{Expr, ","}
+    19	  syntax CmpOps ::= List{CmpOp, ","}
+    20	  syntax Index ::= Expr | Slice
+    21	
+    22	  syntax Expr ::= "Int" "(" Int ")"
+    23	                | "Bool" "(" Bool ")"
+    24	                | "Name" "(" String ")"
+    25	                | "UnaryOp" "(" String "," Expr ")"
+    26	                | "BinOp" "(" String "," Expr "," Expr ")"
+    27	                | "BoolOp" "(" String "," Exprs ")"
+    28	                | "Compare" "(" Expr "," CmpOps ")"
+    29	                | "Call" "(" Expr "," Exprs ")"
+    30	                | "Attribute" "(" Expr "," String ")"
+    31	                | "ListExpr" "(" Exprs ")"
+    32	                | "Subscript" "(" Expr "," Index ")"
+    33	
+    34	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    35	  syntax Slice ::= "Slice" "(" Bound "," Bound "," Bound ")"
+    36	  syntax Bound ::= Expr | "NoBound"
+    37	endmodule
+    38	
+    39	module SEMANTIC
+    40	  imports MPY-SYNTAX
+    41	  imports INT
+    42	  imports BOOL
+    43	  imports STRING
+    44	  imports MAP
+    45	
+    46	  // Runtime values.  The explicit Ints datatype makes list induction and
+    47	  // symbolic execution independent of K's builtin, heterogenous List sort.
+    48	  syntax Ints ::= ".Ints"
+    49	                | Int "::" Ints [symbol(intsCons)]
+    50	  syntax Val ::= "intV" "(" Int ")"
+    51	               | "boolV" "(" Bool ")"
+    52	               | "listV" "(" Ints ")"
+    53	
+    54	  syntax Vals ::= ".Vals"
+    55	                | Val ";" Vals [symbol(valsCons)]
+    56	
+    57	  syntax Def ::= "def" "(" Params "," Stmts ")"
+    58	               | lookupDef(String, Stmts) [function]
+    59	
+    60	  syntax Outcome ::= "normal"
+    61	                   | "returned" "(" Val ")"
+    62	
+    63	  syntax KItem ::= "#run" "(" Pgm "," Val ")" [function]
+    64	  syntax Val ::= evalCall(String, Vals, Stmts) [function]
+    65	               | invoke(Def, Vals, Stmts) [function]
+    66	               | outcomeValue(Outcome) [function]
+    67	               | evalExpr(Expr, Map, Stmts) [function]
+    68	               | evalUnary(String, Val) [function]
+    69	               | evalBin(String, Val, Val) [function]
+    70	               | evalCompare(String, Val, Val) [function]
+    71	               | evalBoolBin(String, Val, Val) [function]
+    72	               | evalBitCount(Val) [function]
+    73	               | lookupEnv(String, Map) [function]
+    74	               | evalLen(Val) [function]
+    75	               | evalIndex(Val, Val) [function]
+    76	               | evalTail(Val) [function]
+    77	  syntax Outcome ::= evalStmts(Stmts, Map, Stmts) [function]
+    78	                   | evalAfterIf(Val, Stmts, Stmts, Stmts, Map, Stmts) [function]
+    79	                   | continueWith(Outcome, Stmts, Map, Stmts) [function]
+    80	  syntax Vals ::= evalArgs(Exprs, Map, Stmts) [function]
+    81	  syntax Ints ::= evalListItems(Exprs, Map, Stmts) [function]
+    82	                | appendInts(Ints, Ints) [function]
+    83	  syntax Int ::= intOf(Val) [function]
+    84	               | lengthInts(Ints) [function]
+    85	               | bitCount(Int) [function]
+    86	
+    87	  configuration <k> #run($PGM:Pgm, $ARGS:Val) </k>
+    88	
+    89	  rule #run(Module(DEFS), INPUT) => evalCall("sort_array", INPUT ; .Vals, DEFS)
+    90	
+    91	  rule lookupDef(NAME, FuncDef(NAME, PS, BODY) REST) => def(PS, BODY)
+    92	  rule lookupDef(NAME, FuncDef(OTHER, PS, BODY) REST)
+    93	    => lookupDef(NAME, REST)
+    94	    requires NAME =/=String OTHER
+    95	
+    96	  rule evalCall(NAME, ARGS, DEFS)
+    97	    => invoke(lookupDef(NAME, DEFS), ARGS, DEFS)
+    98	
+    99	  rule invoke(def(Params(X:String), BODY), V ; .Vals, DEFS)
+   100	    => outcomeValue(evalStmts(BODY, X |-> V, DEFS))
+   101	  rule invoke(def(Params(X:String, Y:String), BODY), V1 ; V2 ; .Vals, DEFS)
+   102	    => outcomeValue(evalStmts(BODY, (X |-> V1) (Y |-> V2), DEFS))
+   103	
+   104	  rule outcomeValue(returned(V)) => V
+   105	
+   106	  rule evalStmts(.Stmts, RHO, DEFS) => normal
+   107	  rule evalStmts(Return(E) REST, RHO, DEFS)
+   108	    => returned(evalExpr(E, RHO, DEFS))
+   109	  rule evalStmts(If(COND, THEN, ELSE) REST, RHO, DEFS)
+   110	    => evalAfterIf(evalExpr(COND, RHO, DEFS), THEN, ELSE, REST, RHO, DEFS)
+   111	
+   112	  rule evalAfterIf(boolV(B), THEN, ELSE, REST, RHO, DEFS)
+   113	    => continueWith(evalStmts(THEN, RHO, DEFS), REST, RHO, DEFS)
+   114	    requires B
+   115	  rule evalAfterIf(boolV(B), THEN, ELSE, REST, RHO, DEFS)
+   116	    => continueWith(evalStmts(ELSE, RHO, DEFS), REST, RHO, DEFS)
+   117	    requires notBool B
+   118	  rule continueWith(returned(V), REST, RHO, DEFS) => returned(V)
+   119	  rule continueWith(normal, REST, RHO, DEFS) => evalStmts(REST, RHO, DEFS)
+   120	
+   121	  rule evalExpr(Int(I), RHO, DEFS) => intV(I)
+   122	  rule evalExpr(Bool(B), RHO, DEFS) => boolV(B)
+   123	  rule evalExpr(Name(X), RHO, DEFS) => lookupEnv(X, RHO)
+   124	  rule lookupEnv(X, (X |-> V) RHO) => V
+   125	  rule evalExpr(UnaryOp(OP, E), RHO, DEFS)
+   126	    => evalUnary(OP, evalExpr(E, RHO, DEFS))
+   127	  rule evalExpr(BinOp(OP, L, R), RHO, DEFS)
+   128	    => evalBin(OP, evalExpr(L, RHO, DEFS), evalExpr(R, RHO, DEFS))
+   129	  rule evalExpr(BoolOp(OP, L:Expr, R:Expr), RHO, DEFS)
+   130	    => evalBoolBin(OP, evalExpr(L, RHO, DEFS), evalExpr(R, RHO, DEFS))
+   131	  rule evalExpr(Compare(L, CmpOp(OP, R)), RHO, DEFS)
+   132	    => evalCompare(OP, evalExpr(L, RHO, DEFS), evalExpr(R, RHO, DEFS))
+   133	  rule evalExpr(Call(Name("len"), E), RHO, DEFS)
+   134	    => evalLen(evalExpr(E, RHO, DEFS))
+   135	  rule evalExpr(Call(Attribute(E, "bit_count"), .Exprs), RHO, DEFS)
+   136	    => evalBitCount(evalExpr(E, RHO, DEFS))
+   137	  rule evalExpr(Call(Name(F), ES), RHO, DEFS)
+   138	    => evalCall(F, evalArgs(ES, RHO, DEFS), DEFS)
+   139	    requires F =/=String "len"
+   140	  rule evalExpr(ListExpr(ES), RHO, DEFS)
+   141	    => listV(evalListItems(ES, RHO, DEFS))
+   142	  rule evalExpr(Subscript(E, I:Expr), RHO, DEFS)
+   143	    => evalIndex(evalExpr(E, RHO, DEFS), evalExpr(I, RHO, DEFS))
+   144	  rule evalExpr(Subscript(E, Slice(Int(1), NoBound, NoBound)), RHO, DEFS)
+   145	    => evalTail(evalExpr(E, RHO, DEFS))
+   146	
+   147	  rule evalArgs(.Exprs, RHO, DEFS) => .Vals
+   148	  rule evalArgs(E, ES, RHO, DEFS)
+   149	    => evalExpr(E, RHO, DEFS) ; evalArgs(ES, RHO, DEFS)
+   150	
+   151	  rule evalListItems(.Exprs, RHO, DEFS) => .Ints
+   152	  rule evalListItems(E, ES, RHO, DEFS)
+   153	    => intOf(evalExpr(E, RHO, DEFS)) :: evalListItems(ES, RHO, DEFS)
+   154	
+   155	  rule intOf(intV(I)) => I
+   156	
+   157	  rule evalUnary("-", intV(I)) => intV(0 -Int I)
+   158	
+   159	  rule evalBin("+", intV(I), intV(J)) => intV(I +Int J)
+   160	  rule evalBin("+", listV(IS), listV(JS)) => listV(appendInts(IS, JS))
+   161	  rule evalBin("%", intV(I), intV(J)) => intV(I %Int J)
+   162	    requires J =/=Int 0
+   163	  rule evalBin("//", intV(I), intV(J)) => intV(I /Int J)
+   164	    requires J =/=Int 0
+   165	
+   166	  rule evalCompare("==", intV(I), intV(J)) => boolV(I ==Int J)
+   167	  rule evalCompare("==", listV(.Ints), listV(.Ints)) => boolV(true)
+   168	  rule evalCompare("==", listV(I :: IS), listV(.Ints)) => boolV(false)
+   169	  rule evalCompare("==", listV(.Ints), listV(J :: JS)) => boolV(false)
+   170	  rule evalCompare("<", intV(I), intV(J)) => boolV(I <Int J)
+   171	  rule evalCompare("<=", intV(I), intV(J)) => boolV(I <=Int J)
+   172	
+   173	  rule evalBoolBin("and", boolV(B1), boolV(B2)) => boolV(B1 andBool B2)
+   174	  rule evalBoolBin("or", boolV(B1), boolV(B2)) => boolV(B1 orBool B2)
+   175	
+   176	  rule evalBitCount(intV(I)) => intV(bitCount(I))
+   177	  rule bitCount(N) => bitCount(0 -Int N) requires N <Int 0
+   178	  rule bitCount(0) => 0
+   179	  rule bitCount(N) => (N %Int 2) +Int bitCount(N /Int 2)
+   180	    requires N >Int 0
+   181	
+   182	  rule evalLen(listV(IS)) => intV(lengthInts(IS))
+   183	  rule lengthInts(.Ints) => 0
+   184	  rule lengthInts(I :: IS) => 1 +Int lengthInts(IS)
+   185	
+   186	  rule evalIndex(listV(I :: IS), intV(0)) => intV(I)
+   187	  rule evalTail(listV(I :: IS)) => listV(IS)
+   188	
+   189	  rule appendInts(.Ints, JS) => JS
+   190	  rule appendInts(I :: IS, JS) => I :: appendInts(IS, JS)
+   191	endmodule
+VERIFICATION.K LINE NUMBERED
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // A named copy of the exact constructor tree emitted in solution.mpy.  The
+     7	  // macro gives specifications a compact way to run the translated program;
+     8	  // it adds no execution rule and therefore cannot bypass the interpreter.
+     9	  syntax Pgm ::= "solutionProgram" [macro]
+    10	  syntax Stmts ::= "solutionDefs" [macro]
+    11	  rule solutionProgram => Module(solutionDefs)
+    12	  rule solutionDefs =>
+    13	      FuncDef("count_ones", Params("n"),
+    14	        Return(Call(Attribute(Name("n"), "bit_count"), .Exprs)))
+    15	      FuncDef("comes_before", Params("a", "b"),
+    16	        Return(
+    17	          BoolOp(
+    18	            "or",
+    19	            Compare(
+    20	              Call(Name("count_ones"), Name("a")),
+    21	              CmpOp("<", Call(Name("count_ones"), Name("b")))),
+    22	            BoolOp(
+    23	              "and",
+    24	              Compare(
+    25	                Call(Name("count_ones"), Name("a")),
+    26	                CmpOp("==", Call(Name("count_ones"), Name("b")))),
+    27	              Compare(Name("a"), CmpOp("<=", Name("b")))))))
+    28	      FuncDef("insert_sorted", Params("x", "values"),
+    29	        If(Compare(Name("values"), CmpOp("==", ListExpr(.Exprs))),
+    30	          Return(ListExpr(Name("x"))),
+    31	          .Stmts)
+    32	        If(Call(
+    33	          Name("comes_before"),
+    34	          Name("x"),
+    35	          Subscript(Name("values"), Int(0))),
+    36	          Return(BinOp("+", ListExpr(Name("x")), Name("values"))),
+    37	          .Stmts)
+    38	        Return(
+    39	          BinOp(
+    40	            "+",
+    41	            ListExpr(Subscript(Name("values"), Int(0))),
+    42	            Call(
+    43	              Name("insert_sorted"),
+    44	              Name("x"),
+    45	              Subscript(Name("values"), Slice(Int(1), NoBound, NoBound))))))
+    46	      FuncDef("sort_array", Params("arr"),
+    47	        If(Compare(Name("arr"), CmpOp("==", ListExpr(.Exprs))),
+    48	          Return(ListExpr(.Exprs)),
+    49	          .Stmts)
+    50	        Return(
+    51	          Call(
+    52	            Name("insert_sorted"),
+    53	            Subscript(Name("arr"), Int(0)),
+    54	            Call(
+    55	              Name("sort_array"),
+    56	              Subscript(Name("arr"), Slice(Int(1), NoBound, NoBound))))))
+    57	
+    58	  // Independent mathematical reference model for the prose contract.
+    59	  syntax Int ::= popcount(Int) [function]
+    60	  syntax Bool ::= beforeEq(Int, Int) [function]
+    61	                | ordered(Ints) [function]
+    62	                | allNonnegative(Ints) [function]
+    63	                | sameMultiplicity(Ints, Ints, Ints) [function]
+    64	  syntax Ints ::= insertModel(Int, Ints) [function]
+    65	                | sortModel(Ints) [function]
+    66	  syntax Int ::= occurrences(Int, Ints) [function]
+    67	
+    68	  rule popcount(N) => bitCount(N)
+    69	
+    70	  rule beforeEq(I, J)
+    71	    => (popcount(I) <Int popcount(J))
+    72	       orBool ((popcount(I) ==Int popcount(J)) andBool (I <=Int J))
+    73	
+    74	  rule insertModel(I, .Ints) => I :: .Ints
+    75	  rule insertModel(I, J :: JS) => I :: J :: JS
+    76	    requires beforeEq(I, J)
+    77	  rule insertModel(I, J :: JS) => J :: insertModel(I, JS)
+    78	    requires notBool beforeEq(I, J)
+    79	
+    80	  rule sortModel(.Ints) => .Ints
+    81	  rule sortModel(I :: IS) => insertModel(I, sortModel(IS))
+    82	
+    83	  rule ordered(.Ints) => true
+    84	  rule ordered(I :: .Ints) => true
+    85	  rule ordered(I :: J :: IS) => beforeEq(I, J) andBool ordered(J :: IS)
+    86	
+    87	  rule allNonnegative(.Ints) => true
+    88	  rule allNonnegative(I :: IS) => (I >=Int 0) andBool allNonnegative(IS)
+    89	
+    90	  rule occurrences(I, .Ints) => 0
+    91	  rule occurrences(I, I :: JS) => 1 +Int occurrences(I, JS)
+    92	  rule occurrences(I, J :: JS) => occurrences(I, JS)
+    93	    requires I =/=Int J
+    94	
+    95	  // The first argument is the finite set of values whose multiplicities are
+    96	  // compared.  Passing the original input is sufficient to establish that a
+    97	  // concrete output neither loses nor duplicates any input element.
+    98	  rule sameMultiplicity(.Ints, INPUT, OUTPUT) => true
+    99	  rule sameMultiplicity(I :: IS, INPUT, OUTPUT)
+   100	    => (occurrences(I, INPUT) ==Int occurrences(I, OUTPUT))
+   101	       andBool sameMultiplicity(IS, INPUT, OUTPUT)
+   102	endmodule
+SPEC.K LINE NUMBERED
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Interpreter-to-model lemmas for the key functions.  They are parametric
+     7	  // in arbitrary mathematical integers, not bounded test values.
+     8	  claim [count-correct]:
+     9	    <k> evalCall("count_ones", intV(N) ; .Vals, solutionDefs)
+    10	      => intV(popcount(N)) </k>
+    11	
+    12	  claim [comparator-correct]:
+    13	    <k> evalCall("comes_before", intV(A) ; intV(B) ; .Vals, solutionDefs)
+    14	      => boolV(beforeEq(A, B)) </k>
+    15	    requires A >=Int 0 andBool B >=Int 0
+    16	
+    17	  claim [insert-empty]:
+    18	    <k> evalCall(
+    19	          "insert_sorted",
+    20	          intV(X) ; listV(.Ints) ; .Vals,
+    21	          solutionDefs)
+    22	      => listV(insertModel(X, .Ints)) </k>
+    23	
+    24	  claim [insert-at-front]:
+    25	    <k> evalCall(
+    26	          "insert_sorted",
+    27	          intV(X) ; listV(Y :: YS) ; .Vals,
+    28	          solutionDefs)
+    29	      => listV(insertModel(X, Y :: YS)) </k>
+    30	    requires beforeEq(X, Y)
+    31	
+    32	  // Exhaustive symbolic proof for every list of length at most two.  The pair
+    33	  // claims cover both possible comparator outcomes for arbitrary A and B.
+    34	  claim [sort-empty-symbolic]:
+    35	    <k> #run(solutionProgram, listV(.Ints))
+    36	      => listV(sortModel(.Ints)) </k>
+    37	
+    38	  claim [sort-singleton-symbolic]:
+    39	    <k> #run(solutionProgram, listV(A :: .Ints))
+    40	      => listV(sortModel(A :: .Ints)) </k>
+    41	
+    42	  claim [sort-pair-before]:
+    43	    <k> #run(solutionProgram, listV(A :: B :: .Ints))
+    44	      => listV(sortModel(A :: B :: .Ints)) </k>
+    45	    requires beforeEq(A, B)
+    46	
+    47	  claim [sort-pair-after]:
+    48	    <k> #run(solutionProgram, listV(A :: B :: .Ints))
+    49	      => listV(sortModel(A :: B :: .Ints)) </k>
+    50	    requires notBool beforeEq(A, B)
+    51	
+    52	  // For length three, the six claims are the six insertion-sort paths.  Their
+    53	  // preconditions partition every possible ordering of A, B, and C.
+    54	  claim [sort-triple-abc]:
+    55	    <k> #run(solutionProgram, listV(A :: B :: C :: .Ints))
+    56	      => listV(sortModel(A :: B :: C :: .Ints)) </k>
+    57	    requires beforeEq(B, C) andBool beforeEq(A, B)
+    58	
+    59	  claim [sort-triple-bac]:
+    60	    <k> #run(solutionProgram, listV(A :: B :: C :: .Ints))
+    61	      => listV(sortModel(A :: B :: C :: .Ints)) </k>
+    62	    requires beforeEq(B, C)
+    63	      andBool notBool beforeEq(A, B)
+    64	      andBool beforeEq(A, C)
+    65	
+    66	  claim [sort-triple-bca]:
+    67	    <k> #run(solutionProgram, listV(A :: B :: C :: .Ints))
+    68	      => listV(sortModel(A :: B :: C :: .Ints)) </k>
+    69	    requires beforeEq(B, C)
+    70	      andBool notBool beforeEq(A, B)
+    71	      andBool notBool beforeEq(A, C)
+    72	
+    73	  claim [sort-triple-acb]:
+    74	    <k> #run(solutionProgram, listV(A :: B :: C :: .Ints))
+    75	      => listV(sortModel(A :: B :: C :: .Ints)) </k>
+    76	    requires notBool beforeEq(B, C) andBool beforeEq(A, C)
+    77	
+    78	  claim [sort-triple-cab]:
+    79	    <k> #run(solutionProgram, listV(A :: B :: C :: .Ints))
+    80	      => listV(sortModel(A :: B :: C :: .Ints)) </k>
+    81	    requires notBool beforeEq(B, C)
+    82	      andBool notBool beforeEq(A, C)
+    83	      andBool beforeEq(A, B)
+    84	
+    85	  claim [sort-triple-cba]:
+    86	    <k> #run(solutionProgram, listV(A :: B :: C :: .Ints))
+    87	      => listV(sortModel(A :: B :: C :: .Ints)) </k>
+    88	    requires notBool beforeEq(B, C)
+    89	      andBool notBool beforeEq(A, C)
+    90	      andBool notBool beforeEq(A, B)
+    91	
+    92	  // Concrete end-to-end consequences through the translated AST.  The first
+    93	  // two intentionally distinguish bit-count ordering from ordinary sorting.
+    94	  claim [example-one]:
+    95	    <k> #run(solutionProgram, listV(1 :: 5 :: 2 :: 3 :: 4 :: .Ints))
+    96	      => listV(1 :: 2 :: 4 :: 3 :: 5 :: .Ints) </k>
+    97	
+    98	  claim [example-three]:
+    99	    <k> #run(solutionProgram, listV(1 :: 0 :: 2 :: 3 :: 4 :: .Ints))
+   100	      => listV(0 :: 1 :: 2 :: 4 :: 3 :: .Ints) </k>
+   101	
+   102	  claim [empty]:
+   103	    <k> #run(solutionProgram, listV(.Ints))
+   104	      => listV(.Ints) </k>
+   105	
+   106	  claim [duplicates]:
+   107	    <k> #run(solutionProgram, listV(3 :: 1 :: 3 :: 0 :: 1 :: .Ints))
+   108	      => listV(0 :: 1 :: 1 :: 3 :: 3 :: .Ints) </k>
+   109	
+   110	  claim [wide-popcounts]:
+   111	    <k> #run(solutionProgram, listV(7 :: 8 :: 3 :: 2 :: 1 :: 0 :: .Ints))
+   112	      => listV(0 :: 1 :: 2 :: 8 :: 3 :: 7 :: .Ints) </k>
+   113	
+   114	  // Total extension used by the implementation for the prompt's negative
+   115	  // example: Python-style binary digit count is taken on the magnitude.
+   116	  claim [negative-extension]:
+   117	    <k> #run(solutionProgram, listV(-2 :: -3 :: -4 :: -5 :: -6 :: .Ints))
+   118	      => listV(-4 :: -2 :: -6 :: -5 :: -3 :: .Ints) </k>
+   119	
+   120	  // Independent checks that each demonstrated result has the two defining
+   121	  // sorting properties: adjacent key order and unchanged multiplicities.
+   122	  claim [example-ordered]:
+   123	    <k> ordered(sortModel(1 :: 5 :: 2 :: 3 :: 4 :: .Ints))
+   124	      => true </k>
+   125	
+   126	  claim [example-permutation]:
+   127	    <k> sameMultiplicity(
+   128	          1 :: 5 :: 2 :: 3 :: 4 :: .Ints,
+   129	          1 :: 5 :: 2 :: 3 :: 4 :: .Ints,
+   130	          sortModel(1 :: 5 :: 2 :: 3 :: 4 :: .Ints))
+   131	      => true </k>
+   132	endmodule
+SOLUTION.MPY LINE NUMBERED
+     1	Module(
+     2	  FuncDef("count_ones", Params("n"),
+     3	    Return(Call(Attribute(Name("n"), "bit_count"), )))
+     4	  FuncDef("comes_before", Params("a", "b"),
+     5	    Return(
+     6	      BoolOp(
+     7	        "or",
+     8	        Compare(
+     9	          Call(Name("count_ones"), Name("a")),
+    10	          CmpOp("<", Call(Name("count_ones"), Name("b")))),
+    11	        BoolOp(
+    12	          "and",
+    13	          Compare(
+    14	            Call(Name("count_ones"), Name("a")),
+    15	            CmpOp("==", Call(Name("count_ones"), Name("b")))),
+    16	          Compare(Name("a"), CmpOp("<=", Name("b")))))))
+    17	  FuncDef("insert_sorted", Params("x", "values"),
+    18	    If(Compare(Name("values"), CmpOp("==", ListExpr())),
+    19	      Return(ListExpr(Name("x"))),
+    20	      )
+    21	    If(Call(
+    22	      Name("comes_before"),
+    23	      Name("x"),
+    24	      Subscript(Name("values"), Int(0))),
+    25	      Return(BinOp("+", ListExpr(Name("x")), Name("values"))),
+    26	      )
+    27	    Return(
+    28	      BinOp(
+    29	        "+",
+    30	        ListExpr(Subscript(Name("values"), Int(0))),
+    31	        Call(
+    32	          Name("insert_sorted"),
+    33	          Name("x"),
+    34	          Subscript(Name("values"), Slice(Int(1), NoBound, NoBound))))))
+    35	  FuncDef("sort_array", Params("arr"),
+    36	    If(Compare(Name("arr"), CmpOp("==", ListExpr())),
+    37	      Return(ListExpr()),
+    38	      )
+    39	    Return(
+    40	      Call(
+    41	        Name("insert_sorted"),
+    42	        Subscript(Name("arr"), Int(0)),
+    43	        Call(
+    44	          Name("sort_array"),
+    45	          Subscript(Name("arr"), Slice(Int(1), NoBound, NoBound)))))))
+
+EXIT_STATUS: 0
+END_UTC: 2026-07-23T18:08:21Z

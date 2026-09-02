@@ -1,0 +1,197 @@
+WORKDIR: /audit-output
+COMMAND: bash -lc printf\ \"CANDIDATE_K_FILES_BEGIN\\n\"\;\ find\ /candidate\ -maxdepth\ 1\ -type\ f\ -name\ \"\*.k\"\ -printf\ \"%f\\n\"\ \|\ sort\;\ printf\ \"CANDIDATE_K_FILES_END\\n\"\;\ printf\ \"SEMANTIC_SOURCE_BEGIN\\n\"\;\ nl\ -ba\ /candidate/semantic.k\;\ printf\ \"SEMANTIC_SOURCE_END\\n\"\;\ printf\ \"VERIFICATION_SOURCE_BEGIN\\n\"\;\ nl\ -ba\ /candidate/verification.k\;\ printf\ \"VERIFICATION_SOURCE_END\\n\"\;\ printf\ \"SPEC_SOURCE_BEGIN\\n\"\;\ nl\ -ba\ /candidate/spec.k\;\ printf\ \"SPEC_SOURCE_END\\n\"\;\ printf\ \"SPECIAL_ATTRIBUTES_BEGIN\\n\"\;\ rg\ -n\ \"function\|functional\|total\|simplification\|priority\|priorities\|opaque\|anywhere\|macro\|alias\"\ /candidate/semantic.k\ /candidate/verification.k\ /candidate/spec.k\ \|\|\ true\;\ printf\ \"SPECIAL_ATTRIBUTES_END\\n\"
+START_UTC: 2026-07-23T07:23:56Z
+CANDIDATE_K_FILES_BEGIN
+semantic.k
+spec.k
+verification.k
+CANDIDATE_K_FILES_END
+SEMANTIC_SOURCE_BEGIN
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports STRING-SYNTAX
+     6	
+     7	  // The constructor grammar consumed by py2mpy.py for this program.
+     8	  syntax Program ::= "Module" "(" Stmts ")"
+     9	  syntax Stmts ::= List{Stmt, ""}
+    10	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    11	                | "Return" "(" Expr ")"
+    12	
+    13	  syntax Params ::= "Params" "(" Strings ")"
+    14	  syntax Strings ::= List{String, ","}
+    15	
+    16	  syntax Expr ::= "Name" "(" String ")"
+    17	                | "Call" "(" Expr "," Exprs ")"
+    18	  syntax Exprs ::= List{Expr, ","}
+    19	
+    20	  // A deliberately inductive, non-empty input domain.  The HumanEval
+    21	  // contract has no result for an empty list, so empty lists are not inputs.
+    22	  syntax IntSeq ::= "[" NonEmptyInts "]"
+    23	  syntax NonEmptyInts ::= Int
+    24	                        | Int "," NonEmptyInts
+    25	endmodule
+    26	
+    27	module MPY-SEMANTICS
+    28	  imports MPY-SYNTAX
+    29	  imports INT
+    30	  imports MAP
+    31	
+    32	  syntax Function ::= "closure" "(" Params "," Stmts ")"
+    33	  syntax Result ::= "noResult" | "result" "(" Int ")"
+    34	
+    35	  syntax KItem ::= "exec" "(" Stmts ")"
+    36	                 | "invoke" "(" String "," IntSeq ")"
+    37	                 | "eval" "(" Expr ")"
+    38	                 | "intVal" "(" Int ")"
+    39	                 | "doReturn"
+    40	
+    41	  // Mathematical meaning of Python's max on a non-empty integer list.
+    42	  syntax Int ::= maxInts(IntSeq) [function, total]
+    43	  syntax Int ::= imax(Int, Int) [function, total]
+    44	
+    45	  rule maxInts([ I:Int ]) => I
+    46	  rule maxInts([ I:Int, IS:NonEmptyInts ]) => imax(I, maxInts([ IS ]))
+    47	
+    48	  rule imax(I, J) => I requires I >=Int J
+    49	  rule imax(I, J) => J requires I <Int J
+    50	
+    51	  configuration
+    52	    <mpy>
+    53	      <k> $PGM:Program ~> invoke("max_element", $ARGS:IntSeq) </k>
+    54	      <functions> .Map </functions>
+    55	      <env> .Map </env>
+    56	      <result> noResult </result>
+    57	    </mpy>
+    58	
+    59	  // Module and statement-list execution.
+    60	  rule <k> Module(SS) => exec(SS) ... </k>
+    61	  rule <k> exec(.Stmts) => .K ... </k>
+    62	  rule <k> exec(S:Stmt REST:Stmts) => S ~> exec(REST) ... </k>
+    63	
+    64	  // Function definitions are closures.  This task has no free variables, so
+    65	  // the function body and its parameter list are the entire closure value.
+    66	  rule <k> FuncDef(F, PS, BODY) => .K ... </k>
+    67	       <functions> FUNS => FUNS [ F <- closure(PS, BODY) ] </functions>
+    68	
+    69	  // The requested entry point has one argument.  A fresh function environment
+    70	  // is installed when it is invoked.
+    71	  rule <k> invoke(F, ARG) => exec(BODY) ... </k>
+    72	       <functions>
+    73	         ... F |-> closure(Params(P:String, .Strings), BODY) ...
+    74	       </functions>
+    75	       <env> _ => P |-> ARG </env>
+    76	
+    77	  rule <k> Return(E) => eval(E) ~> doReturn ... </k>
+    78	
+    79	  // Expression evaluation needed by solution.mpy.  Name lookup is modeled
+    80	  // separately from the max call so the environment is explicit in the state.
+    81	  rule <k> eval(Name(X)) => V ... </k>
+    82	       <env> ... X |-> V ... </env>
+    83	
+    84	  rule <k>
+    85	         eval(Call(Name("max"), Name(X), .Exprs))
+    86	         => intVal(maxInts(IS))
+    87	       ... </k>
+    88	       <env> ... X |-> IS:IntSeq ... </env>
+    89	
+    90	  rule <k> intVal(I) ~> doReturn => .K ... </k>
+    91	       <result> noResult => result(I) </result>
+    92	endmodule
+SEMANTIC_SOURCE_END
+VERIFICATION_SOURCE_BEGIN
+     1	requires "semantic.k"
+     2	
+     3	module MPY-VERIFICATION
+     4	  imports MPY-SEMANTICS
+     5	
+     6	  // This nullary function expands to the exact AST in solution.mpy.  Keeping
+     7	  // it here makes each reachability claim visibly about the translated code.
+     8	  syntax Program ::= "solutionProgram" [function, total]
+     9	  rule solutionProgram =>
+    10	    Module(
+    11	      FuncDef("max_element", Params("l"),
+    12	        Return(Call(Name("max"), Name("l")))))
+    13	
+    14	  // The postcondition is stated at the contract level, independently of the
+    15	  // interpreter's result cell.  maxInts is the mathematical maximum defined
+    16	  // over the semantics' non-empty integer-list domain.
+    17	  syntax Int ::= expectedMaximum(IntSeq) [function, total]
+    18	  rule expectedMaximum(IS) => maxInts(IS)
+    19	endmodule
+VERIFICATION_SOURCE_END
+SPEC_SOURCE_BEGIN
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports MPY-VERIFICATION
+     5	
+     6	  // Universal functional-correctness theorem: for every non-empty integer
+     7	  // list, executing the translated function returns its mathematical maximum.
+     8	  claim
+     9	    <mpy>
+    10	      <k> solutionProgram ~> invoke("max_element", IS:IntSeq) => .K </k>
+    11	      <functions> .Map =>
+    12	        "max_element" |-> closure(
+    13	          Params("l"), Return(Call(Name("max"), Name("l"))))
+    14	      </functions>
+    15	      <env> .Map => "l" |-> IS </env>
+    16	      <result> noResult => result(expectedMaximum(IS)) </result>
+    17	    </mpy>
+    18	
+    19	  // The two examples from prompt.py are retained as concrete regression
+    20	  // theorems in addition to the universal theorem above.
+    21	  claim
+    22	    <mpy>
+    23	      <k> solutionProgram ~> invoke("max_element", [1, 2, 3]) => .K </k>
+    24	      <functions> .Map =>
+    25	        "max_element" |-> closure(
+    26	          Params("l"), Return(Call(Name("max"), Name("l"))))
+    27	      </functions>
+    28	      <env> .Map => "l" |-> [1, 2, 3] </env>
+    29	      <result> noResult => result(3) </result>
+    30	    </mpy>
+    31	
+    32	  claim
+    33	    <mpy>
+    34	      <k>
+    35	        solutionProgram ~> invoke(
+    36	          "max_element", [5, 3, -5, 2, -3, 3, 9, 0, 123, 1, -10]
+    37	        )
+    38	        => .K
+    39	      </k>
+    40	      <functions> .Map =>
+    41	        "max_element" |-> closure(
+    42	          Params("l"), Return(Call(Name("max"), Name("l"))))
+    43	      </functions>
+    44	      <env> .Map =>
+    45	        "l" |-> [5, 3, -5, 2, -3, 3, 9, 0, 123, 1, -10]
+    46	      </env>
+    47	      <result> noResult => result(123) </result>
+    48	    </mpy>
+    49	endmodule
+SPEC_SOURCE_END
+SPECIAL_ATTRIBUTES_BEGIN
+/candidate/spec.k:6:  // Universal functional-correctness theorem: for every non-empty integer
+/candidate/spec.k:7:  // list, executing the translated function returns its mathematical maximum.
+/candidate/spec.k:11:      <functions> .Map =>
+/candidate/spec.k:14:      </functions>
+/candidate/spec.k:24:      <functions> .Map =>
+/candidate/spec.k:27:      </functions>
+/candidate/spec.k:40:      <functions> .Map =>
+/candidate/spec.k:43:      </functions>
+/candidate/verification.k:6:  // This nullary function expands to the exact AST in solution.mpy.  Keeping
+/candidate/verification.k:8:  syntax Program ::= "solutionProgram" [function, total]
+/candidate/verification.k:17:  syntax Int ::= expectedMaximum(IntSeq) [function, total]
+/candidate/semantic.k:42:  syntax Int ::= maxInts(IntSeq) [function, total]
+/candidate/semantic.k:43:  syntax Int ::= imax(Int, Int) [function, total]
+/candidate/semantic.k:54:      <functions> .Map </functions>
+/candidate/semantic.k:65:  // the function body and its parameter list are the entire closure value.
+/candidate/semantic.k:67:       <functions> FUNS => FUNS [ F <- closure(PS, BODY) ] </functions>
+/candidate/semantic.k:69:  // The requested entry point has one argument.  A fresh function environment
+/candidate/semantic.k:72:       <functions>
+/candidate/semantic.k:74:       </functions>
+SPECIAL_ATTRIBUTES_END
+EXIT_STATUS: 0
+END_UTC: 2026-07-23T07:23:56Z

@@ -1,0 +1,469 @@
+Script started on 2026-07-23 14:00:42-05:00 [<not executed on terminal>]
+COMMAND: nl -ba semantic.k
+     1	module MPY-SYNTAX
+     2	  imports INT
+     3	  imports STRING
+     4	
+     5	  syntax Pgm ::= "Module" "(" Stmts ")" [symbol(moduleAst)]
+     6	
+     7	  syntax Stmts ::= List{Stmt, ""}
+     8	  syntax Exprs ::= List{Expr, ","}
+     9	  syntax Ids ::= List{String, ","}
+    10	  syntax CmpOps ::= List{CmpOp, ","}
+    11	
+    12	  syntax Stmt ::= "FuncDef" "(" String "," "Params" "(" Ids ")" "," Stmts ")"
+    13	                [symbol(functionDefinitionAst)]
+    14	                | "Assign" "(" Expr "," Expr ")" [symbol(assignAst)]
+    15	                | "If" "(" Expr "," Stmts "," Stmts ")" [symbol(ifAst)]
+    16	                | "While" "(" Expr "," Stmts ")" [symbol(whileAst)]
+    17	                | "Return" "(" Expr ")" [symbol(returnAst)]
+    18	
+    19	  syntax Expr ::= "Int" "(" Int ")" [symbol(intAst)]
+    20	                | "Name" "(" String ")" [symbol(nameAst)]
+    21	                | "ListExpr" "(" Exprs ")" [symbol(listAst)]
+    22	                | "BinOp" "(" String "," Expr "," Expr ")" [symbol(binOpAst)]
+    23	                | "Compare" "(" Expr "," CmpOps ")" [symbol(compareAst)]
+    24	                | "Call" "(" Expr "," Exprs ")" [symbol(callAst)]
+    25	
+    26	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")" [symbol(cmpOpAst)]
+    27	endmodule
+    28	
+    29	module SEMANTIC
+    30	  imports MPY-SYNTAX
+    31	  imports BOOL
+    32	  imports MAP
+    33	
+    34	  // Runtime values.  Ints is deliberately an explicit, immutable list so
+    35	  // that collection and sorting remain visible in rewrite traces.
+    36	  syntax Ints ::= ".Ints" [constructor, symbol(emptyInts)]
+    37	                | Int "::" Ints [constructor, symbol(consInts)]
+    38	  syntax Value ::= "vi" "(" Int ")" [constructor, symbol(intValue)]
+    39	                 | "vb" "(" Bool ")" [constructor, symbol(boolValue)]
+    40	                 | "vl" "(" Ints ")" [constructor, symbol(listValue)]
+    41	  syntax Function ::= "function" "(" String "," Stmts ")"
+    42	                      [constructor, symbol(functionValue)]
+    43	  syntax Result ::= "noResult" [constructor]
+    44	                  | "result" "(" Value ")" [constructor]
+    45	
+    46	  syntax KItem ::= "run" "(" Pgm ")"
+    47	                 | "load" "(" Stmts ")"
+    48	                 | "start"
+    49	                 | "exec" "(" Stmts ")"
+    50	                 | "eval" "(" Expr ")"
+    51	                 | "assignTo" "(" String ")"
+    52	                 | "singleton"
+    53	                 | "binLeft" "(" String "," Expr ")"
+    54	                 | "binRight" "(" String "," Value ")"
+    55	                 | "cmpLeft" "(" String "," Expr ")"
+    56	                 | "cmpRight" "(" String "," Value ")"
+    57	                 | "whileDecide" "(" Expr "," Stmts "," Stmts ")"
+    58	                 | "ifDecide" "(" Stmts "," Stmts "," Stmts ")"
+    59	                 | "sortResult"
+    60	                 | "finish"
+    61	
+    62	  configuration
+    63	    <python>
+    64	      <k> run($PGM:Pgm) </k>
+    65	      <input> $N:Int </input>
+    66	      <functions> .Map </functions>
+    67	      <env> .Map </env>
+    68	      <result> noResult </result>
+    69	    </python>
+    70	
+    71	  rule <k> run(Module(S)) => load(S) ~> start </k>
+    72	
+    73	  rule <k> load(FuncDef(F, Params(P, .Ids), BODY) REST) => load(REST) ... </k>
+    74	       <functions> FS => FS [ F <- function(P, BODY) ] </functions>
+    75	  rule <k> load(.Stmts) => .K ... </k>
+    76	
+    77	  rule <k> start => exec(BODY) </k>
+    78	       <input> N </input>
+    79	       <functions> ... "get_odd_collatz" |-> function(P, BODY) ... </functions>
+    80	       <env> _ => P |-> vi(N) </env>
+    81	
+    82	  // Statement execution uses explicit continuations in the K cell.
+    83	  rule <k> exec(Assign(Name(X), E) REST)
+    84	        => eval(E) ~> assignTo(X) ~> exec(REST) ... </k>
+    85	  rule <k> V:Value ~> assignTo(X) => .K ... </k>
+    86	       <env> ENV => ENV [ X <- V ] </env>
+    87	
+    88	  rule <k> exec(If(TEST, THEN, ELSE) REST)
+    89	        => eval(TEST) ~> ifDecide(THEN, ELSE, REST) ... </k>
+    90	  rule <k> vb(true) ~> ifDecide(THEN, _, REST)
+    91	        => exec(THEN) ~> exec(REST) ... </k>
+    92	  rule <k> vb(false) ~> ifDecide(_, ELSE, REST)
+    93	        => exec(ELSE) ~> exec(REST) ... </k>
+    94	
+    95	  rule <k> exec(While(TEST, BODY) REST)
+    96	        => eval(TEST) ~> whileDecide(TEST, BODY, REST) ... </k>
+    97	  rule <k> vb(true) ~> whileDecide(TEST, BODY, REST)
+    98	        => exec(BODY) ~> exec(While(TEST, BODY) REST) ... </k>
+    99	  rule <k> vb(false) ~> whileDecide(_, _, REST)
+   100	        => exec(REST) ... </k>
+   101	
+   102	  rule <k> exec(Return(E) _REST) => eval(E) ~> finish ... </k>
+   103	  rule <k> V:Value ~> finish => .K </k>
+   104	       <functions> _ => .Map </functions>
+   105	       <env> _ => .Map </env>
+   106	       <result> noResult => result(V) </result>
+   107	  rule <k> exec(.Stmts) => .K ... </k>
+   108	
+   109	  // Expression evaluation is left-to-right, as in Python.
+   110	  rule <k> eval(Int(I)) => vi(I) ... </k>
+   111	  rule <k> eval(Name(X)) => V ... </k>
+   112	       <env> ... X |-> V ... </env>
+   113	
+   114	  rule <k> eval(ListExpr(.Exprs)) => vl(.Ints) ... </k>
+   115	  rule <k> eval(ListExpr(E, .Exprs)) => eval(E) ~> singleton ... </k>
+   116	  rule <k> vi(I) ~> singleton => vl(I :: .Ints) ... </k>
+   117	
+   118	  rule <k> eval(BinOp(OP, LEFT, RIGHT))
+   119	        => eval(LEFT) ~> binLeft(OP, RIGHT) ... </k>
+   120	  rule <k> LEFT:Value ~> binLeft(OP, RIGHT)
+   121	        => eval(RIGHT) ~> binRight(OP, LEFT) ... </k>
+   122	  rule <k> RIGHT:Value ~> binRight(OP, LEFT)
+   123	        => applyBin(OP, LEFT, RIGHT) ... </k>
+   124	
+   125	  rule <k> eval(Compare(LEFT, CmpOp(OP, RIGHT), .CmpOps))
+   126	        => eval(LEFT) ~> cmpLeft(OP, RIGHT) ... </k>
+   127	  rule <k> LEFT:Value ~> cmpLeft(OP, RIGHT)
+   128	        => eval(RIGHT) ~> cmpRight(OP, LEFT) ... </k>
+   129	  rule <k> RIGHT:Value ~> cmpRight(OP, LEFT)
+   130	        => applyCmp(OP, LEFT, RIGHT) ... </k>
+   131	
+   132	  rule <k> eval(Call(Name("sorted"), E, .Exprs))
+   133	        => eval(E) ~> sortResult ... </k>
+   134	  rule <k> vl(IS) ~> sortResult => vl(sortInts(IS)) ... </k>
+   135	
+   136	  syntax Value ::= applyBin(String, Value, Value) [function]
+   137	  rule applyBin("+",  vi(A), vi(B)) => vi(A +Int B)
+   138	  rule applyBin("*",  vi(A), vi(B)) => vi(A *Int B)
+   139	  rule applyBin("%",  vi(A), vi(B)) => vi(A %Int B) requires B =/=Int 0
+   140	  rule applyBin("//", vi(A), vi(B)) => vi(A /Int B) requires B >Int 0 andBool A >=Int 0
+   141	  rule applyBin("+", vl(AS), vl(BS)) => vl(appendInts(AS, BS))
+   142	
+   143	  syntax Value ::= applyCmp(String, Value, Value) [function]
+   144	  rule applyCmp("==", vi(A), vi(B)) => vb(true)  requires A ==Int B
+   145	  rule applyCmp("==", vi(A), vi(B)) => vb(false) requires A =/=Int B
+   146	  rule applyCmp("!=", vi(A), vi(B)) => vb(true)  requires A =/=Int B
+   147	  rule applyCmp("!=", vi(A), vi(B)) => vb(false) requires A ==Int B
+   148	
+   149	  syntax Ints ::= appendInts(Ints, Ints) [function, total]
+   150	  rule appendInts(.Ints, BS) => BS
+   151	  rule appendInts(I :: IS, BS) => I :: appendInts(IS, BS)
+   152	
+   153	  // Executable insertion sort used to model Python's sorted on integer lists.
+   154	  syntax Ints ::= insertInt(Int, Ints) [function, total]
+   155	  rule insertInt(I, .Ints) => I :: .Ints
+   156	  rule insertInt(I, J :: JS) => I :: J :: JS requires I <=Int J
+   157	  rule insertInt(I, J :: JS) => J :: insertInt(I, JS) requires I >Int J
+   158	
+   159	  syntax Ints ::= sortInts(Ints) [function, total]
+   160	  rule sortInts(.Ints) => .Ints
+   161	  rule sortInts(I :: IS) => insertInt(I, sortInts(IS))
+   162	endmodule
+EXIT: 0
+COMMAND: nl -ba verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // These three definitions spell the translated submission once for use in
+     7	  // claims.  They are equations over the very same AST constructors parsed
+     8	  // from solution.mpy; they do not bypass the operational semantics.
+     9	  syntax Stmt ::= "collatzBranch" [function, total]
+    10	  rule collatzBranch =>
+    11	    If(Compare(BinOp("%", Name("n"), Int(2)), CmpOp("==", Int(1)), .CmpOps),
+    12	       Assign(Name("odds"),
+    13	              BinOp("+", Name("odds"), ListExpr(Name("n"), .Exprs)))
+    14	       Assign(Name("n"),
+    15	              BinOp("+", BinOp("*", Int(3), Name("n")), Int(1))),
+    16	       Assign(Name("n"), BinOp("//", Name("n"), Int(2))))
+    17	
+    18	  syntax Stmt ::= "collatzLoop" [function, total]
+    19	  rule collatzLoop =>
+    20	    While(Compare(Name("n"), CmpOp("!=", Int(1)), .CmpOps), collatzBranch)
+    21	
+    22	  syntax Pgm ::= "solutionProgram" [function, total]
+    23	  rule solutionProgram =>
+    24	    Module(
+    25	      FuncDef("get_odd_collatz", Params("n", .Ids),
+    26	        Assign(Name("odds"), ListExpr(.Exprs))
+    27	        collatzLoop
+    28	        Return(Call(Name("sorted"),
+    29	                    BinOp("+", Name("odds"), ListExpr(Int(1), .Exprs)),
+    30	                    .Exprs))))
+    31	
+    32	  // Executable observers used by validation claims.
+    33	  syntax Bool ::= isSorted(Ints) [function, total]
+    34	  rule isSorted(.Ints) => true
+    35	  rule isSorted(_I :: .Ints) => true
+    36	  rule isSorted(I :: J :: JS) =>
+    37	       (I <=Int J andBool isSorted(J :: JS))
+    38	
+    39	  syntax Bool ::= allOdd(Ints) [function, total]
+    40	  rule allOdd(.Ints) => true
+    41	  rule allOdd(I :: IS) =>
+    42	       ((I %Int 2) ==Int 1 andBool allOdd(IS))
+    43	
+    44	  // Non-functional wrappers ensure observer claims take an operational proof
+    45	  // step instead of being normalized while the claim itself is parsed.
+    46	  syntax KItem ::= "checkSorted" "(" Ints ")"
+    47	                 | "checkAllOdd" "(" Ints ")"
+    48	  rule <k> checkSorted(IS) => isSorted(sortInts(IS)) ... </k>
+    49	  rule <k> checkAllOdd(IS) => allOdd(IS) ... </k>
+    50	endmodule
+EXIT: 0
+COMMAND: nl -ba spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // End-to-end executions through loading, environments, control flow,
+     7	  // arithmetic, collection, and sorting.
+     8	  claim
+     9	    <python>
+    10	      <k> run(solutionProgram) => .K </k>
+    11	      <input> 1 </input>
+    12	      <functions> .Map </functions>
+    13	      <env> .Map </env>
+    14	      <result> noResult => result(vl(1 :: .Ints)) </result>
+    15	    </python>
+    16	
+    17	  claim
+    18	    <python>
+    19	      <k> run(solutionProgram) => .K </k>
+    20	      <input> 2 </input>
+    21	      <functions> .Map </functions>
+    22	      <env> .Map </env>
+    23	      <result> noResult => result(vl(1 :: .Ints)) </result>
+    24	    </python>
+    25	
+    26	  claim
+    27	    <python>
+    28	      <k> run(solutionProgram) => .K </k>
+    29	      <input> 3 </input>
+    30	      <functions> .Map </functions>
+    31	      <env> .Map </env>
+    32	      <result> noResult => result(vl(1 :: 3 :: 5 :: .Ints)) </result>
+    33	    </python>
+    34	
+    35	  // This is the example required by prompt.py.
+    36	  claim
+    37	    <python>
+    38	      <k> run(solutionProgram) => .K </k>
+    39	      <input> 5 </input>
+    40	      <functions> .Map </functions>
+    41	      <env> .Map </env>
+    42	      <result> noResult => result(vl(1 :: 5 :: .Ints)) </result>
+    43	    </python>
+    44	
+    45	  claim
+    46	    <python>
+    47	      <k> run(solutionProgram) => .K </k>
+    48	      <input> 6 </input>
+    49	      <functions> .Map </functions>
+    50	      <env> .Map </env>
+    51	      <result> noResult => result(vl(1 :: 3 :: 5 :: .Ints)) </result>
+    52	    </python>
+    53	
+    54	  claim
+    55	    <python>
+    56	      <k> run(solutionProgram) => .K </k>
+    57	      <input> 7 </input>
+    58	      <functions> .Map </functions>
+    59	      <env> .Map </env>
+    60	      <result>
+    61	        noResult => result(vl(1 :: 5 :: 7 :: 11 :: 13 :: 17 :: .Ints))
+    62	      </result>
+    63	    </python>
+    64	
+    65	  claim
+    66	    <python>
+    67	      <k> run(solutionProgram) => .K </k>
+    68	      <input> 19 </input>
+    69	      <functions> .Map </functions>
+    70	      <env> .Map </env>
+    71	      <result>
+    72	        noResult =>
+    73	          result(vl(1 :: 5 :: 11 :: 13 :: 17 :: 19 :: 29 :: .Ints))
+    74	      </result>
+    75	    </python>
+    76	
+    77	  // A long trajectory (112 Collatz transitions) stress-tests the loop.
+    78	  claim
+    79	    <python>
+    80	      <k> run(solutionProgram) => .K </k>
+    81	      <input> 27 </input>
+    82	      <functions> .Map </functions>
+    83	      <env> .Map </env>
+    84	      <result>
+    85	        noResult => result(vl(
+    86	          1 :: 5 :: 23 :: 27 :: 31 :: 35 :: 41 :: 47 :: 53 :: 61 ::
+    87	          71 :: 91 :: 103 :: 107 :: 121 :: 137 :: 155 :: 161 :: 167 ::
+    88	          175 :: 233 :: 251 :: 263 :: 283 :: 319 :: 325 :: 377 :: 395 ::
+    89	          425 :: 433 :: 445 :: 479 :: 577 :: 593 :: 719 :: 911 :: 1079 ::
+    90	          1367 :: 1619 :: 2051 :: 2429 :: 3077 :: .Ints))
+    91	      </result>
+    92	    </python>
+    93	
+    94	  // Symbolic branch correctness for every positive even current term.
+    95	  claim [even-step]:
+    96	    <python>
+    97	      <k> exec(collatzBranch .Stmts) => .K </k>
+    98	      <input> 0 </input>
+    99	      <functions> .Map </functions>
+   100	      <env>
+   101	        ("n" |-> vi(2 *Int M) "odds" |-> vl(OS))
+   102	        => ("n" |-> vi(M) "odds" |-> vl(OS))
+   103	      </env>
+   104	      <result> noResult </result>
+   105	    </python>
+   106	    requires M >Int 0
+   107	
+   108	  // Symbolic branch correctness for every odd term greater than one.
+   109	  claim [odd-step]:
+   110	    <python>
+   111	      <k> exec(collatzBranch .Stmts) => .K </k>
+   112	      <input> 0 </input>
+   113	      <functions> .Map </functions>
+   114	      <env>
+   115	        ("n" |-> vi(2 *Int M +Int 1) "odds" |-> vl(OS))
+   116	        => ("n" |-> vi(6 *Int M +Int 4)
+   117	            "odds" |-> vl(appendInts(OS, (2 *Int M +Int 1) :: .Ints)))
+   118	      </env>
+   119	      <result> noResult </result>
+   120	    </python>
+   121	    requires M >Int 0
+   122	
+   123	  // Independent checks on the observers used to state the output contract.
+   124	  claim
+   125	    <python>
+   126	      <k> checkSorted(17 :: 1 :: 7 :: 5 :: 13 :: 11 :: .Ints)
+   127	            => true </k>
+   128	      <input> 0 </input>
+   129	      <functions> .Map </functions>
+   130	      <env> .Map </env>
+   131	      <result> noResult </result>
+   132	    </python>
+   133	
+   134	  claim
+   135	    <python>
+   136	      <k> checkAllOdd(17 :: 1 :: 7 :: 5 :: 13 :: 11 :: .Ints)
+   137	            => true </k>
+   138	      <input> 0 </input>
+   139	      <functions> .Map </functions>
+   140	      <env> .Map </env>
+   141	      <result> noResult </result>
+   142	    </python>
+   143	endmodule
+EXIT: 0
+COMMAND: rg -n local declarations and attributes
+spec.k
+8:  claim
+17:  claim
+26:  claim
+36:  claim
+45:  claim
+54:  claim
+65:  claim
+78:  claim
+95:  claim [even-step]:
+109:  claim [odd-step]:
+124:  claim
+134:  claim
+
+verification.k
+9:  syntax Stmt ::= "collatzBranch" [function, total]
+10:  rule collatzBranch =>
+18:  syntax Stmt ::= "collatzLoop" [function, total]
+19:  rule collatzLoop =>
+22:  syntax Pgm ::= "solutionProgram" [function, total]
+23:  rule solutionProgram =>
+33:  syntax Bool ::= isSorted(Ints) [function, total]
+34:  rule isSorted(.Ints) => true
+35:  rule isSorted(_I :: .Ints) => true
+36:  rule isSorted(I :: J :: JS) =>
+39:  syntax Bool ::= allOdd(Ints) [function, total]
+40:  rule allOdd(.Ints) => true
+41:  rule allOdd(I :: IS) =>
+46:  syntax KItem ::= "checkSorted" "(" Ints ")"
+48:  rule <k> checkSorted(IS) => isSorted(sortInts(IS)) ... </k>
+49:  rule <k> checkAllOdd(IS) => allOdd(IS) ... </k>
+
+semantic.k
+5:  syntax Pgm ::= "Module" "(" Stmts ")" [symbol(moduleAst)]
+7:  syntax Stmts ::= List{Stmt, ""}
+8:  syntax Exprs ::= List{Expr, ","}
+9:  syntax Ids ::= List{String, ","}
+10:  syntax CmpOps ::= List{CmpOp, ","}
+12:  syntax Stmt ::= "FuncDef" "(" String "," "Params" "(" Ids ")" "," Stmts ")"
+13:                [symbol(functionDefinitionAst)]
+19:  syntax Expr ::= "Int" "(" Int ")" [symbol(intAst)]
+26:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")" [symbol(cmpOpAst)]
+36:  syntax Ints ::= ".Ints" [constructor, symbol(emptyInts)]
+38:  syntax Value ::= "vi" "(" Int ")" [constructor, symbol(intValue)]
+41:  syntax Function ::= "function" "(" String "," Stmts ")"
+42:                      [constructor, symbol(functionValue)]
+43:  syntax Result ::= "noResult" [constructor]
+46:  syntax KItem ::= "run" "(" Pgm ")"
+62:  configuration
+71:  rule <k> run(Module(S)) => load(S) ~> start </k>
+73:  rule <k> load(FuncDef(F, Params(P, .Ids), BODY) REST) => load(REST) ... </k>
+74:       <functions> FS => FS [ F <- function(P, BODY) ] </functions>
+75:  rule <k> load(.Stmts) => .K ... </k>
+77:  rule <k> start => exec(BODY) </k>
+83:  rule <k> exec(Assign(Name(X), E) REST)
+85:  rule <k> V:Value ~> assignTo(X) => .K ... </k>
+88:  rule <k> exec(If(TEST, THEN, ELSE) REST)
+90:  rule <k> vb(true) ~> ifDecide(THEN, _, REST)
+92:  rule <k> vb(false) ~> ifDecide(_, ELSE, REST)
+95:  rule <k> exec(While(TEST, BODY) REST)
+97:  rule <k> vb(true) ~> whileDecide(TEST, BODY, REST)
+99:  rule <k> vb(false) ~> whileDecide(_, _, REST)
+102:  rule <k> exec(Return(E) _REST) => eval(E) ~> finish ... </k>
+103:  rule <k> V:Value ~> finish => .K </k>
+107:  rule <k> exec(.Stmts) => .K ... </k>
+110:  rule <k> eval(Int(I)) => vi(I) ... </k>
+111:  rule <k> eval(Name(X)) => V ... </k>
+114:  rule <k> eval(ListExpr(.Exprs)) => vl(.Ints) ... </k>
+115:  rule <k> eval(ListExpr(E, .Exprs)) => eval(E) ~> singleton ... </k>
+116:  rule <k> vi(I) ~> singleton => vl(I :: .Ints) ... </k>
+118:  rule <k> eval(BinOp(OP, LEFT, RIGHT))
+120:  rule <k> LEFT:Value ~> binLeft(OP, RIGHT)
+122:  rule <k> RIGHT:Value ~> binRight(OP, LEFT)
+125:  rule <k> eval(Compare(LEFT, CmpOp(OP, RIGHT), .CmpOps))
+127:  rule <k> LEFT:Value ~> cmpLeft(OP, RIGHT)
+129:  rule <k> RIGHT:Value ~> cmpRight(OP, LEFT)
+132:  rule <k> eval(Call(Name("sorted"), E, .Exprs))
+134:  rule <k> vl(IS) ~> sortResult => vl(sortInts(IS)) ... </k>
+136:  syntax Value ::= applyBin(String, Value, Value) [function]
+137:  rule applyBin("+",  vi(A), vi(B)) => vi(A +Int B)
+138:  rule applyBin("*",  vi(A), vi(B)) => vi(A *Int B)
+139:  rule applyBin("%",  vi(A), vi(B)) => vi(A %Int B) requires B =/=Int 0
+140:  rule applyBin("//", vi(A), vi(B)) => vi(A /Int B) requires B >Int 0 andBool A >=Int 0
+141:  rule applyBin("+", vl(AS), vl(BS)) => vl(appendInts(AS, BS))
+143:  syntax Value ::= applyCmp(String, Value, Value) [function]
+144:  rule applyCmp("==", vi(A), vi(B)) => vb(true)  requires A ==Int B
+145:  rule applyCmp("==", vi(A), vi(B)) => vb(false) requires A =/=Int B
+146:  rule applyCmp("!=", vi(A), vi(B)) => vb(true)  requires A =/=Int B
+147:  rule applyCmp("!=", vi(A), vi(B)) => vb(false) requires A ==Int B
+149:  syntax Ints ::= appendInts(Ints, Ints) [function, total]
+150:  rule appendInts(.Ints, BS) => BS
+151:  rule appendInts(I :: IS, BS) => I :: appendInts(IS, BS)
+154:  syntax Ints ::= insertInt(Int, Ints) [function, total]
+155:  rule insertInt(I, .Ints) => I :: .Ints
+156:  rule insertInt(I, J :: JS) => I :: J :: JS requires I <=Int J
+157:  rule insertInt(I, J :: JS) => J :: insertInt(I, JS) requires I >Int J
+159:  syntax Ints ::= sortInts(Ints) [function, total]
+160:  rule sortInts(.Ints) => .Ints
+161:  rule sortInts(I :: IS) => insertInt(I, sortInts(IS))
+EXIT: 0
+COMMAND: declaration counts
+semantic.k syntax_lines=18 rules=44 claims=0 function_decls=5 total_decls=3 simplification_attrs=0 priority_attrs=0 opaque_attrs=0
+verification.k syntax_lines=6 rules=10 claims=0 function_decls=5 total_decls=5 simplification_attrs=0 priority_attrs=0 opaque_attrs=0
+spec.k syntax_lines=0 rules=0 claims=12 function_decls=0 total_decls=0 simplification_attrs=0 priority_attrs=0 opaque_attrs=0
+
+Script done on 2026-07-23 14:00:42-05:00 [COMMAND_EXIT_CODE="0"]

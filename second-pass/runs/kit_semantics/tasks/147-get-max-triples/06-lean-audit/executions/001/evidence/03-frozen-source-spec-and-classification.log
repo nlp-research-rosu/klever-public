@@ -1,0 +1,199 @@
+Script started on 2026-07-31 08:22:25-05:00 [<not executed on terminal>]
+verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION-SYNTAX
+     4	  imports MPY-SYNTAX
+     5	  imports INT-SYNTAX
+     6	
+     7	  syntax Int ::= zeroResidueCount(Int) [function, total]
+     8	               | chooseThree(Int)      [function, total]
+     9	               | expectedTriples(Int)  [function, total]
+    10	endmodule
+    11	
+    12	module VERIFICATION
+    13	  imports VERIFICATION-SYNTAX
+    14	  imports MPY
+    15	  imports INT
+    16	
+    17	  // Among 1,...,N, these are the indices congruent to 2 modulo 3.
+    18	  rule zeroResidueCount(N)
+    19	    => ((N +Int 1) -Int pyMod(N +Int 1, 3)) /Int 3
+    20	
+    21	  // This form deliberately mirrors the reference semantics for Python's //.
+    22	  rule chooseThree(X)
+    23	    => (X *Int (X -Int 1) *Int (X -Int 2)
+    24	        -Int pyMod(X *Int (X -Int 1) *Int (X -Int 2), 6)) /Int 6
+    25	
+    26	  rule expectedTriples(N)
+    27	    => chooseThree(zeroResidueCount(N))
+    28	       +Int chooseThree(N -Int zeroResidueCount(N))
+    29	endmodule
+spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [get-max-triples]:
+     7	    <k>
+     8	      Call(Name("get_max_triples"), Int(N))
+     9	      => expectedTriples(N)
+    10	    </k>
+    11	    <env> 0 </env>
+    12	    <scopes>
+    13	      0 |-> scope(
+    14	        "get_max_triples" |->
+    15	          closureVal(
+    16	            "n",
+    17	            Assign(
+    18	              Name("divisible_by_three"),
+    19	              BinOp("//", BinOp("+", Name("n"), Int(1)), Int(3)))
+    20	            Assign(
+    21	              Name("not_divisible_by_three"),
+    22	              BinOp("-", Name("n"), Name("divisible_by_three")))
+    23	            Assign(
+    24	              Name("triples_of_divisible"),
+    25	              BinOp(
+    26	                "//",
+    27	                BinOp(
+    28	                  "*",
+    29	                  BinOp(
+    30	                    "*",
+    31	                    Name("divisible_by_three"),
+    32	                    BinOp("-", Name("divisible_by_three"), Int(1))),
+    33	                  BinOp("-", Name("divisible_by_three"), Int(2))),
+    34	                Int(6)))
+    35	            Assign(
+    36	              Name("triples_of_non_divisible"),
+    37	              BinOp(
+    38	                "//",
+    39	                BinOp(
+    40	                  "*",
+    41	                  BinOp(
+    42	                    "*",
+    43	                    Name("not_divisible_by_three"),
+    44	                    BinOp("-", Name("not_divisible_by_three"), Int(1))),
+    45	                  BinOp("-", Name("not_divisible_by_three"), Int(2))),
+    46	                Int(6)))
+    47	            Return(
+    48	              BinOp(
+    49	                "+",
+    50	                Name("triples_of_divisible"),
+    51	                Name("triples_of_non_divisible"))),
+    52	            0),
+    53	        parent(-1))
+    54	      -1 |-> builtinsScope
+    55	    </scopes>
+    56	    <scopeLoc> 1 </scopeLoc>
+    57	    <heap> .Map </heap>
+    58	    <heapLoc> 0 </heapLoc>
+    59	    <stack> .List </stack>
+    60	    <ret> noRet </ret>
+    61	    <exc> NoExc </exc>
+    62	    <exit-code> 0 </exit-code>
+    63	    requires N >Int 0
+    64	endmodule
+solution.py
+     1	def get_max_triples(n):
+     2	    divisible_by_three = (n + 1) // 3
+     3	    not_divisible_by_three = n - divisible_by_three
+     4	
+     5	    triples_of_divisible = (
+     6	        divisible_by_three
+     7	        * (divisible_by_three - 1)
+     8	        * (divisible_by_three - 2)
+     9	        // 6
+    10	    )
+    11	    triples_of_non_divisible = (
+    12	        not_divisible_by_three
+    13	        * (not_divisible_by_three - 1)
+    14	        * (not_divisible_by_three - 2)
+    15	        // 6
+    16	    )
+    17	    return triples_of_divisible + triples_of_non_divisible
+prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py smoke.py > smoke.mpy
+     6	python3 check_artifacts.py
+     7	
+     8	kompile reference-semantics/semantics.k \
+     9	  --backend llvm \
+    10	  --main-module MPY-KRUN \
+    11	  --syntax-module MPY-SYNTAX \
+    12	  --output-definition runtime-kompiled
+    13	
+    14	krun smoke.mpy --definition runtime-kompiled | tee krun-smoke.out
+    15	grep -Fq '"result_1" |-> 0' krun-smoke.out
+    16	grep -Fq '"result_5" |-> 1' krun-smoke.out
+    17	grep -Fq '"result_10" |-> 36' krun-smoke.out
+    18	grep -Fq '<exit-code>' krun-smoke.out
+    19	
+    20	kompile verification.k \
+    21	  --backend haskell \
+    22	  --main-module VERIFICATION \
+    23	  --syntax-module VERIFICATION-SYNTAX \
+    24	  --output-definition verification-kompiled
+    25	
+    26	kprove spec.k \
+    27	  --definition verification-kompiled \
+    28	  --spec-module SPEC \
+    29	  2>&1 | tee kprove-positive.out
+    30	grep -qx '#Top' kprove-positive.out
+    31	
+    32	if kprove spec-vacuity.k \
+    33	  --definition verification-kompiled \
+    34	  --spec-module SPEC-VACUITY \
+    35	  > kprove-vacuity.out 2>&1
+    36	then
+    37	  echo "ERROR: false-postcondition mutation unexpectedly proved"
+    38	  exit 1
+    39	else
+    40	  vacuity_status=$?
+    41	fi
+    42	cat kprove-vacuity.out
+    43	grep -q 'WarnStuckClaimState' kprove-vacuity.out
+    44	echo "EXPECTED FAILURE: false-postcondition mutation exit=${vacuity_status}"
+    45	
+    46	if kprove spec-body-mutation.k \
+    47	  --definition verification-kompiled \
+    48	  --spec-module SPEC-BODY-MUTATION \
+    49	  > kprove-body-mutation.out 2>&1
+    50	then
+    51	  echo "ERROR: changed-body mutation unexpectedly proved"
+    52	  exit 1
+    53	else
+    54	  body_status=$?
+    55	fi
+    56	cat kprove-body-mutation.out
+    57	grep -q 'WarnStuckClaimState' kprove-body-mutation.out
+    58	echo "EXPECTED FAILURE: changed-body mutation exit=${body_status}"
+    59	
+    60	python3 validate.py
+lemma-discovery.json
+     1	{
+     2	  "schema_version": 2,
+     3	  "inventory_sha256": "97e6022f17f451a5f99cac62e3030189934e65106ea945ffd1d51f7a67b6ebf5",
+     4	  "rules": [
+     5	    {
+     6	      "source_rule_id": "rule-7f4fda07af964878549fb6179e4214215094e6afdc0f799801aef078770bc8f4",
+     7	      "classification": "DEFINITION",
+     8	      "rationale": "This unguarded equation defines the total summary symbol zeroResidueCount by the supplied Python-floor-division arithmetic expression; it names a mathematical result and does not perform or observe program execution."
+     9	    },
+    10	    {
+    11	      "source_rule_id": "rule-da6a4e2936c513bfd13e5a5dabe3f487b5f2fc80dad7975a6a8838c23f087590",
+    12	      "classification": "DEFINITION",
+    13	      "rationale": "This unguarded equation defines the total summary symbol chooseThree as X*(X-1)*(X-2)//6 in the reference semantics' pyMod and /Int normal form; it is a named arithmetic definition rather than an additional fact or operational rule."
+    14	    },
+    15	    {
+    16	      "source_rule_id": "rule-f0b13856a8dad7aae0ba7cb74d4c557bf3d05dd316341f9923211e2c0e60ee6c",
+    17	      "classification": "DEFINITION",
+    18	      "rationale": "This unguarded equation defines expectedTriples by composing zeroResidueCount and chooseThree into the two-case combinatorial sum used by the postcondition; it introduces the named proof term without replacing execution."
+    19	    }
+    20	  ]
+    21	}
+
+Script done on 2026-07-31 08:22:25-05:00 [COMMAND_EXIT_CODE="0"]

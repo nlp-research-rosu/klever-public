@@ -1,0 +1,244 @@
++ sed -n 130,270p /reference/tools/audit_contract.py
+def _optional_regular_file_hash(path: Path) -> str | None:
+    try:
+        mode = path.lstat().st_mode
+    except OSError:
+        return None
+    if not stat.S_ISREG(mode):
+        return None
+    try:
+        return sha256_file(path)
+    except AuditContractError:
+        return None
+
+
+def _tree_entry_type(mode: int) -> str:
+    if stat.S_ISDIR(mode):
+        return "directory"
+    if stat.S_ISREG(mode):
+        return "file"
+    if stat.S_ISLNK(mode):
+        return "symlink"
+    if stat.S_ISFIFO(mode):
+        return "fifo"
+    if stat.S_ISSOCK(mode):
+        return "socket"
+    if stat.S_ISBLK(mode):
+        return "block-device"
+    if stat.S_ISCHR(mode):
+        return "character-device"
+    return "unknown"
+
+
+def _framed_update(digest: Any, value: bytes) -> None:
+    digest.update(len(value).to_bytes(8, "big"))
+    digest.update(value)
+
+
+def _framed_file_update(
+    digest: Any, path: Path, expected_size: int
+) -> None:
+    digest.update(expected_size.to_bytes(8, "big"))
+    bytes_read = 0
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        with os.fdopen(os.open(path, flags), "rb") as stream:
+            for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                bytes_read += len(chunk)
+                digest.update(chunk)
+    except OSError as error:
+        raise AuditContractError(f"cannot read tree file {path}: {error}") from error
+    if bytes_read != expected_size:
+        raise AuditContractError(
+            f"tree file changed size while hashing: {path} "
+            f"(expected {expected_size}, read {bytes_read})"
+        )
+
+
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, f"tree root {root}")
+    entries: list[tuple[str, str, Path, int]] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as iterator:
+                children = list(iterator)
+        except OSError as error:
+            raise AuditContractError(f"cannot scan tree {directory}: {error}") from error
+        for entry in children:
+            path = Path(entry.path)
+            try:
+                entry_stat = entry.stat(follow_symlinks=False)
+            except OSError as error:
+                raise AuditContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            mode = entry_stat.st_mode
+            entry_type = _tree_entry_type(mode)
+            relative = path.relative_to(root).as_posix()
+            entries.append((relative, entry_type, path, entry_stat.st_size))
+            if entry_type == "directory":
+                pending.append(path)
+
+    digest = hashlib.sha256()
+    for relative, entry_type, path, size in sorted(
+        entries, key=lambda item: item[0]
+    ):
+        _framed_update(digest, os.fsencode(relative))
+        _framed_update(digest, entry_type.encode())
+        if entry_type == "file":
+            _framed_file_update(digest, path, size)
+        elif entry_type == "symlink":
+            try:
+                target = os.readlink(path)
+            except OSError as error:
+                raise AuditContractError(
+                    f"cannot read tree symlink {path}: {error}"
+                ) from error
+            _framed_update(digest, os.fsencode(target))
+        else:
+            _framed_update(digest, b"")
+    return digest.hexdigest()
+
+
+def _optional_tree_hash(root: Path) -> str | None:
+    try:
+        mode = root.lstat().st_mode
+    except OSError:
+        return None
+    if not stat.S_ISDIR(mode):
+        return None
+    try:
+        return sha256_tree(root)
+    except AuditContractError:
+        return None
+
+
+def legacy_content_tree_hash(root: Path) -> str:
+    """Reproduce the schema-v1 seed-tree hash used by imported runs."""
+
+    root = require_real_directory(root, "legacy seed tree")
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        try:
+            metadata = path.lstat()
+        except OSError as error:
+            raise AuditContractError(
+                f"cannot inspect legacy seed tree entry: {path}"
+            ) from error
+        if stat.S_ISDIR(metadata.st_mode):
+            continue
+        if not stat.S_ISREG(metadata.st_mode):
+            raise AuditContractError(
+                f"legacy seed tree contains a linked or unsupported entry: {path}"
+            )
+        relative = path.relative_to(root).as_posix().encode()
+        digest.update(len(relative).to_bytes(4, "big"))
+        digest.update(relative)
+        try:
+            content = path.read_bytes()
+        except OSError as error:
+            raise AuditContractError(
++ sed -n 175,215p /reference/tools/pipeline_contract.py
+    except OSError as error:
+        raise PipelineContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise PipelineContractError(f"cannot hash file {path}: {error}") from error
+    return digest.hexdigest()
+
+
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, "tree root")
+    digest = hashlib.sha256()
+    pending = [root]
+    entries: list[tuple[str, str, Path]] = []
+    while pending:
+        directory = pending.pop()
+        try:
+            children = list(os.scandir(directory))
+        except OSError as error:
+            raise PipelineContractError(f"cannot scan tree {directory}: {error}") from error
+        for child in children:
+            path = Path(child.path)
+            try:
+                mode = child.stat(follow_symlinks=False).st_mode
+            except OSError as error:
+                raise PipelineContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
++ rg -n '(generation_producer_sources_sha256|k_workspace_sha256|generated_tree_sha256|lean_workspace_sha256).*sha256_tree|legacy_content_tree_hash|sha256_tree\(' /reference/tools/audit_contract.py /reference/tools/check_audit_campaign.py /reference/tools/check_kit_bundle.py /reference/tools/create_run.py /reference/tools/import_humaneval_prompts.py /reference/tools/k_rule_inventory.py /reference/tools/klean.py /reference/tools/klean_audit_contract.py /reference/tools/klean_export.py /reference/tools/klean_final_gate.py /reference/tools/klean_preflight.py /reference/tools/legacy_migration.py /reference/tools/lemma_discovery_contract.py /reference/tools/migrate_legacy_runs.py /reference/tools/migrate_six_stage_layout.py /reference/tools/pipeline_contract.py /reference/tools/populate_runs.py /reference/tools/py2mpy.py /reference/tools/run_pipeline.py /reference/tools/stage1_runner.py /reference/tools/stage3_runner.py /reference/tools/stage4_runner.py /reference/tools/stage5_mechanical_check.py /reference/tools/stage5_runner.py /reference/tools/stage6_resolution_contract.py /reference/tools/usage_accounting.py
+/reference/tools/usage_accounting.py:149:def sha256_tree(root: Path) -> str:
+/reference/tools/audit_contract.py:186:def sha256_tree(root: Path) -> str:
+/reference/tools/audit_contract.py:241:        return sha256_tree(root)
+/reference/tools/audit_contract.py:246:def legacy_content_tree_hash(root: Path) -> str:
+/reference/tools/audit_contract.py:328:    trusted_semantics_hash = sha256_tree(semantics) if semantics is not None else None
+/reference/tools/audit_contract.py:331:        "candidate_tree_sha256": sha256_tree(candidate),
+/reference/tools/audit_contract.py:347:        "generation_codex_trace_sha256": sha256_tree(
+/reference/tools/audit_contract.py:534:    actual = pipeline_contract.sha256_tree(semantics)
+/reference/tools/audit_contract.py:605:    candidate_hash = pipeline_contract.sha256_tree(workspace)
+/reference/tools/audit_contract.py:669:        manifest_semantics_hash = pipeline_contract.sha256_tree(semantics)
+/reference/tools/audit_contract.py:672:            legacy_semantics_hash = legacy_content_tree_hash(semantics)
+/reference/tools/audit_contract.py:830:        current_hash = pipeline_contract.sha256_tree(execution)
+/reference/tools/stage5_runner.py:438:        or pipeline_contract.sha256_tree(generation) != validated_sha256
+/reference/tools/legacy_migration.py:1500:    workspace_sha256 = pipeline_contract.sha256_tree(workspace)
+/reference/tools/legacy_migration.py:1844:        "artifact_sha256": pipeline_contract.sha256_tree(execution),
+/reference/tools/legacy_migration.py:1888:    workspace_sha256 = pipeline_contract.sha256_tree(workspace)
+/reference/tools/legacy_migration.py:2564:                "source_sha256": pipeline_contract.sha256_tree(source),
+/reference/tools/legacy_migration.py:2565:                "staged_sha256": pipeline_contract.sha256_tree(staging),
+/reference/tools/legacy_migration.py:2566:                "state_sha256": pipeline_contract.sha256_tree(state_staging),
+/reference/tools/legacy_migration.py:2587:        "source_sha256": pipeline_contract.sha256_tree(audit_source),
+/reference/tools/legacy_migration.py:2670:        if pipeline_contract.sha256_tree(source) != expected:
+/reference/tools/legacy_migration.py:2674:    if pipeline_contract.sha256_tree(source) != audit["source_sha256"]:
+/reference/tools/legacy_migration.py:2744:        if pipeline_contract.sha256_tree(final) != run["staged_sha256"]:
+/reference/tools/legacy_migration.py:2746:        if pipeline_contract.sha256_tree(state_final) != run["state_sha256"]:
+/reference/tools/stage4_runner.py:72:    current = pipeline_contract.sha256_tree(workspace)
+/reference/tools/stage4_runner.py:319:    before_sha256 = pipeline_contract.sha256_tree(generation)
+/reference/tools/stage4_runner.py:418:    after_sha256 = pipeline_contract.sha256_tree(generation)
+/reference/tools/stage4_runner.py:498:        if pipeline_contract.sha256_tree(frozen) != frozen_hash:
+/reference/tools/stage4_runner.py:516:        produced_hash = pipeline_contract.sha256_tree(produced)
+/reference/tools/stage4_runner.py:522:        if pipeline_contract.sha256_tree(publication) != produced_hash:
+/reference/tools/stage4_runner.py:548:    candidate_sha256 = pipeline_contract.sha256_tree(generation)
+/reference/tools/stage4_runner.py:555:    if pipeline_contract.sha256_tree(frozen) != frozen_hash or (
+/reference/tools/klean_final_gate.py:335:            "k_workspace_sha256": pipeline_contract.sha256_tree(
+/reference/tools/klean_final_gate.py:345:                pipeline_contract.sha256_tree(generation)
+/reference/tools/klean_final_gate.py:348:                pipeline_contract.sha256_tree(candidate)
+/reference/tools/stage3_runner.py:122:    current = pipeline_contract.sha256_tree(workspace)
+/reference/tools/stage3_runner.py:215:    workspace_hash = pipeline_contract.sha256_tree(stage_root / "workspace")
+/reference/tools/stage3_runner.py:499:    if pipeline_contract.sha256_tree(k_reference) != expected_k_hash:
+/reference/tools/klean_audit_contract.py:100:            pipeline_contract.sha256_tree(candidate)
+/reference/tools/klean_audit_contract.py:292:        return bundle, pipeline_contract.sha256_tree(bundle)
+/reference/tools/klean_audit_contract.py:318:        k_hash = pipeline_contract.sha256_tree(k_workspace)
+/reference/tools/klean_audit_contract.py:463:                "k_audit_sha256": pipeline_contract.sha256_tree(k_audit),
+/reference/tools/klean_audit_contract.py:464:                "klean_generation_sha256": pipeline_contract.sha256_tree(
+/reference/tools/klean_audit_contract.py:472:                    pipeline_contract.sha256_tree(lean_workspace)
+/reference/tools/klean_audit_contract.py:477:                    pipeline_contract.sha256_tree(lean_invocation)
+/reference/tools/klean_audit_contract.py:714:    if pipeline_contract.sha256_tree(candidate) != expected_candidate:
+/reference/tools/run_pipeline.py:122:    if pipeline_contract.sha256_tree(candidate) != selected.get(
+/reference/tools/populate_runs.py:91:def sha256_tree(root: Path) -> str:
+/reference/tools/populate_runs.py:380:        manifest["inputs"]["reference_semantics_sha256"] = sha256_tree(
+/reference/tools/pipeline_contract.py:190:def sha256_tree(root: Path) -> str:
+/reference/tools/pipeline_contract.py:429:        sha256_tree(semantics)
+/reference/tools/pipeline_contract.py:449:                    sha256_tree(semantics) if semantics is not None else None
+/reference/tools/pipeline_contract.py:1175:            "workspace_sha256": sha256_tree(stage_root / "workspace"),
+/reference/tools/pipeline_contract.py:1226:    current_workspace = sha256_tree(stage_root / "workspace")
+/reference/tools/pipeline_contract.py:1329:    current_workspace = sha256_tree(stage_root / "workspace")
+/reference/tools/pipeline_contract.py:1448:    current_workspace = sha256_tree(stage_root / "workspace")
+/reference/tools/pipeline_contract.py:1627:        "workspace_sha256": sha256_tree(workspace),
+/reference/tools/pipeline_contract.py:2185:    candidate_sha256 = sha256_tree(candidate)
+/reference/tools/migrate_six_stage_layout.py:149:        return pipeline_contract.sha256_tree(path)

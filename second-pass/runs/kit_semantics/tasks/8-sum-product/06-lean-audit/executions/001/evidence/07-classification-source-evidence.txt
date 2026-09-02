@@ -1,0 +1,263 @@
+Script started on 2026-07-30 22:50:37-05:00 [<not executed on terminal>]
+== verification.k ==
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	  imports INT
+     6	  imports BOOL
+     7	
+     8	  // Exact source-domain predicate: every element of the finite ValSeq is an
+     9	  // integer.  Its two equations are disjoint and cover all ValSeq values.
+    10	  syntax Bool ::= allInts(ValSeq) [function, total]
+    11	  rule allInts(.ValSeq) => true
+    12	  rule allInts(vCons(V:Val, VS:ValSeq))
+    13	    => isInt(V) andBool allInts(VS)
+    14	
+    15	  // Guarded total twin of K's partial Val-to-Int subsort cast.  The #Ceil
+    16	  // characterization and orientation pair make it usable only where isInt
+    17	  // establishes definedness; no rule invents a value outside that domain.
+    18	  syntax Bool ::= definedProjectInt(Val) [function, total]
+    19	  rule definedProjectInt(V:Val) => isInt(V)
+    20	
+    21	  syntax Int ::= projectIntTotal(Val)
+    22	    [function, total, symbol(projectIntTotal), no-evaluators]
+    23	
+    24	  rule #Ceil({@V:Val}:>Int)
+    25	    => ({ definedProjectInt(@V) #Equals true } #And #Ceil(@V))
+    26	    [simplification]
+    27	
+    28	  rule projectIntTotal(V:Val) => {V}:>Int
+    29	    requires definedProjectInt(V)
+    30	    [concrete, simplification(10), preserves-definedness]
+    31	
+    32	  rule {V:Val}:>Int => projectIntTotal(V)
+    33	    requires definedProjectInt(V)
+    34	    [symbolic(V), simplification, preserves-definedness]
+    35	
+    36	  rule projectIntTotal(I:Int) => I [simplification]
+    37	  rule projectIntTotal(projectIntTotal(V:Val))
+    38	    => projectIntTotal(V)
+    39	    [simplification]
+    40	
+    41	  // Static-sort dispatch twins of the supplied MPY-INT equations.  The guards
+    42	  // are exactly the original Int/Int match domain expressed dynamically.
+    43	  rule applyBin("+", V:Val, W:Val)
+    44	    => projectIntTotal(V) +Int projectIntTotal(W)
+    45	    requires isInt(V) andBool isInt(W)
+    46	    [simplification]
+    47	
+    48	  rule applyBin("*", V:Val, W:Val)
+    49	    => projectIntTotal(V) *Int projectIntTotal(W)
+    50	    requires isInt(V) andBool isInt(W)
+    51	    [simplification]
+    52	
+    53	  // Mathematical left folds, including the empty identities.  The summaries
+    54	  // are consumed only under allInts; each projected head is therefore defined.
+    55	  syntax Int ::= sumFrom(ValSeq, Int) [function, total]
+    56	  rule sumFrom(.ValSeq, A:Int) => A
+    57	  rule sumFrom(vCons(V:Val, VS:ValSeq), A:Int)
+    58	    => sumFrom(VS, A +Int projectIntTotal(V))
+    59	
+    60	  syntax Int ::= productFrom(ValSeq, Int) [function, total]
+    61	  rule productFrom(.ValSeq, A:Int) => A
+    62	  rule productFrom(vCons(V:Val, VS:ValSeq), A:Int)
+    63	    => productFrom(VS, A *Int projectIntTotal(V))
+    64	endmodule
+== proof command order ==
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	cd "$(dirname "$0")"
+     5	
+     6	python3 py2mpy.py solution.py > solution.mpy
+     7	cmp solution.mpy <(python3 py2mpy.py solution.py)
+     8	
+     9	python3 py2mpy.py smoke.py > smoke.mpy
+    10	
+    11	kompile --backend llvm reference-semantics/semantics.k \
+    12	  --main-module MPY-KRUN \
+    13	  --syntax-module MPY-SYNTAX \
+    14	  --output-definition semantics-kompiled
+    15	
+    16	krun smoke.mpy --definition semantics-kompiled
+    17	
+    18	kompile --backend haskell verification.k \
+    19	  --main-module VERIFICATION \
+    20	  --syntax-module MPY-SYNTAX \
+    21	  --output-definition verification-kompiled
+    22	
+    23	kprove spec.k \
+    24	  --definition verification-kompiled \
+    25	  --spec-module SPEC
+    26	
+    27	python3 test_solution.py
+    28	
+    29	set +e
+    30	kprove spec-vacuity.k \
+    31	  --definition verification-kompiled \
+    32	  --spec-module SPEC-VACUITY
+    33	vacuity_status=$?
+    34	
+    35	kprove spec-body-mutation.k \
+    36	  --definition verification-kompiled \
+    37	  --spec-module SPEC-BODY-MUTATION
+    38	body_mutation_status=$?
+    39	set -e
+    40	
+    41	echo "VACUITY_EXIT=$vacuity_status (expected non-zero)"
+    42	echo "BODY_MUTATION_EXIT=$body_mutation_status (expected non-zero)"
+    43	
+    44	if [[ $vacuity_status -eq 0 || $body_mutation_status -eq 0 ]]; then
+    45	  echo "A negative validation probe unexpectedly proved." >&2
+    46	  exit 1
+    47	fi
+== simplification rules ==
+23-
+24-  rule #Ceil({@V:Val}:>Int)
+25-    => ({ definedProjectInt(@V) #Equals true } #And #Ceil(@V))
+26:    [simplification]
+27-
+28-  rule projectIntTotal(V:Val) => {V}:>Int
+29-    requires definedProjectInt(V)
+30:    [concrete, simplification(10), preserves-definedness]
+31-
+32-  rule {V:Val}:>Int => projectIntTotal(V)
+33-    requires definedProjectInt(V)
+34:    [symbolic(V), simplification, preserves-definedness]
+35-
+36:  rule projectIntTotal(I:Int) => I [simplification]
+37-  rule projectIntTotal(projectIntTotal(V:Val))
+38-    => projectIntTotal(V)
+39:    [simplification]
+40-
+--
+43-  rule applyBin("+", V:Val, W:Val)
+44-    => projectIntTotal(V) +Int projectIntTotal(W)
+45-    requires isInt(V) andBool isInt(W)
+46:    [simplification]
+47-
+48-  rule applyBin("*", V:Val, W:Val)
+49-    => projectIntTotal(V) *Int projectIntTotal(W)
+50-    requires isInt(V) andBool isInt(W)
+51:    [simplification]
+52-
+== fixed Int subsort and applyBin rules ==
+/reference/k-proof/reference-semantics/semantics/int.k
+6-
+7-  rule applyUn("-", I:Int) => 0 -Int I
+8-
+9:  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+10-  // Bool participates in int arithmetic (x += (a == b))
+11:  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+12:  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+13-  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+14:  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+15-  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+16-  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+17-  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+
+/reference/k-proof/reference-semantics/semantics/core.k
+22-                    | zipObj(ValSeq, ValSeq)
+23-                    | zipObjS(IntSeq, IntSeq)
+24-
+25:  syntax Val      ::= Int
+26-                    | Bool
+27-                    | "noneV"
+28-                    | Iterable
+== source and postcondition ==
+     1	from typing import List, Tuple
+     2	
+     3	
+     4	def sum_product(numbers: List[int]) -> Tuple[int, int]:
+     5	    total = 0
+     6	    product = 1
+     7	    for number in numbers:
+     8	        total += number
+     9	        product *= number
+    10	    return (total, product)
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Recurring for-loop head.  "number" is present after the first iteration;
+     7	  // the entry claim executes that first step directly, then uses this
+     8	  // circularity for the arbitrary remaining suffix.
+     9	  claim [loop-invariant]:
+    10	    <k>
+    11	      #loop(
+    12	        list(VS:ValSeq),
+    13	        Name("number"),
+    14	        AugAssign(Name("total"), "+", Name("number"))
+    15	        AugAssign(Name("product"), "*", Name("number"))
+    16	      )
+    17	      => .K
+    18	      ...
+    19	    </k>
+    20	    <env> L:Int </env>
+    21	    <scopes>
+    22	      ...
+    23	      L |-> scope(
+    24	        "numbers" |-> list(INPUT:ValSeq)
+    25	        "number"  |-> (OLD:Val => ?LAST:Val)
+    26	        "total"   |-> (S:Int => sumFrom(VS, S))
+    27	        "product" |-> (P:Int => productFrom(VS, P))
+    28	        .Map,
+    29	        parent(0)
+    30	      )
+    31	      ...
+    32	    </scopes>
+    33	    requires allInts(VS)
+    34	
+    35	  // Full entry theorem.  It starts from the supplied semantics' initial state,
+    36	  // loads the exact translated implementation, invokes the exact binding, and
+    37	  // covers every finite ValSeq whose elements are all semantic Int values.
+    38	  claim [sum-product]:
+    39	    <k>
+    40	      #loadAll(Module(
+    41	        ImportFrom("typing", "List", "Tuple")
+    42	        FuncDef("sum_product", Params("numbers"),
+    43	          Assign(Name("total"), Int(0))
+    44	          Assign(Name("product"), Int(1))
+    45	          For(Name("number"), Name("numbers"),
+    46	            AugAssign(Name("total"), "+", Name("number"))
+    47	            AugAssign(Name("product"), "*", Name("number")))
+    48	          Return(TupleExpr(Name("total"), Name("product"))))
+    49	      ))
+    50	      ~> Call(Name("sum_product"), list(VS:ValSeq))
+    51	      =>
+    52	      tuple(vCons(sumFrom(VS, 0),
+    53	            vCons(productFrom(VS, 1), .ValSeq)))
+    54	    </k>
+    55	    <env> 0 </env>
+    56	    <scopes>
+    57	      -1 |-> builtinsScope
+    58	      0  |-> scope(
+    59	        .Map
+    60	        =>
+    61	        "sum_product" |->
+    62	          closureVal(
+    63	            "numbers", .ParamNames,
+    64	            Assign(Name("total"), Int(0))
+    65	            Assign(Name("product"), Int(1))
+    66	            For(Name("number"), Name("numbers"),
+    67	              AugAssign(Name("total"), "+", Name("number"))
+    68	              AugAssign(Name("product"), "*", Name("number")))
+    69	            Return(TupleExpr(Name("total"), Name("product"))),
+    70	            0
+    71	          ),
+    72	        parent(-1)
+    73	      )
+    74	    </scopes>
+    75	    <scopeLoc> 1 </scopeLoc>
+    76	    <heap> .Map </heap>
+    77	    <heapLoc> 0 </heapLoc>
+    78	    <stack> .List </stack>
+    79	    <ret> noRet </ret>
+    80	    <exc> NoExc </exc>
+    81	    <exit-code> 0 </exit-code>
+    82	    requires allInts(VS)
+    83	endmodule
+
+Script done on 2026-07-30 22:50:37-05:00 [COMMAND_EXIT_CODE="0"]

@@ -1,0 +1,84 @@
+Script started on 2026-07-31 06:56:59-05:00 [<not executed on terminal>]
+        if kind == "file" and path.suffix == ".k"
+    )
+    if not files:
+        raise KleanExportError("K definition workspace contains no .k files")
+    return tuple(sorted(files, key=str))
+
+
+def _local_required_file(source: Path, required: str, workspace: Path) -> Path | None:
+    candidate = Path(required)
+    unresolved = (
+        candidate
+        if candidate.is_absolute()
+        else source.parent / candidate
+    )
+    resolved = unresolved.resolve()
+    try:
+        resolved.relative_to(workspace)
+    except ValueError:
+        raise KleanExportError(
+            "K definition requires a file outside the frozen workspace: "
+            f"{required}"
+        )
+    if not resolved.exists():
+        if resolved.suffix == ".k":
+            raise KleanExportError(
+                f"K definition requires a missing workspace .k file: {required}"
+            )
+        return None
+    if unresolved.is_symlink() or not resolved.is_file() or resolved.suffix != ".k":
+        raise KleanExportError(
+            f"K definition require is not a regular workspace .k file: {resolved}"
+        )
+    return resolved
+
+
+def resolve_definition_closure(workspace: Path) -> DefinitionResolution:
+    original_workspace = Path(workspace)
+    try:
+        workspace_mode = original_workspace.stat(
+            follow_symlinks=False
+        ).st_mode
+    except OSError as error:
+        raise KleanExportError(
+            "K definition workspace must be a real directory"
+        ) from error
+    if not stat.S_ISDIR(workspace_mode):
+        raise KleanExportError(
+            "K definition workspace must be a real directory"
+        )
+    workspace = original_workspace.resolve()
+    verification_file = workspace / "verification.k"
+    if not verification_file.is_file() or verification_file.is_symlink():
+        raise KleanExportError(
+            "K definition workspace is missing regular verification.k"
+        )
+    files = _workspace_k_files(workspace)
+    # A prove.sh may leave mutation and bridge byproducts (verification-mutant.k,
+    # spec-mutant.k, spec-body-mutation.k, ...) in the workspace that reuse the
+    # canonical module names SPEC/VERIFICATION.  Record every declaration during
+    # the flat scan without failing on a collision; ambiguity is adjudicated
+    # below against the files actually reached from the export target, so an
+    # unreached duplicate is ignored while a reached duplicate still fails
+    # closed.
+    module_declarations: dict[str, list[tuple[Path, tuple[str, ...]]]] = {}
+    file_modules: dict[Path, tuple[str, ...]] = {}
+    file_requires: dict[Path, tuple[Path, ...]] = {}
+    for path in files:
+        text = path.read_text()
+        declared: list[str] = []
+        for block in MODULE_BLOCK_RE.finditer(text):
+            name = block.group("name")
+            imports = tuple(IMPORT_RE.findall(block.group("body")))
+            module_declarations.setdefault(name, []).append((path, imports))
+            declared.append(name)
+        file_modules[path] = tuple(declared)
+        file_requires[path] = tuple(
+            required_path
+            for required in REQUIRES_RE.findall(text)
+            if (
+                required_path := _local_required_file(
+                    path, required, workspace
+
+Script done on 2026-07-31 06:56:59-05:00 [COMMAND_EXIT_CODE="0"]

@@ -1,0 +1,519 @@
+COMMAND: inspect Lean shell exported C entry point and Lake launcher form
+/-
+Copyright (c) 2025 Lean FRO. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Leonardo de Moura, Mac Malone
+-/
+prelude
+import Lean.Elab.Frontend
+import Lean.Elab.ParseImportsFast
+import Lean.Compiler.IR.EmitC
+
+/-  Lean companion to  `shell.cpp` -/
+
+open System
+
+namespace Lean
+
+/--
+Decodes an array of bytes that encode a string as [UTF-8](https://en.wikipedia.org/wiki/UTF-8) into
+the corresponding string. Invalid UTF-8 characters in the byte array are replaced with `U+FFFD`
+(the unicode replacement character) in the resulting string.
+
+This is used instead of the standard `String` functions because Lean is expected to not immediately
+abort on files with invalid UTF-8.
+-/
+@[extern "lean_decode_lossy_utf8"]
+private opaque decodeLossyUTF8 (a : @& ByteArray) : String
+
+/- Runs the `main` function of the module with `args` using the Lean interpreter. -/
+@[extern "lean_run_main"]
+private opaque runMain (env : @& Environment) (opts : @& Options) (args : @& List String) : BaseIO UInt32
+
+/--
+Initializes the LLVM subsystem.
+If Lean lacks LLVM support, this function will fail with an assertion violation.
+-/
+@[extern "lean_init_llvm"]
+private opaque initLLVM : IO Unit
+
+/--
+Emits LLVM bitcode for the module.
+Before calling this function, the LLVM subsystem must first be successfully initialized.
+-/
+@[extern "lean_emit_llvm"]
+private opaque emitLLVM (env : Environment) (modName : Name) (filepath : FilePath) : IO Unit
+
+/-- Print all profiling times (if any) to standard error. -/
+@[extern "lean_display_cumulative_profiling_times"]
+private opaque displayCumulativeProfilingTimes : BaseIO Unit
+
+/-- Whether Lean was built with an address sanitizer enabled. -/
+@[extern "lean_internal_has_address_sanitizer"]
+private opaque Internal.hasAddressSanitizer (_ : Unit) : Bool
+
+/-- Whether Lean was built with multithread support. -/
+@[extern "lean_internal_is_multi_thread"]
+private opaque Internal.isMultiThread (_ : Unit) : Bool
+
+/-- Whether Lean was built in debug mode. -/
+@[extern "lean_internal_is_debug"]
+private opaque Internal.isDebug (_ : Unit) : Bool
+
+/-- The mode Lean was built in. -/
+@[extern "lean_internal_get_build_type"]
+private opaque Internal.getBuildType (_ : Unit) : String
+
+/-- Lean equivalent of `LEAN_VERSION_STRING` / `g_short_version_string` -/
+private def shortVersionString : String :=
+  if version.specialDesc ≠ "" then
+    s!"{versionStringCore}-{version.specialDesc}"
+  else if !version.isRelease then
+    s!"{versionStringCore}-pre"
+  else
+    versionStringCore
+
+/-- The full Lean version header (i.e, what is printed by `lean --version`). -/
+private def versionHeader : String := Id.run do
+  let mut ver := shortVersionString
+  if Platform.target ≠ "" then
+    ver := s!"{ver}, {Platform.target}"
+  if githash ≠ "" then
+    ver := s!"{ver}, commit {githash}"
+  s!"Lean (version {ver}, {Internal.getBuildType ()})"
+
+/-- Print the Lean version header. -/
+@[export lean_display_header]
+private def displayHeader : IO Unit := do
+  IO.println versionHeader
+
+/-- Print the Lean CLI help message. -/
+@[export lean_display_help]
+private def displayHelp (useStderr : Bool) : IO Unit := do
+  let out ← if useStderr then IO.getStderr else IO.getStdout
+  out.putStrLn    versionHeader
+  out.putStrLn    "Miscellaneous"
+  out.putStrLn    "  -h, --help             display this message"
+  out.putStrLn    "      --features         display features compiler provides (eg. LLVM support)"
+  out.putStrLn    "  -v, --version          display version information"
+  out.putStrLn    "  -V, --short-version    display short version number"
+  out.putStrLn    "  -g, --githash          display the git commit hash number used to build this binary"
+  out.putStrLn    "      --run <file>       call the 'main' definition in the given file with the remaining arguments"
+  out.putStrLn    "  -o, --o=oname          create olean file"
+  out.putStrLn    "  -i, --i=iname          create ilean file"
+  out.putStrLn    "  -c, --c=fname          name of the C output file"
+  out.putStrLn    "  -b, --bc=fname         name of the LLVM bitcode file"
+  out.putStrLn    "      --stdin            take input from stdin"
+  out.putStrLn    "      --root=dir         set package root directory from which the module name\n"
+  out.putStrLn    "                         of the input file is calculated\n"
+  out.putStrLn    "                         (default: current working directory)\n";
+  out.putStrLn    "  -t, --trust=num        trust level (default: max) 0 means do not trust any macro,\n"
+  out.putStrLn    "                         and type check all imported modules\n";
+  out.putStrLn    "  -q, --quiet            do not print verbose messages"
+  out.putStrLn    "  -M, --memory=num       maximum amount of memory that should be used by Lean"
+  out.putStrLn    "                         (in megabytes)"
+  out.putStrLn    "  -T, --timeout=num      maximum number of memory allocations per task"
+  out.putStrLn    "                         this is a deterministic way of interrupting long running tasks"
+  if Internal.isMultiThread () then
+    out.putStrLn  "  -j, --threads=num      number of threads used to process lean files"
+    out.putStrLn  "  -s, --tstack=num       thread stack size in Kb"
+    out.putStrLn  "      --server           start lean in server mode"
+    out.putStrLn  "      --worker           start lean in server-worker mode"
+  out.putStrLn    "      --plugin=file      load and initialize Lean shared library for registering linters etc."
+  out.putStrLn    "      --load-dynlib=file load shared library to make its symbols available to the interpreter"
+  out.putStrLn    "      --setup=file       JSON file with module setup data (supersedes the file's header)"
+  out.putStrLn    "      --json             report Lean output (e.g., messages) as JSON (one per line)"
+  out.putStrLn    "  -E  --error=kind       report Lean messages of kind as errors"
+  out.putStrLn    "      --deps             just print dependencies of a Lean input"
+  out.putStrLn    "      --src-deps         just print dependency sources of a Lean input"
+  out.putStrLn    "      --print-prefix     print the installation prefix for Lean and exit"
+  out.putStrLn    "      --print-libdir     print the installation directory for Lean's built-in libraries and exit"
+  out.putStrLn    "      --profile          display elaboration/type checking time for each definition/theorem"
+  out.putStrLn    "      --stats            display environment statistics"
+  if Internal.isDebug () then
+    out.putStrLn  "      --debug=tag        enable assertions with the given tag"
+  out.putStrLn    "      -D name=value      set a configuration option (see set_option command)"
+
+@[export lean_shell_main]
+private def shellMain
+    (args : List String)
+    (useStdin : Bool := false)
+    (onlyDeps : Bool := false)
+    (onlySrcDeps : Bool := false)
+    (depsJson : Bool := false)
+    (opts : Options := {})
+    (trustLevel : UInt32 := 0)
+    (rootDir? : Option System.FilePath := none)
+    (setupFileName? : Option System.FilePath := none)
+    (oleanFileName? : Option System.FilePath := none)
+    (ileanFileName? : Option System.FilePath := none)
+    (cFileName? : Option System.FilePath := none)
+    (bcFileName? : Option System.FilePath := none)
+    (jsonOutput : Bool := false)
+    (errorOnKinds : Array Name := #[])
+    (printStats : Bool := false)
+    (run : Bool := false)
+    : IO UInt32 := do
+  if onlyDeps && depsJson then
+    let fns ←
+      if useStdin then
+        (← IO.getStdin).lines
+      else
+        pure args.toArray
+    printImportsJson fns
+    return 0
+  let (fileName?, args) :=
+    match args with
+    | fileName :: args => (some fileName, args)
+    | [] => (none, args)
+  if !run && !args.isEmpty then
+    IO.eprintln "Expected exactly one file name"
+    displayHelp (useStderr := true)
+    return 1
+  let fileName ←
+    if let some fileName := fileName? then
+      pure fileName
+    else if useStdin then
+      pure "<stdin>"
+    else
+      IO.eprintln "Expected exactly one file name"
+      displayHelp (useStderr := true)
+      return 1
+  let contents ← decodeLossyUTF8 <$> do
+    if useStdin then
+      (← IO.getStdin).readBinToEnd
+    else
+      IO.FS.readBinFile fileName
+  if onlyDeps then
+    Elab.printImports contents fileName
+    return 0
+  if onlySrcDeps then
+    Elab.printImportSrcs contents fileName
+    return 0
+  -- Quick and dirty `#lang` support
+  ---TODO: make it extensible, and add `lean4md`
+  let contents ←
+    if contents.startsWith "#lang" then
+      let endLinePos := contents.posOf '\n'
+      let langId := contents.extract ⟨6⟩ endLinePos |>.trim
+      if langId == "lean4" then
+        pure () -- do nothing for now
+      else
+        IO.eprintln s!"unknown language '{langId}'\n";
+        return 1
+      -- Remove up to `\n`
+      pure <| contents.extract endLinePos contents.endPos
+    else
+      pure contents
+  let setup? ← setupFileName?.mapM ModuleSetup.load
+  let mainModuleName ←
+    if let some setup := setup? then
+      pure setup.name
+    else if let some fileName := fileName? then
+      try moduleNameOfFileName fileName rootDir? catch e =>
+        if oleanFileName?.isNone && ileanFileName?.isNone then
+          pure `_stdin
+        else
+          throw e
+    else
+      pure `_stdin
+  let env? ← Elab.runFrontend contents opts fileName mainModuleName trustLevel
+      oleanFileName? ileanFileName? jsonOutput errorOnKinds #[] printStats setup?
+  if let some env := env? then
+    if run then
+      return ← runMain env opts args
+    if let some c := cFileName? then
+      let .ok out ← IO.FS.Handle.mk c .write |>.toBaseIO
+        | IO.eprintln s!"failed to create '{c}'"
+          return 1
+      profileitIO "C code generation" opts do
+        let data ← IO.ofExcept <| IR.emitC env mainModuleName
+        out.write data.toUTF8
+    if let some bc := bcFileName? then
+      initLLVM
+      profileitIO "LLVM code generation" opts do
+        emitLLVM env mainModuleName bc
+  displayCumulativeProfilingTimes
+  if Internal.hasAddressSanitizer () then
+    return if env?.isSome then 0 else 1
+  else
+    -- When not using the address/leak sanitizer, we interrupt execution without garbage collecting.
+    -- This is useful when profiling improvements to Lean startup time.
+    IO.Process.exit <| if env?.isSome then 0 else 1
+COMMAND: lean runtime main declarations
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/Lean/Compiler/IR/EmitLLVM.lean:23:def leanMainFn := "_lean_main"
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/Lean/Compiler/IR/EmitLLVM.lean:1387:  let fnName :=  "lean_initialize_runtime_module"
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/Lean/Compiler/IR/EmitC.lean:20:def leanMainFn := "_lean_main"
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/Lean/Compiler/IR/EmitC.lean:150:       emitLn "void lean_initialize_runtime_module();";
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/Lean/Compiler/IR/EmitC.lean:166:      emitLn "lean_initialize_runtime_module();"
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/Lean/Shell.lean:136:@[export lean_shell_main]
+COMMAND: disassemble Lake _lean_main and main
+
+/opt/elan/toolchains/leanprover--lean4---v4.22.0/bin/lake:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000001e30 <__do_fini+0x30>:
+    1e30:	8b 05 0a 17 00 00    	mov    eax,DWORD PTR [rip+0x170a]        # 3540 <__deregister_frame_info@Base>
+    1e36:	48 83 f8 00          	cmp    rax,0x0
+    1e3a:	74 0c                	je     1e48 <__do_fini+0x48>
+    1e3c:	48 8d 3d b5 ed ff ff 	lea    rdi,[rip+0xffffffffffffedb5]        # bf8 <__EH_FRAME_LIST_END__>
+    1e43:	e8 a8 03 00 00       	call   21f0 <__deregister_frame_info@plt>
+    1e48:	5d                   	pop    rbp
+    1e49:	c3                   	ret    
+    1e4a:	cc                   	int3   
+    1e4b:	cc                   	int3   
+    1e4c:	cc                   	int3   
+    1e4d:	cc                   	int3   
+    1e4e:	cc                   	int3   
+    1e4f:	cc                   	int3   
+
+0000000000001e50 <_lean_main>:
+    1e50:	41 56                	push   r14
+    1e52:	53                   	push   rbx
+    1e53:	50                   	push   rax
+    1e54:	e8 a7 03 00 00       	call   2200 <l_Lake_cli@plt>
+    1e59:	83 38 01             	cmp    DWORD PTR [rax],0x1
+    1e5c:	74 61                	je     1ebf <_lean_main+0x6f>
+    1e5e:	48 8b 58 08          	mov    rbx,QWORD PTR [rax+0x8]
+    1e62:	4c 8b 70 10          	mov    r14,QWORD PTR [rax+0x10]
+    1e66:	41 f6 c6 01          	test   r14b,0x1
+    1e6a:	75 0c                	jne    1e78 <_lean_main+0x28>
+    1e6c:	41 8b 0e             	mov    ecx,DWORD PTR [r14]
+    1e6f:	85 c9                	test   ecx,ecx
+    1e71:	7e 54                	jle    1ec7 <_lean_main+0x77>
+    1e73:	ff c1                	inc    ecx
+    1e75:	41 89 0e             	mov    DWORD PTR [r14],ecx
+    1e78:	f6 c3 01             	test   bl,0x1
+    1e7b:	75 0a                	jne    1e87 <_lean_main+0x37>
+    1e7d:	8b 0b                	mov    ecx,DWORD PTR [rbx]
+    1e7f:	85 c9                	test   ecx,ecx
+    1e81:	7e 4c                	jle    1ecf <_lean_main+0x7f>
+    1e83:	ff c1                	inc    ecx
+    1e85:	89 0b                	mov    DWORD PTR [rbx],ecx
+    1e87:	a8 01                	test   al,0x1
+    1e89:	75 0b                	jne    1e96 <_lean_main+0x46>
+    1e8b:	8b 08                	mov    ecx,DWORD PTR [rax]
+    1e8d:	83 f9 02             	cmp    ecx,0x2
+    1e90:	7c 44                	jl     1ed6 <_lean_main+0x86>
+    1e92:	ff c9                	dec    ecx
+    1e94:	89 08                	mov    DWORD PTR [rax],ecx
+    1e96:	e8 75 03 00 00       	call   2210 <lean_inc_heartbeat@plt>
+    1e9b:	bf 18 00 00 00       	mov    edi,0x18
+    1ea0:	e8 7b 03 00 00       	call   2220 <mi_malloc_small@plt>
+    1ea5:	48 85 c0             	test   rax,rax
+    1ea8:	74 3a                	je     1ee4 <_lean_main+0x94>
+    1eaa:	48 b9 01 00 00 00 18 	movabs rcx,0x2001800000001
+    1eb1:	00 02 00 
+    1eb4:	48 89 08             	mov    QWORD PTR [rax],rcx
+    1eb7:	48 89 58 08          	mov    QWORD PTR [rax+0x8],rbx
+    1ebb:	4c 89 70 10          	mov    QWORD PTR [rax+0x10],r14
+    1ebf:	48 83 c4 08          	add    rsp,0x8
+    1ec3:	5b                   	pop    rbx
+    1ec4:	41 5e                	pop    r14
+    1ec6:	c3                   	ret    
+    1ec7:	74 af                	je     1e78 <_lean_main+0x28>
+    1ec9:	f0 41 ff 0e          	lock dec DWORD PTR [r14]
+    1ecd:	eb a9                	jmp    1e78 <_lean_main+0x28>
+    1ecf:	74 b6                	je     1e87 <_lean_main+0x37>
+    1ed1:	f0 ff 0b             	lock dec DWORD PTR [rbx]
+    1ed4:	eb b1                	jmp    1e87 <_lean_main+0x37>
+    1ed6:	85 c9                	test   ecx,ecx
+    1ed8:	74 bc                	je     1e96 <_lean_main+0x46>
+    1eda:	48 89 c7             	mov    rdi,rax
+    1edd:	e8 4e 03 00 00       	call   2230 <lean_dec_ref_cold@plt>
+    1ee2:	eb b2                	jmp    1e96 <_lean_main+0x46>
+    1ee4:	e8 57 03 00 00       	call   2240 <lean_internal_panic_out_of_memory@plt>
+    1ee9:	0f 1f 80 00 00 00 00 	nop    DWORD PTR [rax+0x0]
+
+0000000000001ef0 <initialize_LakeMain>:
+    1ef0:	53                   	push   rbx
+    1ef1:	80 3d 51 27 00 00 01 	cmp    BYTE PTR [rip+0x2751],0x1        # 4649 <_G_initialized>
+    1ef8:	75 37                	jne    1f31 <initialize_LakeMain+0x41>
+    1efa:	e8 11 03 00 00       	call   2210 <lean_inc_heartbeat@plt>
+    1eff:	bf 18 00 00 00       	mov    edi,0x18
+    1f04:	e8 17 03 00 00       	call   2220 <mi_malloc_small@plt>
+    1f09:	48 85 c0             	test   rax,rax
+    1f0c:	0f 84 a0 00 00 00    	je     1fb2 <initialize_LakeMain+0xc2>
+    1f12:	48 b9 01 00 00 00 18 	movabs rcx,0x2001800000001
+    1f19:	00 02 00 
+    1f1c:	48 89 08             	mov    QWORD PTR [rax],rcx
+    1f1f:	48 c7 40 08 01 00 00 	mov    QWORD PTR [rax+0x8],0x1
+    1f26:	00 
+    1f27:	48 c7 40 10 01 00 00 	mov    QWORD PTR [rax+0x10],0x1
+    1f2e:	00 
+    1f2f:	5b                   	pop    rbx
+    1f30:	c3                   	ret    
+    1f31:	c6 05 11 27 00 00 01 	mov    BYTE PTR [rip+0x2711],0x1        # 4649 <_G_initialized>
+    1f38:	40 0f b6 df          	movzx  ebx,dil
+    1f3c:	be 01 00 00 00       	mov    esi,0x1
+    1f41:	89 df                	mov    edi,ebx
+    1f43:	e8 08 03 00 00       	call   2250 <initialize_Lake@plt>
+    1f48:	0f b6 48 07          	movzx  ecx,BYTE PTR [rax+0x7]
+    1f4c:	c1 e1 18             	shl    ecx,0x18
+    1f4f:	81 f9 00 00 00 01    	cmp    ecx,0x1000000
+    1f55:	74 26                	je     1f7d <initialize_LakeMain+0x8d>
+    1f57:	8b 08                	mov    ecx,DWORD PTR [rax]
+    1f59:	83 f9 02             	cmp    ecx,0x2
+    1f5c:	7c 31                	jl     1f8f <initialize_LakeMain+0x9f>
+    1f5e:	ff c9                	dec    ecx
+    1f60:	89 08                	mov    DWORD PTR [rax],ecx
+    1f62:	be 01 00 00 00       	mov    esi,0x1
+    1f67:	89 df                	mov    edi,ebx
+    1f69:	e8 f2 02 00 00       	call   2260 <initialize_Lake_CLI@plt>
+    1f6e:	0f b6 48 07          	movzx  ecx,BYTE PTR [rax+0x7]
+    1f72:	c1 e1 18             	shl    ecx,0x18
+    1f75:	81 f9 00 00 00 01    	cmp    ecx,0x1000000
+    1f7b:	75 02                	jne    1f7f <initialize_LakeMain+0x8f>
+    1f7d:	5b                   	pop    rbx
+    1f7e:	c3                   	ret    
+    1f7f:	8b 08                	mov    ecx,DWORD PTR [rax]
+    1f81:	83 f9 02             	cmp    ecx,0x2
+    1f84:	7c 17                	jl     1f9d <initialize_LakeMain+0xad>
+    1f86:	ff c9                	dec    ecx
+    1f88:	89 08                	mov    DWORD PTR [rax],ecx
+    1f8a:	e9 6b ff ff ff       	jmp    1efa <initialize_LakeMain+0xa>
+    1f8f:	85 c9                	test   ecx,ecx
+    1f91:	74 cf                	je     1f62 <initialize_LakeMain+0x72>
+    1f93:	48 89 c7             	mov    rdi,rax
+    1f96:	e8 95 02 00 00       	call   2230 <lean_dec_ref_cold@plt>
+    1f9b:	eb c5                	jmp    1f62 <initialize_LakeMain+0x72>
+    1f9d:	85 c9                	test   ecx,ecx
+    1f9f:	0f 84 55 ff ff ff    	je     1efa <initialize_LakeMain+0xa>
+    1fa5:	48 89 c7             	mov    rdi,rax
+    1fa8:	e8 83 02 00 00       	call   2230 <lean_dec_ref_cold@plt>
+    1fad:	e9 48 ff ff ff       	jmp    1efa <initialize_LakeMain+0xa>
+    1fb2:	e8 89 02 00 00       	call   2240 <lean_internal_panic_out_of_memory@plt>
+    1fb7:	66 0f 1f 84 00 00 00 	nop    WORD PTR [rax+rax*1+0x0]
+    1fbe:	00 00 
+
+0000000000001fc0 <main>:
+    1fc0:	55                   	push   rbp
+    1fc1:	41 57                	push   r15
+    1fc3:	41 56                	push   r14
+    1fc5:	41 55                	push   r13
+    1fc7:	41 54                	push   r12
+    1fc9:	53                   	push   rbx
+    1fca:	50                   	push   rax
+    1fcb:	89 fd                	mov    ebp,edi
+    1fcd:	e8 9e 02 00 00       	call   2270 <lean_setup_args@plt>
+    1fd2:	48 89 c3             	mov    rbx,rax
+    1fd5:	31 c0                	xor    eax,eax
+    1fd7:	e8 a4 02 00 00       	call   2280 <lean_initialize@plt>
+    1fdc:	31 ff                	xor    edi,edi
+    1fde:	e8 ad 02 00 00       	call   2290 <lean_set_panic_messages@plt>
+    1fe3:	bf 01 00 00 00       	mov    edi,0x1
+    1fe8:	e8 03 ff ff ff       	call   1ef0 <initialize_LakeMain>
+    1fed:	49 89 c6             	mov    r14,rax
+    1ff0:	bf 01 00 00 00       	mov    edi,0x1
+    1ff5:	e8 96 02 00 00       	call   2290 <lean_set_panic_messages@plt>
+    1ffa:	e8 a1 02 00 00       	call   22a0 <lean_io_mark_end_initialization@plt>
+    1fff:	41 81 7e 04 ff ff ff 	cmp    DWORD PTR [r14+0x4],0xffffff
+    2006:	00 
+    2007:	0f 87 8f 00 00 00    	ja     209c <main+0xdc>
+    200d:	41 8b 06             	mov    eax,DWORD PTR [r14]
+    2010:	83 f8 02             	cmp    eax,0x2
+    2013:	0f 8c d3 00 00 00    	jl     20ec <main+0x12c>
+    2019:	ff c8                	dec    eax
+    201b:	41 89 06             	mov    DWORD PTR [r14],eax
+    201e:	e8 8d 02 00 00       	call   22b0 <lean_init_task_manager@plt>
+    2023:	41 be 01 00 00 00    	mov    r14d,0x1
+    2029:	83 fd 02             	cmp    ebp,0x2
+    202c:	7c 5e                	jl     208c <main+0xcc>
+    202e:	41 89 ef             	mov    r15d,ebp
+    2031:	49 ff c7             	inc    r15
+    2034:	41 bd 01 00 00 00    	mov    r13d,0x1
+    203a:	49 bc 01 00 00 00 18 	movabs r12,0x102001800000001
+    2041:	00 02 01 
+    2044:	66 66 66 2e 0f 1f 84 	data16 data16 cs nop WORD PTR [rax+rax*1+0x0]
+    204b:	00 00 00 00 00 
+    2050:	e8 bb 01 00 00       	call   2210 <lean_inc_heartbeat@plt>
+    2055:	bf 18 00 00 00       	mov    edi,0x18
+    205a:	e8 c1 01 00 00       	call   2220 <mi_malloc_small@plt>
+    205f:	48 85 c0             	test   rax,rax
+    2062:	0f 84 ac 00 00 00    	je     2114 <main+0x154>
+    2068:	49 89 c6             	mov    r14,rax
+    206b:	4c 89 20             	mov    QWORD PTR [rax],r12
+    206e:	4a 8b 7c fb f0       	mov    rdi,QWORD PTR [rbx+r15*8-0x10]
+    2073:	e8 48 02 00 00       	call   22c0 <lean_mk_string@plt>
+    2078:	49 89 46 08          	mov    QWORD PTR [r14+0x8],rax
+    207c:	4d 89 6e 10          	mov    QWORD PTR [r14+0x10],r13
+    2080:	49 ff cf             	dec    r15
+    2083:	4d 89 f5             	mov    r13,r14
+    2086:	49 83 ff 02          	cmp    r15,0x2
+    208a:	7f c4                	jg     2050 <main+0x90>
+    208c:	be 01 00 00 00       	mov    esi,0x1
+    2091:	4c 89 f7             	mov    rdi,r14
+    2094:	e8 b7 fd ff ff       	call   1e50 <_lean_main>
+    2099:	49 89 c6             	mov    r14,rax
+    209c:	e8 2f 02 00 00       	call   22d0 <lean_finalize_task_manager@plt>
+    20a1:	41 81 7e 04 ff ff ff 	cmp    DWORD PTR [r14+0x4],0xffffff
+    20a8:	00 
+    20a9:	77 16                	ja     20c1 <main+0x101>
+    20ab:	49 8b 5e 08          	mov    rbx,QWORD PTR [r14+0x8]
+    20af:	48 d1 eb             	shr    rbx,1
+    20b2:	41 8b 06             	mov    eax,DWORD PTR [r14]
+    20b5:	83 f8 02             	cmp    eax,0x2
+    20b8:	7c 4c                	jl     2106 <main+0x146>
+    20ba:	ff c8                	dec    eax
+    20bc:	41 89 06             	mov    DWORD PTR [r14],eax
+    20bf:	eb 1a                	jmp    20db <main+0x11b>
+    20c1:	4c 89 f7             	mov    rdi,r14
+    20c4:	e8 17 02 00 00       	call   22e0 <lean_io_result_show_error@plt>
+    20c9:	41 8b 06             	mov    eax,DWORD PTR [r14]
+    20cc:	83 f8 02             	cmp    eax,0x2
+    20cf:	7c 30                	jl     2101 <main+0x141>
+    20d1:	ff c8                	dec    eax
+    20d3:	41 89 06             	mov    DWORD PTR [r14],eax
+    20d6:	bb 01 00 00 00       	mov    ebx,0x1
+    20db:	89 d8                	mov    eax,ebx
+    20dd:	48 83 c4 08          	add    rsp,0x8
+    20e1:	5b                   	pop    rbx
+    20e2:	41 5c                	pop    r12
+    20e4:	41 5d                	pop    r13
+    20e6:	41 5e                	pop    r14
+    20e8:	41 5f                	pop    r15
+    20ea:	5d                   	pop    rbp
+    20eb:	c3                   	ret    
+    20ec:	85 c0                	test   eax,eax
+    20ee:	0f 84 2a ff ff ff    	je     201e <main+0x5e>
+    20f4:	4c 89 f7             	mov    rdi,r14
+    20f7:	e8 34 01 00 00       	call   2230 <lean_dec_ref_cold@plt>
+    20fc:	e9 1d ff ff ff       	jmp    201e <main+0x5e>
+    2101:	bb 01 00 00 00       	mov    ebx,0x1
+    2106:	85 c0                	test   eax,eax
+    2108:	74 d1                	je     20db <main+0x11b>
+    210a:	4c 89 f7             	mov    rdi,r14
+    210d:	e8 1e 01 00 00       	call   2230 <lean_dec_ref_cold@plt>
+    2112:	eb c7                	jmp    20db <main+0x11b>
+    2114:	e8 27 01 00 00       	call   2240 <lean_internal_panic_out_of_memory@plt>
+    2119:	cc                   	int3   
+    211a:	cc                   	int3   
+    211b:	cc                   	int3   
+    211c:	cc                   	int3   
+    211d:	cc                   	int3   
+    211e:	cc                   	int3   
+    211f:	cc                   	int3   
+
+0000000000002120 <__libc_csu_init>:
+    2120:	41 57                	push   r15
+    2122:	41 56                	push   r14
+    2124:	41 89 ff             	mov    r15d,edi
+    2127:	41 55                	push   r13
+    2129:	41 54                	push   r12
+    212b:	4c 8d 25 be 11 00 00 	lea    r12,[rip+0x11be]        # 32f0 <__init>
+    2132:	55                   	push   rbp
+    2133:	48 8d 2d be 11 00 00 	lea    rbp,[rip+0x11be]        # 32f8 <__fini>
+    213a:	53                   	push   rbx
+    213b:	49 89 f6             	mov    r14,rsi
+    213e:	49 89 d5             	mov    r13,rdx
+    2141:	4c 29 e5             	sub    rbp,r12
+    2144:	48 83 ec 08          	sub    rsp,0x8
+    2148:	48 c1 fd 03          	sar    rbp,0x3
+    214c:	e8 43 00 00 00       	call   2194 <_init>
+    2151:	48 85 ed             	test   rbp,rbp
+    2154:	74 20                	je     2176 <__libc_csu_init+0x56>
+    2156:	31 db                	xor    ebx,ebx
+    2158:	0f 1f 84 00 00 00 00 	nop    DWORD PTR [rax+rax*1+0x0]
+    215f:	00 

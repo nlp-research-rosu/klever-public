@@ -1,0 +1,354 @@
+WORKDIR: /audit-output
+COMMAND: /audit-output/evidence/static_inventory.sh
+START_UTC: 2026-07-23T14:13:58Z
+Numbered source: semantic.k
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports BOOL-SYNTAX
+     4	  imports STRING-SYNTAX
+     5	
+     6	  syntax Pgm ::= "Module" "(" Stmts ")"
+     7	
+     8	  // Statement sequences are juxtaposed by py2mpy.py.
+     9	  syntax Stmts ::= List{Stmt, ""}
+    10	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    11	                | "Return" "(" Expr ")"
+    12	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    13	
+    14	  syntax Params ::= "Params" "(" Strs ")"
+    15	  syntax Strs ::= List{String, ","}
+    16	
+    17	  syntax Exprs ::= List{Expr, ","}
+    18	  syntax Expr ::= "Int" "(" Int ")"
+    19	                | "Bool" "(" Bool ")"
+    20	                | "Str" "(" String ")"
+    21	                | "Name" "(" String ")"
+    22	                | "ListExpr" "(" Exprs ")"
+    23	                | "BinOp" "(" String "," Expr "," Expr ")"
+    24	                | "Compare" "(" Expr "," CmpOps ")"
+    25	                | "Call" "(" Expr "," Exprs ")"
+    26	                | "Subscript" "(" Expr "," Index ")"
+    27	
+    28	  syntax CmpOps ::= List{CmpOp, ","}
+    29	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    30	
+    31	  syntax Index ::= Expr
+    32	                 | "Slice" "(" Bound "," Bound "," Bound ")"
+    33	  syntax Bound ::= Expr | "NoBound"
+    34	endmodule
+    35	
+    36	module MPY
+    37	  imports MPY-SYNTAX
+    38	  imports INT
+    39	  imports BOOL
+    40	  imports STRING
+    41	  imports MAP
+    42	
+    43	  // Runtime values. Values is a proper, finite sequence, so ListV is a
+    44	  // direct model of a Python list for the fragment used by solution.py.
+    45	  syntax Value ::= "IntV" "(" Int ")"
+    46	                 | "BoolV" "(" Bool ")"
+    47	                 | "StrV" "(" String ")"
+    48	                 | "ListV" "(" Values ")"
+    49	                 | "NoneV"
+    50	  syntax Values ::= List{Value, ","}
+    51	
+    52	  syntax Closure ::= "closure" "(" Params "," Stmts ")"
+    53	  syntax KItem ::= "#prepend" "(" Value ")"
+    54	
+    55	  // A program is loaded as a map of function closures, then derivative is
+    56	  // invoked with the single list supplied in the ARGS configuration cell.
+    57	  syntax Value ::= "#run" "(" Pgm "," Value ")" [function]
+    58	                 | "#call" "(" String "," Values "," Map ")"
+    59	                 | "#exec" "(" Stmts "," Map "," Map ")"
+    60	                 | "#choose" "(" Value "," Stmts "," Stmts "," Map "," Map ")" [function]
+    61	                 | "#eval" "(" Expr "," Map "," Map ")" [function]
+    62	                 | "#bin" "(" String "," Value "," Value ")" [function]
+    63	                 | "#equal" "(" Value "," Value ")" [function]
+    64	                 | "#head" "(" Value ")" [function]
+    65	                 | "#tail" "(" Value ")" [function]
+    66	
+    67	  syntax Values ::= "#evalArgs" "(" Exprs "," Map "," Map ")" [function]
+    68	                  | "#concat" "(" Values ";" Values ")" [function]
+    69	  syntax Map ::= "#collect" "(" Stmts ")" [function]
+    70	               | "#bind" "(" Params "," Values ")" [function]
+    71	
+    72	  configuration
+    73	    <mpy>
+    74	      <k> #run($PGM:Pgm, $ARGS:Value) </k>
+    75	    </mpy>
+    76	
+    77	  // Module loading and calls.
+    78	  rule #run(Module(SS), ARG) => #call("derivative", ARG, #collect(SS))
+    79	
+    80	  rule #collect(.Stmts) => .Map
+    81	  rule #collect(FuncDef(F, PS, BODY) REST)
+    82	    => (F |-> closure(PS, BODY)) #collect(REST)
+    83	
+    84	  rule #bind(Params(.Strs), .Values) => .Map
+    85	  rule #bind(Params(X, XS), (V, VS))
+    86	    => (X |-> V) #bind(Params(XS), VS)
+    87	
+    88	  rule #call(F, VS, (F |-> closure(PS, BODY)) FUNS)
+    89	    => #exec(BODY, #bind(PS, VS), (F |-> closure(PS, BODY)) FUNS)
+    90	
+    91	  // Return evaluation. The list-plus-recursive-call form uses an explicit
+    92	  // continuation, preserving Python's evaluation order while keeping the
+    93	  // recursive call visible at the head of <k> for symbolic reasoning.
+    94	  rule #exec(Return(ListExpr(ES)) _REST, ENV, FUNS)
+    95	    => #eval(ListExpr(ES), ENV, FUNS)
+    96	  rule #exec(Return(Call(Name(F), ES)) _REST, ENV, FUNS)
+    97	    => #call(F, #evalArgs(ES, ENV, FUNS), FUNS)
+    98	  rule <k>
+    99	         #exec(
+   100	           Return(BinOp("+", ListExpr(LEFT), Call(Name(F), RIGHT))) _REST,
+   101	           ENV,
+   102	           FUNS)
+   103	       => #call(F, #evalArgs(RIGHT, ENV, FUNS), FUNS)
+   104	          ~> #prepend(ListV(#evalArgs(LEFT, ENV, FUNS)))
+   105	       ... </k>
+   106	  rule <k> ListV(YS) ~> #prepend(ListV(XS)) => ListV(#concat(XS ; YS)) ... </k>
+   107	  // Constructor-directed versions of Python's list-empty test. These are
+   108	  // ordinary semantic transitions (rather than equations), allowing kprove
+   109	  // to split a symbolic finite list into its empty/nonempty cases.
+   110	  rule #exec(
+   111	          If(Compare(Name(X), CmpOp("==", ListExpr(.Exprs))), THEN, _ELSE) _REST,
+   112	          (X |-> ListV(.Values)) ENV,
+   113	          FUNS)
+   114	    => #exec(THEN, (X |-> ListV(.Values)) ENV, FUNS)
+   115	  rule #exec(
+   116	          If(Compare(Name(X), CmpOp("==", ListExpr(.Exprs))), _THEN, ELSE) _REST,
+   117	          (X |-> ListV((V, VS))) ENV,
+   118	          FUNS)
+   119	    => #exec(ELSE, (X |-> ListV((V, VS))) ENV, FUNS)
+   120	  rule #exec(.Stmts, _ENV, _FUNS) => NoneV
+   121	
+   122	  rule #choose(BoolV(true),  THEN, _ELSE, ENV, FUNS) => #exec(THEN, ENV, FUNS)
+   123	  rule #choose(BoolV(false), _THEN, ELSE, ENV, FUNS) => #exec(ELSE, ENV, FUNS)
+   124	
+   125	  // Expression evaluation for the constructors exercised by solution.mpy.
+   126	  rule #eval(Int(I), _ENV, _FUNS) => IntV(I)
+   127	  rule #eval(Bool(B), _ENV, _FUNS) => BoolV(B)
+   128	  rule #eval(Str(S), _ENV, _FUNS) => StrV(S)
+   129	  rule #eval(Name(X), (X |-> V:Value) _ENV, _FUNS) => V
+   130	  rule #eval(ListExpr(ES), ENV, FUNS) => ListV(#evalArgs(ES, ENV, FUNS))
+   131	  rule #eval(BinOp(OP, L, R), ENV, FUNS)
+   132	    => #bin(OP, #eval(L, ENV, FUNS), #eval(R, ENV, FUNS))
+   133	  rule #eval(Compare(L, CmpOp("==", R)), ENV, FUNS)
+   134	    => #equal(#eval(L, ENV, FUNS), #eval(R, ENV, FUNS))
+   135	  rule #eval(Call(Name(F), ES), ENV, FUNS)
+   136	    => #call(F, #evalArgs(ES, ENV, FUNS), FUNS)
+   137	  rule #eval(Subscript(E, Int(0)), ENV, FUNS)
+   138	    => #head(#eval(E, ENV, FUNS))
+   139	  rule #eval(Subscript(E, Slice(Int(1), NoBound, NoBound)), ENV, FUNS)
+   140	    => #tail(#eval(E, ENV, FUNS))
+   141	
+   142	  rule #evalArgs(.Exprs, _ENV, _FUNS) => .Values
+   143	  rule #evalArgs((E, ES), ENV, FUNS)
+   144	    => (#eval(E, ENV, FUNS), #evalArgs(ES, ENV, FUNS))
+   145	
+   146	  // Python integer arithmetic and list concatenation.
+   147	  rule #bin("+", IntV(I), IntV(J)) => IntV(I +Int J)
+   148	  rule #bin("*", IntV(I), IntV(J)) => IntV(I *Int J)
+   149	  rule #bin("+", ListV(XS), ListV(YS)) => ListV(#concat(XS ; YS))
+   150	
+   151	  rule #concat(.Values ; YS) => YS
+   152	  rule #concat((V, VS) ; YS) => (V, #concat(VS ; YS))
+   153	
+   154	  // Equality is complete for integers, booleans, strings, and the only list
+   155	  // comparison used by the program (against []).
+   156	  rule #equal(IntV(I), IntV(J)) => BoolV(I ==Int J)
+   157	  rule #equal(BoolV(B), BoolV(C)) => BoolV(B ==Bool C)
+   158	  rule #equal(StrV(S), StrV(T)) => BoolV(S ==String T)
+   159	  rule #equal(ListV(.Values), ListV(.Values)) => BoolV(true)
+   160	  rule #equal(ListV((_V, _VS)), ListV(.Values)) => BoolV(false)
+   161	  rule #equal(ListV(.Values), ListV((_V, _VS))) => BoolV(false)
+   162	
+   163	  rule #head(ListV((V, _VS))) => V
+   164	  rule #tail(ListV(.Values)) => ListV(.Values)
+   165	  rule #tail(ListV((_V, VS))) => ListV(VS)
+   166	endmodule
+
+Numbered source: verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // This macro is deliberately the exact constructor tree emitted in
+     7	  // solution.mpy. Keeping it here makes the proof talk about the translated
+     8	  // program rather than a hand-written mathematical stand-in.
+     9	  syntax Pgm ::= "solutionProgram" [macro]
+    10	  syntax Stmts ::= "solutionFunctions" [macro]
+    11	  syntax Map ::= "solutionFuns" [macro]
+    12	
+    13	  rule solutionProgram => Module(solutionFunctions)
+    14	  rule solutionFuns => #collect(solutionFunctions)
+    15	  rule solutionFunctions =>
+    16	    FuncDef("derivative", Params("xs"),
+    17	      Return(
+    18	        Call(
+    19	          Name("derivative_helper"),
+    20	          Subscript(Name("xs"), Slice(Int(1), NoBound, NoBound)),
+    21	          Int(1))))
+    22	    FuncDef("derivative_helper", Params("xs", "degree"),
+    23	      If(Compare(Name("xs"), CmpOp("==", ListExpr(.Exprs))),
+    24	        Return(ListExpr(.Exprs)),
+    25	        Return(
+    26	          BinOp("+",
+    27	            ListExpr(
+    28	              BinOp("*", Name("degree"),
+    29	                Subscript(Name("xs"), Int(0)))),
+    30	            Call(
+    31	              Name("derivative_helper"),
+    32	              Subscript(Name("xs"), Slice(Int(1), NoBound, NoBound)),
+    33	              BinOp("+", Name("degree"), Int(1)))))))
+    34	
+    35	  // Mathematical model over runtime coefficient sequences. For integer
+    36	  // coefficients, #bin("*", IntV(N), C) is exactly N *Int C by semantic.k.
+    37	  // Leaving it in this factored form also describes Python's stuck/error
+    38	  // behavior outside the supported numeric fragment without assuming a type.
+    39	  syntax Values ::= "#differentiate" "(" Int "," Values ")" [function]
+    40	
+    41	  rule #differentiate(_N, .Values) => .Values
+    42	  rule #differentiate(N, (C, CS))
+    43	    => (#bin("*", IntV(N), C), #differentiate(N +Int 1, CS))
+    44	endmodule
+
+Numbered source: spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Structural induction theorem for the recursive helper. After one
+     7	  // nonempty-list step, the remaining obligation is the same claim at the
+     8	  // tail and successor degree, so kprove closes it by circularity.
+     9	  claim
+    10	    <mpy>
+    11	      <k>
+    12	        #call("derivative_helper",
+    13	          (ListV(CS:Values), IntV(N:Int)),
+    14	          solutionFuns)
+    15	        ~> K:K
+    16	        => ListV(#differentiate(N, CS)) ~> K
+    17	      </k>
+    18	    </mpy>
+    19	    [label(helper-correct)]
+    20	
+    21	  // [] and C0 :: CS exhaust all finite coefficient lists. The first
+    22	  // coefficient is discarded and the helper begins at degree one.
+    23	  claim
+    24	    <mpy>
+    25	      <k>
+    26	        #run(solutionProgram, ListV(.Values))
+    27	        => ListV(.Values)
+    28	      </k>
+    29	    </mpy>
+    30	    [label(derivative-empty), depends(helper-correct)]
+    31	
+    32	  claim
+    33	    <mpy>
+    34	      <k>
+    35	        #run(solutionProgram,
+    36	          ListV((_C0:Value, CS:Values)))
+    37	        => ListV(#differentiate(1, CS))
+    38	      </k>
+    39	    </mpy>
+    40	    [label(derivative-nonempty), depends(helper-correct)]
+    41	endmodule
+
+Declarations and rule/claim starts
+/tmp/audit-work/audit-62/spec.k:9:  claim
+/tmp/audit-work/audit-62/spec.k:23:  claim
+/tmp/audit-work/audit-62/spec.k:32:  claim
+/tmp/audit-work/audit-62/verification.k:9:  syntax Pgm ::= "solutionProgram" [macro]
+/tmp/audit-work/audit-62/verification.k:10:  syntax Stmts ::= "solutionFunctions" [macro]
+/tmp/audit-work/audit-62/verification.k:11:  syntax Map ::= "solutionFuns" [macro]
+/tmp/audit-work/audit-62/verification.k:13:  rule solutionProgram => Module(solutionFunctions)
+/tmp/audit-work/audit-62/verification.k:14:  rule solutionFuns => #collect(solutionFunctions)
+/tmp/audit-work/audit-62/verification.k:15:  rule solutionFunctions =>
+/tmp/audit-work/audit-62/verification.k:39:  syntax Values ::= "#differentiate" "(" Int "," Values ")" [function]
+/tmp/audit-work/audit-62/verification.k:41:  rule #differentiate(_N, .Values) => .Values
+/tmp/audit-work/audit-62/verification.k:42:  rule #differentiate(N, (C, CS))
+/tmp/audit-work/audit-62/semantic.k:6:  syntax Pgm ::= "Module" "(" Stmts ")"
+/tmp/audit-work/audit-62/semantic.k:9:  syntax Stmts ::= List{Stmt, ""}
+/tmp/audit-work/audit-62/semantic.k:10:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+/tmp/audit-work/audit-62/semantic.k:14:  syntax Params ::= "Params" "(" Strs ")"
+/tmp/audit-work/audit-62/semantic.k:15:  syntax Strs ::= List{String, ","}
+/tmp/audit-work/audit-62/semantic.k:17:  syntax Exprs ::= List{Expr, ","}
+/tmp/audit-work/audit-62/semantic.k:18:  syntax Expr ::= "Int" "(" Int ")"
+/tmp/audit-work/audit-62/semantic.k:28:  syntax CmpOps ::= List{CmpOp, ","}
+/tmp/audit-work/audit-62/semantic.k:29:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+/tmp/audit-work/audit-62/semantic.k:31:  syntax Index ::= Expr
+/tmp/audit-work/audit-62/semantic.k:33:  syntax Bound ::= Expr | "NoBound"
+/tmp/audit-work/audit-62/semantic.k:45:  syntax Value ::= "IntV" "(" Int ")"
+/tmp/audit-work/audit-62/semantic.k:50:  syntax Values ::= List{Value, ","}
+/tmp/audit-work/audit-62/semantic.k:52:  syntax Closure ::= "closure" "(" Params "," Stmts ")"
+/tmp/audit-work/audit-62/semantic.k:53:  syntax KItem ::= "#prepend" "(" Value ")"
+/tmp/audit-work/audit-62/semantic.k:57:  syntax Value ::= "#run" "(" Pgm "," Value ")" [function]
+/tmp/audit-work/audit-62/semantic.k:60:                 | "#choose" "(" Value "," Stmts "," Stmts "," Map "," Map ")" [function]
+/tmp/audit-work/audit-62/semantic.k:61:                 | "#eval" "(" Expr "," Map "," Map ")" [function]
+/tmp/audit-work/audit-62/semantic.k:62:                 | "#bin" "(" String "," Value "," Value ")" [function]
+/tmp/audit-work/audit-62/semantic.k:63:                 | "#equal" "(" Value "," Value ")" [function]
+/tmp/audit-work/audit-62/semantic.k:64:                 | "#head" "(" Value ")" [function]
+/tmp/audit-work/audit-62/semantic.k:65:                 | "#tail" "(" Value ")" [function]
+/tmp/audit-work/audit-62/semantic.k:67:  syntax Values ::= "#evalArgs" "(" Exprs "," Map "," Map ")" [function]
+/tmp/audit-work/audit-62/semantic.k:68:                  | "#concat" "(" Values ";" Values ")" [function]
+/tmp/audit-work/audit-62/semantic.k:69:  syntax Map ::= "#collect" "(" Stmts ")" [function]
+/tmp/audit-work/audit-62/semantic.k:70:               | "#bind" "(" Params "," Values ")" [function]
+/tmp/audit-work/audit-62/semantic.k:72:  configuration
+/tmp/audit-work/audit-62/semantic.k:78:  rule #run(Module(SS), ARG) => #call("derivative", ARG, #collect(SS))
+/tmp/audit-work/audit-62/semantic.k:80:  rule #collect(.Stmts) => .Map
+/tmp/audit-work/audit-62/semantic.k:81:  rule #collect(FuncDef(F, PS, BODY) REST)
+/tmp/audit-work/audit-62/semantic.k:84:  rule #bind(Params(.Strs), .Values) => .Map
+/tmp/audit-work/audit-62/semantic.k:85:  rule #bind(Params(X, XS), (V, VS))
+/tmp/audit-work/audit-62/semantic.k:88:  rule #call(F, VS, (F |-> closure(PS, BODY)) FUNS)
+/tmp/audit-work/audit-62/semantic.k:94:  rule #exec(Return(ListExpr(ES)) _REST, ENV, FUNS)
+/tmp/audit-work/audit-62/semantic.k:96:  rule #exec(Return(Call(Name(F), ES)) _REST, ENV, FUNS)
+/tmp/audit-work/audit-62/semantic.k:98:  rule <k>
+/tmp/audit-work/audit-62/semantic.k:106:  rule <k> ListV(YS) ~> #prepend(ListV(XS)) => ListV(#concat(XS ; YS)) ... </k>
+/tmp/audit-work/audit-62/semantic.k:110:  rule #exec(
+/tmp/audit-work/audit-62/semantic.k:115:  rule #exec(
+/tmp/audit-work/audit-62/semantic.k:120:  rule #exec(.Stmts, _ENV, _FUNS) => NoneV
+/tmp/audit-work/audit-62/semantic.k:122:  rule #choose(BoolV(true),  THEN, _ELSE, ENV, FUNS) => #exec(THEN, ENV, FUNS)
+/tmp/audit-work/audit-62/semantic.k:123:  rule #choose(BoolV(false), _THEN, ELSE, ENV, FUNS) => #exec(ELSE, ENV, FUNS)
+/tmp/audit-work/audit-62/semantic.k:126:  rule #eval(Int(I), _ENV, _FUNS) => IntV(I)
+/tmp/audit-work/audit-62/semantic.k:127:  rule #eval(Bool(B), _ENV, _FUNS) => BoolV(B)
+/tmp/audit-work/audit-62/semantic.k:128:  rule #eval(Str(S), _ENV, _FUNS) => StrV(S)
+/tmp/audit-work/audit-62/semantic.k:129:  rule #eval(Name(X), (X |-> V:Value) _ENV, _FUNS) => V
+/tmp/audit-work/audit-62/semantic.k:130:  rule #eval(ListExpr(ES), ENV, FUNS) => ListV(#evalArgs(ES, ENV, FUNS))
+/tmp/audit-work/audit-62/semantic.k:131:  rule #eval(BinOp(OP, L, R), ENV, FUNS)
+/tmp/audit-work/audit-62/semantic.k:133:  rule #eval(Compare(L, CmpOp("==", R)), ENV, FUNS)
+/tmp/audit-work/audit-62/semantic.k:135:  rule #eval(Call(Name(F), ES), ENV, FUNS)
+/tmp/audit-work/audit-62/semantic.k:137:  rule #eval(Subscript(E, Int(0)), ENV, FUNS)
+/tmp/audit-work/audit-62/semantic.k:139:  rule #eval(Subscript(E, Slice(Int(1), NoBound, NoBound)), ENV, FUNS)
+/tmp/audit-work/audit-62/semantic.k:142:  rule #evalArgs(.Exprs, _ENV, _FUNS) => .Values
+/tmp/audit-work/audit-62/semantic.k:143:  rule #evalArgs((E, ES), ENV, FUNS)
+/tmp/audit-work/audit-62/semantic.k:147:  rule #bin("+", IntV(I), IntV(J)) => IntV(I +Int J)
+/tmp/audit-work/audit-62/semantic.k:148:  rule #bin("*", IntV(I), IntV(J)) => IntV(I *Int J)
+/tmp/audit-work/audit-62/semantic.k:149:  rule #bin("+", ListV(XS), ListV(YS)) => ListV(#concat(XS ; YS))
+/tmp/audit-work/audit-62/semantic.k:151:  rule #concat(.Values ; YS) => YS
+/tmp/audit-work/audit-62/semantic.k:152:  rule #concat((V, VS) ; YS) => (V, #concat(VS ; YS))
+/tmp/audit-work/audit-62/semantic.k:156:  rule #equal(IntV(I), IntV(J)) => BoolV(I ==Int J)
+/tmp/audit-work/audit-62/semantic.k:157:  rule #equal(BoolV(B), BoolV(C)) => BoolV(B ==Bool C)
+/tmp/audit-work/audit-62/semantic.k:158:  rule #equal(StrV(S), StrV(T)) => BoolV(S ==String T)
+/tmp/audit-work/audit-62/semantic.k:159:  rule #equal(ListV(.Values), ListV(.Values)) => BoolV(true)
+/tmp/audit-work/audit-62/semantic.k:160:  rule #equal(ListV((_V, _VS)), ListV(.Values)) => BoolV(false)
+/tmp/audit-work/audit-62/semantic.k:161:  rule #equal(ListV(.Values), ListV((_V, _VS))) => BoolV(false)
+/tmp/audit-work/audit-62/semantic.k:163:  rule #head(ListV((V, _VS))) => V
+/tmp/audit-work/audit-62/semantic.k:164:  rule #tail(ListV(.Values)) => ListV(.Values)
+/tmp/audit-work/audit-62/semantic.k:165:  rule #tail(ListV((_V, VS))) => ListV(VS)
+
+Special proof-affecting attributes
+function=13
+total=0
+functional=0
+simplification=0
+concrete=0
+priority=0
+owise=0
+macro=4
+anywhere=0
+EXIT_STATUS: 0
+END_UTC: 2026-07-23T14:13:58Z

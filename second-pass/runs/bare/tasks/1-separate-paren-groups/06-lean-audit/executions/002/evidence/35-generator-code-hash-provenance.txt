@@ -1,0 +1,187 @@
+$ rg -n "exporter_sha256|klean_py_sha256" /reference/tools/{klean_export,stage4_runner,klean_preflight,klean_audit_contract,klean_final_gate}.py
+/reference/tools/klean_export.py:1230:                "klean_py_sha256": hashlib.sha256(KLEAN.read_bytes()).hexdigest(),
+/reference/tools/klean_export.py:1231:                "exporter_sha256": hashlib.sha256(
+$ sed -n "1180,1275p" /reference/tools/klean_export.py
+            generated = publish_staging / "generated"
+            shutil.copytree(
+                package,
+                generated,
+                ignore=shutil.ignore_patterns(".lake", "build"),
+            )
+            inventory = _trust_inventory(
+                generated,
+                axiomatized=axiomatized,
+                noncomputable_repair=noncomputable_repair,
+            )
+            input_manifest = {
+                "schema_version": 3,
+                "problem": problem,
+                "frozen_input_sha256": before_hash,
+                "stage1_workspace_sha256": before_hash,
+                "stage3_discovery_manifest_sha256": (
+                    discovery_manifest_sha256
+                ),
+                "verification_sha256": hashlib.sha256(
+                    verification.read_bytes()
+                ).hexdigest(),
+                "verification_module": module,
+                "syntax_module": resolution.syntax_module,
+                "required_k_files": [
+                    str(path) for path in resolution.required_files
+                ],
+                "inventory_sha256": validated["inventory_sha256"],
+                "summary_functions": [
+                    {
+                        "name": function.name,
+                        "return_sort": function.ret,
+                        "argument_sorts": function.args,
+                    }
+                    for function in functions
+                ],
+                "definitions": validated["definitions"],
+                "operational_rules": validated["operational_rules"],
+                "proved_derived_lemmas": validated[
+                    "proved_derived_lemmas"
+                ],
+                "source_rules": domain_rules,
+            }
+            obligations = obligation_map.get("obligations")
+            if not isinstance(obligations, list):
+                raise KleanExportError("generated obligations are malformed")
+            target = target_statement(generated)
+            generator_manifest = {
+                "schema_version": 3,
+                "toolchain": lock,
+                "klean_py_sha256": hashlib.sha256(KLEAN.read_bytes()).hexdigest(),
+                "exporter_sha256": hashlib.sha256(
+                    Path(__file__).read_bytes()
+                ).hexdigest(),
+                "generated_tree_sha256": tree_digest(generated),
+                "obligation_count": len(obligations),
+                "obligation_map_sha256": hashlib.sha256(
+                    (generated / "obligation-map.json").read_bytes()
+                ).hexdigest(),
+                "target": target,
+                "provenance": {
+                    "stage1_workspace_sha256": before_hash,
+                    "stage3_discovery_manifest_sha256": (
+                        discovery_manifest_sha256
+                    ),
+                    "inventory_sha256": validated["inventory_sha256"],
+                    "generator_image_id": generator_image_id,
+                },
+            }
+            result = {
+                "schema_version": 3,
+                "status": (
+                    "OK" if obligations else "KLEAN_NO_OBLIGATIONS"
+                ),
+                "problem": problem,
+                "generated_tree_sha256": generator_manifest[
+                    "generated_tree_sha256"
+                ],
+                "frozen_input_sha256": before_hash,
+                "stage3_discovery_manifest_sha256": (
+                    discovery_manifest_sha256
+                ),
+                "trust_inventory_sha256": "",
+                "obligation_count": len(obligations),
+            }
+            _write_json(publish_staging / "input-manifest.json", input_manifest)
+            _write_json(
+                publish_staging / "generator-manifest.json",
+                generator_manifest,
+            )
+            _write_json(publish_staging / "trust-inventory.json", inventory)
+            result["trust_inventory_sha256"] = hashlib.sha256(
+                (publish_staging / "trust-inventory.json").read_bytes()
+            ).hexdigest()
+            _write_json(publish_staging / "export-result.json", result)
+        publish_staging.rename(destination)
+$ sed -n "330,410p" /reference/tools/stage4_runner.py
+        )
+        generator_manifest, _generator_bytes = _candidate_json(
+            generation, "generator-manifest.json"
+        )
+        _trust_inventory, trust_inventory_bytes = _candidate_json(
+            generation, "trust-inventory.json"
+        )
+        export_result, _export_bytes = _candidate_json(
+            generation, "export-result.json"
+        )
+        generated_sha256 = preflight["generated_tree_sha256"]
+        common_documents = (
+            ("input manifest", input_manifest),
+            ("generator manifest", generator_manifest),
+            ("export result", export_result),
+        )
+        for label, document in common_documents:
+            if document.get("schema_version") != 3:
+                raise Stage4RunnerError(
+                    f"Stage 4 candidate {label} schema version is not 3"
+                )
+        if (
+            input_manifest.get("problem") != problem
+            or input_manifest.get("frozen_input_sha256")
+            != stage1_workspace_sha256
+            or input_manifest.get("stage1_workspace_sha256")
+            != stage1_workspace_sha256
+            or input_manifest.get("stage3_discovery_manifest_sha256")
+            != stage3_discovery_manifest_sha256
+        ):
+            raise Stage4RunnerError(
+                "Stage 4 candidate input sidecar provenance is invalid"
+            )
+        provenance = generator_manifest.get("provenance")
+        if (
+            generator_manifest.get("generated_tree_sha256")
+            != generated_sha256
+            or not isinstance(provenance, dict)
+            or provenance.get("stage1_workspace_sha256")
+            != stage1_workspace_sha256
+            or provenance.get("stage3_discovery_manifest_sha256")
+            != stage3_discovery_manifest_sha256
+        ):
+            raise Stage4RunnerError(
+                "Stage 4 candidate generator sidecar provenance is invalid"
+            )
+        expected_export_status = (
+            "OK"
+            if preflight["status"] == "PASS"
+            else "KLEAN_NO_OBLIGATIONS"
+        )
+        if (
+            export_result.get("problem") != problem
+            or export_result.get("status") != expected_export_status
+            or export_result.get("frozen_input_sha256")
+            != stage1_workspace_sha256
+            or export_result.get("stage3_discovery_manifest_sha256")
+            != stage3_discovery_manifest_sha256
+            or export_result.get("generated_tree_sha256")
+            != generated_sha256
+            or export_result.get("trust_inventory_sha256")
+            != hashlib.sha256(trust_inventory_bytes).hexdigest()
+        ):
+            raise Stage4RunnerError(
+                "Stage 4 candidate export sidecar provenance is invalid"
+            )
+        obligation_count = preflight.get("obligation_count")
+        if (
+            not isinstance(obligation_count, int)
+            or isinstance(obligation_count, bool)
+            or obligation_count < 0
+            or generator_manifest.get("obligation_count")
+            != obligation_count
+            or export_result.get("obligation_count")
+            != obligation_count
+        ):
+            raise Stage4RunnerError(
+                "Stage 4 candidate sidecar obligation counts are invalid"
+            )
+    after_sha256 = pipeline_contract.sha256_tree(generation)
+    if (
+$ nl -ba /reference/klean-generation/export.log
+     1	{"frozen_input_sha256": "f7198173f419636cacf3c009694d458c1c8113750de230e115a8bdfd24289f83", "generated_tree_sha256": "ec2cabdd88613df091a482f8974a0b9be67d75d3d97827da8ff6ac78ae163e7a", "obligation_count": 0, "problem": "1-separate-paren-groups", "schema_version": 3, "stage3_discovery_manifest_sha256": "1d658f9f3f836cd96386a95bf89aa4d0ae7883a6c174f3fd3bb21487b68e0357", "status": "KLEAN_NO_OBLIGATIONS", "trust_inventory_sha256": "b52c40d9bb8196c1e9a497db5e90d91f26dd670ff21803ccf508394f3c3de2ea"}
+$ nl -ba /reference/klean-generation/preflight.log
+     1	{"frozen_input_sha256": "f7198173f419636cacf3c009694d458c1c8113750de230e115a8bdfd24289f83", "generated_tree_sha256": "ec2cabdd88613df091a482f8974a0b9be67d75d3d97827da8ff6ac78ae163e7a", "obligation_count": 0, "problem": "1-separate-paren-groups", "schema_version": 3, "stage3_discovery_manifest_sha256": "1d658f9f3f836cd96386a95bf89aa4d0ae7883a6c174f3fd3bb21487b68e0357", "status": "KLEAN_NO_OBLIGATIONS", "trust_inventory_sha256": "b52c40d9bb8196c1e9a497db5e90d91f26dd670ff21803ccf508394f3c3de2ea"}
+     2	{"designated_sorry_count": 0, "diagnostics": [{"command": ["lake", "clean"], "exit_code": 0, "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "output_tail": ""}, {"command": ["lake", "build"], "exit_code": 0, "output_sha256": "669037f0d20098cd4e0488a046a50dee67e38e9994f982b51afd0bd6f01a0ee7", "output_tail": "\u2714 [2/9] Built Klean1SeparateParenGroups.Prelude\n\u2714 [3/9] Built Klean1SeparateParenGroups.Sorts\n\u2714 [4/9] Built Klean1SeparateParenGroups.Inj\n\u2714 [5/9] Built Klean1SeparateParenGroups.Func\n\u2714 [6/9] Built Klean1SeparateParenGroups.Lemmas\n\u2714 [7/9] Built Klean1SeparateParenGroups.Rewrite\n\u2714 [8/9] Built Klean1SeparateParenGroups\nBuild completed successfully.\n"}], "frozen_input_sha256": "f7198173f419636cacf3c009694d458c1c8113750de230e115a8bdfd24289f83", "generated_tree_sha256": "ec2cabdd88613df091a482f8974a0b9be67d75d3d97827da8ff6ac78ae163e7a", "obligation_count": 0, "schema_version": 3, "stage1_workspace_sha256": "f7198173f419636cacf3c009694d458c1c8113750de230e115a8bdfd24289f83", "stage3_discovery_manifest_sha256": "1d658f9f3f836cd96386a95bf89aa4d0ae7883a6c174f3fd3bb21487b68e0357", "status": "KLEAN_NO_OBLIGATIONS", "target": null, "trust_declaration_count": 44}

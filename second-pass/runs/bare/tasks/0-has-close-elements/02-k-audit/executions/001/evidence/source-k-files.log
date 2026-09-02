@@ -1,0 +1,292 @@
+WORKDIR: /audit-output
+COMMAND: bash -lc for\ p\ in\ /tmp/audit-work/source/semantic.k\ /tmp/audit-work/source/verification.k\ /tmp/audit-work/source/spec.k\;\ do\ printf\ \"FILE\ %s\\n\"\ \"\$p\"\;\ nl\ -ba\ \"\$p\"\;\ done
+--- OUTPUT ---
+FILE /tmp/audit-work/source/semantic.k
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports BOOL-SYNTAX
+     5	  imports FLOAT-SYNTAX
+     6	  imports INT-SYNTAX
+     7	  imports STRING-SYNTAX
+     8	
+     9	  syntax Pgm ::= "Module" "(" Stmts ")"
+    10	
+    11	  syntax Stmts ::= List{Stmt, ""}
+    12	  syntax Stmt ::= "ImportFrom" "(" String "," Strings ")"
+    13	                | "FuncDef" "(" String "," Params "," Stmts ")"
+    14	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    15	                | "Return" "(" Expr ")"
+    16	
+    17	  syntax Strings ::= List{String, ","}
+    18	  syntax Params ::= "Params" "(" Strings ")"
+    19	
+    20	  syntax Exprs ::= List{Expr, ","}
+    21	  syntax CmpOps ::= List{CmpOp, ","}
+    22	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    23	  syntax Index ::= Expr | Slice
+    24	  syntax Bound ::= Expr | "NoBound"
+    25	  syntax Slice ::= "Slice" "(" Bound "," Bound "," Bound ")"
+    26	
+    27	  syntax Expr ::= "Name" "(" String ")"
+    28	                | "Int" "(" Int ")"
+    29	                | "Float" "(" Float ")"
+    30	                | "Bool" "(" Bool ")"
+    31	                | "BinOp" "(" String "," Expr "," Expr ")"
+    32	                | "Compare" "(" Expr "," CmpOps ")"
+    33	                | "Call" "(" Expr "," Exprs ")"
+    34	                | "Subscript" "(" Expr "," Index ")"
+    35	endmodule
+    36	
+    37	module MPY-SEMANTIC
+    38	  imports MPY-SYNTAX
+    39	  imports BOOL
+    40	  imports INT
+    41	  imports K-EQUAL
+    42	  imports MAP
+    43	  imports STRING
+    44	
+    45	  syntax PVal ::= VInt(Int)
+    46	                | VRat(Int, Int)
+    47	                | VBool(Bool)
+    48	                | VList(PValues)
+    49	                | "VNone"
+    50	  syntax PValues ::= List{PVal, ","}
+    51	  syntax Function ::= function(Params, Stmts)
+    52	
+    53	  // The configuration takes the translated module as $PGM and a comma-separated
+    54	  // entry-point argument list as $ARGS.
+    55	  configuration <k> runProgram($PGM:Pgm, $ARGS:PValues) </k>
+    56	
+    57	  syntax PVal ::= runProgram(Pgm, PValues)
+    58	                | call(String, PValues, Map) [function]
+    59	                | exec(Stmts, Map, Map) [function]
+    60	                | branch(PVal, Stmts, Stmts, Stmts, Map, Map) [function]
+    61	                | eval(Expr, Map, Map) [function]
+    62	                | subValue(PVal, PVal) [function]
+    63	                | absValue(PVal) [function]
+    64	                | compareValue(String, PVal, PVal) [function]
+    65	                | subscriptValue(PVal, PVal) [function]
+    66	                | sliceOne(PVal) [function]
+    67	                | lengthValue(PVal) [function]
+    68	  syntax PValues ::= evalExprs(Exprs, Map, Map) [function]
+    69	  syntax Stmts ::= concatStmts(Stmts, Stmts) [function]
+    70	  syntax Map ::= collect(Stmts) [function]
+    71	               | bind(Params, PValues) [function]
+    72	  syntax KItem ::= "verify" "(" PValues ")"
+    73	
+    74	  rule runProgram(Module(SS), ARGS)
+    75	    => call("has_close_elements", ARGS, collect(SS))
+    76	
+    77	  rule collect(.Stmts) => .Map
+    78	  rule collect(ImportFrom(_, _) REST) => collect(REST)
+    79	  rule collect(FuncDef(F, P, BODY) REST)
+    80	    => (F |-> function(P, BODY)) collect(REST)
+    81	
+    82	  rule bind(Params(.Strings), .PValues) => .Map
+    83	  rule bind(Params(X, XS), V, VS)
+    84	    => (X |-> V) bind(Params(XS), VS)
+    85	
+    86	  rule call(F, VS, (F |-> function(P, BODY)) REST)
+    87	    => exec(BODY, bind(P, VS), (F |-> function(P, BODY)) REST)
+    88	
+    89	  rule exec(Return(E) _REST, ENV, FS) => eval(E, ENV, FS)
+    90	  rule exec(If(COND, THEN, ELSE) REST, ENV, FS)
+    91	    => branch(eval(COND, ENV, FS), THEN, ELSE, REST, ENV, FS)
+    92	
+    93	  rule branch(VBool(B), THEN, ELSE, REST, ENV, FS)
+    94	    => #if B
+    95	       #then exec(concatStmts(THEN, REST), ENV, FS)
+    96	       #else exec(concatStmts(ELSE, REST), ENV, FS)
+    97	       #fi
+    98	  rule branch((#if B #then V1:PVal #else V2:PVal #fi),
+    99	              THEN, ELSE, REST, ENV, FS)
+   100	    => #if B
+   101	       #then branch(V1, THEN, ELSE, REST, ENV, FS)
+   102	       #else branch(V2, THEN, ELSE, REST, ENV, FS)
+   103	       #fi [simplification]
+   104	
+   105	  rule concatStmts(.Stmts, REST) => REST
+   106	  rule concatStmts((S:Stmt SS:Stmts), REST)
+   107	    => S concatStmts(SS, REST)
+   108	
+   109	  rule eval(Name(X), (X |-> V) _REST, _) => V
+   110	  rule eval(Int(I), _, _) => VInt(I)
+   111	  rule eval(Bool(B), _, _) => VBool(B)
+   112	
+   113	  rule eval(BinOp("-", L, R), ENV, FS)
+   114	    => subValue(eval(L, ENV, FS), eval(R, ENV, FS))
+   115	  rule eval(Compare(L, CmpOp(OP, R)), ENV, FS)
+   116	    => compareValue(OP, eval(L, ENV, FS), eval(R, ENV, FS))
+   117	
+   118	  rule eval(Call(Name("len"), E), ENV, FS)
+   119	    => lengthValue(eval(E, ENV, FS))
+   120	  rule eval(Call(Name("abs"), E), ENV, FS)
+   121	    => absValue(eval(E, ENV, FS))
+   122	  rule eval(Call(Name(F), ES), ENV, FS)
+   123	    => call(F, evalExprs(ES, ENV, FS), FS)
+   124	    requires F =/=String "len" andBool F =/=String "abs"
+   125	
+   126	  rule evalExprs(.Exprs, _, _) => .PValues
+   127	  rule evalExprs(E, ES, ENV, FS)
+   128	    => eval(E, ENV, FS), evalExprs(ES, ENV, FS)
+   129	
+   130	  rule eval(Subscript(E, I:Expr), ENV, FS)
+   131	    => subscriptValue(eval(E, ENV, FS), eval(I, ENV, FS))
+   132	  rule eval(Subscript(E, Slice(Int(1), NoBound, NoBound)), ENV, FS)
+   133	    => sliceOne(eval(E, ENV, FS))
+   134	
+   135	  rule lengthValue(VList(VS)) => VInt(lengthValues(VS))
+   136	  syntax Int ::= lengthValues(PValues) [function]
+   137	  rule lengthValues(.PValues) => 0
+   138	  rule lengthValues(_V, VS) => 1 +Int lengthValues(VS)
+   139	
+   140	  rule subscriptValue(VList(V, _), VInt(0)) => V
+   141	  rule sliceOne(VList(_V, VS)) => VList(VS)
+   142	
+   143	  rule subValue(VInt(I), VInt(J)) => VInt(I -Int J)
+   144	  rule subValue(VRat(A, B), VRat(C, D))
+   145	    => VRat((A *Int D) -Int (C *Int B), B *Int D)
+   146	  rule subValue(VRat(A, B), VInt(I)) => VRat(A -Int (I *Int B), B)
+   147	  rule subValue(VInt(I), VRat(A, B)) => VRat((I *Int B) -Int A, B)
+   148	
+   149	  rule absValue(VInt(I)) => VInt(absInt(I))
+   150	  rule absValue(VRat(A, B)) => VRat(absInt(A), B)
+   151	
+   152	  rule compareValue("==", VInt(I), VInt(J)) => VBool(I ==Int J)
+   153	  rule compareValue("<", VInt(I), VInt(J)) => VBool(I <Int J)
+   154	  rule compareValue("<", VRat(A, B), VRat(C, D))
+   155	    => VBool(A *Int D <Int C *Int B)
+   156	    requires B >Int 0 andBool D >Int 0
+   157	  rule compareValue("<", VRat(A, B), VInt(I))
+   158	    => VBool(A <Int I *Int B)
+   159	    requires B >Int 0
+   160	  rule compareValue("<", VInt(I), VRat(A, B))
+   161	    => VBool(I *Int B <Int A)
+   162	    requires B >Int 0
+   163	endmodule
+   164	
+   165	module MPY
+   166	  imports MPY-SEMANTIC
+   167	endmodule
+FILE /tmp/audit-work/source/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // A closed K term for the exact AST emitted in solution.mpy.  Keeping this
+     7	  // in the verification layer lets claims quantify only over input values.
+     8	  syntax Pgm ::= "solutionProgram" [function]
+     9	  rule solutionProgram =>
+    10	    Module(
+    11	      ImportFrom("typing", "List")
+    12	      FuncDef("close_to_first", Params("first", "rest", "threshold"),
+    13	        If(Compare(Call(Name("len"), Name("rest")), CmpOp("==", Int(0))),
+    14	          Return(Bool(false)),
+    15	          .Stmts)
+    16	        If(Compare(
+    17	          Call(
+    18	            Name("abs"),
+    19	            BinOp("-", Name("first"), Subscript(Name("rest"), Int(0)))),
+    20	          CmpOp("<", Name("threshold"))),
+    21	          Return(Bool(true)),
+    22	          .Stmts)
+    23	        Return(
+    24	          Call(
+    25	            Name("close_to_first"),
+    26	            Name("first"),
+    27	            Subscript(Name("rest"), Slice(Int(1), NoBound, NoBound)),
+    28	            Name("threshold"))))
+    29	      FuncDef("has_close_elements", Params("numbers", "threshold"),
+    30	        If(Compare(Call(Name("len"), Name("numbers")), CmpOp("<", Int(2))),
+    31	          Return(Bool(false)),
+    32	          .Stmts)
+    33	        If(Call(
+    34	          Name("close_to_first"),
+    35	          Subscript(Name("numbers"), Int(0)),
+    36	          Subscript(Name("numbers"), Slice(Int(1), NoBound, NoBound)),
+    37	          Name("threshold")),
+    38	          Return(Bool(true)),
+    39	          .Stmts)
+    40	        Return(
+    41	          Call(
+    42	            Name("has_close_elements"),
+    43	            Subscript(Name("numbers"), Slice(Int(1), NoBound, NoBound)),
+    44	            Name("threshold")))))
+    45	
+    46	  syntax Map ::= "solutionFunctions" [function]
+    47	               | functionsOf(Pgm) [function]
+    48	  rule solutionFunctions => functionsOf(solutionProgram)
+    49	  rule functionsOf(Module(SS)) => collect(SS)
+    50	  rule <k> verify(ARGS) => call("has_close_elements", ARGS, solutionFunctions) ... </k>
+    51	
+    52	  // Independent mathematical specification: a pair exists if the head is
+    53	  // close to some tail element, or a pair exists wholly within the tail.
+    54	  syntax Bool ::= closePair(PVal, PVal, PVal) [function]
+    55	                | closeFirstRef(PVal, PVal, PVal) [function]
+    56	                | hasCloseRef(PVal, PVal) [function]
+    57	                | boolOf(PVal) [function]
+    58	
+    59	  rule boolOf(VBool(B)) => B
+    60	  rule closePair(X, Y, T)
+    61	    => boolOf(compareValue("<", absValue(subValue(X, Y)), T))
+    62	
+    63	  rule closeFirstRef(_, VList(.PValues), _) => false
+    64	  rule closeFirstRef(X, VList(Y, REST), T)
+    65	    => closePair(X, Y, T) orBool closeFirstRef(X, VList(REST), T)
+    66	
+    67	  rule hasCloseRef(VList(.PValues), _) => false
+    68	  rule hasCloseRef(VList(_X), _) => false
+    69	  rule hasCloseRef(VList(X, Y, REST), T)
+    70	    => closeFirstRef(X, VList(Y, REST), T)
+    71	       orBool hasCloseRef(VList(Y, REST), T)
+    72	endmodule
+FILE /tmp/audit-work/source/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // The two examples from prompt.py, represented as exact decimal rationals.
+     7	  claim <k> verify(
+     8	                  VList(VRat(10, 10), VRat(20, 10), VRat(30, 10)),
+     9	                  VRat(5, 10)) => VBool(false) </k>
+    10	
+    11	  claim <k> verify(
+    12	                  VList(VRat(10, 10), VRat(28, 10), VRat(30, 10),
+    13	                        VRat(40, 10), VRat(50, 10), VRat(20, 10)),
+    14	                  VRat(3, 10)) => VBool(true) </k>
+    15	
+    16	  // Boundary behavior: no pair in lists of size zero or one.
+    17	  claim <k> verify(VList(.PValues), VInt(_T)) => VBool(false) </k>
+    18	
+    19	  claim <k> verify(VList(VInt(_X)), VInt(_T)) => VBool(false) </k>
+    20	
+    21	  // A symbolic pair establishes strictness: equality with the threshold is
+    22	  // false, and the result for arbitrary integers is exactly |x-y| < t.
+    23	  claim <k> verify(VList(VInt(X), VInt(Y)), VInt(T))
+    24	             => VBool(absInt(X -Int Y) <Int T) </k>
+    25	
+    26	  // For arbitrary values, the interpreter agrees with the independently
+    27	  // recursive existential-pair specification.  Length four exercises all six
+    28	  // pair positions as well as both source-level recursive functions.
+    29	  claim <k> verify(VList(VInt(X), VInt(Y), VInt(Z)), VInt(T))
+    30	             => VBool(hasCloseRef(
+    31	                  VList(VInt(X), VInt(Y), VInt(Z)), VInt(T)))
+    32	        </k>
+    33	
+    34	  claim <k> verify(VList(VInt(W), VInt(X), VInt(Y), VInt(Z)), VInt(T))
+    35	             => VBool(hasCloseRef(
+    36	                  VList(VInt(W), VInt(X), VInt(Y), VInt(Z)), VInt(T)))
+    37	        </k>
+    38	
+    39	  // Concrete strict-boundary checks.
+    40	  claim <k> verify(VList(VRat(10, 10), VRat(15, 10)),
+    41	                  VRat(5, 10)) => VBool(false) </k>
+    42	
+    43	  claim <k> verify(VList(VRat(10, 10), VRat(15, 10)),
+    44	                  VRat(5000001, 10000000)) => VBool(true) </k>
+    45	endmodule
+--- END OUTPUT ---
+EXIT STATUS: 0

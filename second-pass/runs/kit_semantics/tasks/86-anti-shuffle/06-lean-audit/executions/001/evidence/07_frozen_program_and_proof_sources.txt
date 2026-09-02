@@ -1,0 +1,456 @@
+Script started on 2026-07-31 06:56:44-05:00 [<not executed on terminal>]
+### verification.k
+     1	requires "program-generated.k"
+     2	
+     3	module VERIFICATION
+     4	  imports PROGRAM-GENERATED
+     5	
+     6	  // Derived directly from MPY-STR's complete lexicographic cases: for two
+     7	  // one-character strings, lexicographic order is integer-code order.
+     8	  rule strLt(
+     9	         iCons(C:Int, .IntSeq),
+    10	         iCons(D:Int, .IntSeq))
+    11	    => C <Int D
+    12	    [simplification]
+    13	
+    14	  // Exact AST aliases for the translated implementation.  These construct
+    15	  // syntax only; they do not summarize or replace execution.
+    16	  syntax Stmts ::= antiInnerBody() [function, total]
+    17	                 | antiPostInsert() [function, total]
+    18	                 | antiOuterBody() [function, total]
+    19	                 | antiTail() [function, total]
+    20	
+    21	  rule antiInnerBody()
+    22	    => If(
+    23	         BoolOp(
+    24	           "and",
+    25	           (UnaryOp("not", Name("inserted")),
+    26	            Compare(Name("char"), CmpOp("<", Name("old_char"))),
+    27	            .Exprs)),
+    28	         AugAssign(Name("new_word"), "+", Name("char"))
+    29	         Assign(Name("inserted"), Bool(true))
+    30	         .Stmts,
+    31	         .Stmts)
+    32	       AugAssign(Name("new_word"), "+", Name("old_char"))
+    33	       .Stmts
+    34	
+    35	  rule antiPostInsert()
+    36	    => If(
+    37	         UnaryOp("not", Name("inserted")),
+    38	         AugAssign(Name("new_word"), "+", Name("char"))
+    39	         Assign(Name("inserted"), Bool(true))
+    40	         .Stmts,
+    41	         .Stmts)
+    42	       Assign(Name("word"), Name("new_word"))
+    43	       .Stmts
+    44	
+    45	  rule antiOuterBody()
+    46	    => If(
+    47	         Compare(Name("char"), CmpOp("==", Str(" "))),
+    48	         AugAssign(Name("result"), "+", Name("word"))
+    49	         AugAssign(Name("result"), "+", Str(" "))
+    50	         Assign(Name("word"), Str(""))
+    51	         .Stmts,
+    52	         Assign(Name("new_word"), Str(""))
+    53	         Assign(Name("inserted"), Bool(false))
+    54	         For(Name("old_char"), Name("word"), antiInnerBody())
+    55	         antiPostInsert())
+    56	       .Stmts
+    57	
+    58	  rule antiTail()
+    59	    => AugAssign(Name("result"), "+", Name("word"))
+    60	       Return(Name("result"))
+    61	       .Stmts
+    62	
+    63	  // Exact value produced by the insertion loop from its loop-head state.
+    64	  // The guard-free constructor equations unfold one step without splitting an
+    65	  // unknown tail.
+    66	  syntax IntSeq ::= insertGo(IntSeq, Int, IntSeq, Bool)
+    67	                    [function, total]
+    68	  rule insertGo(.IntSeq, C:Int, A:IntSeq, B:Bool)
+    69	    => #if B
+    70	       #then A
+    71	       #else seqConcat(A, iCons(C, .IntSeq))
+    72	       #fi
+    73	  rule insertGo(
+    74	         iCons(OLD:Int, IS:IntSeq),
+    75	         C:Int,
+    76	         A:IntSeq,
+    77	         B:Bool)
+    78	    => #if notBool B andBool C <Int OLD
+    79	       #then insertGo(
+    80	               IS,
+    81	               C,
+    82	               seqConcat(
+    83	                 seqConcat(A, iCons(C, .IntSeq)),
+    84	                 iCons(OLD, .IntSeq)),
+    85	               true)
+    86	       #else insertGo(
+    87	               IS,
+    88	               C,
+    89	               seqConcat(A, iCons(OLD, .IntSeq)),
+    90	               B)
+    91	       #fi
+    92	
+    93	  // Exact value produced by the outer loop and its function tail.
+    94	  syntax IntSeq ::= antiGo(IntSeq, IntSeq, IntSeq) [function, total]
+    95	  rule antiGo(.IntSeq, R:IntSeq, W:IntSeq)
+    96	    => seqConcat(R, W)
+    97	  rule antiGo(iCons(C:Int, S:IntSeq), R:IntSeq, W:IntSeq)
+    98	    => #if C ==Int 32
+    99	       #then antiGo(
+   100	               S,
+   101	               seqConcat(seqConcat(R, W), iCons(32, .IntSeq)),
+   102	               .IntSeq)
+   103	       #else antiGo(
+   104	               S,
+   105	               R,
+   106	               insertGo(W, C, .IntSeq, false))
+   107	       #fi
+   108	
+   109	endmodule
+
+### prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py concrete-tests.py > concrete-tests.mpy
+     6	python3 generate_program_module.py
+     7	
+     8	kompile --backend llvm reference-semantics/semantics.k \
+     9	  --main-module MPY-KRUN \
+    10	  --syntax-module MPY-SYNTAX \
+    11	  --output-definition runtime-kompiled
+    12	krun concrete-tests.mpy --definition runtime-kompiled
+    13	
+    14	kompile --backend haskell reference-semantics/semantics.k \
+    15	  --main-module MPY \
+    16	  --syntax-module MPY-SYNTAX \
+    17	  --output-definition lemma-kompiled
+    18	kprove lemma-spec.k \
+    19	  --definition lemma-kompiled \
+    20	  --spec-module LEMMA-SPEC
+    21	
+    22	kompile --backend haskell verification.k \
+    23	  --main-module VERIFICATION \
+    24	  --syntax-module MPY-SYNTAX \
+    25	  --output-definition verification-kompiled
+    26	kprove spec.k \
+    27	  --definition verification-kompiled \
+    28	  --spec-module SPEC
+    29	
+    30	python3 test_solution.py
+    31	
+    32	if kprove spec-vacuity.k \
+    33	    --definition verification-kompiled \
+    34	    --spec-module SPEC-VACUITY \
+    35	    > vacuity.log 2>&1; then
+    36	  cat vacuity.log
+    37	  echo "UNEXPECTED: false-result vacuity claim proved" >&2
+    38	  exit 1
+    39	else
+    40	  cat vacuity.log
+    41	  echo "EXPECTED FAILURE: false-result vacuity claim was rejected"
+    42	fi
+    43	
+    44	./mutation-probe.sh
+
+### lemma-spec.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module LEMMA-SPEC
+     4	  imports MPY
+     5	
+     6	  // Bridge-free universal derivation of verification.k's one-character
+     7	  // lexicographic simplification.
+     8	  claim [single-char-str-lt-less]:
+     9	    <k>
+    10	      strLt(
+    11	        iCons(C:Int, .IntSeq),
+    12	        iCons(D:Int, .IntSeq))
+    13	      => true
+    14	    </k>
+    15	    requires C <Int D
+    16	
+    17	  claim [single-char-str-lt-greater]:
+    18	    <k>
+    19	      strLt(
+    20	        iCons(C:Int, .IntSeq),
+    21	        iCons(D:Int, .IntSeq))
+    22	      => false
+    23	    </k>
+    24	    requires C >Int D
+    25	
+    26	  claim [single-char-str-lt-equal]:
+    27	    <k>
+    28	      strLt(
+    29	        iCons(C:Int, .IntSeq),
+    30	        iCons(D:Int, .IntSeq))
+    31	      => false
+    32	    </k>
+    33	    requires C ==Int D
+    34	endmodule
+
+### spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Inner insertion loop as an independent local-state theorem.  The framed
+     7	  // continuation is arbitrary and is preserved.
+     8	  claim [anti-shuffle-inner-loop]:
+     9	    <k>
+    10	      #loop(str(IS:IntSeq), Name("old_char"), antiInnerBody())
+    11	      ~> antiPostInsert()
+    12	      => .K
+    13	      ...
+    14	    </k>
+    15	    <env> 1 </env>
+    16	    <scopes>
+    17	      -1 |-> builtinsScope
+    18	      0 |-> scope(
+    19	             "anti_shuffle" |->
+    20	               closureVal(("s", .ParamNames), solutionBody(), 0),
+    21	             parent(-1))
+    22	      1 |-> scope(
+    23	             ("s" |-> str(ORIGINAL:IntSeq))
+    24	             ("result" |-> str(R:IntSeq))
+    25	             ("word" |-> str(WORD:IntSeq))
+    26	             ("char" |-> str(iCons(C:Int, .IntSeq)))
+    27	             ("new_word" |-> str(A:IntSeq))
+    28	             ("inserted" |-> B:Bool)
+    29	             ("old_char" |-> str(OLD:IntSeq)),
+    30	             parent(0))
+    31	      =>
+    32	      -1 |-> builtinsScope
+    33	      0 |-> scope(
+    34	             "anti_shuffle" |->
+    35	               closureVal(("s", .ParamNames), solutionBody(), 0),
+    36	             parent(-1))
+    37	      1 |-> scope(
+    38	             ("s" |-> str(ORIGINAL:IntSeq))
+    39	             ("result" |-> str(R:IntSeq))
+    40	             ("word" |-> str(insertGo(IS, C, A, B)))
+    41	             ("char" |-> str(iCons(C:Int, .IntSeq)))
+    42	             ("new_word" |-> str(insertGo(IS, C, A, B)))
+    43	             ("inserted" |-> true)
+    44	             ("old_char" |-> str(?FINALOLD:IntSeq)),
+    45	             parent(0))
+    46	    </scopes>
+    47	    <scopeLoc> 2 </scopeLoc>
+    48	    <heap> .Map </heap>
+    49	    <heapLoc> 0 </heapLoc>
+    50	    <stack> STACK:List </stack>
+    51	    <ret> noRet </ret>
+    52	    <exc> NoExc </exc>
+    53	    <exit-code> 0 </exit-code>
+    54	
+    55	  // Outer character loop.  The relation in the postcondition is also the
+    56	  // invariant threaded through the inner-loop claim above.
+    57	  claim [anti-shuffle-outer-loop]:
+    58	    <k>
+    59	      #loop(str(S:IntSeq), Name("char"), antiOuterBody())
+    60	      ~> antiTail()
+    61	      ~> #endcall
+    62	      => str(antiGo(S, R, W))
+    63	    </k>
+    64	    <env> 1 => 0 </env>
+    65	    <scopes>
+    66	      -1 |-> builtinsScope
+    67	      0 |-> scope(
+    68	             "anti_shuffle" |->
+    69	               closureVal(("s", .ParamNames), solutionBody(), 0),
+    70	             parent(-1))
+    71	      1 |-> scope(
+    72	             ("s" |-> str(ORIGINAL:IntSeq))
+    73	             ("result" |-> str(R:IntSeq))
+    74	             ("word" |-> str(W:IntSeq))
+    75	             ("char" |-> str(CURRENT:IntSeq))
+    76	             ("new_word" |-> str(NEW:IntSeq))
+    77	             ("inserted" |-> INSERTED:Bool)
+    78	             ("old_char" |-> str(OLD:IntSeq)),
+    79	             parent(0))
+    80	      =>
+    81	      -1 |-> builtinsScope
+    82	      0 |-> scope(
+    83	             "anti_shuffle" |->
+    84	               closureVal(("s", .ParamNames), solutionBody(), 0),
+    85	             parent(-1))
+    86	    </scopes>
+    87	    <scopeLoc> 2 => 1 </scopeLoc>
+    88	    <heap> .Map </heap>
+    89	    <heapLoc> 0 </heapLoc>
+    90	    <stack> ListItem(frame(.K, 0, 1)) => .List </stack>
+    91	    <ret> noRet </ret>
+    92	    <exc> NoExc </exc>
+    93	    <exit-code> 0 </exit-code>
+    94	
+    95	  // Whole-program claim: load the exact translated definition, resolve its
+    96	  // public name, execute the real body, and constrain the returned string.
+    97	  claim [anti-shuffle]:
+    98	    <k>
+    99	      #loadAll(solutionModule())
+   100	      ~> Call(Name("anti_shuffle"), str(INPUT:IntSeq), .Exprs)
+   101	      => str(antiGo(INPUT, .IntSeq, .IntSeq))
+   102	    </k>
+   103	    <env> 0 </env>
+   104	    <scopes>
+   105	      0 |-> scope(.Map, parent(-1))
+   106	      -1 |-> builtinsScope
+   107	      =>
+   108	      0 |-> scope(
+   109	             "anti_shuffle" |->
+   110	               closureVal(("s", .ParamNames), solutionBody(), 0),
+   111	             parent(-1))
+   112	      -1 |-> builtinsScope
+   113	    </scopes>
+   114	    <scopeLoc> 1 </scopeLoc>
+   115	    <heap> .Map </heap>
+   116	    <heapLoc> 0 </heapLoc>
+   117	    <stack> .List </stack>
+   118	    <ret> noRet </ret>
+   119	    <exc> NoExc </exc>
+   120	    <exit-code> 0 </exit-code>
+   121	endmodule
+
+### solution.py
+     1	def anti_shuffle(s):
+     2	    result = ''
+     3	    word = ''
+     4	    char = ''
+     5	    new_word = ''
+     6	    inserted = False
+     7	    old_char = ''
+     8	    for char in s:
+     9	        if char == ' ':
+    10	            result += word
+    11	            result += ' '
+    12	            word = ''
+    13	        else:
+    14	            new_word = ''
+    15	            inserted = False
+    16	            for old_char in word:
+    17	                if not inserted and char < old_char:
+    18	                    new_word += char
+    19	                    inserted = True
+    20	                new_word += old_char
+    21	            if not inserted:
+    22	                new_word += char
+    23	                inserted = True
+    24	            word = new_word
+    25	    result += word
+    26	    return result
+
+### solution.mpy
+     1	Module(
+     2	  FuncDef("anti_shuffle", Params("s"),
+     3	    Assign(Name("result"), Str(""))
+     4	    Assign(Name("word"), Str(""))
+     5	    Assign(Name("char"), Str(""))
+     6	    Assign(Name("new_word"), Str(""))
+     7	    Assign(Name("inserted"), Bool(false))
+     8	    Assign(Name("old_char"), Str(""))
+     9	    For(Name("char"), Name("s"),
+    10	      If(Compare(Name("char"), CmpOp("==", Str(" "))),
+    11	        AugAssign(Name("result"), "+", Name("word"))
+    12	        AugAssign(Name("result"), "+", Str(" "))
+    13	        Assign(Name("word"), Str("")),
+    14	        Assign(Name("new_word"), Str(""))
+    15	        Assign(Name("inserted"), Bool(false))
+    16	        For(Name("old_char"), Name("word"),
+    17	          If(BoolOp(
+    18	            "and",
+    19	            UnaryOp("not", Name("inserted")),
+    20	            Compare(Name("char"), CmpOp("<", Name("old_char")))),
+    21	            AugAssign(Name("new_word"), "+", Name("char"))
+    22	            Assign(Name("inserted"), Bool(true)),
+    23	            )
+    24	          AugAssign(Name("new_word"), "+", Name("old_char")))
+    25	        If(UnaryOp("not", Name("inserted")),
+    26	          AugAssign(Name("new_word"), "+", Name("char"))
+    27	          Assign(Name("inserted"), Bool(true)),
+    28	          )
+    29	        Assign(Name("word"), Name("new_word"))))
+    30	    AugAssign(Name("result"), "+", Name("word"))
+    31	    Return(Name("result"))))
+
+### program-generated.k
+     1	// Generated from solution.py; sha256=e088ef66a781f529cf950b58790d19b7a2f8b37f2fd4b024bb23fc6840b948da
+     2	// Regenerate with: python3 generate_program_module.py
+     3	requires "reference-semantics/semantics.k"
+     4	
+     5	module PROGRAM-GENERATED
+     6	  imports MPY
+     7	
+     8	  syntax Module ::= solutionModule() [function, total]
+     9	  rule solutionModule()
+    10	    =>
+    11	      Module(
+    12	        FuncDef("anti_shuffle", Params("s"),
+    13	          Assign(Name("result"), Str(""))
+    14	          Assign(Name("word"), Str(""))
+    15	          Assign(Name("char"), Str(""))
+    16	          Assign(Name("new_word"), Str(""))
+    17	          Assign(Name("inserted"), Bool(false))
+    18	          Assign(Name("old_char"), Str(""))
+    19	          For(Name("char"), Name("s"),
+    20	            If(Compare(Name("char"), CmpOp("==", Str(" "))),
+    21	              AugAssign(Name("result"), "+", Name("word"))
+    22	              AugAssign(Name("result"), "+", Str(" "))
+    23	              Assign(Name("word"), Str("")),
+    24	              Assign(Name("new_word"), Str(""))
+    25	              Assign(Name("inserted"), Bool(false))
+    26	              For(Name("old_char"), Name("word"),
+    27	                If(BoolOp(
+    28	                  "and",
+    29	                  UnaryOp("not", Name("inserted")),
+    30	                  Compare(Name("char"), CmpOp("<", Name("old_char")))),
+    31	                  AugAssign(Name("new_word"), "+", Name("char"))
+    32	                  Assign(Name("inserted"), Bool(true)),
+    33	                  .Stmts)
+    34	                AugAssign(Name("new_word"), "+", Name("old_char")))
+    35	              If(UnaryOp("not", Name("inserted")),
+    36	                AugAssign(Name("new_word"), "+", Name("char"))
+    37	                Assign(Name("inserted"), Bool(true)),
+    38	                .Stmts)
+    39	              Assign(Name("word"), Name("new_word"))))
+    40	          AugAssign(Name("result"), "+", Name("word"))
+    41	          Return(Name("result"))))
+    42	
+    43	  syntax Stmts ::= solutionBody() [function, total]
+    44	  rule solutionBody()
+    45	    =>
+    46	      Assign(Name("result"), Str(""))
+    47	      Assign(Name("word"), Str(""))
+    48	      Assign(Name("char"), Str(""))
+    49	      Assign(Name("new_word"), Str(""))
+    50	      Assign(Name("inserted"), Bool(false))
+    51	      Assign(Name("old_char"), Str(""))
+    52	      For(Name("char"), Name("s"),
+    53	        If(Compare(Name("char"), CmpOp("==", Str(" "))),
+    54	          AugAssign(Name("result"), "+", Name("word"))
+    55	          AugAssign(Name("result"), "+", Str(" "))
+    56	          Assign(Name("word"), Str("")),
+    57	          Assign(Name("new_word"), Str(""))
+    58	          Assign(Name("inserted"), Bool(false))
+    59	          For(Name("old_char"), Name("word"),
+    60	            If(BoolOp(
+    61	              "and",
+    62	              UnaryOp("not", Name("inserted")),
+    63	              Compare(Name("char"), CmpOp("<", Name("old_char")))),
+    64	              AugAssign(Name("new_word"), "+", Name("char"))
+    65	              Assign(Name("inserted"), Bool(true)),
+    66	              .Stmts)
+    67	            AugAssign(Name("new_word"), "+", Name("old_char")))
+    68	          If(UnaryOp("not", Name("inserted")),
+    69	            AugAssign(Name("new_word"), "+", Name("char"))
+    70	            Assign(Name("inserted"), Bool(true)),
+    71	            .Stmts)
+    72	          Assign(Name("word"), Name("new_word"))))
+    73	      AugAssign(Name("result"), "+", Name("word"))
+    74	      Return(Name("result"))
+    75	endmodule
+
+Script done on 2026-07-31 06:56:44-05:00 [COMMAND_EXIT_CODE="0"]

@@ -1,0 +1,136 @@
+COMMAND
+PYTHONPATH=/reference python - <<'PY'
+import hashlib, json, re
+from pathlib import Path
+from tools.pipeline_contract import sha256_tree
+from tools.klean_export import tree_digest, target_statement
+
+def fh(p): return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def canon(x): return hashlib.sha256(json.dumps(x,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest()
+def files_under(root):
+  root=Path(root)
+  return sorted(p for p in root.rglob('*') if p.is_file() and not p.is_symlink())
+
+ai=json.loads(Path('/audit-input.json').read_text())
+res=ai['resolution']; h=res['hashes']
+gen=Path('/reference/klean-generation'); generated=gen/'generated'
+gm=json.loads((gen/'generator-manifest.json').read_text())
+im=json.loads((gen/'input-manifest.json').read_text())
+er=json.loads((gen/'export-result.json').read_text())
+om=json.loads((generated/'obligation-map.json').read_text())
+ld=json.loads(Path('/reference/lemma-discovery.json').read_text())
+observed={
+ 'resolved_input_sha256': canon(res),
+ 'k_workspace_sha256': sha256_tree(Path('/reference/k-proof')),
+ 'stage1_export_sha256': tree_digest(Path('/reference/k-proof')),
+ 'discovery_manifest_sha256': fh('/reference/lemma-discovery.json'),
+ 'k_audit_sha256': sha256_tree(Path('/reference/k-audit')),
+ 'klean_generation_sha256': sha256_tree(gen),
+ 'generation_producer_sources_sha256': sha256_tree(Path('/reference/generation-tools')),
+ 'generated_tree_sha256': tree_digest(generated),
+}
+expected={'resolved_input_sha256':ai['resolved_input_sha256'], **h}
+for k,v in observed.items():
+  print(f'{k}: observed={v} expected={expected[k]} match={v==expected[k]}')
+print('lean_workspace_absent=',not Path('/candidate').exists())
+print('lean_hashes_null=',h['lean_workspace_sha256'] is None and h['lean_invocation_sha256'] is None)
+source_expected=res['stage1_source_hashes']
+source_actual={p.relative_to('/reference/k-proof').as_posix():fh(p) for p in files_under('/reference/k-proof')}
+print('stage1_source_hash_count_expected=',len(source_expected))
+print('stage1_source_hash_count_actual=',len(source_actual))
+print('stage1_source_missing=',sorted(set(source_expected)-set(source_actual))[:10])
+print('stage1_source_extra=',sorted(set(source_actual)-set(source_expected))[:10])
+print('stage1_source_mismatches=',[k for k in sorted(set(source_expected)&set(source_actual)) if source_expected[k]!=source_actual[k]][:10])
+sidecar_hashes={name:fh(gen/name) for name in ['input-manifest.json','generator-manifest.json','trust-inventory.json','export-result.json']}
+print('sidecar_hashes=',json.dumps(sidecar_hashes,sort_keys=True))
+print('obligation_map_sha256_observed=',fh(generated/'obligation-map.json'))
+print('obligation_map_sha256_manifest=',gm['obligation_map_sha256'])
+print('trust_inventory_sha256_export=',er['trust_inventory_sha256'])
+print('trust_inventory_sha256_observed=',sidecar_hashes['trust-inventory.json'])
+print('stage1_bindings=',json.dumps({
+ 'input_frozen':im['frozen_input_sha256']==observed['stage1_export_sha256'],
+ 'input_stage1':im['stage1_workspace_sha256']==observed['stage1_export_sha256'],
+ 'generator_stage1':gm['provenance']['stage1_workspace_sha256']==observed['stage1_export_sha256'],
+ 'export_stage1':er['frozen_input_sha256']==observed['stage1_export_sha256'],
+},sort_keys=True))
+print('stage3_bindings=',json.dumps({
+ 'input':im['stage3_discovery_manifest_sha256']==observed['discovery_manifest_sha256'],
+ 'generator':gm['provenance']['stage3_discovery_manifest_sha256']==observed['discovery_manifest_sha256'],
+ 'export':er['stage3_discovery_manifest_sha256']==observed['discovery_manifest_sha256'],
+},sort_keys=True))
+print('inventory_bindings=',json.dumps({
+ 'stage3':ld['inventory_sha256'],
+ 'input':im['inventory_sha256'],
+ 'generator':gm['provenance']['inventory_sha256'],
+},sort_keys=True))
+true_domain_ids=[x['source_rule_id'] for x in ld['rules'] if x['classification']=='DOMAIN_LEMMA']
+input_ids=[x['source_rule_id'] for x in im['source_rules']]
+map_source_ids=[x['source_rule_id'] for x in om['source_rules']]
+obligation_ids=[x['source_rule_id'] for x in om['obligations']]
+print('ordered_domain_ids=',json.dumps(true_domain_ids))
+print('ordered_input_source_ids=',json.dumps(input_ids))
+print('ordered_map_source_ids=',json.dumps(map_source_ids))
+print('ordered_obligation_ids=',json.dumps(obligation_ids))
+print('source_obligation_bijection=',true_domain_ids==input_ids==map_source_ids==obligation_ids and len(obligation_ids)==len(set(obligation_ids)))
+print('trust_parameters=',json.dumps(om['trust_parameters']))
+print('obligation_count_bindings=',json.dumps({
+ 'generator':gm['obligation_count'], 'export':er['obligation_count'], 'audit_preflight':res['stage4_preflight']['obligation_count'], 'actual':len(om['obligations'])
+},sort_keys=True))
+lean_sources=files_under(generated)
+raw_targets=[]
+for p in lean_sources:
+  if p.suffix=='.lean':
+    for m in re.finditer(r'(?m)^\s*def\s+targetStatement\b',p.read_text()): raw_targets.append(p.relative_to(generated).as_posix())
+print('raw_target_declarations=',json.dumps(raw_targets))
+print('producer_target_statement=',json.dumps(target_statement(generated),sort_keys=True))
+print('target_bindings=',json.dumps({
+ 'generator':gm['target'], 'audit':res['target'], 'audit_preflight':res['stage4_preflight']['target']
+},sort_keys=True))
+print('statuses=',json.dumps({
+ 'selected':res['selections']['klean_generation']['status'], 'export':er['status'], 'audit_preflight':res['stage4_preflight']['status']
+},sort_keys=True))
+print('ALL_RECORDED_HASHES_MATCH=',all(observed[k]==expected[k] for k in observed) and source_expected==source_actual and fh(generated/'obligation-map.json')==gm['obligation_map_sha256'] and er['trust_inventory_sha256']==sidecar_hashes['trust-inventory.json'])
+PY
+
+WORKDIR
+/audit-output
+
+EXIT
+0
+
+OUTPUT
+resolved_input_sha256: observed=ab8617645e61b9f88729c034153ef6691251ec6a88edcedba0bc5ccd822f65fd expected=ab8617645e61b9f88729c034153ef6691251ec6a88edcedba0bc5ccd822f65fd match=True
+k_workspace_sha256: observed=ee1dc44f34b5a93af3f36c176363a63c7d2409102f45ee7606ff112f20320685 expected=ee1dc44f34b5a93af3f36c176363a63c7d2409102f45ee7606ff112f20320685 match=True
+stage1_export_sha256: observed=b20ae20bcb603d10b86dcb9787fa672d7ef71d338f044d132eaf2217432b5949 expected=b20ae20bcb603d10b86dcb9787fa672d7ef71d338f044d132eaf2217432b5949 match=True
+discovery_manifest_sha256: observed=34bdea4f70053dcc60a6d72610cd6d89f82454bdef8fbdbe48d5c8e81348e05e expected=34bdea4f70053dcc60a6d72610cd6d89f82454bdef8fbdbe48d5c8e81348e05e match=True
+k_audit_sha256: observed=dfa57a66e81055783970d8a078a5191d36c1984cde0e465645614cbbc7e6228f expected=dfa57a66e81055783970d8a078a5191d36c1984cde0e465645614cbbc7e6228f match=True
+klean_generation_sha256: observed=7028a4c7adcab2f9200b85057b2025d7b3945f78d1414c0886b0ab8e8f002799 expected=7028a4c7adcab2f9200b85057b2025d7b3945f78d1414c0886b0ab8e8f002799 match=True
+generation_producer_sources_sha256: observed=94ba4c012f48b7135094fefcc4517f5c9a5c1052fc304449c5505ddb4dca91b4 expected=94ba4c012f48b7135094fefcc4517f5c9a5c1052fc304449c5505ddb4dca91b4 match=True
+generated_tree_sha256: observed=e0c59505c3464b8bda84b1e8a90313397264005647f44abaaafe8045e90f7fa5 expected=e0c59505c3464b8bda84b1e8a90313397264005647f44abaaafe8045e90f7fa5 match=True
+lean_workspace_absent= True
+lean_hashes_null= True
+stage1_source_hash_count_expected= 778
+stage1_source_hash_count_actual= 778
+stage1_source_missing= []
+stage1_source_extra= []
+stage1_source_mismatches= []
+sidecar_hashes= {"export-result.json": "4b86dd484dc58583c34c0b60e6f68c03d7723f8d337690fea02ef684c9e538bd", "generator-manifest.json": "fba6699177a1bd65b6b3d297d46187fd69c1f11ac0382d6806e9e841f370ae8e", "input-manifest.json": "f49ac22cb44e2a2e1cc0a70868b356013db48301d72cbdb747cf3ab2dfc5ecd8", "trust-inventory.json": "52b4bc7ea97cd96ba3d9318a18c2262116332a5f686fdfa935a63ad0d1f549b5"}
+obligation_map_sha256_observed= cf331f312938e04436a60d1dc49b5a1f6f60b03f3283415439a7c175e9812048
+obligation_map_sha256_manifest= cf331f312938e04436a60d1dc49b5a1f6f60b03f3283415439a7c175e9812048
+trust_inventory_sha256_export= 52b4bc7ea97cd96ba3d9318a18c2262116332a5f686fdfa935a63ad0d1f549b5
+trust_inventory_sha256_observed= 52b4bc7ea97cd96ba3d9318a18c2262116332a5f686fdfa935a63ad0d1f549b5
+stage1_bindings= {"export_stage1": true, "generator_stage1": true, "input_frozen": true, "input_stage1": true}
+stage3_bindings= {"export": true, "generator": true, "input": true}
+inventory_bindings= {"generator": "769426b2163a87c782102e56a3bed0a12ffc57f4f5045ad2ec51f22e842de036", "input": "769426b2163a87c782102e56a3bed0a12ffc57f4f5045ad2ec51f22e842de036", "stage3": "769426b2163a87c782102e56a3bed0a12ffc57f4f5045ad2ec51f22e842de036"}
+ordered_domain_ids= []
+ordered_input_source_ids= []
+ordered_map_source_ids= []
+ordered_obligation_ids= []
+source_obligation_bijection= True
+trust_parameters= []
+obligation_count_bindings= {"actual": 0, "audit_preflight": 0, "export": 0, "generator": 0}
+raw_target_declarations= []
+producer_target_statement= null
+target_bindings= {"audit": null, "audit_preflight": null, "generator": null}
+statuses= {"audit_preflight": "KLEAN_NO_OBLIGATIONS", "export": "KLEAN_NO_OBLIGATIONS", "selected": "KLEAN_NO_OBLIGATIONS"}
+ALL_RECORDED_HASHES_MATCH= True

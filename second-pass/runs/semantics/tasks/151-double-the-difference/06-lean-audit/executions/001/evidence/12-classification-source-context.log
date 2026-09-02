@@ -1,0 +1,229 @@
+Script started on 2026-07-28 18:53:55-05:00 [<not executed on terminal>]
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module DOUBLE-THE-DIFFERENCE-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // A symbolic sequence of exactly the numeric values admitted by the prompt.
+     7	  // Keeping the Int/Float choice in the constructor lets kprove split the
+     8	  // sequence structurally instead of treating an arbitrary Val as non-integer.
+     9	  syntax NumSeq ::= ".NumSeq"
+    10	                  | iNum(Int, NumSeq)
+    11	                  | fNum(Float, NumSeq)
+    12	
+    13	  // numVals is a proof-domain representation of a list's ValSeq.  Its iterator
+    14	  // rules expose the NumSeq constructor directly to symbolic narrowing.
+    15	  syntax ValSeq ::= numVals(NumSeq)
+    16	  rule <k> #iterNext(list(numVals(.NumSeq)))
+    17	        => #iterDone ... </k>
+    18	  rule <k> #iterNext(list(numVals(iNum(I, REST))))
+    19	        => #iterYield(I, list(numVals(REST))) ... </k>
+    20	  rule <k> #iterNext(list(numVals(fNum(F, REST))))
+    21	        => #iterYield(F, list(numVals(REST))) ... </k>
+    22	
+    23	  syntax Int ::= oddSquare(Int) [function, total]
+    24	  rule oddSquare(I)
+    25	    => #if I >Int 0 andBool pyMod(I, 2) ==Int 1
+    26	       #then I *Int I
+    27	       #else 0
+    28	       #fi
+    29	
+    30	  syntax Int ::= doubleDifferenceSpec(NumSeq) [function, total]
+    31	  rule doubleDifferenceSpec(.NumSeq)       => 0
+    32	  rule doubleDifferenceSpec(iNum(I, REST))
+    33	    => oddSquare(I) +Int doubleDifferenceSpec(REST)
+    34	  rule doubleDifferenceSpec(fNum(_F, REST))
+    35	    => doubleDifferenceSpec(REST)
+    36	
+    37	  syntax Val ::= finalNumber(NumSeq, Val) [function, total]
+    38	  rule finalNumber(.NumSeq, OLD)          => OLD
+    39	  rule finalNumber(iNum(I, REST), _OLD)   => finalNumber(REST, I)
+    40	  rule finalNumber(fNum(F, REST), _OLD)   => finalNumber(REST, F)
+    41	endmodule
+     1	requires "verification.k"
+     2	
+     3	module DOUBLE-THE-DIFFERENCE-SPEC
+     4	  imports DOUBLE-THE-DIFFERENCE-VERIFICATION
+     5	
+     6	  claim [loop-invariant]:
+     7	    <k>
+     8	      #loop(
+     9	        list(numVals(NUMBERS)),
+    10	        Name("number"),
+    11	        If(
+    12	          BoolOp(
+    13	            "and",
+    14	            Call(
+    15	              Name("isinstance"),
+    16	              Name("number"),
+    17	              Name("int")),
+    18	            Compare(
+    19	              Name("number"),
+    20	              CmpOp(">", Int(0))),
+    21	            Compare(
+    22	              BinOp("%", Name("number"), Int(2)),
+    23	              CmpOp("==", Int(1)))),
+    24	          AugAssign(
+    25	            Name("total"),
+    26	            "+",
+    27	            BinOp("**", Name("number"), Int(2))),
+    28	          .Stmts))
+    29	      ~> CONT
+    30	    =>
+    31	      CONT
+    32	    </k>
+    33	    <env> 1 </env>
+    34	    <scopes>
+    35	      1 |-> scope(
+    36	        "lst" |-> _INPUT
+    37	        "total" |->
+    38	          (ACC => ACC +Int doubleDifferenceSpec(NUMBERS))
+    39	        "number" |->
+    40	          (OLDNUMBER => finalNumber(NUMBERS, OLDNUMBER)),
+    41	        parent(0))
+    42	      0 |-> scope(
+    43	        "double_the_difference" |-> _FUNCTION,
+    44	        parent(-1))
+    45	      -1 |-> builtinsScope
+    46	    </scopes>
+    47	
+    48	  claim [double-the-difference-correct]:
+    49	    <k>
+    50	      Call(
+    51	        Name("double_the_difference"),
+    52	        list(numVals(NUMBERS)))
+    53	      => doubleDifferenceSpec(NUMBERS)
+    54	    </k>
+    55	    <env> 0 </env>
+    56	    <scopes>
+    57	      0 |-> scope(
+    58	        "double_the_difference" |->
+    59	          closureVal(
+    60	            "lst",
+    61	            Assign(Name("total"), Int(0))
+    62	            Assign(Name("number"), Int(0))
+    63	            For(
+    64	              Name("number"),
+    65	              Name("lst"),
+    66	              If(
+    67	                BoolOp(
+    68	                  "and",
+    69	                  Call(
+    70	                    Name("isinstance"),
+    71	                    Name("number"),
+    72	                    Name("int")),
+    73	                  Compare(
+    74	                    Name("number"),
+    75	                    CmpOp(">", Int(0))),
+    76	                  Compare(
+    77	                    BinOp("%", Name("number"), Int(2)),
+    78	                    CmpOp("==", Int(1)))),
+    79	                AugAssign(
+    80	                  Name("total"),
+    81	                  "+",
+    82	                  BinOp("**", Name("number"), Int(2))),
+    83	                .Stmts))
+    84	            Return(Name("total")),
+    85	            0),
+    86	        parent(-1))
+    87	      -1 |-> builtinsScope
+    88	    </scopes>
+    89	    <scopeLoc> 1 </scopeLoc>
+    90	    <heap> .Map </heap>
+    91	    <heapLoc> 0 </heapLoc>
+    92	    <stack> .List </stack>
+    93	    <ret> noRet </ret>
+    94	    <exc> NoExc </exc>
+    95	    <exit-code> 0 </exit-code>
+    96	endmodule
+// reference/src/semantics/iter.k — MPY-ITER
+// The iterator protocol, DECLARATION ONLY. Each iterable's #iterNext case lives in that
+// iterable's own module (list/tuple/str in their modules, rangeObj in range.k, zip in
+// builtins.k). Consumers (the for-loop, `x in _`, sum/all/any/max/min) import this.
+
+module MPY-ITER
+  imports MPY-CORE
+  syntax KItem ::= #iterNext(Iterable) | "#iterDone" | #iterYield(Val, Iterable)
+endmodule
+// reference/src/semantics/list.k — MPY-LIST
+
+module MPY-LIST
+  imports MPY-CORE
+  imports MPY-ITER
+  imports MPY-OPERATORS
+
+  // ==== iteration (the iterator protocol's list case) =======================
+  rule <k> #iterNext(list(.ValSeq))                => #iterDone ... </k>
+  rule <k> #iterNext(list(vCons(V:Val, R:ValSeq))) => #iterYield(V, list(R)) ... </k>
+
+  // ==== ListExpr: [...] literal -> a fresh heap object =======================
+  syntax ApplyK ::= "toList"
+  rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>
+  rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>
+
+  // ==== list ops: + / == / != ===============================================
+  syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]
+  rule valSeqConcat(.ValSeq, T:ValSeq)                => T
+  rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))
+
+  // list + list constructs a NEW object (k-cell — it allocates; operands land here
+  // already deref'd). priority(45) beats the generic BinOp dispatch.
+  rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k>
+       [priority(45)]
+
+  rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B
+  rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B)
+
+  // ==== deep equality when elements are heap objects (list-of-lists) ========
+  // Python == is structural at every depth. Fires ONLY when a ref is present
+  // (the guard decides on concrete seqs); the plain ==K path above is unchanged.
+  syntax Bool ::= hasRefVS(ValSeq) [function, total]
+  rule hasRefVS(.ValSeq)                => false
+  rule hasRefVS(vCons(V:Val, R:ValSeq)) => isRefV(V) orBool hasRefVS(R)
+  // ==== For: one loop, in-cell continuation, over #iterNext =================
+  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+  // circularities anchor on #loop and narrowing substitutes the structure)
+  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+                 | #loopLbl(K) | "#cont" | "#brk"
+
+  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+
+  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+
+  // ==== While ==============================================================
+  rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>
+  rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>
+// reference/src/semantics/int.k — MPY-INT
+// Int cases of the operator dispatch; Python // and % are floored (pyMod).
+
+module MPY-INT
+  imports MPY-CORE
+
+  rule applyUn("-", I:Int) => 0 -Int I
+
+  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+  // Bool participates in int arithmetic (x += (a == b))
+  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+
+  syntax Int ::= pyMod(Int, Int) [function]
+  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+
+  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+endmodule
+
+Script done on 2026-07-28 18:53:55-05:00 [COMMAND_EXIT_CODE="0"]

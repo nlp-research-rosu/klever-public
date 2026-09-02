@@ -1,0 +1,247 @@
+$ nl -ba /candidate/semantic.k
+     1	module SEMANTIC-SYNTAX
+     2	  imports STRING-SYNTAX
+     3	  imports BOOL-SYNTAX
+     4	  imports MAP
+     5	
+     6	  syntax Pgm ::= "Module" "(" Stmts ")"
+     7	  syntax Stmts ::= List{Stmt, ""}
+     8	  syntax Stmt ::= "ImportFrom" "(" String "," String ")"
+     9	                | "FuncDef" "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"
+    10	                | "Return" "(" Expr ")"
+    11	
+    12	  syntax Params ::= "Params" "(" String "," String ")"
+    13	  syntax CellVars ::= "CellVars" "(" String ")"
+    14	  syntax FreeVars ::= "FreeVars" "(" ")"
+    15	
+    16	  syntax Expr ::= "Name" "(" String ")"
+    17	                | "ListComp" "(" Expr "," CompFors ")"
+    18	                | "Compare" "(" Expr "," CmpOps ")"
+    19	  syntax CompFors ::= List{CompFor, ""}
+    20	  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+    21	  syntax Exprs ::= List{Expr, ","}
+    22	  syntax CmpOps ::= List{CmpOp, ","}
+    23	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    24	
+    25	  syntax PyList ::= "Nil"
+    26	                  | "Cons" "(" String "," PyList ")"
+    27	
+    28	  syntax KItem ::= execute(Pgm, String, PyList, String)
+    29	endmodule
+    30	
+    31	module SEMANTIC
+    32	  imports SEMANTIC-SYNTAX
+    33	  imports BOOL
+    34	  imports INT
+    35	  imports STRING
+    36	  imports MAP
+    37	
+    38	  configuration <k> execute($PGM:Pgm,
+    39	                             $FUNCTION:String,
+    40	                             $INPUT:PyList,
+    41	                             $SUBSTRING:String)
+    42	                </k>
+    43	
+    44	  syntax Function ::= function(Params, Stmts)
+    45	  syntax Function ::= lookupFunction(String, Stmts) [function]
+    46	
+    47	  rule lookupFunction(FUNCTION,
+    48	         ImportFrom(_MODULE, _NAMES) REST)
+    49	    => lookupFunction(FUNCTION, REST)
+    50	  rule lookupFunction(FUNCTION,
+    51	         FuncDef(FUNCTION, PARAMS, _CELLS, _FREES, BODY) _REST)
+    52	    => function(PARAMS, BODY)
+    53	  rule lookupFunction(FUNCTION,
+    54	         FuncDef(OTHER, _PARAMS, _CELLS, _FREES, _BODY) REST)
+    55	    => lookupFunction(FUNCTION, REST)
+    56	    requires FUNCTION =/=String OTHER
+    57	
+    58	  syntax Expr ::= returnExpr(Stmts) [function]
+    59	  rule returnExpr(Return(EXPRESSION) _REST) => EXPRESSION
+    60	
+    61	  syntax PyList ::= invoke(Function, PyList, String) [function]
+    62	  syntax PyList ::= evalList(Expr, Map) [function]
+    63	  syntax SubstringFilter ::= substringFilter(String)
+    64	  syntax PyList ::= evalComp(PyList, SubstringFilter) [function, total]
+    65	  syntax String ::= evalString(Expr, Map) [function]
+    66	  syntax Bool ::= containsString(String, String) [function]
+    67	
+    68	  rule <k> execute(Module(STATEMENTS), FUNCTION, INPUT, SUBSTRING)
+    69	        => invoke(lookupFunction(FUNCTION, STATEMENTS), INPUT, SUBSTRING)
+    70	       </k>
+    71	
+    72	  rule invoke(function(Params(INPUTNAME, SUBSTRINGNAME), BODY),
+    73	              INPUT, SUBSTRING)
+    74	    => evalList(returnExpr(BODY),
+    75	                (INPUTNAME |-> INPUT) (SUBSTRINGNAME |-> SUBSTRING))
+    76	
+    77	  rule evalList(Name(NAME), (NAME |-> VALUE:PyList) _REST) => VALUE
+    78	  rule evalString(Name(NAME), (NAME |-> VALUE:String) _REST) => VALUE
+    79	
+    80	  rule evalList(
+    81	         ListComp(Name(TARGET),
+    82	           CompFor(Name(TARGET),
+    83	                   ITERABLE,
+    84	                   Compare(NEEDLE, CmpOp("in", Name(TARGET))))),
+    85	         ENV)
+    86	    => evalComp(evalList(ITERABLE, ENV),
+    87	                substringFilter(evalString(NEEDLE, ENV)))
+    88	
+    89	  rule evalComp(Nil, _FILTER) => Nil
+    90	  rule evalComp(Cons(HEAD, TAIL), substringFilter(NEEDLE))
+    91	    => Cons(HEAD, evalComp(TAIL, substringFilter(NEEDLE)))
+    92	    requires containsString(HEAD, NEEDLE)
+    93	  rule evalComp(Cons(HEAD, TAIL), substringFilter(NEEDLE))
+    94	    => evalComp(TAIL, substringFilter(NEEDLE))
+    95	    requires notBool containsString(HEAD, NEEDLE)
+    96	
+    97	  rule containsString(HAYSTACK, NEEDLE)
+    98	    => findString(HAYSTACK, NEEDLE, 0) >=Int 0
+    99	endmodule
+EXIT: 0
+$ nl -ba /candidate/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	  imports K-EQUAL
+     6	
+     7	  syntax Pgm ::= "solutionProgram" [function]
+     8	  rule solutionProgram =>
+     9	    Module(
+    10	      ImportFrom("typing", "List")
+    11	      FuncDef("filter_by_substring",
+    12	        Params("strings", "substring"),
+    13	        CellVars("substring"),
+    14	        FreeVars(),
+    15	        Return(
+    16	          ListComp(Name("string"),
+    17	            CompFor(
+    18	              Name("string"),
+    19	              Name("strings"),
+    20	              Compare(Name("substring"), CmpOp("in", Name("string"))))))))
+    21	
+    22	  syntax PyList ::= filterRef(PyList, String) [function, total]
+    23	  rule filterRef(Nil, _SUBSTRING) => Nil
+    24	  rule filterRef(Cons(HEAD, TAIL), SUBSTRING)
+    25	    => Cons(HEAD, filterRef(TAIL, SUBSTRING))
+    26	    requires containsString(HEAD, SUBSTRING)
+    27	  rule filterRef(Cons(HEAD, TAIL), SUBSTRING)
+    28	    => filterRef(TAIL, SUBSTRING)
+    29	    requires notBool containsString(HEAD, SUBSTRING)
+    30	endmodule
+EXIT: 0
+$ nl -ba /candidate/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // The exact translated program reduces, for arbitrary inputs, to the
+     7	  // generic list-comprehension evaluator.  The base and two exhaustive step
+     8	  // claims prove that evaluator equal to filterRef by induction on PyList.
+     9	  claim <k> execute(solutionProgram,
+    10	                    "filter_by_substring",
+    11	                    INPUT:PyList,
+    12	                    SUBSTRING:String)
+    13	          => evalComp(INPUT,
+    14	                      substringFilter(SUBSTRING))
+    15	        </k>
+    16	    [label(UNIVERSAL-PROGRAM-REDUCTION)]
+    17	
+    18	  claim <k> evalComp(Nil,
+    19	                     substringFilter(SUBSTRING:String))
+    20	          => filterRef(Nil, SUBSTRING)
+    21	        </k>
+    22	    [label(UNIVERSAL-BASE)]
+    23	
+    24	  claim <k> evalComp(Cons(HEAD:String, TAIL:PyList),
+    25	                     substringFilter(SUBSTRING:String))
+    26	          => filterRef(Cons(HEAD, TAIL), SUBSTRING)
+    27	        </k>
+    28	    requires containsString(HEAD, SUBSTRING)
+    29	             andBool
+    30	             (evalComp(TAIL,
+    31	                       substringFilter(SUBSTRING))
+    32	              ==K filterRef(TAIL, SUBSTRING))
+    33	    [label(UNIVERSAL-STEP-KEEP)]
+    34	
+    35	  claim <k> evalComp(Cons(HEAD:String, TAIL:PyList),
+    36	                     substringFilter(SUBSTRING:String))
+    37	          => filterRef(Cons(HEAD, TAIL), SUBSTRING)
+    38	        </k>
+    39	    requires notBool containsString(HEAD, SUBSTRING)
+    40	             andBool
+    41	             (evalComp(TAIL,
+    42	                       substringFilter(SUBSTRING))
+    43	              ==K filterRef(TAIL, SUBSTRING))
+    44	    [label(UNIVERSAL-STEP-DROP)]
+    45	
+    46	  claim <k> execute(solutionProgram,
+    47	                    "filter_by_substring",
+    48	                    Nil,
+    49	                    "a")
+    50	          => Nil
+    51	        </k>
+    52	    [label(EMPTY-EXAMPLE)]
+    53	
+    54	  claim <k> execute(solutionProgram,
+    55	                    "filter_by_substring",
+    56	                    Cons("abc", Cons("bacd", Cons("cde", Cons("array", Nil)))),
+    57	                    "a")
+    58	          => Cons("abc", Cons("bacd", Cons("array", Nil)))
+    59	        </k>
+    60	    [label(PROMPT-EXAMPLE)]
+    61	endmodule
+EXIT: 0
+$ rg -n "configuration|syntax |\\[function|\\[total|\\[functional|rule |claim |priority|simplification|opaque|owise|anywhere|fresh" /candidate/*.k
+/candidate/verification.k:7:  syntax Pgm ::= "solutionProgram" [function]
+/candidate/verification.k:8:  rule solutionProgram =>
+/candidate/verification.k:22:  syntax PyList ::= filterRef(PyList, String) [function, total]
+/candidate/verification.k:23:  rule filterRef(Nil, _SUBSTRING) => Nil
+/candidate/verification.k:24:  rule filterRef(Cons(HEAD, TAIL), SUBSTRING)
+/candidate/verification.k:27:  rule filterRef(Cons(HEAD, TAIL), SUBSTRING)
+/candidate/spec.k:9:  claim <k> execute(solutionProgram,
+/candidate/spec.k:18:  claim <k> evalComp(Nil,
+/candidate/spec.k:24:  claim <k> evalComp(Cons(HEAD:String, TAIL:PyList),
+/candidate/spec.k:35:  claim <k> evalComp(Cons(HEAD:String, TAIL:PyList),
+/candidate/spec.k:46:  claim <k> execute(solutionProgram,
+/candidate/spec.k:54:  claim <k> execute(solutionProgram,
+/candidate/semantic.k:6:  syntax Pgm ::= "Module" "(" Stmts ")"
+/candidate/semantic.k:7:  syntax Stmts ::= List{Stmt, ""}
+/candidate/semantic.k:8:  syntax Stmt ::= "ImportFrom" "(" String "," String ")"
+/candidate/semantic.k:12:  syntax Params ::= "Params" "(" String "," String ")"
+/candidate/semantic.k:13:  syntax CellVars ::= "CellVars" "(" String ")"
+/candidate/semantic.k:14:  syntax FreeVars ::= "FreeVars" "(" ")"
+/candidate/semantic.k:16:  syntax Expr ::= "Name" "(" String ")"
+/candidate/semantic.k:19:  syntax CompFors ::= List{CompFor, ""}
+/candidate/semantic.k:20:  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+/candidate/semantic.k:21:  syntax Exprs ::= List{Expr, ","}
+/candidate/semantic.k:22:  syntax CmpOps ::= List{CmpOp, ","}
+/candidate/semantic.k:23:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+/candidate/semantic.k:25:  syntax PyList ::= "Nil"
+/candidate/semantic.k:28:  syntax KItem ::= execute(Pgm, String, PyList, String)
+/candidate/semantic.k:38:  configuration <k> execute($PGM:Pgm,
+/candidate/semantic.k:44:  syntax Function ::= function(Params, Stmts)
+/candidate/semantic.k:45:  syntax Function ::= lookupFunction(String, Stmts) [function]
+/candidate/semantic.k:47:  rule lookupFunction(FUNCTION,
+/candidate/semantic.k:50:  rule lookupFunction(FUNCTION,
+/candidate/semantic.k:53:  rule lookupFunction(FUNCTION,
+/candidate/semantic.k:58:  syntax Expr ::= returnExpr(Stmts) [function]
+/candidate/semantic.k:59:  rule returnExpr(Return(EXPRESSION) _REST) => EXPRESSION
+/candidate/semantic.k:61:  syntax PyList ::= invoke(Function, PyList, String) [function]
+/candidate/semantic.k:62:  syntax PyList ::= evalList(Expr, Map) [function]
+/candidate/semantic.k:63:  syntax SubstringFilter ::= substringFilter(String)
+/candidate/semantic.k:64:  syntax PyList ::= evalComp(PyList, SubstringFilter) [function, total]
+/candidate/semantic.k:65:  syntax String ::= evalString(Expr, Map) [function]
+/candidate/semantic.k:66:  syntax Bool ::= containsString(String, String) [function]
+/candidate/semantic.k:68:  rule <k> execute(Module(STATEMENTS), FUNCTION, INPUT, SUBSTRING)
+/candidate/semantic.k:72:  rule invoke(function(Params(INPUTNAME, SUBSTRINGNAME), BODY),
+/candidate/semantic.k:77:  rule evalList(Name(NAME), (NAME |-> VALUE:PyList) _REST) => VALUE
+/candidate/semantic.k:78:  rule evalString(Name(NAME), (NAME |-> VALUE:String) _REST) => VALUE
+/candidate/semantic.k:80:  rule evalList(
+/candidate/semantic.k:89:  rule evalComp(Nil, _FILTER) => Nil
+/candidate/semantic.k:90:  rule evalComp(Cons(HEAD, TAIL), substringFilter(NEEDLE))
+/candidate/semantic.k:93:  rule evalComp(Cons(HEAD, TAIL), substringFilter(NEEDLE))
+/candidate/semantic.k:97:  rule containsString(HAYSTACK, NEEDLE)
+EXIT: 0

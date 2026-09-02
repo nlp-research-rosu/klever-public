@@ -1,0 +1,912 @@
+VERIFICATION.K
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION-BASE
+     4	  imports MPY
+     5	
+     6	  syntax Bool ::= isNumericVal(Val) [function, total]
+     7	  rule isNumericVal(V:Val)
+     8	    => isInt(V) orBool isBool(V) orBool isFloat(V)
+     9	
+    10	  syntax Bool ::= orderablePair(Val, Val) [function, total]
+    11	  rule orderablePair(V:Val, W:Val)
+    12	    => (isNumericVal(V) andBool isNumericVal(W))
+    13	       orBool (isStr(V) andBool isStr(W))
+    14	
+    15	  // This recursive predicate exactly characterizes the list inputs for which
+    16	  // every comparison performed by the scan is defined in MPY.  The first
+    17	  // element is unrestricted because the program does not compare it.
+    18	  syntax Bool ::= scanDefined(ValSeq, Int, Val)
+    19	    [function, total, no-evaluators]
+    20	  rule scanDefined(.ValSeq, _I:Int, _P:Val) => true
+    21	    [simplification]
+    22	  rule scanDefined(vCons(V:Val, R:ValSeq), I:Int, _P:Val)
+    23	    => scanDefined(R, I +Int 1, V)
+    24	    requires I ==Int 0
+    25	    [simplification]
+    26	  rule scanDefined(vCons(V:Val, R:ValSeq), I:Int, P:Val)
+    27	    => orderablePair(V, P) andBool scanDefined(R, I +Int 1, V)
+    28	    requires I >Int 0
+    29	    [simplification]
+    30	  rule scanDefined(vCons(_V:Val, _R:ValSeq), I:Int, _P:Val) => false
+    31	    requires I <Int 0
+    32	    [simplification]
+    33	
+    34	  // A total mathematical presentation of the fixed semantics' >= dispatch.
+    35	  // The ten orderable cases are disjoint and cover orderablePair exactly.
+    36	  syntax Bool ::= orderGe(Val, Val)
+    37	    [function, total, no-evaluators]
+    38	  rule orderGe(I:Int, J:Int) => I >=Int J [simplification]
+    39	  rule orderGe(B:Bool, C:Bool)
+    40	    => boolAsInt(B) >=Int boolAsInt(C)
+    41	    [simplification]
+    42	  rule orderGe(B:Bool, I:Int)
+    43	    => boolAsInt(B) >=Int I
+    44	    [simplification]
+    45	  rule orderGe(I:Int, B:Bool)
+    46	    => I >=Int boolAsInt(B)
+    47	    [simplification]
+    48	  rule orderGe(F:Float, G:Float)
+    49	    => notBool floatLt(F, G)
+    50	    [simplification]
+    51	  rule orderGe(I:Int, F:Float)
+    52	    => notBool ltIF(I, F)
+    53	    [simplification]
+    54	  rule orderGe(F:Float, I:Int)
+    55	    => notBool ltFI(F, I)
+    56	    [simplification]
+    57	  rule orderGe(B:Bool, F:Float)
+    58	    => notBool ltIF(boolAsInt(B), F)
+    59	    [simplification]
+    60	  rule orderGe(F:Float, B:Bool)
+    61	    => notBool ltFI(F, boolAsInt(B))
+    62	    [simplification]
+    63	  rule orderGe(str(A:IntSeq), str(B:IntSeq))
+    64	    => notBool strLt(A, B)
+    65	    [simplification]
+    66	  rule orderGe(V:Val, W:Val) => false
+    67	    requires notBool orderablePair(V, W)
+    68	    [simplification]
+    69	
+    70	  // Mathematical left-to-right scan of the unvisited suffix.  I is the
+    71	  // current absolute index, P is the preceding value (ignored when I == 0),
+    72	  // and A is the largest matching index already seen.
+    73	  syntax Int ::= arrangeSeq(ValSeq, Int, Val, Int)
+    74	    [function, total, no-evaluators]
+    75	
+    76	  rule arrangeSeq(.ValSeq, _I:Int, _P:Val, A:Int) => A
+    77	    [simplification]
+    78	
+    79	  rule arrangeSeq(vCons(V:Val, R:ValSeq), I:Int, _P:Val, A:Int)
+    80	    => arrangeSeq(R, I +Int 1, V, A)
+    81	    requires I ==Int 0
+    82	    [simplification]
+    83	
+    84	  rule arrangeSeq(vCons(V:Val, R:ValSeq), I:Int, P:Val, _A:Int)
+    85	    => arrangeSeq(R, I +Int 1, V, I)
+    86	    requires I >Int 0
+    87	     andBool notBool orderGe(V, P)
+    88	    [simplification]
+    89	
+    90	  rule arrangeSeq(vCons(V:Val, R:ValSeq), I:Int, P:Val, A:Int)
+    91	    => arrangeSeq(R, I +Int 1, V, A)
+    92	    requires I >Int 0
+    93	     andBool orderGe(V, P)
+    94	    [simplification]
+    95	
+    96	  rule arrangeSeq(vCons(_V:Val, _R:ValSeq), I:Int, _P:Val, A:Int) => A
+    97	    requires I <Int 0
+    98	    [simplification]
+    99	endmodule
+   100	
+   101	module VERIFICATION
+   102	  imports VERIFICATION-BASE
+   103	
+   104	  // Guarded dynamic-dispatch bridge.  connection-spec.k proves, without this
+   105	  // module, that each of its ten static cases is the corresponding MPY rule.
+   106	  rule applyCmp(">=", V:Val, W:Val) => orderGe(V, W)
+   107	    requires orderablePair(V, W)
+   108	    [simplification]
+   109	endmodule
+
+SPEC.K
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [can-arrange-loop]:
+     7	    <k>
+     8	      (#loop(
+     9	        list(VS),
+    10	        Name("value"),
+    11	        If(
+    12	          Compare(Name("i"), CmpOp(">", Int(0))),
+    13	          If(
+    14	            UnaryOp(
+    15	              "not",
+    16	              Compare(
+    17	                Name("value"),
+    18	                CmpOp(">=", Name("previous")))),
+    19	            Assign(Name("index"), Name("i")),
+    20	            .Stmts),
+    21	          .Stmts)
+    22	        Assign(Name("previous"), Name("value"))
+    23	        Assign(Name("i"), BinOp("+", Name("i"), Int(1)))
+    24	        .Stmts)
+    25	      => .K)
+    26	      ~> (Return(Name("index")) .Stmts)
+    27	      ~> #endcall
+    28	    </k>
+    29	    <env> 1 </env>
+    30	    <scopes>
+    31	      -1 |-> builtinsScope
+    32	      0  |-> scope(
+    33	        "can_arrange" |->
+    34	          closureVal(
+    35	            "arr", .ParamNames,
+    36	            Assign(Name("index"), UnaryOp("-", Int(1)))
+    37	            Assign(Name("i"), Int(0))
+    38	            Assign(Name("previous"), Int(0))
+    39	            Assign(Name("value"), Int(0))
+    40	            For(
+    41	              Name("value"), Name("arr"),
+    42	              If(
+    43	                Compare(Name("i"), CmpOp(">", Int(0))),
+    44	                If(
+    45	                  UnaryOp(
+    46	                    "not",
+    47	                    Compare(
+    48	                      Name("value"),
+    49	                      CmpOp(">=", Name("previous")))),
+    50	                  Assign(Name("index"), Name("i")),
+    51	                  .Stmts),
+    52	                .Stmts)
+    53	              Assign(Name("previous"), Name("value"))
+    54	              Assign(Name("i"), BinOp("+", Name("i"), Int(1)))
+    55	              .Stmts)
+    56	            Return(Name("index"))
+    57	            .Stmts,
+    58	            0),
+    59	        parent(-1))
+    60	      1  |-> scope(
+    61	        "arr"      |-> list(ORIG)
+    62	        "i"        |-> (I => ?FINAL_I:Int)
+    63	        "index"    |-> (A => arrangeSeq(VS, I, P, A))
+    64	        "previous" |-> (P => ?FINAL_PREVIOUS:Val)
+    65	        "value"    |-> (P => ?FINAL_VALUE:Val),
+    66	        parent(0))
+    67	    </scopes>
+    68	    <scopeLoc> 2 </scopeLoc>
+    69	    <heap> .Map </heap>
+    70	    <heapLoc> 0 </heapLoc>
+    71	    <stack> ListItem(frame(.K, 0, 1)) </stack>
+    72	    <ret> noRet </ret>
+    73	    <exc> NoExc </exc>
+    74	    <exit-code> 0 </exit-code>
+    75	    requires I >=Int 0
+    76	     andBool scanDefined(VS, I, P)
+    77	
+    78	  claim [can-arrange]:
+    79	    <k>
+    80	      (#loadAll(
+    81	        Module(
+    82	          FuncDef(
+    83	            "can_arrange", Params("arr"),
+    84	            Assign(Name("index"), UnaryOp("-", Int(1)))
+    85	            Assign(Name("i"), Int(0))
+    86	            Assign(Name("previous"), Int(0))
+    87	            Assign(Name("value"), Int(0))
+    88	            For(
+    89	              Name("value"), Name("arr"),
+    90	              If(
+    91	                Compare(Name("i"), CmpOp(">", Int(0))),
+    92	                If(
+    93	                  UnaryOp(
+    94	                    "not",
+    95	                    Compare(
+    96	                      Name("value"),
+    97	                      CmpOp(">=", Name("previous")))),
+    98	                  Assign(Name("index"), Name("i")),
+    99	                  .Stmts),
+   100	                .Stmts)
+   101	              Assign(Name("previous"), Name("value"))
+   102	              Assign(Name("i"), BinOp("+", Name("i"), Int(1)))
+   103	              .Stmts)
+   104	            Return(Name("index"))
+   105	            .Stmts)
+   106	          .Stmts))
+   107	      ~> Call(Name("can_arrange"), list(VS))
+   108	      => arrangeSeq(VS, 0, 0, -1))
+   109	    </k>
+   110	    <env> 0 </env>
+   111	    <scopes>
+   112	      -1 |-> builtinsScope
+   113	      0  |-> scope(
+   114	        .Map
+   115	        => "can_arrange" |->
+   116	             closureVal(
+   117	               "arr", .ParamNames,
+   118	               Assign(Name("index"), UnaryOp("-", Int(1)))
+   119	               Assign(Name("i"), Int(0))
+   120	               Assign(Name("previous"), Int(0))
+   121	               Assign(Name("value"), Int(0))
+   122	               For(
+   123	                 Name("value"), Name("arr"),
+   124	                 If(
+   125	                   Compare(Name("i"), CmpOp(">", Int(0))),
+   126	                   If(
+   127	                     UnaryOp(
+   128	                       "not",
+   129	                       Compare(
+   130	                         Name("value"),
+   131	                         CmpOp(">=", Name("previous")))),
+   132	                     Assign(Name("index"), Name("i")),
+   133	                     .Stmts),
+   134	                   .Stmts)
+   135	                 Assign(Name("previous"), Name("value"))
+   136	                 Assign(Name("i"), BinOp("+", Name("i"), Int(1)))
+   137	                 .Stmts)
+   138	               Return(Name("index"))
+   139	               .Stmts,
+   140	               0),
+   141	        parent(-1))
+   142	    </scopes>
+   143	    <scopeLoc> 1 </scopeLoc>
+   144	    <heap> .Map </heap>
+   145	    <heapLoc> 0 </heapLoc>
+   146	    <stack> .List </stack>
+   147	    <ret> noRet </ret>
+   148	    <exc> NoExc </exc>
+   149	    <exit-code> 0 </exit-code>
+   150	    requires scanDefined(VS, 0, 0)
+   151	endmodule
+
+CONNECTION-SPEC.K
+     1	requires "verification.k"
+     2	
+     3	module CONNECTION-SPEC
+     4	  imports VERIFICATION-BASE
+     5	
+     6	  claim [ge-int-int]:
+     7	    <k> applyCmp(">=", I:Int, J:Int) => orderGe(I, J) </k>
+     8	
+     9	  claim [ge-bool-bool]:
+    10	    <k> applyCmp(">=", B:Bool, C:Bool) => orderGe(B, C) </k>
+    11	
+    12	  claim [ge-bool-int]:
+    13	    <k> applyCmp(">=", B:Bool, I:Int) => orderGe(B, I) </k>
+    14	
+    15	  claim [ge-int-bool]:
+    16	    <k> applyCmp(">=", I:Int, B:Bool) => orderGe(I, B) </k>
+    17	
+    18	  claim [ge-float-float]:
+    19	    <k> applyCmp(">=", F:Float, G:Float) => orderGe(F, G) </k>
+    20	
+    21	  claim [ge-int-float]:
+    22	    <k> applyCmp(">=", I:Int, F:Float) => orderGe(I, F) </k>
+    23	
+    24	  claim [ge-float-int]:
+    25	    <k> applyCmp(">=", F:Float, I:Int) => orderGe(F, I) </k>
+    26	
+    27	  claim [ge-bool-float]:
+    28	    <k> applyCmp(">=", B:Bool, F:Float) => orderGe(B, F) </k>
+    29	
+    30	  claim [ge-float-bool]:
+    31	    <k> applyCmp(">=", F:Float, B:Bool) => orderGe(F, B) </k>
+    32	
+    33	  claim [ge-str-str]:
+    34	    <k>
+    35	      applyCmp(">=", str(A:IntSeq), str(B:IntSeq))
+    36	      => orderGe(str(A), str(B))
+    37	    </k>
+    38	endmodule
+
+CONNECTION-NEGATIVE-SPEC.K
+     1	requires "verification.k"
+     2	
+     3	module CONNECTION-NEGATIVE-SPEC
+     4	  imports VERIFICATION-BASE
+     5	
+     6	  // Deliberately false opposite interpretation: 2 >= 1 is true.
+     7	  claim [wrong-ge]:
+     8	    <k> applyCmp(">=", 2, 1) => false </k>
+     9	endmodule
+
+PROVE.SH
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	mkdir -p evidence
+     5	
+     6	python3 py2mpy.py solution.py > solution.mpy
+     7	python3 check_program_identity.py | tee evidence/program-identity.log
+     8	sha256sum solution.py solution.mpy | tee evidence/program-hashes.log
+     9	python3 -m py_compile solution.py differential_test.py
+    10	
+    11	python3 py2mpy.py smoke.py > smoke.mpy
+    12	kompile reference-semantics/semantics.k \
+    13	  --backend llvm \
+    14	  --main-module MPY-KRUN \
+    15	  --syntax-module MPY-SYNTAX \
+    16	  --output-definition runtime-kompiled \
+    17	  2>&1 | tee evidence/llvm-kompile.log
+    18	krun smoke.mpy --definition runtime-kompiled \
+    19	  2>&1 | tee evidence/krun-smoke.log
+    20	
+    21	python3 differential_test.py | tee evidence/differential.log
+    22	
+    23	# Bridge-free connection definition and its ten complete static cases.
+    24	kompile verification.k \
+    25	  --backend haskell \
+    26	  --main-module VERIFICATION-BASE \
+    27	  --syntax-module MPY-SYNTAX \
+    28	  --output-definition connection-kompiled \
+    29	  2>&1 | tee evidence/connection-kompile.log
+    30	kprove connection-spec.k \
+    31	  --definition connection-kompiled \
+    32	  --spec-module CONNECTION-SPEC \
+    33	  2>&1 | tee evidence/connection-kprove.log
+    34	
+    35	# Positive target proof: both the loop circularity and whole-program claim.
+    36	kompile verification.k \
+    37	  --backend haskell \
+    38	  --main-module VERIFICATION \
+    39	  --syntax-module MPY-SYNTAX \
+    40	  --output-definition verification-kompiled \
+    41	  2>&1 | tee evidence/verification-kompile.log
+    42	kprove spec.k \
+    43	  --definition verification-kompiled \
+    44	  --spec-module SPEC \
+    45	  2>&1 | tee evidence/target-kprove.log
+    46	
+    47	run_expected_failure() {
+    48	  local log_file=$1
+    49	  shift
+    50	  set +e
+    51	  "$@" >"$log_file" 2>&1
+    52	  local status=$?
+    53	  set -e
+    54	  cat "$log_file"
+    55	  if [[ $status -eq 0 ]]; then
+    56	    echo "UNEXPECTED SUCCESS: $*" >&2
+    57	    return 1
+    58	  fi
+    59	  grep -q "WarnStuckClaimState" "$log_file"
+    60	  echo "EXPECTED FAILURE (exit $status): $*"
+    61	}
+    62	
+    63	run_expected_failure evidence/spec-vacuity.log \
+    64	  kprove spec-vacuity.k \
+    65	    --definition verification-kompiled \
+    66	    --spec-module SPEC-VACUITY
+    67	
+    68	run_expected_failure evidence/body-mutation.log \
+    69	  kprove body-mutation-spec.k \
+    70	    --definition verification-kompiled \
+    71	    --spec-module BODY-MUTATION-SPEC
+    72	
+    73	run_expected_failure evidence/connection-negative.log \
+    74	  kprove connection-negative-spec.k \
+    75	    --definition connection-kompiled \
+    76	    --spec-module CONNECTION-NEGATIVE-SPEC
+
+SOLUTION.PY
+     1	def can_arrange(arr):
+     2	    index = -1
+     3	    i = 0
+     4	    previous = 0
+     5	    value = 0
+     6	    for value in arr:
+     7	        if i > 0:
+     8	            if not value >= previous:
+     9	                index = i
+    10	        previous = value
+    11	        i = i + 1
+    12	    return index
+
+PROMPT.PY
+     1	
+     2	def can_arrange(arr):
+     3	    """Create a function which returns the largest index of an element which
+     4	    is not greater than or equal to the element immediately preceding it. If
+     5	    no such element exists then return -1. The given array will not contain
+     6	    duplicate values.
+     7	
+     8	    Examples:
+     9	    can_arrange([1,2,4,3,5]) = 3
+    10	    can_arrange([1,2,3]) = -1
+    11	    """
+
+APPLYCMP_REFERENCES
+/reference/k-proof/spec.k-59-        parent(-1))
+/reference/k-proof/spec.k-60-      1  |-> scope(
+/reference/k-proof/spec.k-61-        "arr"      |-> list(ORIG)
+/reference/k-proof/spec.k-62-        "i"        |-> (I => ?FINAL_I:Int)
+/reference/k-proof/spec.k:63:        "index"    |-> (A => arrangeSeq(VS, I, P, A))
+/reference/k-proof/spec.k-64-        "previous" |-> (P => ?FINAL_PREVIOUS:Val)
+/reference/k-proof/spec.k-65-        "value"    |-> (P => ?FINAL_VALUE:Val),
+/reference/k-proof/spec.k-66-        parent(0))
+/reference/k-proof/spec.k-67-    </scopes>
+--
+/reference/k-proof/spec.k-72-    <ret> noRet </ret>
+/reference/k-proof/spec.k-73-    <exc> NoExc </exc>
+/reference/k-proof/spec.k-74-    <exit-code> 0 </exit-code>
+/reference/k-proof/spec.k-75-    requires I >=Int 0
+/reference/k-proof/spec.k:76:     andBool scanDefined(VS, I, P)
+/reference/k-proof/spec.k-77-
+/reference/k-proof/spec.k-78-  claim [can-arrange]:
+/reference/k-proof/spec.k-79-    <k>
+/reference/k-proof/spec.k-80-      (#loadAll(
+--
+/reference/k-proof/spec.k-104-            Return(Name("index"))
+/reference/k-proof/spec.k-105-            .Stmts)
+/reference/k-proof/spec.k-106-          .Stmts))
+/reference/k-proof/spec.k-107-      ~> Call(Name("can_arrange"), list(VS))
+/reference/k-proof/spec.k:108:      => arrangeSeq(VS, 0, 0, -1))
+/reference/k-proof/spec.k-109-    </k>
+/reference/k-proof/spec.k-110-    <env> 0 </env>
+/reference/k-proof/spec.k-111-    <scopes>
+/reference/k-proof/spec.k-112-      -1 |-> builtinsScope
+--
+/reference/k-proof/spec.k-146-    <stack> .List </stack>
+/reference/k-proof/spec.k-147-    <ret> noRet </ret>
+/reference/k-proof/spec.k-148-    <exc> NoExc </exc>
+/reference/k-proof/spec.k-149-    <exit-code> 0 </exit-code>
+/reference/k-proof/spec.k:150:    requires scanDefined(VS, 0, 0)
+/reference/k-proof/spec.k-151-endmodule
+--
+/reference/k-proof/connection-negative-spec.k-4-  imports VERIFICATION-BASE
+/reference/k-proof/connection-negative-spec.k-5-
+/reference/k-proof/connection-negative-spec.k-6-  // Deliberately false opposite interpretation: 2 >= 1 is true.
+/reference/k-proof/connection-negative-spec.k-7-  claim [wrong-ge]:
+/reference/k-proof/connection-negative-spec.k:8:    <k> applyCmp(">=", 2, 1) => false </k>
+/reference/k-proof/connection-negative-spec.k-9-endmodule
+--
+/reference/k-proof/connection-spec.k-3-module CONNECTION-SPEC
+/reference/k-proof/connection-spec.k-4-  imports VERIFICATION-BASE
+/reference/k-proof/connection-spec.k-5-
+/reference/k-proof/connection-spec.k-6-  claim [ge-int-int]:
+/reference/k-proof/connection-spec.k:7:    <k> applyCmp(">=", I:Int, J:Int) => orderGe(I, J) </k>
+/reference/k-proof/connection-spec.k-8-
+/reference/k-proof/connection-spec.k-9-  claim [ge-bool-bool]:
+/reference/k-proof/connection-spec.k:10:    <k> applyCmp(">=", B:Bool, C:Bool) => orderGe(B, C) </k>
+/reference/k-proof/connection-spec.k-11-
+/reference/k-proof/connection-spec.k-12-  claim [ge-bool-int]:
+/reference/k-proof/connection-spec.k:13:    <k> applyCmp(">=", B:Bool, I:Int) => orderGe(B, I) </k>
+/reference/k-proof/connection-spec.k-14-
+/reference/k-proof/connection-spec.k-15-  claim [ge-int-bool]:
+/reference/k-proof/connection-spec.k:16:    <k> applyCmp(">=", I:Int, B:Bool) => orderGe(I, B) </k>
+/reference/k-proof/connection-spec.k-17-
+/reference/k-proof/connection-spec.k-18-  claim [ge-float-float]:
+/reference/k-proof/connection-spec.k:19:    <k> applyCmp(">=", F:Float, G:Float) => orderGe(F, G) </k>
+/reference/k-proof/connection-spec.k-20-
+/reference/k-proof/connection-spec.k-21-  claim [ge-int-float]:
+/reference/k-proof/connection-spec.k:22:    <k> applyCmp(">=", I:Int, F:Float) => orderGe(I, F) </k>
+/reference/k-proof/connection-spec.k-23-
+/reference/k-proof/connection-spec.k-24-  claim [ge-float-int]:
+/reference/k-proof/connection-spec.k:25:    <k> applyCmp(">=", F:Float, I:Int) => orderGe(F, I) </k>
+/reference/k-proof/connection-spec.k-26-
+/reference/k-proof/connection-spec.k-27-  claim [ge-bool-float]:
+/reference/k-proof/connection-spec.k:28:    <k> applyCmp(">=", B:Bool, F:Float) => orderGe(B, F) </k>
+/reference/k-proof/connection-spec.k-29-
+/reference/k-proof/connection-spec.k-30-  claim [ge-float-bool]:
+/reference/k-proof/connection-spec.k:31:    <k> applyCmp(">=", F:Float, B:Bool) => orderGe(F, B) </k>
+/reference/k-proof/connection-spec.k-32-
+/reference/k-proof/connection-spec.k-33-  claim [ge-str-str]:
+/reference/k-proof/connection-spec.k-34-    <k>
+/reference/k-proof/connection-spec.k:35:      applyCmp(">=", str(A:IntSeq), str(B:IntSeq))
+/reference/k-proof/connection-spec.k:36:      => orderGe(str(A), str(B))
+/reference/k-proof/connection-spec.k-37-    </k>
+/reference/k-proof/connection-spec.k-38-endmodule
+--
+/reference/k-proof/verification.k-6-  syntax Bool ::= isNumericVal(Val) [function, total]
+/reference/k-proof/verification.k-7-  rule isNumericVal(V:Val)
+/reference/k-proof/verification.k-8-    => isInt(V) orBool isBool(V) orBool isFloat(V)
+/reference/k-proof/verification.k-9-
+/reference/k-proof/verification.k:10:  syntax Bool ::= orderablePair(Val, Val) [function, total]
+/reference/k-proof/verification.k:11:  rule orderablePair(V:Val, W:Val)
+/reference/k-proof/verification.k-12-    => (isNumericVal(V) andBool isNumericVal(W))
+/reference/k-proof/verification.k-13-       orBool (isStr(V) andBool isStr(W))
+/reference/k-proof/verification.k-14-
+/reference/k-proof/verification.k-15-  // This recursive predicate exactly characterizes the list inputs for which
+/reference/k-proof/verification.k-16-  // every comparison performed by the scan is defined in MPY.  The first
+/reference/k-proof/verification.k-17-  // element is unrestricted because the program does not compare it.
+/reference/k-proof/verification.k:18:  syntax Bool ::= scanDefined(ValSeq, Int, Val)
+/reference/k-proof/verification.k-19-    [function, total, no-evaluators]
+/reference/k-proof/verification.k:20:  rule scanDefined(.ValSeq, _I:Int, _P:Val) => true
+/reference/k-proof/verification.k-21-    [simplification]
+/reference/k-proof/verification.k:22:  rule scanDefined(vCons(V:Val, R:ValSeq), I:Int, _P:Val)
+/reference/k-proof/verification.k:23:    => scanDefined(R, I +Int 1, V)
+/reference/k-proof/verification.k-24-    requires I ==Int 0
+/reference/k-proof/verification.k-25-    [simplification]
+/reference/k-proof/verification.k:26:  rule scanDefined(vCons(V:Val, R:ValSeq), I:Int, P:Val)
+/reference/k-proof/verification.k:27:    => orderablePair(V, P) andBool scanDefined(R, I +Int 1, V)
+/reference/k-proof/verification.k-28-    requires I >Int 0
+/reference/k-proof/verification.k-29-    [simplification]
+/reference/k-proof/verification.k:30:  rule scanDefined(vCons(_V:Val, _R:ValSeq), I:Int, _P:Val) => false
+/reference/k-proof/verification.k-31-    requires I <Int 0
+/reference/k-proof/verification.k-32-    [simplification]
+/reference/k-proof/verification.k-33-
+/reference/k-proof/verification.k-34-  // A total mathematical presentation of the fixed semantics' >= dispatch.
+/reference/k-proof/verification.k:35:  // The ten orderable cases are disjoint and cover orderablePair exactly.
+/reference/k-proof/verification.k:36:  syntax Bool ::= orderGe(Val, Val)
+/reference/k-proof/verification.k-37-    [function, total, no-evaluators]
+/reference/k-proof/verification.k:38:  rule orderGe(I:Int, J:Int) => I >=Int J [simplification]
+/reference/k-proof/verification.k:39:  rule orderGe(B:Bool, C:Bool)
+/reference/k-proof/verification.k-40-    => boolAsInt(B) >=Int boolAsInt(C)
+/reference/k-proof/verification.k-41-    [simplification]
+/reference/k-proof/verification.k:42:  rule orderGe(B:Bool, I:Int)
+/reference/k-proof/verification.k-43-    => boolAsInt(B) >=Int I
+/reference/k-proof/verification.k-44-    [simplification]
+/reference/k-proof/verification.k:45:  rule orderGe(I:Int, B:Bool)
+/reference/k-proof/verification.k-46-    => I >=Int boolAsInt(B)
+/reference/k-proof/verification.k-47-    [simplification]
+/reference/k-proof/verification.k:48:  rule orderGe(F:Float, G:Float)
+/reference/k-proof/verification.k-49-    => notBool floatLt(F, G)
+/reference/k-proof/verification.k-50-    [simplification]
+/reference/k-proof/verification.k:51:  rule orderGe(I:Int, F:Float)
+/reference/k-proof/verification.k-52-    => notBool ltIF(I, F)
+/reference/k-proof/verification.k-53-    [simplification]
+/reference/k-proof/verification.k:54:  rule orderGe(F:Float, I:Int)
+/reference/k-proof/verification.k-55-    => notBool ltFI(F, I)
+/reference/k-proof/verification.k-56-    [simplification]
+/reference/k-proof/verification.k:57:  rule orderGe(B:Bool, F:Float)
+/reference/k-proof/verification.k-58-    => notBool ltIF(boolAsInt(B), F)
+/reference/k-proof/verification.k-59-    [simplification]
+/reference/k-proof/verification.k:60:  rule orderGe(F:Float, B:Bool)
+/reference/k-proof/verification.k-61-    => notBool ltFI(F, boolAsInt(B))
+/reference/k-proof/verification.k-62-    [simplification]
+/reference/k-proof/verification.k:63:  rule orderGe(str(A:IntSeq), str(B:IntSeq))
+/reference/k-proof/verification.k-64-    => notBool strLt(A, B)
+/reference/k-proof/verification.k-65-    [simplification]
+/reference/k-proof/verification.k:66:  rule orderGe(V:Val, W:Val) => false
+/reference/k-proof/verification.k:67:    requires notBool orderablePair(V, W)
+/reference/k-proof/verification.k-68-    [simplification]
+/reference/k-proof/verification.k-69-
+/reference/k-proof/verification.k-70-  // Mathematical left-to-right scan of the unvisited suffix.  I is the
+/reference/k-proof/verification.k-71-  // current absolute index, P is the preceding value (ignored when I == 0),
+/reference/k-proof/verification.k-72-  // and A is the largest matching index already seen.
+/reference/k-proof/verification.k:73:  syntax Int ::= arrangeSeq(ValSeq, Int, Val, Int)
+/reference/k-proof/verification.k-74-    [function, total, no-evaluators]
+/reference/k-proof/verification.k-75-
+/reference/k-proof/verification.k:76:  rule arrangeSeq(.ValSeq, _I:Int, _P:Val, A:Int) => A
+/reference/k-proof/verification.k-77-    [simplification]
+/reference/k-proof/verification.k-78-
+/reference/k-proof/verification.k:79:  rule arrangeSeq(vCons(V:Val, R:ValSeq), I:Int, _P:Val, A:Int)
+/reference/k-proof/verification.k:80:    => arrangeSeq(R, I +Int 1, V, A)
+/reference/k-proof/verification.k-81-    requires I ==Int 0
+/reference/k-proof/verification.k-82-    [simplification]
+/reference/k-proof/verification.k-83-
+/reference/k-proof/verification.k:84:  rule arrangeSeq(vCons(V:Val, R:ValSeq), I:Int, P:Val, _A:Int)
+/reference/k-proof/verification.k:85:    => arrangeSeq(R, I +Int 1, V, I)
+/reference/k-proof/verification.k-86-    requires I >Int 0
+/reference/k-proof/verification.k:87:     andBool notBool orderGe(V, P)
+/reference/k-proof/verification.k-88-    [simplification]
+/reference/k-proof/verification.k-89-
+/reference/k-proof/verification.k:90:  rule arrangeSeq(vCons(V:Val, R:ValSeq), I:Int, P:Val, A:Int)
+/reference/k-proof/verification.k:91:    => arrangeSeq(R, I +Int 1, V, A)
+/reference/k-proof/verification.k-92-    requires I >Int 0
+/reference/k-proof/verification.k:93:     andBool orderGe(V, P)
+/reference/k-proof/verification.k-94-    [simplification]
+/reference/k-proof/verification.k-95-
+/reference/k-proof/verification.k:96:  rule arrangeSeq(vCons(_V:Val, _R:ValSeq), I:Int, _P:Val, A:Int) => A
+/reference/k-proof/verification.k-97-    requires I <Int 0
+/reference/k-proof/verification.k-98-    [simplification]
+/reference/k-proof/verification.k-99-endmodule
+/reference/k-proof/verification.k-100-
+--
+/reference/k-proof/verification.k-102-  imports VERIFICATION-BASE
+/reference/k-proof/verification.k-103-
+/reference/k-proof/verification.k-104-  // Guarded dynamic-dispatch bridge.  connection-spec.k proves, without this
+/reference/k-proof/verification.k-105-  // module, that each of its ten static cases is the corresponding MPY rule.
+/reference/k-proof/verification.k:106:  rule applyCmp(">=", V:Val, W:Val) => orderGe(V, W)
+/reference/k-proof/verification.k:107:    requires orderablePair(V, W)
+/reference/k-proof/verification.k-108-    [simplification]
+/reference/k-proof/verification.k-109-endmodule
+--
+/reference/k-proof/reference-semantics/semantics/bool.k-6-  imports MPY-CORE
+/reference/k-proof/reference-semantics/semantics/bool.k-7-
+/reference/k-proof/reference-semantics/semantics/bool.k-8-  rule applyUn("not", V:Val) => notBool truthy(V)
+/reference/k-proof/reference-semantics/semantics/bool.k-9-
+/reference/k-proof/reference-semantics/semantics/bool.k:10:  rule applyCmp("==", B1:Bool, B2:Bool) => B1 ==Bool B2
+/reference/k-proof/reference-semantics/semantics/bool.k:11:  rule applyCmp("!=", B1:Bool, B2:Bool) => B1 =/=Bool B2
+/reference/k-proof/reference-semantics/semantics/bool.k-12-
+/reference/k-proof/reference-semantics/semantics/bool.k-13-  // bool is a subtype of int: a Bool compared with an Int promotes to 0/1 and
+/reference/k-proof/reference-semantics/semantics/bool.k-14-  // re-dispatches to the Int comparison cases (True==1, False==0, True<2, ...).
+/reference/k-proof/reference-semantics/semantics/bool.k-15-  // The == / != Bool x Bool cases above are kept; only the four ordering ops are
+/reference/k-proof/reference-semantics/semantics/bool.k-16-  // promoted for Bool x Bool (to avoid duplicating the two rules above).
+/reference/k-proof/reference-semantics/semantics/bool.k:17:  rule applyCmp(OP:String, B:Bool, I:Int) => applyCmp(OP, boolAsInt(B), I)
+/reference/k-proof/reference-semantics/semantics/bool.k-18-       requires isEqOrdOp(OP)
+/reference/k-proof/reference-semantics/semantics/bool.k:19:  rule applyCmp(OP:String, I:Int, B:Bool) => applyCmp(OP, I, boolAsInt(B))
+/reference/k-proof/reference-semantics/semantics/bool.k-20-       requires isEqOrdOp(OP)
+/reference/k-proof/reference-semantics/semantics/bool.k:21:  rule applyCmp(OP:String, B1:Bool, B2:Bool) => applyCmp(OP, boolAsInt(B1), boolAsInt(B2))
+/reference/k-proof/reference-semantics/semantics/bool.k-22-       requires isOrdOp(OP)
+/reference/k-proof/reference-semantics/semantics/bool.k-23-
+/reference/k-proof/reference-semantics/semantics/bool.k-24-  // ==== BoolOp: short-circuit, value-returning and / or =====================
+/reference/k-proof/reference-semantics/semantics/bool.k-25-  // the node is its own accumulator: heat the HEAD element only, then either return it
+--
+/reference/k-proof/reference-semantics/semantics/core.k-206-
+/reference/k-proof/reference-semantics/semantics/core.k-207-  // ==== extensible operator dispatch (cases added by the construct modules) ==
+/reference/k-proof/reference-semantics/semantics/core.k-208-  syntax Val  ::= applyUn(String, Val) [function]
+/reference/k-proof/reference-semantics/semantics/core.k-209-  syntax Val  ::= applyBin(String, Val, Val) [function]
+/reference/k-proof/reference-semantics/semantics/core.k:210:  syntax Bool ::= applyCmp(String, Val, Val) [function]
+/reference/k-proof/reference-semantics/semantics/core.k-211-
+/reference/k-proof/reference-semantics/semantics/core.k-212-  // ==== bool-is-a-subtype-of-int: numeric promotion helpers =================
+/reference/k-proof/reference-semantics/semantics/core.k-213-  // Python: `bool` derives from `int`; True/False act as 1/0 in arithmetic and
+/reference/k-proof/reference-semantics/semantics/core.k-214-  // comparison. boolAsInt is the total 0/1 coercion; the op-class predicates gate
+--
+/reference/k-proof/reference-semantics/semantics/concrete.k-87-  // cross-type ==K collapse never arises there.)
+/reference/k-proof/reference-semantics/semantics/concrete.k-88-  // krun-only (priority 40 beats list.k's default rules); kprove uses the
+/reference/k-proof/reference-semantics/semantics/concrete.k-89-  // structural ==K rules in list.k unchanged.
+/reference/k-proof/reference-semantics/semantics/concrete.k-90-  syntax Bool ::= numOrKEq(Val, Val) [function]
+/reference/k-proof/reference-semantics/semantics/concrete.k:91:  rule numOrKEq(A:Val, B:Val) => applyCmp("==", A, B)
+/reference/k-proof/reference-semantics/semantics/concrete.k-92-       requires (isInt(A) orBool isBool(A) orBool isFloat(A))
+/reference/k-proof/reference-semantics/semantics/concrete.k-93-        andBool (isInt(B) orBool isBool(B) orBool isFloat(B))
+/reference/k-proof/reference-semantics/semantics/concrete.k-94-  rule numOrKEq(A:Val, B:Val) => A ==K B [owise]
+/reference/k-proof/reference-semantics/semantics/concrete.k-95-
+--
+/reference/k-proof/reference-semantics/semantics/set.k-35-  syntax Bool ::= sameSet(IntSeq, IntSeq) [function, total]
+/reference/k-proof/reference-semantics/semantics/set.k-36-  rule sameSet(A:IntSeq, B:IntSeq) => subsetCodes(A, B) andBool subsetCodes(B, A)
+/reference/k-proof/reference-semantics/semantics/set.k-37-
+/reference/k-proof/reference-semantics/semantics/set.k-38-  // set == set  (the only comparison sets support here)
+/reference/k-proof/reference-semantics/semantics/set.k:39:  rule applyCmp("==", setV(A:IntSeq), setV(B:IntSeq)) => sameSet(A, B)
+/reference/k-proof/reference-semantics/semantics/set.k-40-endmodule
+--
+/reference/k-proof/reference-semantics/semantics/sort.k-22-  rule insVS(X:Int, .ValSeq)                => vCons(X, .ValSeq) [concrete]
+/reference/k-proof/reference-semantics/semantics/sort.k-23-  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]
+/reference/k-proof/reference-semantics/semantics/sort.k-24-  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X  >Int Y [concrete]
+/reference/k-proof/reference-semantics/semantics/sort.k-25-  // v3: mixed-numeric elements (float/bool heads; float/bool tail elements under
+/reference/k-proof/reference-semantics/semantics/sort.k:26:  // an Int head) insert via the shared applyCmp dispatch — the exact ltIF/ltFI
+/reference/k-proof/reference-semantics/semantics/sort.k-27-  // bridges (float.k) + the bool->int promotion (bool.k), so mixed sorts match
+/reference/k-proof/reference-semantics/semantics/sort.k-28-  // CPython bit-exactly. X goes before Y iff not (Y < X) — the same tie rule as
+/reference/k-proof/reference-semantics/semantics/sort.k-29-  // insVS's X <=Int Y, so equal keys keep first-seen order (stable insertion
+/reference/k-proof/reference-semantics/semantics/sort.k:30:  // from the right). str-vs-numeric has no applyCmp leg and stays stuck
+/reference/k-proof/reference-semantics/semantics/sort.k-31-  // (CPython TypeError).
+/reference/k-proof/reference-semantics/semantics/sort.k-32-  syntax ValSeq ::= insVSn(Val, ValSeq) [function]
+/reference/k-proof/reference-semantics/semantics/sort.k-33-  rule sortVS(vCons(X:Val, R:ValSeq)) => insVSn(X, sortVS(R))
+/reference/k-proof/reference-semantics/semantics/sort.k-34-       requires isFloat(X) orBool isBool(X) [concrete]
+/reference/k-proof/reference-semantics/semantics/sort.k-35-  rule insVS(X:Int, vCons(Y:Val, R:ValSeq)) => vCons(X, vCons(Y, R))
+/reference/k-proof/reference-semantics/semantics/sort.k:36:       requires (isFloat(Y) orBool isBool(Y)) andBool notBool applyCmp("<", Y, X) [concrete]
+/reference/k-proof/reference-semantics/semantics/sort.k-37-  rule insVS(X:Int, vCons(Y:Val, R:ValSeq)) => vCons(Y, insVS(X, R))
+/reference/k-proof/reference-semantics/semantics/sort.k:38:       requires (isFloat(Y) orBool isBool(Y)) andBool applyCmp("<", Y, X) [concrete]
+/reference/k-proof/reference-semantics/semantics/sort.k-39-  rule insVSn(X:Val, .ValSeq) => vCons(X, .ValSeq) [concrete]
+/reference/k-proof/reference-semantics/semantics/sort.k-40-  rule insVSn(X:Val, vCons(Y:Val, R:ValSeq)) => vCons(X, vCons(Y, R))
+/reference/k-proof/reference-semantics/semantics/sort.k:41:       requires notBool applyCmp("<", Y, X) [concrete]
+/reference/k-proof/reference-semantics/semantics/sort.k-42-  rule insVSn(X:Val, vCons(Y:Val, R:ValSeq)) => vCons(Y, insVSn(X, R))
+/reference/k-proof/reference-semantics/semantics/sort.k:43:       requires applyCmp("<", Y, X) [concrete]
+/reference/k-proof/reference-semantics/semantics/sort.k-44-  // str elements insert by the shared lexicographic strLt (methods.k)
+/reference/k-proof/reference-semantics/semantics/sort.k-45-  syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]
+/reference/k-proof/reference-semantics/semantics/sort.k-46-  rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]
+/reference/k-proof/reference-semantics/semantics/sort.k-47-  rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]
+--
+/reference/k-proof/reference-semantics/semantics/operators.k-1-// reference/src/semantics/operators.k — MPY-OPERATORS
+/reference/k-proof/reference-semantics/semantics/operators.k-2-// The operator DISPATCH layer: operands evaluate by strictness (heat/cool over KResult=Val),
+/reference/k-proof/reference-semantics/semantics/operators.k:3:// the cooled node hands to applyUn/applyBin/applyCmp (declared in core.k; each domain file
+/reference/k-proof/reference-semantics/semantics/operators.k-4-// owns its cases — bool.k, int.k, float.k, str.k, list.k, tuple.k, set.k, dict.k).
+/reference/k-proof/reference-semantics/semantics/operators.k-5-
+/reference/k-proof/reference-semantics/semantics/operators.k-6-module MPY-OPERATORS
+/reference/k-proof/reference-semantics/semantics/operators.k-7-  imports MPY-CORE
+--
+/reference/k-proof/reference-semantics/semantics/operators.k-13-
+/reference/k-proof/reference-semantics/semantics/operators.k-14-  // Compare's right operand sits under the CmpOp wrapper — contexts instead of attributes
+/reference/k-proof/reference-semantics/semantics/operators.k-15-  context Compare(HOLE, _)
+/reference/k-proof/reference-semantics/semantics/operators.k-16-  context Compare(_:Val, CmpOp(_, HOLE))
+/reference/k-proof/reference-semantics/semantics/operators.k:17:  rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]
+/reference/k-proof/reference-semantics/semantics/operators.k-18-
+/reference/k-proof/reference-semantics/semantics/operators.k:19:  rule applyCmp("is",     V:Val, noneV) => V ==K noneV
+/reference/k-proof/reference-semantics/semantics/operators.k:20:  rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)
+/reference/k-proof/reference-semantics/semantics/operators.k-21-
+/reference/k-proof/reference-semantics/semantics/operators.k-22-  // ==== operand deref: heap objects combine/compare by STRUCTURE ============
+/reference/k-proof/reference-semantics/semantics/operators.k-23-  // (Python: list == is structural; identity only via `is`.) priority(40)
+/reference/k-proof/reference-semantics/semantics/operators.k:24:  // preempts the generic dispatch so applyUn/applyBin/applyCmp never see a ref.
+/reference/k-proof/reference-semantics/semantics/operators.k-25-  rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k>
+/reference/k-proof/reference-semantics/semantics/operators.k-26-       <heap> ... H |-> V:Val ... </heap>
+/reference/k-proof/reference-semantics/semantics/operators.k-27-       [priority(40)]
+/reference/k-proof/reference-semantics/semantics/operators.k-28-  rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k>
+--
+/reference/k-proof/reference-semantics/semantics/list.k-23-  // already deref'd). priority(45) beats the generic BinOp dispatch.
+/reference/k-proof/reference-semantics/semantics/list.k-24-  rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k>
+/reference/k-proof/reference-semantics/semantics/list.k-25-       [priority(45)]
+/reference/k-proof/reference-semantics/semantics/list.k-26-
+/reference/k-proof/reference-semantics/semantics/list.k:27:  rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B
+/reference/k-proof/reference-semantics/semantics/list.k:28:  rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B)
+/reference/k-proof/reference-semantics/semantics/list.k-29-
+/reference/k-proof/reference-semantics/semantics/list.k-30-  // ==== deep equality when elements are heap objects (list-of-lists) ========
+/reference/k-proof/reference-semantics/semantics/list.k-31-  // Python == is structural at every depth. Fires ONLY when a ref is present
+/reference/k-proof/reference-semantics/semantics/list.k-32-  // (the guard decides on concrete seqs); the plain ==K path above is unchanged.
+--
+/reference/k-proof/reference-semantics/semantics/dict.k-91-  rule normIdxD(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0
+/reference/k-proof/reference-semantics/semantics/dict.k-92-  rule normIdxD(I:Int, _:Int)   => I          requires I >=Int 0
+/reference/k-proof/reference-semantics/semantics/dict.k-93-
+/reference/k-proof/reference-semantics/semantics/dict.k-94-  // ==== dict == (order-insensitive: same size + same key->value pairs) =======
+/reference/k-proof/reference-semantics/semantics/dict.k:95:  rule applyCmp("==", dictV(KS1:ValSeq, VS1:ValSeq), dictV(KS2:ValSeq, VS2:ValSeq))
+/reference/k-proof/reference-semantics/semantics/dict.k-96-    => (vsLen(KS1) ==Int vsLen(KS2)) andBool dSubset(KS1, VS1, KS2, VS2)
+/reference/k-proof/reference-semantics/semantics/dict.k-97-  syntax Bool ::= dSubset(ValSeq, ValSeq, ValSeq, ValSeq) [function]
+/reference/k-proof/reference-semantics/semantics/dict.k-98-  rule dSubset(.ValSeq, .ValSeq, _:ValSeq, _:ValSeq) => true
+/reference/k-proof/reference-semantics/semantics/dict.k-99-  rule dSubset(vCons(K:Val, KR:ValSeq), vCons(V:Val, VR:ValSeq), KS2:ValSeq, VS2:ValSeq)
+--
+/reference/k-proof/reference-semantics/semantics/tuple.k-14-  syntax ApplyK ::= "toTuple"
+/reference/k-proof/reference-semantics/semantics/tuple.k-15-  rule <k> TupleExpr(ES:Exprs) => #evalArgs(ES, .Vals, toTuple) ... </k>
+/reference/k-proof/reference-semantics/semantics/tuple.k-16-  rule <k> #applyK(toTuple, ACC:Vals) => tuple(vals2valSeq(ACC)) ... </k>
+/reference/k-proof/reference-semantics/semantics/tuple.k-17-
+/reference/k-proof/reference-semantics/semantics/tuple.k:18:  rule applyCmp("==", tuple(A:ValSeq), tuple(B:ValSeq)) => A ==K B
+/reference/k-proof/reference-semantics/semantics/tuple.k-19-  // membership routes through the same k-cell fold as lists (list.k)
+/reference/k-proof/reference-semantics/semantics/tuple.k-20-  rule <k> Compare(LV:Val, CmpOp("in",     tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ... </k>
+/reference/k-proof/reference-semantics/semantics/tuple.k-21-  rule <k> Compare(LV:Val, CmpOp("not in", tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ~> #notB ... </k>
+/reference/k-proof/reference-semantics/semantics/tuple.k-22-  // t.index(v): first index of v (ValueError out of subset)
+--
+/reference/k-proof/reference-semantics/semantics/tuple.k-24-  syntax Int ::= idxOfVS(ValSeq, Val, Int) [function]
+/reference/k-proof/reference-semantics/semantics/tuple.k-25-  rule idxOfVS(vCons(A:Val, _:ValSeq), V:Val, I:Int) => I requires A ==K V
+/reference/k-proof/reference-semantics/semantics/tuple.k-26-  rule idxOfVS(vCons(A:Val, R:ValSeq), V:Val, I:Int) => idxOfVS(R, V, I +Int 1)
+/reference/k-proof/reference-semantics/semantics/tuple.k-27-       requires notBool (A ==K V)
+/reference/k-proof/reference-semantics/semantics/tuple.k:28:  rule applyCmp("!=", tuple(A:ValSeq), tuple(B:ValSeq)) => notBool (A ==K B)
+/reference/k-proof/reference-semantics/semantics/tuple.k-29-
+/reference/k-proof/reference-semantics/semantics/tuple.k-30-  // ==== target binding: bind a Name or a TupleExpr target to a value ========
+/reference/k-proof/reference-semantics/semantics/tuple.k-31-  syntax KItem ::= #bindTgt(Expr, Val)
+/reference/k-proof/reference-semantics/semantics/tuple.k-32-  rule <k> #bindTgt(Name(X:String), V:Val) => .K ... </k>
+--
+/reference/k-proof/reference-semantics/semantics/str.k-21-  rule seqConcat(.IntSeq, T:IntSeq)                => T
+/reference/k-proof/reference-semantics/semantics/str.k-22-  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+/reference/k-proof/reference-semantics/semantics/str.k-23-
+/reference/k-proof/reference-semantics/semantics/str.k-24-  rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+/reference/k-proof/reference-semantics/semantics/str.k:25:  rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+/reference/k-proof/reference-semantics/semantics/str.k:26:  rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)
+/reference/k-proof/reference-semantics/semantics/str.k-27-
+/reference/k-proof/reference-semantics/semantics/str.k-28-  // substring membership: `P in X` iff the code-seq P occurs contiguously in X
+/reference/k-proof/reference-semantics/semantics/str.k:29:  rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)
+/reference/k-proof/reference-semantics/semantics/str.k:30:  rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)
+/reference/k-proof/reference-semantics/semantics/str.k-31-
+/reference/k-proof/reference-semantics/semantics/str.k-32-  syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]
+/reference/k-proof/reference-semantics/semantics/str.k-33-  rule strPrefix(.IntSeq, _:IntSeq)               => true
+/reference/k-proof/reference-semantics/semantics/str.k-34-  rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false
+--
+/reference/k-proof/reference-semantics/semantics/str.k-52-  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true          requires A  <Int B
+/reference/k-proof/reference-semantics/semantics/str.k-53-  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false         requires A  >Int B
+/reference/k-proof/reference-semantics/semantics/str.k-54-  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B
+/reference/k-proof/reference-semantics/semantics/str.k-55-
+/reference/k-proof/reference-semantics/semantics/str.k:56:  rule applyCmp("<",  str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+/reference/k-proof/reference-semantics/semantics/str.k:57:  rule applyCmp(">",  str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)
+/reference/k-proof/reference-semantics/semantics/str.k:58:  rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)
+/reference/k-proof/reference-semantics/semantics/str.k:59:  rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)
+/reference/k-proof/reference-semantics/semantics/str.k-60-endmodule
+--
+/reference/k-proof/reference-semantics/semantics/int.k-27-
+/reference/k-proof/reference-semantics/semantics/int.k-28-  syntax Int ::= pyMod(Int, Int) [function]
+/reference/k-proof/reference-semantics/semantics/int.k-29-  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+/reference/k-proof/reference-semantics/semantics/int.k-30-
+/reference/k-proof/reference-semantics/semantics/int.k:31:  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+/reference/k-proof/reference-semantics/semantics/int.k:32:  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+/reference/k-proof/reference-semantics/semantics/int.k:33:  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+/reference/k-proof/reference-semantics/semantics/int.k:34:  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+/reference/k-proof/reference-semantics/semantics/int.k:35:  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+/reference/k-proof/reference-semantics/semantics/int.k:36:  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+/reference/k-proof/reference-semantics/semantics/int.k-37-endmodule
+--
+/reference/k-proof/reference-semantics/semantics/float.k-39-  rule applyBin("%", F1:Float, F2:Float) => floatMod(F1, F2)
+/reference/k-proof/reference-semantics/semantics/float.k-40-
+/reference/k-proof/reference-semantics/semantics/float.k-41-  // float equality — for concrete krun asserts (e.g. `area == 7.5`); the FLOAT.eq hook is fine on
+/reference/k-proof/reference-semantics/semantics/float.k-42-  // concrete floats. kprove proofs return floats structurally and do not compare them.
+/reference/k-proof/reference-semantics/semantics/float.k:43:  rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2
+/reference/k-proof/reference-semantics/semantics/float.k:44:  rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2)
+/reference/k-proof/reference-semantics/semantics/float.k-45-
+/reference/k-proof/reference-semantics/semantics/float.k-46-  // float `<` and abs — OPAQUE for kprove ([no-evaluators], so a SYMBOLIC float compare stays an
+/reference/k-proof/reference-semantics/semantics/float.k-47-  // uninterpreted Bool a proof case-splits on — a SINGLE compare per branch, not a nonlinear cascade),
+/reference/k-proof/reference-semantics/semantics/float.k-48-  // [concrete] for krun. Additive, sort-disjoint from the Int rules. (has_close_elements: the pairwise
+/reference/k-proof/reference-semantics/semantics/float.k-49-  // `abs(a-b) < t` proximity test.)
+/reference/k-proof/reference-semantics/semantics/float.k-50-  syntax Bool ::= floatLt(Float, Float) [function, total, symbol(floatLt), no-evaluators]
+/reference/k-proof/reference-semantics/semantics/float.k-51-  rule floatLt(F1:Float, F2:Float) => F1 <Float F2 [concrete]
+/reference/k-proof/reference-semantics/semantics/float.k:52:  rule applyCmp("<", F1:Float, F2:Float) => floatLt(F1, F2)
+/reference/k-proof/reference-semantics/semantics/float.k-53-
+/reference/k-proof/reference-semantics/semantics/float.k-54-  syntax Float ::= absF(Float) [function, total, symbol(absF), no-evaluators]
+/reference/k-proof/reference-semantics/semantics/float.k-55-  rule absF(F:Float) => absFloat(F) [concrete]
+/reference/k-proof/reference-semantics/semantics/float.k-56-  rule applyBuiltin("abs", F:Float, .Vals) => absF(F)
+--
+/reference/k-proof/reference-semantics/semantics/float.k-123-  // ---- the remaining comparisons (gtF promoted from find_zero — its summaries
+/reference/k-proof/reference-semantics/semantics/float.k-124-  //      case-split on the atom; >= / <= derive from the two opaque compares) ----
+/reference/k-proof/reference-semantics/semantics/float.k-125-  syntax Bool ::= gtF(Float, Float) [function, total, symbol(gtF), no-evaluators]
+/reference/k-proof/reference-semantics/semantics/float.k-126-  rule gtF(F1:Float, F2:Float) => F1 >Float F2 [concrete]
+/reference/k-proof/reference-semantics/semantics/float.k:127:  rule applyCmp(">",  F1:Float, F2:Float) => gtF(F1, F2)
+/reference/k-proof/reference-semantics/semantics/float.k:128:  rule applyCmp(">=", F1:Float, F2:Float) => notBool floatLt(F1, F2)
+/reference/k-proof/reference-semantics/semantics/float.k:129:  rule applyCmp("<=", F1:Float, F2:Float) => notBool gtF(F1, F2)
+/reference/k-proof/reference-semantics/semantics/float.k-130-
+/reference/k-proof/reference-semantics/semantics/float.k-131-  // ---- mixed Int/Float operators promote the Int side (n ** 0.5 etc.) ----
+/reference/k-proof/reference-semantics/semantics/float.k-132-  rule applyBin("**", I:Int, F:Float) => powF(intToF(I), F)
+/reference/k-proof/reference-semantics/semantics/float.k-133-  rule applyBin("**", F:Float, I:Int) => powF(F, intToF(I))
+--
+/reference/k-proof/reference-semantics/semantics/float.k-166-    => (floorFloat(F) ==Float ceilFloat(F)) andBool (Float2Int(floorFloat(F)) ==Int I)
+/reference/k-proof/reference-semantics/semantics/float.k-167-       requires floatFinite(F) [concrete]
+/reference/k-proof/reference-semantics/semantics/float.k-168-  rule eqIF(I:Int, F:Float) => eqF(intToF(I), F) requires notBool floatFinite(F) [concrete]
+/reference/k-proof/reference-semantics/semantics/float.k-169-
+/reference/k-proof/reference-semantics/semantics/float.k:170:  rule applyCmp("==", I:Int, F:Float) => eqIF(I, F)
+/reference/k-proof/reference-semantics/semantics/float.k:171:  rule applyCmp("==", F:Float, I:Int) => eqIF(I, F)
+/reference/k-proof/reference-semantics/semantics/float.k:172:  rule applyCmp("!=", I:Int, F:Float) => notBool eqIF(I, F)
+/reference/k-proof/reference-semantics/semantics/float.k:173:  rule applyCmp("!=", F:Float, I:Int) => notBool eqIF(I, F)
+/reference/k-proof/reference-semantics/semantics/float.k:174:  rule applyCmp("<",  I:Int, F:Float) => ltIF(I, F)
+/reference/k-proof/reference-semantics/semantics/float.k:175:  rule applyCmp("<",  F:Float, I:Int) => ltFI(F, I)
+/reference/k-proof/reference-semantics/semantics/float.k:176:  rule applyCmp(">",  I:Int, F:Float) => ltFI(F, I)          // I >  F  <=>  F <  I
+/reference/k-proof/reference-semantics/semantics/float.k:177:  rule applyCmp(">",  F:Float, I:Int) => ltIF(I, F)          // F >  I  <=>  I <  F
+/reference/k-proof/reference-semantics/semantics/float.k:178:  rule applyCmp("<=", I:Int, F:Float) => notBool ltFI(F, I)  // I <= F  <=>  not (F < I)
+/reference/k-proof/reference-semantics/semantics/float.k:179:  rule applyCmp("<=", F:Float, I:Int) => notBool ltIF(I, F)  // F <= I  <=>  not (I < F)
+/reference/k-proof/reference-semantics/semantics/float.k:180:  rule applyCmp(">=", I:Int, F:Float) => notBool ltIF(I, F)  // I >= F  <=>  not (I < F)
+/reference/k-proof/reference-semantics/semantics/float.k:181:  rule applyCmp(">=", F:Float, I:Int) => notBool ltFI(F, I)  // F >= I  <=>  not (F < I)
+/reference/k-proof/reference-semantics/semantics/float.k-182-
+/reference/k-proof/reference-semantics/semantics/float.k-183-  // ---- bool is a subtype of int: a Bool operand with a Float promotes to 0/1 --
+/reference/k-proof/reference-semantics/semantics/float.k-184-  rule applyBin(OP:String, B:Bool, F:Float) => applyBin(OP, boolAsInt(B), F) requires isArithOp(OP)
+/reference/k-proof/reference-semantics/semantics/float.k-185-  rule applyBin(OP:String, F:Float, B:Bool) => applyBin(OP, F, boolAsInt(B)) requires isArithOp(OP)
+/reference/k-proof/reference-semantics/semantics/float.k:186:  rule applyCmp(OP:String, B:Bool, F:Float) => applyCmp(OP, boolAsInt(B), F) requires isEqOrdOp(OP)
+/reference/k-proof/reference-semantics/semantics/float.k:187:  rule applyCmp(OP:String, F:Float, B:Bool) => applyCmp(OP, F, boolAsInt(B)) requires isEqOrdOp(OP)
+/reference/k-proof/reference-semantics/semantics/float.k-188-
+/reference/k-proof/reference-semantics/semantics/float.k-189-  // ---- x == None (promoted from 137; `is` cases live in operators.k) ----
+/reference/k-proof/reference-semantics/semantics/float.k:190:  rule applyCmp("==", V:Val, noneV) => V ==K noneV
+/reference/k-proof/reference-semantics/semantics/float.k:191:  rule applyCmp("!=", V:Val, noneV) => notBool (V ==K noneV)
+/reference/k-proof/reference-semantics/semantics/float.k-192-
+/reference/k-proof/reference-semantics/semantics/float.k-193-  // ---- float(str): decimal parse (promoted from 137's defined chain) ----
+/reference/k-proof/reference-semantics/semantics/float.k-194-  // digits '.' digits, optional leading '-'; concrete evaluation only (the
+/reference/k-proof/reference-semantics/semantics/float.k-195-  // symbolic side stays an opaque decStrToF term a proof case-splits on).
+--
+/reference/k-proof/reference-semantics/semantics/float.k-337-  rule <k> #iterYield(V:Val, R:Iterable) ~> #minContF(M:Float) => #minAccF(R, minFloat(M, {V}:>Float)) ... </k>
+/reference/k-proof/reference-semantics/semantics/float.k-338-       requires isFloat(V)
+/reference/k-proof/reference-semantics/semantics/float.k-339-
+/reference/k-proof/reference-semantics/semantics/float.k-340-  // cross-sort steps (v3): an Int/Bool yield hands the Float-seeded fold to the
+/reference/k-proof/reference-semantics/semantics/float.k:341:  // general Val fold (builtins.k), which compares through the same applyCmp
+/reference/k-proof/reference-semantics/semantics/float.k-342-  // dispatch (the exact ltIF/ltFI bridges + the bool promotion above) — mixed
+/reference/k-proof/reference-semantics/semantics/float.k-343-  // lists like [2.5, 1]. Guards are disjoint from the isFloat steps above.
+/reference/k-proof/reference-semantics/semantics/float.k-344-  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxContF(M:Float)
+/reference/k-proof/reference-semantics/semantics/float.k-345-        => #iterYield(V, R) ~> #maxContV(M) ... </k>
+--
+/reference/k-proof/reference-semantics/semantics/builtins.k-95-
+/reference/k-proof/reference-semantics/semantics/builtins.k-96-  // ---- general Val branch of the max/min folds (v3) ------------------------
+/reference/k-proof/reference-semantics/semantics/builtins.k-97-  // The Int fold above and the Float fold (float.k) cover homogeneous lists; the
+/reference/k-proof/reference-semantics/semantics/builtins.k-98-  // remaining CPython-orderable seeds (Bool, str) and every cross-sort step land
+/reference/k-proof/reference-semantics/semantics/builtins.k:99:  // here. Ordering reuses the semantics' OWN applyCmp dispatch (int.k; float.k's
+/reference/k-proof/reference-semantics/semantics/builtins.k-100-  // exact ltIF/ltFI bridges; bool.k's bool->int promotion; str.k's strLt), so
+/reference/k-proof/reference-semantics/semantics/builtins.k:101:  // mixed comparisons stay bit-exact with CPython; a pair applyCmp does not
+/reference/k-proof/reference-semantics/semantics/builtins.k-102-  // order (e.g. int vs str) leaves the fold stuck (unmodeled TypeError).
+/reference/k-proof/reference-semantics/semantics/builtins.k-103-  // Strict > (resp. <) replacement keeps the FIRST maximal (minimal) element —
+/reference/k-proof/reference-semantics/semantics/builtins.k-104-  // CPython's tie rule.
+/reference/k-proof/reference-semantics/semantics/builtins.k-105-  syntax KItem ::= #maxAccV(Iterable, Val) | #maxContV(Val)
+--
+/reference/k-proof/reference-semantics/semantics/builtins.k-110-       requires isFloat(V) orBool isBool(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k-111-  rule <k> #maxAccV(IT:Iterable, M:Val) => #iterNext(IT) ~> #maxContV(M) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-112-  rule <k> #iterDone ~> #maxContV(M:Val) => M ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-113-  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxContV(M:Val) => #maxAccV(R, V) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:114:       requires applyCmp(">", V, M)
+/reference/k-proof/reference-semantics/semantics/builtins.k-115-  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxContV(M:Val) => #maxAccV(R, M) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:116:       requires notBool applyCmp(">", V, M)
+/reference/k-proof/reference-semantics/semantics/builtins.k-117-
+/reference/k-proof/reference-semantics/semantics/builtins.k-118-  syntax KItem ::= #minAccV(Iterable, Val) | #minContV(Val)
+/reference/k-proof/reference-semantics/semantics/builtins.k-119-  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAccV(R, V) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-120-       requires isBool(V) orBool isStr(V)
+--
+/reference/k-proof/reference-semantics/semantics/builtins.k-123-       requires isFloat(V) orBool isBool(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k-124-  rule <k> #minAccV(IT:Iterable, M:Val) => #iterNext(IT) ~> #minContV(M) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-125-  rule <k> #iterDone ~> #minContV(M:Val) => M ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k-126-  rule <k> #iterYield(V:Val, R:Iterable) ~> #minContV(M:Val) => #minAccV(R, V) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:127:       requires applyCmp("<", V, M)
+/reference/k-proof/reference-semantics/semantics/builtins.k-128-  rule <k> #iterYield(V:Val, R:Iterable) ~> #minContV(M:Val) => #minAccV(R, M) ... </k>
+/reference/k-proof/reference-semantics/semantics/builtins.k:129:       requires notBool applyCmp("<", V, M)
+/reference/k-proof/reference-semantics/semantics/builtins.k-130-
+/reference/k-proof/reference-semantics/semantics/builtins.k-131-  // ==== variadic max / min (a Vals fold) ====================================
+/reference/k-proof/reference-semantics/semantics/builtins.k:132:  // v3: Val operands (mixed int/float/bool, str) via the same applyCmp
+/reference/k-proof/reference-semantics/semantics/builtins.k-133-  // dispatch; strict > / < keeps the FIRST maximal/minimal operand (CPython's
+/reference/k-proof/reference-semantics/semantics/builtins.k-134-  // tie rule — and exactly the old maxInt/minInt fold on the all-Int domain).
+/reference/k-proof/reference-semantics/semantics/builtins.k-135-  syntax Val ::= maxVals(Val, Vals) [function]
+/reference/k-proof/reference-semantics/semantics/builtins.k-136-  rule applyBuiltin("max", I:Int, REST:Vals) => maxVals(I, REST)
+/reference/k-proof/reference-semantics/semantics/builtins.k-137-  rule applyBuiltin("max", V:Val, (V2:Val, REST:Vals)) => maxVals(V, (V2, REST))
+/reference/k-proof/reference-semantics/semantics/builtins.k-138-       requires isFloat(V) orBool isBool(V) orBool isStr(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k-139-  rule maxVals(M:Val, .Vals)           => M
+/reference/k-proof/reference-semantics/semantics/builtins.k:140:  rule maxVals(M:Val, (V:Val, R:Vals)) => maxVals(V, R) requires applyCmp(">", V, M)
+/reference/k-proof/reference-semantics/semantics/builtins.k:141:  rule maxVals(M:Val, (V:Val, R:Vals)) => maxVals(M, R) requires notBool applyCmp(">", V, M)
+/reference/k-proof/reference-semantics/semantics/builtins.k-142-
+/reference/k-proof/reference-semantics/semantics/builtins.k-143-  syntax Val ::= minVals(Val, Vals) [function]
+/reference/k-proof/reference-semantics/semantics/builtins.k-144-  rule applyBuiltin("min", I:Int, REST:Vals) => minVals(I, REST)
+/reference/k-proof/reference-semantics/semantics/builtins.k-145-  rule applyBuiltin("min", V:Val, (V2:Val, REST:Vals)) => minVals(V, (V2, REST))
+/reference/k-proof/reference-semantics/semantics/builtins.k-146-       requires isFloat(V) orBool isBool(V) orBool isStr(V)
+/reference/k-proof/reference-semantics/semantics/builtins.k-147-  rule minVals(M:Val, .Vals)           => M
+/reference/k-proof/reference-semantics/semantics/builtins.k:148:  rule minVals(M:Val, (V:Val, R:Vals)) => minVals(V, R) requires applyCmp("<", V, M)
+/reference/k-proof/reference-semantics/semantics/builtins.k:149:  rule minVals(M:Val, (V:Val, R:Vals)) => minVals(M, R) requires notBool applyCmp("<", V, M)
+/reference/k-proof/reference-semantics/semantics/builtins.k-150-
+/reference/k-proof/reference-semantics/semantics/builtins.k-151-  // ==== bin(n) — "0b" + binary digit codes (promoted from 103's defined fold) ==
+/reference/k-proof/reference-semantics/semantics/builtins.k-152-  rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(48, iCons(98, binCodes(N))))
+/reference/k-proof/reference-semantics/semantics/builtins.k-153-       requires N >=Int 0

@@ -1,0 +1,298 @@
+VERIFICATION_K
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION-SYNTAX
+     4	  imports MPY
+     5	
+     6	  // Exact syntactic abbreviations for the two bodies in solution.mpy.
+     7	  syntax Stmts ::= "digitSumLoopBody" [macro]
+     8	  rule digitSumLoopBody =>
+     9	      AugAssign(Name("total"), "+",
+    10	        BinOp("%", Name("number"), Int(10)))
+    11	      AugAssign(Name("number"), "//", Int(10))
+    12	
+    13	  syntax Stmts ::= "digitSumBody" [macro]
+    14	  rule digitSumBody =>
+    15	      If(Compare(Name("number"), CmpOp("<", Int(0))),
+    16	        Assign(Name("sign"), UnaryOp("-", Int(1)))
+    17	        Assign(Name("number"), UnaryOp("-", Name("number"))),
+    18	        Assign(Name("sign"), Int(1)))
+    19	      Assign(Name("total"), Int(0))
+    20	      While(Compare(Name("number"), CmpOp(">=", Int(10))),
+    21	        digitSumLoopBody)
+    22	      Return(BinOp("+", Name("total"),
+    23	        BinOp("*", Name("sign"), Name("number"))))
+    24	
+    25	  syntax Stmts ::= "orderByPointsBody" [macro]
+    26	  rule orderByPointsBody =>
+    27	      Return(Call(Name("sorted"), Name("nums"),
+    28	        KwArg("key", Name("digit_sum"))))
+    29	
+    30	  syntax Module ::= "solutionModule" [macro]
+    31	  rule solutionModule =>
+    32	      Module(
+    33	        FuncDef("digit_sum", Params("number"), digitSumBody)
+    34	        FuncDef("order_by_points", Params("nums"), orderByPointsBody))
+    35	
+    36	  // Mathematical summaries used by the claims.
+    37	  syntax Int ::= magnitude(Int) [function, total]
+    38	               | leadingDigit(Int) [function, total]
+    39	               | lowerDigitSum(Int) [function, total]
+    40	               | lowerDigitSumAcc(Int, Int) [function, total]
+    41	               | signedDigitSum(Int) [function, total]
+    42	
+    43	  syntax Bool ::= allInts(ValSeq) [function, total]
+    44	
+    45	  // The intended stable ordering, conditional on the supplied semantics'
+    46	  // contract for the external Python primitive sorted(..., key=...).
+    47	  syntax ValSeq ::= expectedOrder(ValSeq) [function, total]
+    48	endmodule
+    49	
+    50	module VERIFICATION
+    51	  imports VERIFICATION-SYNTAX
+    52	
+    53	  rule magnitude(N:Int) => N
+    54	    requires N >=Int 0
+    55	  rule magnitude(N:Int) => 0 -Int N
+    56	    requires N <Int 0
+    57	
+    58	  rule leadingDigit(N:Int) => N
+    59	    requires 0 <=Int N andBool N <Int 10
+    60	  rule leadingDigit(N:Int)
+    61	    => leadingDigit((N -Int pyMod(N, 10)) /Int 10)
+    62	    requires N >=Int 10
+    63	  rule leadingDigit(N:Int) => leadingDigit(0 -Int N)
+    64	    requires N <Int 0
+    65	
+    66	  rule lowerDigitSum(N:Int) => lowerDigitSumAcc(N, 0)
+    67	    requires N >=Int 0
+    68	  rule lowerDigitSum(N:Int) => lowerDigitSumAcc(0 -Int N, 0)
+    69	    requires N <Int 0
+    70	
+    71	  rule lowerDigitSumAcc(N:Int, S:Int) => S
+    72	    requires 0 <=Int N andBool N <Int 10
+    73	  rule lowerDigitSumAcc(N:Int, S:Int)
+    74	    => lowerDigitSumAcc(
+    75	         (N -Int pyMod(N, 10)) /Int 10,
+    76	         S +Int pyMod(N, 10))
+    77	    requires N >=Int 10
+    78	  rule lowerDigitSumAcc(N:Int, S:Int)
+    79	    => lowerDigitSumAcc(0 -Int N, S)
+    80	    requires N <Int 0
+    81	
+    82	  rule signedDigitSum(N:Int)
+    83	    => lowerDigitSum(magnitude(N)) +Int leadingDigit(magnitude(N))
+    84	    requires N >=Int 0
+    85	  rule signedDigitSum(N:Int)
+    86	    => lowerDigitSum(magnitude(N)) -Int leadingDigit(magnitude(N))
+    87	    requires N <Int 0
+    88	
+    89	  rule allInts(.ValSeq) => true
+    90	  rule allInts(vCons(_:Int, REST:ValSeq)) => allInts(REST)
+    91	  rule allInts(vCons(V:Val, _:ValSeq)) => false
+    92	    requires notBool isInt(V)
+    93	
+    94	  rule expectedOrder(VS:ValSeq)
+    95	    => sortKeyVS(
+    96	         VS,
+    97	         closureVal("number", digitSumBody, 0))
+    98	endmodule
+SPEC_K
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [digit-sum-loop]:
+     7	    <k>
+     8	      #while(
+     9	        Compare(Name("number"), CmpOp(">=", Int(10))),
+    10	        digitSumLoopBody
+    11	      ) => .K
+    12	      ...
+    13	    </k>
+    14	    <env> 1 </env>
+    15	    <scopes>
+    16	      ...
+    17	      1 |-> scope(
+    18	        "number" |-> (N:Int => leadingDigit(N))
+    19	        "sign"   |-> SIGN:Int
+    20	        "total"  |-> (S:Int => lowerDigitSumAcc(N, S)),
+    21	        parent(0))
+    22	      ...
+    23	    </scopes>
+    24	    requires N >=Int 0
+    25	
+    26	  claim [digit-sum-function]:
+    27	    <k>
+    28	      #loadAll(solutionModule)
+    29	      ~> Call(Name("digit_sum"), (N:Int, .Exprs))
+    30	      => signedDigitSum(N)
+    31	    </k>
+    32	    <env> 0 </env>
+    33	    <scopes>
+    34	        0 |-> scope(.Map, parent(-1))
+    35	        -1 |-> builtinsScope
+    36	      =>
+    37	        0 |-> scope(
+    38	          "digit_sum" |-> closureVal("number", digitSumBody, 0)
+    39	          "order_by_points" |->
+    40	            closureVal("nums", orderByPointsBody, 0),
+    41	          parent(-1))
+    42	        -1 |-> builtinsScope
+    43	    </scopes>
+    44	    <scopeLoc> 1 </scopeLoc>
+    45	    <heap> .Map </heap>
+    46	    <heapLoc> 0 </heapLoc>
+    47	    <stack> .List </stack>
+    48	    <ret> noRet </ret>
+    49	    <exc> NoExc </exc>
+    50	    <exit-code> 0 </exit-code>
+    51	
+    52	  claim [order-by-points]:
+    53	    <k>
+    54	      #loadAll(solutionModule)
+    55	      ~> Call(Name("order_by_points"), (list(VS:ValSeq), .Exprs))
+    56	      => ref(0)
+    57	    </k>
+    58	    <env> 0 </env>
+    59	    <scopes>
+    60	        0 |-> scope(.Map, parent(-1))
+    61	        -1 |-> builtinsScope
+    62	      =>
+    63	        0 |-> scope(
+    64	          "digit_sum" |-> closureVal("number", digitSumBody, 0)
+    65	          "order_by_points" |->
+    66	            closureVal("nums", orderByPointsBody, 0),
+    67	          parent(-1))
+    68	        -1 |-> builtinsScope
+    69	    </scopes>
+    70	    <scopeLoc> 1 </scopeLoc>
+    71	    <heap> .Map => 0 |-> list(expectedOrder(VS)) </heap>
+    72	    <heapLoc> 0 => 1 </heapLoc>
+    73	    <stack> .List </stack>
+    74	    <ret> noRet </ret>
+    75	    <exc> NoExc </exc>
+    76	    <exit-code> 0 </exit-code>
+    77	    requires allInts(VS)
+    78	endmodule
+SOLUTION_PY
+     1	def digit_sum(number):
+     2	    if number < 0:
+     3	        sign = -1
+     4	        number = -number
+     5	    else:
+     6	        sign = 1
+     7	    total = 0
+     8	    while number >= 10:
+     9	        total += number % 10
+    10	        number //= 10
+    11	    return total + sign * number
+    12	
+    13	
+    14	def order_by_points(nums):
+    15	    return sorted(nums, key=digit_sum)
+PROMPT_PY
+     1	
+     2	def order_by_points(nums):
+     3	    """
+     4	    Write a function which sorts the given list of integers
+     5	    in ascending order according to the sum of their digits.
+     6	    Note: if there are several items with similar sum of their digits,
+     7	    order them based on their index in original list.
+     8	
+     9	    For example:
+    10	    >>> order_by_points([1, 11, -1, -11, -12]) == [-1, -11, 1, -12, 11]
+    11	    >>> order_by_points([]) == []
+    12	    """
+PROVE_SH
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	mkdir -p proof-logs
+     5	
+     6	python3 py2mpy.py solution.py > solution.mpy
+     7	python3 py2mpy.py concrete_tests.py > concrete_tests.mpy
+     8	python3 validate.py 2>&1 | tee proof-logs/python-validation.out
+     9	
+    10	kompile reference-semantics/semantics.k \
+    11	  --backend llvm \
+    12	  --main-module MPY-KRUN \
+    13	  --syntax-module MPY-SYNTAX \
+    14	  --output-definition runtime-kompiled \
+    15	  2>&1 | tee proof-logs/llvm-kompile.out
+    16	
+    17	krun concrete_tests.mpy \
+    18	  --definition runtime-kompiled \
+    19	  2>&1 | tee proof-logs/concrete-krun.out
+    20	rg -U -q '<exc>[[:space:]]+NoExc[[:space:]]+</exc>' \
+    21	  proof-logs/concrete-krun.out
+    22	rg -U -q '<exit-code>[[:space:]]+0[[:space:]]+</exit-code>' \
+    23	  proof-logs/concrete-krun.out
+    24	
+    25	kompile verification.k \
+    26	  --backend haskell \
+    27	  --main-module VERIFICATION \
+    28	  --syntax-module MPY-SYNTAX \
+    29	  --output-definition verification-kompiled \
+    30	  2>&1 | tee proof-logs/haskell-kompile.out
+    31	
+    32	kast solution.mpy \
+    33	  --definition verification-kompiled \
+    34	  --module VERIFICATION-SYNTAX \
+    35	  --sort Module \
+    36	  --expand-macros \
+    37	  --output kore \
+    38	  > solution.kore
+    39	kast \
+    40	  --expression solutionModule \
+    41	  --definition verification-kompiled \
+    42	  --module VERIFICATION-SYNTAX \
+    43	  --sort Module \
+    44	  --expand-macros \
+    45	  --output kore \
+    46	  > verification-solution.kore
+    47	diff -u solution.kore verification-solution.kore \
+    48	  > proof-logs/program-identity.diff
+    49	echo "KORE program identity: identical" \
+    50	  | tee proof-logs/program-identity.out
+    51	
+    52	kprove spec.k \
+    53	  --definition verification-kompiled \
+    54	  --spec-module SPEC \
+    55	  2>&1 | tee proof-logs/kprove.out
+    56	rg -q '^#Top$' proof-logs/kprove.out
+    57	
+    58	set +e
+    59	kprove mutation-spec.k \
+    60	  --definition verification-kompiled \
+    61	  --spec-module MUTATION-SPEC \
+    62	  --claims MUTATION-SPEC.digit-sum-body-mutation \
+    63	  > proof-logs/mutation-body.out 2>&1
+    64	mutation_body_status=$?
+    65	set -e
+    66	if [ "$mutation_body_status" -eq 0 ]; then
+    67	  echo "unexpected success: digit-sum body mutation" >&2
+    68	  exit 1
+    69	fi
+    70	rg -q 'WarnStuckClaimState' proof-logs/mutation-body.out
+    71	echo "digit-sum body mutation: expected exit $mutation_body_status" \
+    72	  | tee proof-logs/mutation-body-status.out
+    73	
+    74	set +e
+    75	kprove mutation-spec.k \
+    76	  --definition verification-kompiled \
+    77	  --spec-module MUTATION-SPEC \
+    78	  --claims MUTATION-SPEC.target-postcondition-mutation \
+    79	  > proof-logs/mutation-postcondition.out 2>&1
+    80	mutation_postcondition_status=$?
+    81	set -e
+    82	if [ "$mutation_postcondition_status" -eq 0 ]; then
+    83	  echo "unexpected success: target postcondition mutation" >&2
+    84	  exit 1
+    85	fi
+    86	rg -q 'WarnStuckClaimState' proof-logs/mutation-postcondition.out
+    87	echo "target postcondition mutation: expected exit $mutation_postcondition_status" \
+    88	  | tee proof-logs/mutation-postcondition-status.out
+    89	
+    90	echo "all positive proofs and validation checks passed"

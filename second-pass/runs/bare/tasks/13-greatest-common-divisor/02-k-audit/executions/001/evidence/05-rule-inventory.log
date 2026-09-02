@@ -1,0 +1,287 @@
+WORKDIR: /audit-output
+COMMAND: /audit-output/evidence/rule_inventory.sh
+--- OUTPUT BEGIN ---
+FILE /tmp/audit-work/source/semantic.k
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports BOOL-SYNTAX
+     4	  imports STRING-SYNTAX
+     5	
+     6	  syntax Pgm ::= "Module" "(" Stmts ")"
+     7	  syntax Stmts ::= List{Stmt, ""}
+     8	
+     9	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    10	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    11	                | "While" "(" Expr "," Stmts ")"
+    12	                | "Assign" "(" Expr "," Expr ")"
+    13	                | "Return" "(" Expr ")"
+    14	
+    15	  syntax Params ::= "Params" "(" Strings ")"
+    16	  syntax Strings ::= List{String, ","}
+    17	
+    18	  syntax Expr ::= "Int" "(" Int ")"
+    19	                | "Name" "(" String ")"
+    20	                | "UnaryOp" "(" String "," Expr ")"
+    21	                | "BinOp" "(" String "," Expr "," Expr ")"
+    22	                | "Compare" "(" Expr "," CmpOp ")"
+    23	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    24	endmodule
+    25	
+    26	module MPY
+    27	  imports MPY-SYNTAX
+    28	  imports INT
+    29	  imports BOOL
+    30	  imports MAP
+    31	
+    32	  syntax Result ::= "noResult" | "result" "(" Int ")"
+    33	
+    34	  configuration
+    35	    <gcd-program>
+    36	      <k> $PGM:Pgm </k>
+    37	      <env> .Map </env>
+    38	      <inputA> $A:Int </inputA>
+    39	      <inputB> $B:Int </inputB>
+    40	      <result> noResult </result>
+    41	    </gcd-program>
+    42	
+    43	  syntax KItem ::= "execStmts" "(" Stmts ")"
+    44	                 | "execStmt" "(" Stmt ")"
+    45	
+    46	  syntax Int ::= "evalInt" "(" Expr "," Map ")" [function]
+    47	  syntax Bool ::= "evalBool" "(" Expr "," Map ")" [function]
+    48	
+    49	  rule evalInt(Int(I), _ENV) => I
+    50	  rule evalInt(Name(X), (X |-> I) _REST) => I
+    51	  rule evalInt(UnaryOp("-", E), ENV) => 0 -Int evalInt(E, ENV)
+    52	  rule evalInt(BinOp("%", E1, E2), ENV)
+    53	    => evalInt(E1, ENV) %Int evalInt(E2, ENV)
+    54	
+    55	  rule evalBool(Compare(E1, CmpOp("<", E2)), ENV)
+    56	    => evalInt(E1, ENV) <Int evalInt(E2, ENV)
+    57	  rule evalBool(Compare(E1, CmpOp("!=", E2)), ENV)
+    58	    => evalInt(E1, ENV) =/=Int evalInt(E2, ENV)
+    59	
+    60	  rule <k> Module(FuncDef("greatest_common_divisor", Params(X:String, Y:String), BODY))
+    61	            => execStmts(BODY) ... </k>
+    62	       <env> .Map => (X |-> A) (Y |-> B) </env>
+    63	       <inputA> A </inputA>
+    64	       <inputB> B </inputB>
+    65	
+    66	  rule <k> execStmts(.Stmts) => .K ... </k>
+    67	  rule <k> execStmts(S SS) => execStmt(S) ~> execStmts(SS) ... </k>
+    68	
+    69	  rule <k> execStmt(Assign(Name(X), E)) => .K ... </k>
+    70	       <env> ENV => ENV [ X <- evalInt(E, ENV) ] </env>
+    71	
+    72	  rule <k> execStmt(If(COND, THEN, _ELSE)) => execStmts(THEN) ... </k>
+    73	       <env> ENV </env>
+    74	    requires evalBool(COND, ENV)
+    75	  rule <k> execStmt(If(COND, _THEN, ELSE)) => execStmts(ELSE) ... </k>
+    76	       <env> ENV </env>
+    77	    requires notBool evalBool(COND, ENV)
+    78	
+    79	  rule <k> execStmt(While(COND, BODY))
+    80	            => execStmts(BODY) ~> execStmt(While(COND, BODY)) ... </k>
+    81	       <env> ENV </env>
+    82	    requires evalBool(COND, ENV)
+    83	  rule <k> execStmt(While(COND, _BODY)) => .K ... </k>
+    84	       <env> ENV </env>
+    85	    requires notBool evalBool(COND, ENV)
+    86	
+    87	  rule <k> execStmt(Return(E)) ~> _REST:K => .K </k>
+    88	       <env> ENV </env>
+    89	       <result> noResult => result(evalInt(E, ENV)) </result>
+    90	endmodule
+FILE /tmp/audit-work/source/gcd-spec.k
+     1	module GCD-SPEC
+     2	  imports INT
+     3	  imports BOOL
+     4	
+     5	  // Mathematical GCD is characterized by the Euclidean equations below.
+     6	  // Keeping gcdSpec constructor-valued makes the equations logical lemmas;
+     7	  // it also avoids asking the simplifier to evaluate a symbolic recursion.
+     8	  syntax Int ::= "gcdSpec" "(" Int "," Int ")" [function, total]
+     9	  syntax Int ::= "finalR" "(" Int "," Int ")" [function, total]
+    10	  syntax Int ::= "normInt" "(" Int ")" [function, total]
+    11	
+    12	  // Concrete equations make the reference function executable; symbolic
+    13	  // reasoning uses the Euclidean equality simplifications below.
+    14	  rule gcdSpec(A, 0) => A
+    15	    requires A >=Int 0
+    16	  rule gcdSpec(A, B) => gcdSpec(B, A %Int B)
+    17	    requires (A >=Int 0) andBool (B >Int 0) [simplification, concrete]
+    18	
+    19	  rule normInt(A) => 0 -Int A
+    20	    requires A <Int 0
+    21	  rule normInt(A) => A
+    22	    requires A >=Int 0
+    23	
+    24	  rule finalR(R, R) => 0 [simplification]
+    25	  rule finalR(_B, 0) => 0 [simplification]
+    26	  rule finalR(0, R) => R
+    27	  rule finalR(B, _R) => 0
+    28	    requires B =/=Int 0
+    29	
+    30	  rule { gcdSpec(A, 0) #Equals A } => #Top
+    31	    requires A >=Int 0 [simplification]
+    32	  rule { A #Equals gcdSpec(A, 0) } => #Top
+    33	    requires A >=Int 0 [simplification]
+    34	  rule { gcdSpec(A, B) #Equals gcdSpec(B, R) } => #Top
+    35	    requires (A >=Int 0) andBool (B >Int 0)
+    36	      andBool (R ==Int (A %Int B)) [simplification]
+    37	  rule { gcdSpec(B, R) #Equals gcdSpec(A, B) } => #Top
+    38	    requires (A >=Int 0) andBool (B >Int 0)
+    39	      andBool (R ==Int (A %Int B)) [simplification]
+    40	endmodule
+FILE /tmp/audit-work/source/verification.k
+     1	requires "semantic.k"
+     2	requires "gcd-spec.k"
+     3	
+     4	module VERIFICATION
+     5	  imports MPY
+     6	  imports GCD-SPEC
+     7	
+     8	  // This rule is the loop theorem discharged independently by loop-spec.k.
+     9	  // It is compiled into the verification definition only after that proof.
+    10	  rule
+    11	    <k>
+    12	      execStmt(While(
+    13	        Compare(Name("b"), CmpOp("!=", Int(0))),
+    14	        Assign(Name("r"), BinOp("%", Name("a"), Name("b")))
+    15	        Assign(Name("a"), Name("b"))
+    16	        Assign(Name("b"), Name("r"))
+    17	      ))
+    18	      => .K ...
+    19	    </k>
+    20	    <env>
+    21	      ("a" |-> A) ("b" |-> B) ("r" |-> R0:Int)
+    22	      => ("a" |-> gcdSpec(A, B)) ("b" |-> 0)
+    23	         ("r" |-> finalR(B, R0))
+    24	    </env>
+    25	    requires (A >=Int 0) andBool (B >=Int 0) [priority(40)]
+    26	endmodule
+FILE /tmp/audit-work/source/loop-verification.k
+     1	requires "semantic.k"
+     2	requires "gcd-spec.k"
+     3	
+     4	module LOOP-VERIFICATION
+     5	  imports MPY
+     6	  imports GCD-SPEC
+     7	endmodule
+FILE /tmp/audit-work/source/loop-spec.k
+     1	requires "loop-verification.k"
+     2	
+     3	module LOOP-SPEC
+     4	  imports LOOP-VERIFICATION
+     5	
+     6	  claim
+     7	    <k>
+     8	      execStmt(While(
+     9	        Compare(Name("b"), CmpOp("!=", Int(0))),
+    10	        Assign(Name("r"), BinOp("%", Name("a"), Name("b")))
+    11	        Assign(Name("a"), Name("b"))
+    12	        Assign(Name("b"), Name("r"))
+    13	      ))
+    14	      => .K
+    15	    </k>
+    16	    <env>
+    17	      ("a" |-> A) ("b" |-> B) ("r" |-> R0:Int)
+    18	      => ("a" |-> gcdSpec(A, B)) ("b" |-> 0)
+    19	         ("r" |-> finalR(B, R0))
+    20	    </env>
+    21	    requires (A >=Int 0) andBool (B >=Int 0)
+    22	endmodule
+FILE /tmp/audit-work/source/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Whole-program functional correctness for every pair of mathematical
+     7	  // integers, including negative arguments and zero.
+     8	  claim [gcd-correct]:
+     9	    <k>
+    10	      Module(
+    11	        FuncDef("greatest_common_divisor", Params("a", "b"),
+    12	          If(Compare(Name("a"), CmpOp("<", Int(0))),
+    13	            Assign(Name("a"), UnaryOp("-", Name("a"))),
+    14	            .Stmts)
+    15	          If(Compare(Name("b"), CmpOp("<", Int(0))),
+    16	            Assign(Name("b"), UnaryOp("-", Name("b"))),
+    17	            .Stmts)
+    18	          Assign(Name("r"), Int(0))
+    19	          While(Compare(Name("b"), CmpOp("!=", Int(0))),
+    20	            Assign(Name("r"), BinOp("%", Name("a"), Name("b")))
+    21	            Assign(Name("a"), Name("b"))
+    22	            Assign(Name("b"), Name("r"))
+    23	          )
+    24	          Return(Name("a"))
+    25	        )
+    26	      )
+    27	      => .K
+    28	    </k>
+    29	    <env>
+    30	      .Map
+    31	      => ("a" |-> gcdSpec(normInt(A), normInt(B)))
+    32	         ("b" |-> 0) ("r" |-> 0)
+    33	    </env>
+    34	    <inputA> A </inputA>
+    35	    <inputB> B </inputB>
+    36	    <result>
+    37	      noResult => result(gcdSpec(normInt(A), normInt(B)))
+    38	    </result>
+    39	endmodule
+DECLARATION_AND_RULE_INDEX
+/tmp/audit-work/source/loop-spec.k:6:  claim
+/tmp/audit-work/source/verification.k:10:  rule
+/tmp/audit-work/source/verification.k:25:    requires (A >=Int 0) andBool (B >=Int 0) [priority(40)]
+/tmp/audit-work/source/gcd-spec.k:8:  syntax Int ::= "gcdSpec" "(" Int "," Int ")" [function, total]
+/tmp/audit-work/source/gcd-spec.k:9:  syntax Int ::= "finalR" "(" Int "," Int ")" [function, total]
+/tmp/audit-work/source/gcd-spec.k:10:  syntax Int ::= "normInt" "(" Int ")" [function, total]
+/tmp/audit-work/source/gcd-spec.k:14:  rule gcdSpec(A, 0) => A
+/tmp/audit-work/source/gcd-spec.k:16:  rule gcdSpec(A, B) => gcdSpec(B, A %Int B)
+/tmp/audit-work/source/gcd-spec.k:17:    requires (A >=Int 0) andBool (B >Int 0) [simplification, concrete]
+/tmp/audit-work/source/gcd-spec.k:19:  rule normInt(A) => 0 -Int A
+/tmp/audit-work/source/gcd-spec.k:21:  rule normInt(A) => A
+/tmp/audit-work/source/gcd-spec.k:24:  rule finalR(R, R) => 0 [simplification]
+/tmp/audit-work/source/gcd-spec.k:25:  rule finalR(_B, 0) => 0 [simplification]
+/tmp/audit-work/source/gcd-spec.k:26:  rule finalR(0, R) => R
+/tmp/audit-work/source/gcd-spec.k:27:  rule finalR(B, _R) => 0
+/tmp/audit-work/source/gcd-spec.k:30:  rule { gcdSpec(A, 0) #Equals A } => #Top
+/tmp/audit-work/source/gcd-spec.k:31:    requires A >=Int 0 [simplification]
+/tmp/audit-work/source/gcd-spec.k:32:  rule { A #Equals gcdSpec(A, 0) } => #Top
+/tmp/audit-work/source/gcd-spec.k:33:    requires A >=Int 0 [simplification]
+/tmp/audit-work/source/gcd-spec.k:34:  rule { gcdSpec(A, B) #Equals gcdSpec(B, R) } => #Top
+/tmp/audit-work/source/gcd-spec.k:36:      andBool (R ==Int (A %Int B)) [simplification]
+/tmp/audit-work/source/gcd-spec.k:37:  rule { gcdSpec(B, R) #Equals gcdSpec(A, B) } => #Top
+/tmp/audit-work/source/gcd-spec.k:39:      andBool (R ==Int (A %Int B)) [simplification]
+/tmp/audit-work/source/semantic.k:6:  syntax Pgm ::= "Module" "(" Stmts ")"
+/tmp/audit-work/source/semantic.k:7:  syntax Stmts ::= List{Stmt, ""}
+/tmp/audit-work/source/semantic.k:9:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+/tmp/audit-work/source/semantic.k:15:  syntax Params ::= "Params" "(" Strings ")"
+/tmp/audit-work/source/semantic.k:16:  syntax Strings ::= List{String, ","}
+/tmp/audit-work/source/semantic.k:18:  syntax Expr ::= "Int" "(" Int ")"
+/tmp/audit-work/source/semantic.k:23:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+/tmp/audit-work/source/semantic.k:32:  syntax Result ::= "noResult" | "result" "(" Int ")"
+/tmp/audit-work/source/semantic.k:34:  configuration
+/tmp/audit-work/source/semantic.k:43:  syntax KItem ::= "execStmts" "(" Stmts ")"
+/tmp/audit-work/source/semantic.k:46:  syntax Int ::= "evalInt" "(" Expr "," Map ")" [function]
+/tmp/audit-work/source/semantic.k:47:  syntax Bool ::= "evalBool" "(" Expr "," Map ")" [function]
+/tmp/audit-work/source/semantic.k:49:  rule evalInt(Int(I), _ENV) => I
+/tmp/audit-work/source/semantic.k:50:  rule evalInt(Name(X), (X |-> I) _REST) => I
+/tmp/audit-work/source/semantic.k:51:  rule evalInt(UnaryOp("-", E), ENV) => 0 -Int evalInt(E, ENV)
+/tmp/audit-work/source/semantic.k:52:  rule evalInt(BinOp("%", E1, E2), ENV)
+/tmp/audit-work/source/semantic.k:55:  rule evalBool(Compare(E1, CmpOp("<", E2)), ENV)
+/tmp/audit-work/source/semantic.k:57:  rule evalBool(Compare(E1, CmpOp("!=", E2)), ENV)
+/tmp/audit-work/source/semantic.k:60:  rule <k> Module(FuncDef("greatest_common_divisor", Params(X:String, Y:String), BODY))
+/tmp/audit-work/source/semantic.k:66:  rule <k> execStmts(.Stmts) => .K ... </k>
+/tmp/audit-work/source/semantic.k:67:  rule <k> execStmts(S SS) => execStmt(S) ~> execStmts(SS) ... </k>
+/tmp/audit-work/source/semantic.k:69:  rule <k> execStmt(Assign(Name(X), E)) => .K ... </k>
+/tmp/audit-work/source/semantic.k:72:  rule <k> execStmt(If(COND, THEN, _ELSE)) => execStmts(THEN) ... </k>
+/tmp/audit-work/source/semantic.k:75:  rule <k> execStmt(If(COND, _THEN, ELSE)) => execStmts(ELSE) ... </k>
+/tmp/audit-work/source/semantic.k:79:  rule <k> execStmt(While(COND, BODY))
+/tmp/audit-work/source/semantic.k:83:  rule <k> execStmt(While(COND, _BODY)) => .K ... </k>
+/tmp/audit-work/source/semantic.k:87:  rule <k> execStmt(Return(E)) ~> _REST:K => .K </k>
+/tmp/audit-work/source/spec.k:8:  claim [gcd-correct]:
+--- OUTPUT END ---
+EXIT_STATUS: 0

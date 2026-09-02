@@ -1,0 +1,248 @@
+COMMAND: bash -lc $'set -u\nfor path in /reference/prompt.py /reference/canonical.py /candidate/solution.py /candidate/solution.mpy /candidate/spec.k /candidate/verification.k /candidate/prove.sh /candidate/concrete-tests.mpy /candidate/reference-semantics/semantics.k; do\n  printf "FILE: %s\\n" "$path"\n  nl -ba "$path"\ndone'
+FILE: /reference/prompt.py
+     1	
+     2	
+     3	def modp(n: int, p: int):
+     4	    """Return 2^n modulo p (be aware of numerics).
+     5	    >>> modp(3, 5)
+     6	    3
+     7	    >>> modp(1101, 101)
+     8	    2
+     9	    >>> modp(0, 101)
+    10	    1
+    11	    >>> modp(3, 11)
+    12	    8
+    13	    >>> modp(100, 101)
+    14	    1
+    15	    """
+FILE: /reference/canonical.py
+     1	# canonical.py — the UNMODIFIED HumanEval/49 reference solution (from the dataset).
+     2	# Co-located with solution.py (the proof rewrite) to make the original<->rewrite link
+     3	# explicit & auditable.  entry point: modp
+     4	
+     5	
+     6	
+     7	def modp(n: int, p: int):
+     8	    """Return 2^n modulo p (be aware of numerics).
+     9	    >>> modp(3, 5)
+    10	    3
+    11	    >>> modp(1101, 101)
+    12	    2
+    13	    >>> modp(0, 101)
+    14	    1
+    15	    >>> modp(3, 11)
+    16	    8
+    17	    >>> modp(100, 101)
+    18	    1
+    19	    """
+    20	    ret = 1
+    21	    for i in range(n):
+    22	        ret = (2 * ret) % p
+    23	    return ret
+FILE: /candidate/solution.py
+     1	def modp(n: int, p: int):
+     2	    """Return 2^n modulo p."""
+     3	    return (2 ** n) % p
+FILE: /candidate/solution.mpy
+     1	Module(
+     2	  FuncDef("modp", Params("n", "p"),
+     3	    Expr(Str("Return 2^n modulo p."))
+     4	    Return(BinOp("%", BinOp("**", Int(2), Name("n")), Name("p")))))
+FILE: /candidate/spec.k
+     1	requires "verification.k"
+     2	
+     3	module MODP-SPEC
+     4	  imports MODP-VERIFICATION
+     5	
+     6	  claim
+     7	    <k>
+     8	      ( #loadAll(modpProgram)
+     9	        ~> Call(Name("modp"), (Int(N), Int(P), .Exprs)) )
+    10	      => (specModp(N, P) ~> .K)
+    11	    </k>
+    12	    <env> 0 </env>
+    13	    <scopes>
+    14	      ( 0  |-> scope(.Map, parent(-1))
+    15	        -1 |-> builtinsScope )
+    16	      =>
+    17	      ( 0  |-> scope(
+    18	                  "modp" |-> closureVal(
+    19	                    ("n", "p", .ParamNames), modpBody, 0),
+    20	                  parent(-1))
+    21	        -1 |-> builtinsScope )
+    22	    </scopes>
+    23	    <scopeLoc> 1 </scopeLoc>
+    24	    <heap> .Map </heap>
+    25	    <heapLoc> 0 </heapLoc>
+    26	    <stack> .List </stack>
+    27	    <ret> noRet </ret>
+    28	    <exc> NoExc </exc>
+    29	    <exit-code> 0 </exit-code>
+    30	    requires N >=Int 0 andBool P >Int 0
+    31	endmodule
+FILE: /candidate/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module MODP-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // This is the exact Module term generated in solution.mpy.  Giving it a
+     7	  // name keeps the reachability claim readable while still executing the
+     8	  // translated program through the supplied Python semantics.
+     9	  syntax Stmts ::= "modpBody" [function]
+    10	  rule modpBody
+    11	    => Expr(Str("Return 2^n modulo p."))
+    12	       Return(BinOp("%", BinOp("**", Int(2), Name("n")), Name("p")))
+    13	
+    14	  syntax Module ::= "modpProgram" [function]
+    15	  rule modpProgram
+    16	    => Module(
+    17	         FuncDef("modp", Params("n", "p"), modpBody))
+    18	
+    19	  // Mathematical contract for the supported input domain.  pyMod is the
+    20	  // supplied semantics' Python (floored) remainder, and ^Int is unbounded
+    21	  // integer exponentiation.
+    22	  syntax Int ::= specModp(Int, Int) [function]
+    23	  rule specModp(N:Int, P:Int) => pyMod(2 ^Int N, P)
+    24	       requires N >=Int 0 andBool P >Int 0
+    25	endmodule
+FILE: /candidate/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Translate the submitted Python implementation.
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	
+     7	# Build the supplied concrete semantics exactly as required, then run all
+     8	# examples from prompt.py as assertions.
+     9	kompile reference-semantics/semantics.k \
+    10	  --backend llvm \
+    11	  --main-module MPY-KRUN \
+    12	  --syntax-module MPY-SYNTAX \
+    13	  --output-definition runtime-kompiled \
+    14	  -w none
+    15	krun concrete-tests.mpy --definition runtime-kompiled
+    16	
+    17	# Build the symbolic extension (which imports MPY, not MPY-KRUN) and prove
+    18	# every reachability claim in spec.k.
+    19	kompile verification.k \
+    20	  --backend haskell \
+    21	  --main-module MODP-VERIFICATION \
+    22	  --syntax-module MPY-SYNTAX \
+    23	  --output-definition verification-kompiled \
+    24	  -w none
+    25	kprove spec.k \
+    26	  --definition verification-kompiled \
+    27	  --spec-module MODP-SPEC \
+    28	  -w none
+FILE: /candidate/concrete-tests.mpy
+     1	Module(
+     2	  FuncDef("modp", Params("n", "p"),
+     3	    Expr(Str("Return 2^n modulo p."))
+     4	    Return(BinOp("%", BinOp("**", Int(2), Name("n")), Name("p"))))
+     5	  Assert(
+     6	    Compare(Call(Name("modp"), Int(3), Int(5)), CmpOp("==", Int(3))))
+     7	  Assert(
+     8	    Compare(
+     9	      Call(Name("modp"), Int(1101), Int(101)),
+    10	      CmpOp("==", Int(2))))
+    11	  Assert(
+    12	    Compare(Call(Name("modp"), Int(0), Int(101)), CmpOp("==", Int(1))))
+    13	  Assert(
+    14	    Compare(Call(Name("modp"), Int(3), Int(11)), CmpOp("==", Int(8))))
+    15	  Assert(
+    16	    Compare(
+    17	      Call(Name("modp"), Int(100), Int(101)),
+    18	      CmpOp("==", Int(1)))))
+FILE: /candidate/reference-semantics/semantics.k
+     1	// reference/src/semantics.k — the supplied `.mpy` semantics, ASSEMBLED.
+     2	//
+     3	//   kompile reference-semantics/semantics.k --backend llvm \
+     4	//     --main-module MPY-KRUN --syntax-module MPY-SYNTAX \
+     5	//     --output-definition runtime-kompiled
+     6	//
+     7	// Concrete-only legs are included through MPY-KRUN. Proof definitions import
+     8	// MPY and any explicit proof extensions supplied by the task author.
+     9	//
+    10	// Files (dependency order — everything imports MPY-CORE):
+    11	//   semantics/syntax.k         MPY-SYNTAX       AST productions
+    12	//   semantics/core.k           MPY-CORE         values, config, load, lookup, shared helpers   [required]
+    13	//   semantics/iter.k           MPY-ITER         the iterator protocol (#iterNext/#iterYield/#iterDone) decl
+    14	//   semantics/range.k          MPY-RANGE        rangeObj: inRange / rangeLen / its #iterNext
+    15	//   semantics/operators.k      MPY-OPERATORS    operator DISPATCH (UnaryOp/BinOp/Compare/BoolOp) — domain files own the cases
+    16	//   semantics/int.k            MPY-INT          Int operator cases; floored // and % (pyMod)
+    17	//   semantics/bool.k           MPY-BOOL         Bool operator cases + truthy not/and/or (BoolOp)
+    18	//   semantics/float.k          MPY-FLOAT        Float Val: literal + opaque float ops ([concrete] for krun)
+    19	//   semantics/str.k            MPY-STR          str(IntSeq): literal, +, ==, in
+    20	//   semantics/set.k            MPY-SET          set(str): distinct char codes (len / membership)
+    21	//   semantics/list.k           MPY-LIST         ListExpr, list(ValSeq): +, ==, in
+    22	//   semantics/tuple.k          MPY-TUPLE        TupleExpr, tuple ==, target-binding + unpacking
+    23	//   semantics/subscript.k      MPY-SUBSCRIPT    Subscript indexing + Slice
+    24	//   semantics/comprehension.k  MPY-COMPREHENSION  list comprehensions [ELT for T in ITER if COND]
+    25	//   semantics/methods.k        MPY-METHODS      pure str methods: is*/lower/upper/swapcase/startswith
+    26	//   semantics/controls.k       MPY-CONTROLS     Assign/AugAssign, If, IfExp, For, While, break/continue
+    27	//   semantics/functions.k      MPY-FUNCTIONS    def / call / return (frame stack)
+    28	//   semantics/builtins.k       MPY-BUILTINS     builtins as calls: len/sum/abs/min/max/ord/chr/str
+    29	//   semantics/call.k           MPY-CALL         ALL Call routing + argument evaluation
+    30	//   semantics/sort.k           MPY-SORT         trusted sorted(): opaque sortVS + concrete insertion sort
+    31	//   semantics/assert.k         MPY-ASSERT       Assert oracle (smoke programs only)
+    32	//   semantics/dict.k           MPY-DICT         order-preserving dictV(KS,VS) + .keys() + list()
+    33	
+    34	requires "semantics/syntax.k"
+    35	requires "semantics/core.k"
+    36	requires "semantics/iter.k"
+    37	requires "semantics/range.k"
+    38	requires "semantics/operators.k"
+    39	requires "semantics/int.k"
+    40	requires "semantics/bool.k"
+    41	requires "semantics/float.k"
+    42	requires "semantics/str.k"
+    43	requires "semantics/set.k"
+    44	requires "semantics/list.k"
+    45	requires "semantics/tuple.k"
+    46	requires "semantics/subscript.k"
+    47	requires "semantics/comprehension.k"
+    48	requires "semantics/methods.k"
+    49	requires "semantics/controls.k"
+    50	requires "semantics/functions.k"
+    51	requires "semantics/builtins.k"
+    52	requires "semantics/call.k"
+    53	requires "semantics/sort.k"
+    54	requires "semantics/assert.k"
+    55	requires "semantics/dict.k"
+    56	requires "semantics/concrete.k"
+    57	
+    58	module MPY
+    59	  imports MPY-CORE
+    60	  imports MPY-ITER
+    61	  imports MPY-RANGE
+    62	  imports MPY-OPERATORS
+    63	  imports MPY-INT
+    64	  imports MPY-BOOL
+    65	  imports MPY-FLOAT
+    66	  imports MPY-STR
+    67	  imports MPY-SET
+    68	  imports MPY-LIST
+    69	  imports MPY-TUPLE
+    70	  imports MPY-SUBSCRIPT
+    71	  imports MPY-COMPREHENSION
+    72	  imports MPY-METHODS
+    73	  imports MPY-CONTROLS
+    74	  imports MPY-FUNCTIONS
+    75	  imports MPY-BUILTINS
+    76	  imports MPY-CALL
+    77	  imports MPY-SORT
+    78	  imports MPY-ASSERT
+    79	  imports MPY-DICT
+    80	endmodule
+    81	
+    82	// The krun (llvm) main module: MPY plus the concrete-only legs (keyed sort's
+    83	// real key calls, deep list equality). Verification builds import MPY and
+    84	// never see MPY-CONCRETE. The llvm kompile MUST use --main-module MPY-KRUN —
+    85	// with plain MPY the concrete legs are silently absent (this was live for a
+    86	// while: sorted-key stuck and comprehension asserted wrong under krun).
+    87	module MPY-KRUN
+    88	  imports MPY
+    89	  imports MPY-CONCRETE
+    90	endmodule
+EXIT_STATUS: 0

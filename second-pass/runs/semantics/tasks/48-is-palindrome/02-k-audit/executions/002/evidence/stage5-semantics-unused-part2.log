@@ -1,0 +1,419 @@
+COMMAND: bash -lc for\ f\ in\ reference-semantics/semantics/comprehension.k\ reference-semantics/semantics/controls.k\ reference-semantics/semantics/dict.k\ reference-semantics/semantics/methods.k\;\ do\ echo\ \"=====\ \$f\ =====\"\;\ nl\ -ba\ \"\$f\"\;\ done
+WORKDIR: /tmp/audit-work/reconstruction-001
+--- OUTPUT ---
+===== reference-semantics/semantics/comprehension.k =====
+     1	// reference/src/semantics/comprehension.k — MPY-COMPREHENSION
+     2	
+     3	module MPY-COMPREHENSION
+     4	  imports MPY-CORE
+     5	  imports MPY-OPERATORS
+     6	  imports MPY-LIST
+     7	  imports MPY-CONTROLS
+     8	  imports MPY-FUNCTIONS
+     9	
+    10	  // A comprehension is pure syntactic sugar
+    11	  rule ListComp(ELT:Expr, Gs:CompFors) => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)
+    12	  rule GenExp(ELT:Expr, Gs:CompFors)   => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)
+    13	
+    14	  syntax Stmts ::= compBody(CompFors, Expr) [macro]
+    15	  rule compBody(Gs:CompFors, ELT:Expr)
+    16	    => Assign(Name("$acc"), ListExpr(.Exprs)) compNest(Gs, ELT) Return(Name("$acc"))
+    17	
+    18	  syntax Stmt ::= compNest(CompFors, Expr) [macro-rec]
+    19	  rule compNest(.CompFors, ELT:Expr)
+    20	    => Assign(Name("$acc"), BinOp("+", Name("$acc"), ListExpr(ELT)))
+    21	  rule compNest((CompFor(T:Expr, ITER:Expr, Fs:Exprs) GRest:CompFors), ELT:Expr)
+    22	    => For(T, ITER, If(compGuard(Fs), compNest(GRest, ELT), .Stmts))
+    23	
+    24	  syntax Expr ::= compGuard(Exprs) [macro]
+    25	  rule compGuard(.Exprs)             => Bool(true)
+    26	  rule compGuard((F:Expr, Fs:Exprs)) => BoolOp("and", (F, Fs))
+    27	endmodule
+===== reference-semantics/semantics/controls.k =====
+     1	// reference/src/semantics/controls.k — MPY-CONTROLS
+     2	
+     3	module MPY-CONTROLS
+     4	  imports MPY-CORE
+     5	  imports MPY-TUPLE
+     6	  imports MPY-ITER
+     7	
+     8	  // ==== Assign / AugAssign (write the current scope; RHS evaluated by strictness) ==
+     9	  rule <k> Assign(Name(X:String), V:Val) => .K ... </k>
+    10	       <env> L:Int </env>
+    11	       <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>
+    12	  rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k>
+    13	       <env> L:Int </env>
+    14	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    15	       requires "$cells" in_keys(M)
+    16	        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+    17	        andBool X in_keys(M) andBool isCellRef({M[X]}:>Val)
+    18	       [priority(40)]
+    19	
+    20	  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k>
+    21	       <env> L:Int </env>
+    22	       <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes>
+    23	       requires X in_keys(M)
+    24	  // `lst += [..]` where lst is a heap ref: the generic rule leaves applyBin(OP, ref, V) — but the
+    25	  // ref-deref preemption is BinOp-level (operators.k), so applyBin never derefs and it sticks. Route
+    26	  // the ref case through BinOp so the deref + list-concat + #alloc path fires (result is a fresh ref).
+    27	  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k>
+    28	       <env> L:Int </env>
+    29	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    30	       requires X in_keys(M) andBool isRefV({M[X]}:>Val)
+    31	       [priority(40)]
+    32	
+    33	  // ==== import trivia: `from math import floor, ceil` binds the supported
+    34	  // names as builtins in the current scope; every other import is a no-op
+    35	  rule <k> ImportFrom("math", NS:ParamNames) => #bindImports(NS) ... </k>
+    36	  rule <k> ImportFrom(_:String, _:ParamNames) => .K ... </k> [owise]
+    37	  syntax KItem ::= #bindImports(ParamNames)
+    38	  rule <k> #bindImports(.ParamNames) => .K ... </k>
+    39	  rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>
+    40	       <env> L:Int </env>
+    41	       <scopes> ... L |-> scope(M:Map => M [ N <- builtinV(N) ], _) ... </scopes>
+    42	       requires N ==String "floor" orBool N ==String "ceil"
+    43	  rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>
+    44	       requires notBool (N ==String "floor" orBool N ==String "ceil")
+    45	
+    46	  // ==== Expr statement: evaluate for effect, discard the value ===============
+    47	  // (bare calls — mutator methods, docstrings; the WP0 statement-trivia rung)
+    48	  rule <k> Expr(_:Val) => .K ... </k>
+    49	
+    50	  // ==== If (condition evaluated by strictness) ==============================
+    51	  syntax KItem ::= #branch(Bool, Stmts, Stmts)
+    52	  rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>
+    53	  rule <k> #branch(true,  T:Stmts, _:Stmts) => T ... </k>
+    54	  rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>
+    55	
+    56	  // ==== IfExp: ternary T if C else E ========================================
+    57	  rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k>
+    58	       requires truthy(V)
+    59	  rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k>
+    60	       requires notBool truthy(V)
+    61	
+    62	  // ==== For: one loop, in-cell continuation, over #iterNext =================
+    63	  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+    64	  // circularities anchor on #loop and narrowing substitutes the structure)
+    65	  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+    66	                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+    67	                 | #loopLbl(K) | "#cont" | "#brk"
+    68	
+    69	  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+    70	
+    71	  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+    72	  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+    73	  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+    74	        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+    75	
+    76	  // ==== While ==============================================================
+    77	  rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>
+    78	  rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>
+    79	  rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k>
+    80	       requires truthy(V)
+    81	  rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k>
+    82	       requires notBool truthy(V)
+    83	
+    84	  // ==== loop control (break / continue) =====================================
+    85	  rule <k> #loopLbl(NEXT:K) => NEXT ... </k>
+    86	  rule <k> Continue => #cont ... </k>
+    87	  rule <k> Break => #brk ... </k>
+    88	  rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>
+    89	  rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]
+    90	  rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>
+    91	  rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]
+    92	
+    93	  // ==== heap-object deref at the truthiness/iteration consumers ==============
+    94	  // (priority(40) preempts the generic Val rules so truthy/#loop never see a ref)
+    95	  rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k>
+    96	       <heap> ... H |-> V:Val ... </heap>
+    97	       [priority(40)]
+    98	  rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k>
+    99	       <heap> ... H |-> V:Val ... </heap>
+   100	       [priority(40)]
+   101	  rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k>
+   102	       <heap> ... H |-> V:Val ... </heap>
+   103	       [priority(40)]
+   104	  // For derefs its iterable ONCE at loop start (iteration is over the snapshot;
+   105	  // mutating the iterated list inside its own loop is outside the subset)
+   106	  rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k>
+   107	       <heap> ... H |-> V:Val ... </heap>
+   108	       [priority(40)]
+   109	endmodule
+===== reference-semantics/semantics/dict.k =====
+     1	// reference/src/semantics/dict.k — MPY-DICT
+     2	//
+     3	// Minimal dict support. A dict value is `dictV(KS, VS)`: PARALLEL insertion-ordered key/value
+     4	// ValSeqs (Python dict order; keys distinct; re-inserting a key updates its value in place, keeping
+     5	// the original position). Concrete for krun (the ordered build + `.keys()` are the real ops); a proof
+     6	// over a SYMBOLIC dict passes `dictV(KS, WS)` with a symbolic key sequence KS and reads
+     7	// `d.keys() = list(KS)`, then keeps each key opaque problem-locally.
+     8	//
+     9	// Only the pieces needed so far: a dict VALUE (so `{}` inside a mixed list evaluates and
+    10	// `isinstance(x, int)` rejects it), the `{k: v, ...}` literal, and `.keys()`. More dict ops (subscript
+    11	// / `.get()` / `.values()` / dict `==`) are added as dict problems need them — kept minimal + additive.
+    12	
+    13	module MPY-DICT
+    14	  imports MPY-CORE
+    15	  imports MPY-ITER
+    16	  imports MPY-METHODS
+    17	  imports MPY-LIST
+    18	
+    19	  // dict as PARALLEL ordered key/value ValSeqs (same length; keys distinct).
+    20	  syntax Val ::= dictV(ValSeq, ValSeq)
+    21	
+    22	  // ==== DictExpr: {k: v, ...} literal. Eval each key then value, left to right, insert-with-dedup.
+    23	  syntax KItem ::= #dictAcc(Entries, ValSeq, ValSeq)
+    24	                 | #dictKey(Expr, Entries, ValSeq, ValSeq)
+    25	                 | #dictVal(Val, Entries, ValSeq, ValSeq)
+    26	  rule <k> DictExpr(ES:Entries) => #dictAcc(ES, .ValSeq, .ValSeq) ... </k>
+    27	  rule <k> #dictAcc(.Entries, KS:ValSeq, VS:ValSeq) => dictV(KS, VS) ... </k>
+    28	  rule <k> #dictAcc((Entry(K:Expr, V:Expr), REST:Entries), KS:ValSeq, VS:ValSeq)
+    29	        => K ~> #dictKey(V, REST, KS, VS) ... </k>
+    30	  rule <k> KV:Val ~> #dictKey(V:Expr, REST:Entries, KS:ValSeq, VS:ValSeq)
+    31	        => V ~> #dictVal(KV, REST, KS, VS) ... </k>
+    32	  rule <k> VV:Val ~> #dictVal(KV:Val, REST:Entries, KS:ValSeq, VS:ValSeq)
+    33	        => #dictAcc(REST, dPutK(KS, KV), dPutV(KS, VS, KV, VV)) ... </k>
+    34	
+    35	  // insert-with-dedup helpers (concrete Val key equality via ==K). [total] so buildFold over a dict is
+    36	  // total (its #Ceil is #Top) — needed when a symbolic proof carries a built dict as a config value.
+    37	  syntax Bool ::= dHasKey(ValSeq, Val) [function, total]
+    38	  rule dHasKey(.ValSeq, _:Val)                => false
+    39	  rule dHasKey(vCons(A:Val, _:ValSeq), K:Val) => true          requires A ==K K
+    40	  rule dHasKey(vCons(A:Val, R:ValSeq), K:Val) => dHasKey(R, K) requires notBool (A ==K K)
+    41	
+    42	  // dPutK: KS unchanged if K already present, else append K (keep-first-position).
+    43	  syntax ValSeq ::= dPutK(ValSeq, Val) [function, total]
+    44	  rule dPutK(KS:ValSeq, K:Val) => KS                                  requires dHasKey(KS, K)
+    45	  rule dPutK(KS:ValSeq, K:Val) => valSeqConcat(KS, vCons(K, .ValSeq)) requires notBool dHasKey(KS, K)
+    46	
+    47	  // dPutV: parallel to KS — set the value at K's position if present, else append V at the end. The
+    48	  // [owise] catch-all covers the degenerate mismatched-length case (never reached for a well-formed dict).
+    49	  syntax ValSeq ::= dPutV(ValSeq, ValSeq, Val, Val) [function, total]
+    50	  rule dPutV(vCons(A:Val, _:ValSeq), vCons(_:Val, VR:ValSeq), K:Val, V:Val)  => vCons(V, VR)
+    51	       requires A ==K K
+    52	  rule dPutV(vCons(A:Val, KR:ValSeq), vCons(B:Val, VR:ValSeq), K:Val, V:Val) => vCons(B, dPutV(KR, VR, K, V))
+    53	       requires notBool (A ==K K)
+    54	  rule dPutV(_KS:ValSeq, VS:ValSeq, _K:Val, V:Val) => valSeqConcat(VS, vCons(V, .ValSeq)) [owise]
+    55	
+    56	  // ==== dict methods ========================================================
+    57	  // d.keys() -> a FRESH list object of the ordered keys (k-cell: it allocates).
+    58	  rule <k> #applyK(toCall(boundMethodV(dictV(KS:ValSeq, _:ValSeq), "keys")), .Vals)
+    59	        => #alloc(list(KS)) ... </k>
+    60	       [priority(40)]
+    61	
+    62	  // ==== dict subscript READ: d[k] (assoc lookup; KeyError is out of subset) ==
+    63	  rule applyIndexD(dictV(KS:ValSeq, VS:ValSeq), K:Val) => dGet(KS, VS, K)
+    64	  syntax Val ::= applyIndexD(Val, Val) [function]
+    65	  rule <k> Subscript(dictV(KS:ValSeq, VS:ValSeq), K:Val) => applyIndexD(dictV(KS, VS), K) ... </k>
+    66	       [priority(45)]
+    67	
+    68	  // ==== dict subscript-assign: d[k] = v (insert/update in place) =============
+    69	  // Only for a LOCAL dict variable X (the current scope holds it). Reuses dPutK/dPutV.
+    70	  syntax Val ::= dictSet(Val, Val, Val) [function]
+    71	  rule dictSet(dictV(KS:ValSeq, VS:ValSeq), K:Val, V:Val) => dictV(dPutK(KS, K), dPutV(KS, VS, K, V))
+    72	
+    73	  // RHS evaluates first (Assign strictness), then the key. Dispatch on the scope
+    74	  // value: a bare dict updates in the scope (dicts stay values); a ref (a heap
+    75	  // list — or a heap dict later) writes the heap in place.
+    76	  syntax KItem ::= #dsetK(String, Val)
+    77	  rule <k> Assign(Subscript(Name(X:String), K:Expr), VV:Val) => K ~> #dsetK(X, VV) ... </k>
+    78	  rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => .K ... </k>
+    79	       <env> L:Int </env>
+    80	       <scopes> ... L |-> scope(M:Map => M [ X <- dictSet({M[X]}:>Val, KV, VV) ], _) ... </scopes>
+    81	       requires X in_keys(M) andBool notBool isRefV({M[X]}:>Val)
+    82	  rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => #dsetV({M[X]}:>Val, KV, VV) ... </k>
+    83	       <env> L:Int </env>
+    84	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    85	       requires X in_keys(M) andBool isRefV({M[X]}:>Val)
+    86	  syntax KItem ::= #dsetV(Val, Val, Val)
+    87	  rule <k> #dsetV(ref(H:Int), I:Int, VV:Val) => .K ... </k>
+    88	       <heap> ... H |-> list(VS:ValSeq => setVSAt(VS, normIdxD(I, vsLen(VS)), VV)) ... </heap>
+    89	  // negative-index normalization local to the write (subscript.k's is not imported here)
+    90	  syntax Int ::= normIdxD(Int, Int) [function, total]
+    91	  rule normIdxD(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0
+    92	  rule normIdxD(I:Int, _:Int)   => I          requires I >=Int 0
+    93	
+    94	  // ==== dict == (order-insensitive: same size + same key->value pairs) =======
+    95	  rule applyCmp("==", dictV(KS1:ValSeq, VS1:ValSeq), dictV(KS2:ValSeq, VS2:ValSeq))
+    96	    => (vsLen(KS1) ==Int vsLen(KS2)) andBool dSubset(KS1, VS1, KS2, VS2)
+    97	  syntax Bool ::= dSubset(ValSeq, ValSeq, ValSeq, ValSeq) [function]
+    98	  rule dSubset(.ValSeq, .ValSeq, _:ValSeq, _:ValSeq) => true
+    99	  rule dSubset(vCons(K:Val, KR:ValSeq), vCons(V:Val, VR:ValSeq), KS2:ValSeq, VS2:ValSeq)
+   100	    => dHasKey(KS2, K) andBool (dGet(KS2, VS2, K) ==K V) andBool dSubset(KR, VR, KS2, VS2)
+   101	  syntax Val ::= dGet(ValSeq, ValSeq, Val) [function]
+   102	  rule dGet(vCons(A:Val, _:ValSeq), vCons(B:Val, _:ValSeq), K:Val) => B                requires A ==K K
+   103	  rule dGet(vCons(A:Val, KR:ValSeq), vCons(_:Val, VR:ValSeq), K:Val) => dGet(KR, VR, K) requires notBool (A ==K K)
+   104	endmodule
+===== reference-semantics/semantics/methods.k =====
+     1	// reference/src/semantics/methods.k — MPY-METHODS
+     2	
+     3	module MPY-METHODS
+     4	  imports MPY-CORE
+     5	  imports K-EQUAL
+     6	  imports MPY-STR
+     7	  imports MPY-LIST
+     8	
+     9	  // method-call routing + arg-eval live in call.k; this module owns applyMethod.
+    10	  syntax Val ::= applyMethod(Val, String, Vals) [function]
+    11	
+    12	  // ==== string predicates (Python semantics) =================================
+    13	  rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)
+    14	  rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)
+    15	  rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)
+    16	  rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS)
+    17	
+    18	  // ==== case maps ============================================================
+    19	  rule applyMethod(str(CS:IntSeq), "lower",    .Vals) => str(mapLower(CS))
+    20	  rule applyMethod(str(CS:IntSeq), "upper",    .Vals) => str(mapUpper(CS))
+    21	  rule applyMethod(str(CS:IntSeq), "swapcase", .Vals) => str(mapSwap(CS))
+    22	
+    23	  // ==== join / count / strip / encode ========================================
+    24	  // S.join(list-of-str): fold with separator codes (receiver + arg deref'd by
+    25	  // the call layer; the result str is a value)
+    26	  rule applyMethod(str(SEP:IntSeq), "join", list(VS:ValSeq), .Vals) => str(joinCodes(SEP, VS))
+    27	  syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]
+    28	  rule joinCodes(_:IntSeq, .ValSeq) => .IntSeq
+    29	  rule joinCodes(_:IntSeq, vCons(str(CS:IntSeq), .ValSeq)) => CS
+    30	  rule joinCodes(SEP:IntSeq, vCons(str(CS:IntSeq), vCons(V:Val, R:ValSeq)))
+    31	    => seqConcat(CS, seqConcat(SEP, joinCodes(SEP, vCons(V, R))))
+    32	
+    33	  // S.count(sub): non-overlapping window scan (Python str.count)
+    34	  rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)
+    35	  syntax Int ::= cntSub(IntSeq, IntSeq) [function]
+    36	  rule cntSub(.IntSeq, _:IntSeq) => 0
+    37	  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC)
+    38	       requires strPrefix(PC, iCons(C, R)) andBool isLen(PC) >Int 0
+    39	  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => cntSub(R, PC)
+    40	       requires notBool strPrefix(PC, iCons(C, R)) orBool isLen(PC) <=Int 0
+    41	  syntax IntSeq ::= dropIS(IntSeq, Int) [function, total]
+    42	  rule dropIS(S:IntSeq, N:Int) => S requires N <=Int 0
+    43	  rule dropIS(.IntSeq, _:Int) => .IntSeq [owise]
+    44	  rule dropIS(iCons(_:Int, R:IntSeq), N:Int) => dropIS(R, N -Int 1) requires N >Int 0
+    45	
+    46	  // S.strip(): trim whitespace runs from both ends
+    47	  rule applyMethod(str(CS:IntSeq), "strip", .Vals) => str(revIS(trimWS(revIS(trimWS(CS)))))
+    48	  syntax IntSeq ::= trimWS(IntSeq) [function, total]
+    49	  rule trimWS(.IntSeq) => .IntSeq
+    50	  rule trimWS(iCons(C:Int, R:IntSeq)) => trimWS(R) requires isWSC(C)
+    51	  rule trimWS(iCons(C:Int, R:IntSeq)) => iCons(C, R) requires notBool isWSC(C)
+    52	  syntax IntSeq ::= revIS(IntSeq) [function, total] | revISAcc(IntSeq, IntSeq) [function, total]
+    53	  rule revIS(S:IntSeq) => revISAcc(S, .IntSeq)
+    54	  rule revISAcc(.IntSeq, A:IntSeq) => A
+    55	  rule revISAcc(iCons(C:Int, R:IntSeq), A:IntSeq) => revISAcc(R, iCons(C, A))
+    56	
+    57	  // S.encode('ascii'): identity on the code-sequence model (bytes == codes)
+    58	  rule applyMethod(str(CS:IntSeq), "encode", str(_:IntSeq), .Vals) => str(CS)
+    59	
+    60	  // ==== prefix ===============================================================
+    61	  rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)
+    62	
+    63	  // ==== list.count(v) — number of occurrences of v in the list (concrete for krun) ==========
+    64	  rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)
+    65	  syntax Int ::= cntOccVS(ValSeq, Val) [function, total]
+    66	  rule cntOccVS(.ValSeq, _:Val)                => 0
+    67	  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V
+    68	  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => cntOccVS(R, V)        requires notBool (A ==K V)
+    69	
+    70	  // ==== split (no-arg: on whitespace runs, dropping empty tokens) + replace (single char) ==========
+    71	  // Concrete string ops for krun. A proof over a symbolic string intercepts the split problem-locally.
+    72	  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals)
+    73	        => #alloc(list(splitWS(CS, .IntSeq, .ValSeq))) ... </k>
+    74	       [priority(40)]
+    75	  syntax ValSeq ::= splitWS(IntSeq, IntSeq, ValSeq) [function]  // remaining, current token, result
+    76	  rule splitWS(.IntSeq, CUR:IntSeq, ACC:ValSeq) => flushTok(ACC, CUR)
+    77	  rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, .IntSeq, flushTok(ACC, CUR))
+    78	       requires isWSC(C)
+    79	  rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, seqConcat(CUR, iCons(C, .IntSeq)), ACC)
+    80	       requires notBool isWSC(C)
+    81	  // flush the current token to the result list iff non-empty.
+    82	  syntax ValSeq ::= flushTok(ValSeq, IntSeq) [function]
+    83	  rule flushTok(ACC:ValSeq, .IntSeq)            => ACC
+    84	  rule flushTok(ACC:ValSeq, iCons(C:Int, T:IntSeq)) => valSeqConcat(ACC, vCons(str(iCons(C, T)), .ValSeq))
+    85	  syntax Bool ::= isWSC(Int) [function, total]
+    86	  rule isWSC(C:Int) => C ==Int 32 orBool C ==Int 9 orBool C ==Int 10 orBool C ==Int 13
+    87	
+    88	  // split(sep='x') keyword form delegates to the positional k-cell rule
+    89	  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (kwV("sep", str(S:IntSeq)), .Vals))
+    90	        => #applyK(toCall(boundMethodV(str(CS), "split")), (str(S), .Vals)) ... </k>
+    91	       [priority(39)]
+    92	
+    93	  // str.split(sep) — single-char separator, KEEPING empty parts (Python's sep-split; len == #sep + 1).
+    94	  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (str(iCons(SEP:Int, .IntSeq)), .Vals))
+    95	        => #alloc(list(splitSep(CS, SEP, .IntSeq))) ... </k>
+    96	       [priority(40)]
+    97	  syntax ValSeq ::= splitSep(IntSeq, Int, IntSeq) [function]  // remaining, sep code, current token
+    98	  rule splitSep(.IntSeq, _SEP:Int, CUR:IntSeq)              => vCons(str(CUR), .ValSeq)
+    99	  rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => vCons(str(CUR), splitSep(R, SEP, .IntSeq))
+   100	       requires C ==Int SEP
+   101	  rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => splitSep(R, SEP, seqConcat(CUR, iCons(C, .IntSeq)))
+   102	       requires notBool (C ==Int SEP)
+   103	
+   104	  rule applyMethod(str(CS:IntSeq), "replace", str(iCons(A:Int, .IntSeq)), str(iCons(B:Int, .IntSeq)), .Vals)
+   105	    => str(replaceC(CS, A, B))
+   106	  syntax IntSeq ::= replaceC(IntSeq, Int, Int) [function, total]
+   107	  rule replaceC(.IntSeq, _:Int, _:Int)             => .IntSeq
+   108	  rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(B, replaceC(R, A, B)) requires C ==Int A
+   109	  rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(C, replaceC(R, A, B)) requires notBool (C ==Int A)
+   110	
+   111	  // ==== char helpers =========================================================
+   112	  syntax Bool ::= isUpperC(Int) [function, total]
+   113	  rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90
+   114	
+   115	  syntax Bool ::= isLowerC(Int) [function, total]
+   116	  rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122
+   117	
+   118	  syntax Bool ::= isAlphaC(Int) [function, total]
+   119	  rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)
+   120	
+   121	  syntax Bool ::= isDigitC(Int) [function, total]
+   122	  rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57
+   123	
+   124	  syntax Bool ::= hasUpper(IntSeq) [function, total]
+   125	  rule hasUpper(.IntSeq) => false
+   126	  rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)
+   127	
+   128	  syntax Bool ::= hasLower(IntSeq) [function, total]
+   129	  rule hasLower(.IntSeq) => false
+   130	  rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)
+   131	
+   132	  syntax Bool ::= allAlpha(IntSeq) [function, total]
+   133	  rule allAlpha(.IntSeq) => true
+   134	  rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)
+   135	
+   136	  syntax Bool ::= allDigit(IntSeq) [function, total]
+   137	  rule allDigit(.IntSeq) => true
+   138	  rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)
+   139	
+   140	  syntax Int ::= lowerC(Int) [function, total]
+   141	
+   142	  rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)
+   143	  rule lowerC(C:Int) => C         [owise]
+   144	
+   145	  syntax Int ::= upperC(Int) [function, total]
+   146	  rule upperC(C:Int) => C -Int 32 requires isLowerC(C)
+   147	  rule upperC(C:Int) => C         [owise]
+   148	
+   149	  syntax Int ::= swapC(Int) [function, total]
+   150	  rule swapC(C:Int) => C +Int 32 requires isUpperC(C)
+   151	  rule swapC(C:Int) => C -Int 32 requires isLowerC(C)
+   152	  rule swapC(C:Int) => C         [owise]
+   153	
+   154	  syntax IntSeq ::= mapLower(IntSeq) [function, total]
+   155	  rule mapLower(.IntSeq) => .IntSeq
+   156	  rule mapLower(iCons(C:Int, S:IntSeq)) => iCons(lowerC(C), mapLower(S))
+   157	
+   158	  syntax IntSeq ::= mapUpper(IntSeq) [function, total]
+   159	  rule mapUpper(.IntSeq) => .IntSeq
+   160	  rule mapUpper(iCons(C:Int, S:IntSeq)) => iCons(upperC(C), mapUpper(S))
+   161	
+   162	  syntax IntSeq ::= mapSwap(IntSeq) [function, total]
+   163	  rule mapSwap(.IntSeq) => .IntSeq
+   164	  rule mapSwap(iCons(C:Int, S:IntSeq)) => iCons(swapC(C), mapSwap(S))
+   165	
+   166	  syntax Bool ::= startsWith(IntSeq, IntSeq) [function, total]
+   167	  rule startsWith(.IntSeq, _:IntSeq)               => true
+   168	  rule startsWith(iCons(_:Int, _:IntSeq), .IntSeq) => false
+   169	  rule startsWith(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool startsWith(As, Bs)
+   170	endmodule
+--- STATUS ---
+EXIT: 0

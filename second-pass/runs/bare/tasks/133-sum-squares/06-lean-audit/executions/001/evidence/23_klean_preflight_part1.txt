@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+"""Hard, model-free sanity gate for a deterministic Klean generation."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
+
+REPO = Path(__file__).resolve().parent.parent
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from tools import klean_export
+from tools import lemma_discovery_contract
+
+
+class KleanPreflightError(RuntimeError):
+    pass
+
+
+_SIDECAR_NAMES = (
+    "input-manifest.json",
+    "generator-manifest.json",
+    "trust-inventory.json",
+    "export-result.json",
+)
+
+
+@dataclass(frozen=True)
+class PreflightSnapshot:
+    stage1_workspace_sha256: str
+    stage3_discovery_manifest_sha256: str
+    generated_tree_sha256: str
+    sidecar_sha256: tuple[tuple[str, str], ...]
+
+
+def _preflight_snapshot(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+) -> PreflightSnapshot:
+    generated = generation / "generated"
+    try:
+        sidecars = tuple(
+            (
+                name,
+                hashlib.sha256(
+                    pipeline_path.read_bytes()
+                ).hexdigest(),
+            )
+            for name in _SIDECAR_NAMES
+            if (
+                pipeline_path := generation / name
+            ).is_file()
+            and not pipeline_path.is_symlink()
+        )
+        if len(sidecars) != len(_SIDECAR_NAMES):
+            raise KleanPreflightError(
+                "preflight sidecar set is incomplete or unsafe"
+            )
+        return PreflightSnapshot(
+            stage1_workspace_sha256=klean_export.tree_digest(
+                frozen_input
+            ),
+            stage3_discovery_manifest_sha256=hashlib.sha256(
+                discovery_manifest.read_bytes()
+            ).hexdigest(),
+            generated_tree_sha256=klean_export.tree_digest(generated),
+            sidecar_sha256=sidecars,
+        )
+    except (OSError, klean_export.KleanExportError) as error:
+        raise KleanPreflightError(
+            "cannot snapshot immutable preflight inputs"
+        ) from error
+
+
+def _require_unchanged_snapshot(
+    expected: PreflightSnapshot,
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+) -> None:
+    current = _preflight_snapshot(
+        frozen_input, discovery_manifest, generation
+    )
+    if current.stage1_workspace_sha256 != (
+        expected.stage1_workspace_sha256
+    ):
+        raise KleanPreflightError(
+            "frozen Stage 1 input changed during preflight"
+        )
+    if current.stage3_discovery_manifest_sha256 != (
+        expected.stage3_discovery_manifest_sha256
+    ):
+        raise KleanPreflightError(
+            "validated Stage 3 discovery manifest changed during preflight"
+        )
+    if current.generated_tree_sha256 != expected.generated_tree_sha256:
+        raise KleanPreflightError(
+            "generated project changed during preflight"
+        )
+    if current.sidecar_sha256 != expected.sidecar_sha256:
+        raise KleanPreflightError(
+            "generation sidecar changed during preflight"
+        )
+
+
+def _regular_json(path: Path, label: str) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise KleanPreflightError(f"{label} must be a regular file: {path}")
+    try:
+        document = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise KleanPreflightError(f"{label} is malformed: {path}") from error
+    if not isinstance(document, dict):
+        raise KleanPreflightError(f"{label} must be a JSON object")
+    return document
+
+
+def _run(
+    command: list[str],
+    *,
+    cwd: Path,
+    timeout: int,
+) -> tuple[int, str]:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            timeout=timeout,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        return result.returncode, result.stdout
+    except subprocess.TimeoutExpired:
+        return 124, f"TIMEOUT after {timeout}s"
+
+
+def _lean_sources(generated: Path) -> list[Path]:
+    return [
+        path
+        for _relative, kind, path in klean_export._tree_entries(generated)
+        if kind == "file" and path.suffix == ".lean"
+    ]
+
+
+def _trust_declarations(sources: list[Path]) -> dict[str, tuple[str, str]]:
+    declarations: dict[str, tuple[str, str]] = {}
+    for source in sources:
+        for declaration in klean_export.lean_trust_declarations(source):
+            name = declaration["name"]
+            if name in declarations:
+                raise KleanPreflightError(
+                    f"duplicate trust declaration: {name}"
+                )
+            declarations[name] = (
+                declaration["kind"],
+                declaration["type"],
+            )
+    return declarations
+
+
+def _reject_proposition_trust(
+    generated: Path,
+    sources: list[Path],
+    declarations: dict[str, tuple[str, str]],
+) -> None:
+    """Apply a policy that is independent of the generator's allowlist.
+

@@ -1,0 +1,323 @@
+COMMAND: bash -lc $'for f in /reference/prompt.py /reference/canonical.py /candidate/solution.py /candidate/solution.mpy /candidate/semantic.k /candidate/verification.k /candidate/spec.k /candidate/prove.sh; do printf "\\n===== %s =====\\n" "$f"; nl -ba "$f"; done\nprintf "\\n===== TRANSLATOR ENTRY/CONSTRUCTORS =====\\n"\nrg -n "^(class |def |if __name__|    def visit_|parser|sys\\.argv|print\\()" /reference/py2mpy.py'
+
+===== /reference/prompt.py =====
+     1	
+     2	
+     3	def incr_list(l: list):
+     4	    """Return list with elements incremented by 1.
+     5	    >>> incr_list([1, 2, 3])
+     6	    [2, 3, 4]
+     7	    >>> incr_list([5, 3, 5, 2, 3, 3, 9, 0, 123])
+     8	    [6, 4, 6, 3, 4, 4, 10, 1, 124]
+     9	    """
+
+===== /reference/canonical.py =====
+     1	# canonical.py — the UNMODIFIED HumanEval/42 reference solution (from the dataset).
+     2	# Co-located with solution.py (the proof rewrite) to make the original<->rewrite link
+     3	# explicit & auditable.  entry point: incr_list
+     4	
+     5	
+     6	
+     7	def incr_list(l: list):
+     8	    """Return list with elements incremented by 1.
+     9	    >>> incr_list([1, 2, 3])
+    10	    [2, 3, 4]
+    11	    >>> incr_list([5, 3, 5, 2, 3, 3, 9, 0, 123])
+    12	    [6, 4, 6, 3, 4, 4, 10, 1, 124]
+    13	    """
+    14	    return [(e + 1) for e in l]
+
+===== /candidate/solution.py =====
+     1	def incr_list(l: list):
+     2	    result = []
+     3	    for value in l:
+     4	        result = result + [value + 1]
+     5	    return result
+
+===== /candidate/solution.mpy =====
+     1	Module(
+     2	  FuncDef("incr_list", Params("l"),
+     3	    Assign(Name("result"), ListExpr())
+     4	    For(Name("value"), Name("l"),
+     5	      Assign(
+     6	        Name("result"),
+     7	        BinOp(
+     8	          "+",
+     9	          Name("result"),
+    10	          ListExpr(BinOp("+", Name("value"), Int(1))))))
+    11	    Return(Name("result"))))
+
+===== /candidate/semantic.k =====
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports STRING-SYNTAX
+     6	
+     7	  // The constructor grammar emitted by py2mpy.py for this task's subset.
+     8	  syntax Program ::= "Module" "(" Stmts ")"
+     9	  syntax Stmts   ::= List{Stmt, ""}
+    10	  syntax Params  ::= "Params" "(" Strings ")"
+    11	  syntax Strings ::= List{String, ","}
+    12	
+    13	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    14	                | "Assign" "(" Exp "," Exp ")"
+    15	                | "For" "(" Exp "," Exp "," Stmts ")"
+    16	                | "Return" "(" Exp ")"
+    17	
+    18	  syntax Exp  ::= "Name" "(" String ")"
+    19	                | "Int" "(" Int ")"
+    20	                | "ListExpr" "(" Exps ")"
+    21	                | "BinOp" "(" String "," Exp "," Exp ")"
+    22	  syntax Exps ::= List{Exp, ","}
+    23	endmodule
+    24	
+    25	module MPY
+    26	  imports MPY-SYNTAX
+    27	  imports INT
+    28	  imports LIST
+    29	  imports MAP
+    30	
+    31	  // Runtime Python values. A Python list is represented by a K semantic List
+    32	  // containing PyVal elements, so size and indexed lookup remain symbolic.
+    33	  syntax PyVal ::= pyInt(Int) | pyList(List)
+    34	                 | #incPrefix(List, Int) [function, total]
+    35	  syntax Result ::= "noResult" | result(PyVal)
+    36	  syntax IterVal ::= "noIter" | iter(String, PyVal)
+    37	  // Canonical logical value used by the loop invariant. It cannot arise in a
+    38	  // concrete run: only symbolic proof states introduce it.
+    39	
+    40	  configuration
+    41	    <mpy>
+    42	      <k> #init($PGM:Program, $ARGS:PyVal) </k>
+    43	      <env> .Map </env>
+    44	      <iter> noIter </iter>
+    45	      <result> noResult </result>
+    46	    </mpy>
+    47	
+    48	  syntax KItem ::= #init(Program, PyVal)
+    49	                 | #exec(Stmts)
+    50	                 | #for(List, Int, String, Stmts)
+    51	                 | #bind(String, PyVal)
+    52	                 | #return(PyVal)
+    53	
+    54	  // This semantics deliberately supports the translated subset used by the
+    55	  // solution. The source module must define the requested one-argument entry.
+    56	  rule <k> #init(Module(FuncDef("incr_list", Params("l"), BODY)), ARG)
+    57	         => #exec(BODY) ... </k>
+    58	       <env> .Map => "l" |-> ARG </env>
+    59	
+    60	  rule <k> #exec(.Stmts) => .K ... </k>
+    61	
+    62	  rule <k> #exec(Assign(Name(X), E) REST) => #exec(REST) ... </k>
+    63	       <env> ENV => ENV [ X <- #eval(E, ENV, IT) ] </env>
+    64	       <iter> IT </iter>
+    65	
+    66	  rule <k> #exec(For(Name(X), E, BODY) REST)
+    67	         => #for(#asList(#eval(E, ENV, IT)), 0, X, BODY) ~> #exec(REST) ... </k>
+    68	       <env> ENV </env>
+    69	       <iter> IT </iter>
+    70	
+    71	  rule <k> #exec(Return(E) _REST) => #return(#eval(E, ENV, IT)) ... </k>
+    72	       <env> ENV </env>
+    73	       <iter> IT </iter>
+    74	
+    75	  rule <k> #for(L, I, X, BODY)
+    76	         => #bind(X, #at(L, I)) ~> #exec(BODY)
+    77	            ~> #for(L, I +Int 1, X, BODY) ... </k>
+    78	    requires I <Int size(L)
+    79	
+    80	  rule <k> #for(L, I, _X, _BODY) => .K ... </k>
+    81	    requires I >=Int size(L)
+    82	
+    83	  rule <k> #bind(X, V) => .K ... </k>
+    84	       <iter> _ => iter(X, V) </iter>
+    85	
+    86	  rule <k> #return(V) ~> _ => .K </k>
+    87	       <result> noResult => result(V) </result>
+    88	
+    89	  // Expression evaluation is big-step because all supported expressions are
+    90	  // pure. Statement order and for-loop control remain explicit in <k>.
+    91	  syntax PyVal ::= #eval(Exp, Map, IterVal) [function, total]
+    92	                 | #add(PyVal, PyVal) [function, total]
+    93	                 | #at(List, Int) [function, total]
+    94	  syntax List ::= #evalExps(Exps, Map, IterVal) [function, total]
+    95	  syntax List ::= #asList(PyVal) [function]
+    96	
+    97	  rule #eval(Name(X), _ENV, iter(X, V)) => V
+    98	  rule #eval(Name(X), (X |-> V) _ENV, _IT) => V
+    99	  rule #eval(Int(I), _ENV, _IT) => pyInt(I)
+   100	  rule #eval(ListExpr(ES), ENV, IT) => pyList(#evalExps(ES, ENV, IT))
+   101	  rule #eval(BinOp("+", E1, E2), ENV, IT)
+   102	    => #add(#eval(E1, ENV, IT), #eval(E2, ENV, IT))
+   103	
+   104	  rule #evalExps(.Exps, _ENV, _IT) => .List
+   105	  rule #evalExps(E, ES, ENV, IT)
+   106	    => ListItem(#eval(E, ENV, IT)) #evalExps(ES, ENV, IT)
+   107	
+   108	  rule #add(pyInt(I), pyInt(J)) => pyInt(I +Int J)
+   109	  rule #add(pyList(L1), pyList(L2)) => pyList(L1 L2)
+   110	  rule #add(
+   111	         #incPrefix(L, I),
+   112	         pyList(ListItem(#add(#at(L, I), pyInt(1)))))
+   113	    => #incPrefix(L, I +Int 1)
+   114	    [simplification]
+   115	
+   116	  rule #asList(pyList(L)) => L
+   117	  rule #at(ListItem(V:PyVal) _L, 0) => V
+   118	  rule #at(ListItem(_V) L, I) => #at(L, I -Int 1)
+   119	    requires I >Int 0
+   120	
+   121	  rule #incPrefix(_L, 0) => pyList(.List)
+   122	endmodule
+
+===== /candidate/verification.k =====
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	  imports BOOL
+     6	  imports K-EQUAL
+     7	  imports MAP-SYMBOLIC
+     8	
+     9	  // #incPrefix(L, I) is the canonical abstraction of the first I elements of
+    10	  // L, each incremented by one. MPY gives its empty base and one-step append
+    11	  // equation. SPEC supplies and discharges the loop invariant; there are no
+    12	  // trusted reachability rules here.
+    13	  rule { #incPrefix(L, I) #Equals #incPrefix(L, J) }
+    14	    => { I #Equals J }
+    15	    [simplification]
+    16	
+    17	  rule 0 <=Int size(_L:List) => true [simplification]
+    18	endmodule
+
+===== /candidate/spec.k =====
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Loop invariant: if result initially contains A, executing the remaining
+     7	  // suffix [I, size(L)) appends exactly its element-wise increment.
+     8	  claim [for-invariant]:
+     9	    <k>
+    10	      #for(
+    11	        L,
+    12	        I,
+    13	        "value",
+    14	        Assign(
+    15	          Name("result"),
+    16	          BinOp(
+    17	            "+",
+    18	            Name("result"),
+    19	            ListExpr(BinOp("+", Name("value"), Int(1))))))
+    20	      ~> #exec(Return(Name("result")))
+    21	      => .K
+    22	    </k>
+    23	    <env>
+    24	      "l" |-> pyList(L)
+    25	      "result" |-> (#incPrefix(L, I) => #incPrefix(L, size(L)))
+    26	    </env>
+    27	    <iter>
+    28	      _IT => ?_
+    29	    </iter>
+    30	    <result>
+    31	      noResult => result(#incPrefix(L, size(L)))
+    32	    </result>
+    33	    requires (0 <=Int I) andBool (I <=Int size(L))
+    34	
+    35	  // Whole-program functional correctness for an arbitrary symbolic list L.
+    36	  claim [incr-list-correct]:
+    37	    <k>
+    38	      #init(
+    39	        Module(
+    40	          FuncDef("incr_list", Params("l"),
+    41	            Assign(Name("result"), ListExpr(.Exps))
+    42	            For(Name("value"), Name("l"),
+    43	              Assign(
+    44	                Name("result"),
+    45	                BinOp(
+    46	                  "+",
+    47	                  Name("result"),
+    48	                  ListExpr(BinOp("+", Name("value"), Int(1))))))
+    49	            Return(Name("result")))),
+    50	        pyList(L))
+    51	      => .K
+    52	    </k>
+    53	    <env>
+    54	      .Map => ?_
+    55	    </env>
+    56	    <iter>
+    57	      noIter => ?_
+    58	    </iter>
+    59	    <result>
+    60	      noResult => result(#incPrefix(L, size(L)))
+    61	    </result>
+    62	    [depends(for-invariant)]
+    63	endmodule
+
+===== /candidate/prove.sh =====
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Recreate the constructor program from the submitted Python implementation.
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	
+     7	# Check the Python implementation against the prompt examples and edge cases.
+     8	python3 - <<'PY'
+     9	from solution import incr_list
+    10	
+    11	assert incr_list([1, 2, 3]) == [2, 3, 4]
+    12	assert incr_list([5, 3, 5, 2, 3, 3, 9, 0, 123]) == [6, 4, 6, 3, 4, 4, 10, 1, 124]
+    13	assert incr_list([]) == []
+    14	original = [1, -2]
+    15	answer = incr_list(original)
+    16	assert answer == [2, -1]
+    17	assert original == [1, -2]
+    18	assert answer is not original
+    19	PY
+    20	
+    21	# Compile the semantics used for both execution and proof.
+    22	kompile semantic.k --backend haskell --main-module MPY --syntax-module MPY-SYNTAX
+    23	
+    24	# Exercise the translated program in K. A successful closed pattern is #Top.
+    25	krun -d semantic-kompiled \
+    26	  -cARGS='pyList(ListItem(pyInt(1)) ListItem(pyInt(2)) ListItem(pyInt(3)))' \
+    27	  --pattern '<result> result(pyList(ListItem(pyInt(2)) ListItem(pyInt(3)) ListItem(pyInt(4)))) </result>' \
+    28	  solution.mpy
+    29	
+    30	krun -d semantic-kompiled \
+    31	  -cARGS='pyList(ListItem(pyInt(5)) ListItem(pyInt(3)) ListItem(pyInt(5)) ListItem(pyInt(2)) ListItem(pyInt(3)) ListItem(pyInt(3)) ListItem(pyInt(9)) ListItem(pyInt(0)) ListItem(pyInt(123)))' \
+    32	  --pattern '<result> result(pyList(ListItem(pyInt(6)) ListItem(pyInt(4)) ListItem(pyInt(6)) ListItem(pyInt(3)) ListItem(pyInt(4)) ListItem(pyInt(4)) ListItem(pyInt(10)) ListItem(pyInt(1)) ListItem(pyInt(124)))) </result>' \
+    33	  solution.mpy
+    34	
+    35	krun -d semantic-kompiled \
+    36	  -cARGS='pyList(.List)' \
+    37	  --pattern '<result> result(pyList(.List)) </result>' \
+    38	  solution.mpy
+    39	
+    40	# Prove every claim in SPEC (the invariant and whole-program theorem).
+    41	kprove spec.k --definition semantic-kompiled
+
+===== TRANSLATOR ENTRY/CONSTRUCTORS =====
+44:class Unsupported(Exception):
+55:class Ctor:
+63:class Seq:
+70:def q(s: str) -> str:
+101:def _frees(table):
+105:def _deep_frees(table):
+112:def _walk_symtable(table, depth=0):
+125:def scope_info(name, lineno):
+132:def emit_expr(node: ast.expr):
+243:def _op_or_raise(table, op, label):
+250:def _compfor(g):
+258:def _gens(generators):
+263:def emit_index(node: ast.expr):
+285:def emit_stmt(node: ast.stmt):
+359:def emit_stmts(stmts) -> Seq:
+363:def emit_module(tree: ast.Module) -> Ctor:
+373:def render(node, ind: int = 0) -> str:
+411:def main(argv=None) -> int:
+433:if __name__ == "__main__":
+
+EXIT STATUS: 0

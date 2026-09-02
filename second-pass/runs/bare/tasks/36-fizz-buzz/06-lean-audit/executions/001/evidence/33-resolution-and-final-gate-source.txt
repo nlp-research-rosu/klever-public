@@ -1,0 +1,431 @@
++ sed -n 1,520p /reference/tools/stage6_resolution_contract.py
+#!/usr/bin/env python3
+"""Dependency-light signed-resolution contract for Stage 6 audit inputs."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from typing import Any
+
+
+SCHEMA_VERSION = 3
+RESOLUTION_KEYS = frozenset(
+    {
+        "schema_version",
+        "run_id",
+        "problem_id",
+        "condition",
+        "mode",
+        "semantics_mode",
+        "k_workspace",
+        "k_audit",
+        "discovery_manifest",
+        "klean_generation",
+        "lean_workspace",
+        "lean_invocation",
+        "target",
+        "stage1_source_hashes",
+        "trust_inventory",
+        "hashes",
+        "selections",
+        "stage4_preflight",
+        "stage5_result",
+    }
+)
+
+
+class Stage6ResolutionContractError(RuntimeError):
+    """Raised when a Stage 6 signed resolution is malformed."""
+
+
+def canonical_json_sha256(document: Any) -> str:
+    encoded = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def validate_sha256(value: object, label: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(
+        r"[0-9a-f]{64}", value
+    ) is None:
+        raise Stage6ResolutionContractError(f"{label} is malformed")
+    return value
+
+
+def build_audit_input(
+    resolution: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "resolution": resolution,
+        "resolved_input_sha256": canonical_json_sha256(resolution),
+    }
+
+
+def verify_audit_input(
+    document: dict[str, Any],
+) -> tuple[dict[str, Any], str]:
+    required = {
+        "schema_version",
+        "resolution",
+        "resolved_input_sha256",
+    }
+    keys = set(document)
+    if (
+        (keys != required and keys != required | {"audit"})
+        or document.get("schema_version") != SCHEMA_VERSION
+    ):
+        raise Stage6ResolutionContractError(
+            "Stage 6 audit input envelope is malformed"
+        )
+    audit = document.get("audit")
+    if "audit" in document and not isinstance(audit, dict):
+        raise Stage6ResolutionContractError(
+            "Stage 6 audit metadata is malformed"
+        )
+    resolution = document.get("resolution")
+    if (
+        not isinstance(resolution, dict)
+        or set(resolution) != RESOLUTION_KEYS
+        or resolution.get("schema_version") != SCHEMA_VERSION
+    ):
+        raise Stage6ResolutionContractError(
+            "Stage 6 signed resolution is malformed"
+        )
+    digest = validate_sha256(
+        document.get("resolved_input_sha256"),
+        "Stage 6 resolved-input digest",
+    )
+    if canonical_json_sha256(resolution) != digest:
+        raise Stage6ResolutionContractError(
+            "Stage 6 audit input digest does not match signed resolution"
+        )
+    return resolution, digest
++ sed -n 130,450p /reference/tools/klean_final_gate.py
+        if not isinstance(entry, dict):
+            raise KleanFinalGateError("trust inventory entry is malformed")
+        name = entry.get("name")
+        if not isinstance(name, str) or not name:
+            raise KleanFinalGateError("trust inventory name is malformed")
+        names.add(name)
+    return names
+
+
+def _parse_axioms(output: str) -> set[str]:
+    matches = re.findall(r"depends on axioms:\s*\[([^\]]*)\]", output)
+    if len(matches) != 1:
+        raise KleanFinalGateError("#print axioms output is missing or ambiguous")
+    return {
+        token.strip()
+        for token in matches[0].split(",")
+        if token.strip()
+    }
+
+
+def _audit_input_binding(path: Path) -> dict[str, Any]:
+    document = _regular_json(path, "Stage 6 audit input")
+    try:
+        resolution, digest = (
+            stage6_resolution_contract.verify_audit_input(document)
+        )
+    except (
+        stage6_resolution_contract.Stage6ResolutionContractError
+    ) as error:
+        raise KleanFinalGateError(str(error)) from error
+    mode = resolution.get("mode")
+    hashes = resolution.get("hashes")
+    if (
+        mode not in {
+            "CLASSIFICATION_ONLY",
+            "CLASSIFICATION_AND_PROOF",
+        }
+        or not isinstance(hashes, dict)
+    ):
+        raise KleanFinalGateError(
+            "Stage 6 audit input binding is malformed"
+        )
+    return {
+        "resolution": resolution,
+        "resolved_input_sha256": digest,
+    }
+
+
+def _input_hashes(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    candidate: Path | None,
+) -> dict[str, Any]:
+    try:
+        return {
+            "k_workspace_sha256": pipeline_contract.sha256_tree(
+                frozen_input
+            ),
+            "stage1_export_sha256": klean_export.tree_digest(
+                frozen_input
+            ),
+            "discovery_manifest_sha256": (
+                pipeline_contract.sha256_file(discovery_manifest)
+            ),
+            "klean_generation_sha256": (
+                pipeline_contract.sha256_tree(generation)
+            ),
+            "lean_workspace_sha256": (
+                pipeline_contract.sha256_tree(candidate)
+                if candidate is not None
+                else None
+            ),
+        }
+    except (
+        OSError,
+        klean_export.KleanExportError,
+        pipeline_contract.PipelineContractError,
+    ) as error:
+        raise KleanFinalGateError(
+            "cannot hash Stage 6 mechanical inputs"
+        ) from error
+
+
+def _require_bound_inputs(
+    audit_input: dict[str, Any],
+    observed: dict[str, Any],
+) -> None:
+    expected = audit_input["resolution"]["hashes"]
+    for key, digest in observed.items():
+        if expected.get(key) != digest:
+            raise KleanFinalGateError(
+                f"Stage 6 {key} differs from audit input"
+            )
+
+
+def _result_binding(audit_input: Path) -> dict[str, Any]:
+    try:
+        document = _audit_input_binding(Path(audit_input))
+    except KleanFinalGateError:
+        return {}
+    return {
+        "mode": document["resolution"]["mode"],
+        "resolved_input_sha256": document[
+            "resolved_input_sha256"
+        ],
+        "input_hashes": document["resolution"]["hashes"],
+    }
+
+
+def check_final(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    candidate: Path | None,
+    *,
+    toolchain_lock: Path,
+    audit_input: Path,
+    run_command: Callable[..., tuple[int, str]] = _run,
+) -> dict[str, Any]:
+    frozen_input = Path(frozen_input)
+    discovery_manifest = Path(discovery_manifest)
+    generation = Path(generation)
+    candidate = Path(candidate) if candidate is not None else None
+    audit_binding = _audit_input_binding(Path(audit_input))
+    signed_resolution = audit_binding["resolution"]
+    if (
+        signed_resolution["mode"] == "CLASSIFICATION_AND_PROOF"
+        and candidate is None
+    ):
+        raise KleanFinalGateError(
+            "proof-bearing audit requires a Stage 5 Lean candidate"
+        )
+    if (
+        signed_resolution["mode"] == "CLASSIFICATION_ONLY"
+        and candidate is not None
+    ):
+        raise KleanFinalGateError(
+            "classification-only audit must not use a Stage 5 Lean "
+            "candidate"
+        )
+    expected_mode = signed_resolution["mode"]
+    observed_mode = (
+        "CLASSIFICATION_AND_PROOF"
+        if candidate is not None
+        else "CLASSIFICATION_ONLY"
+    )
+    if observed_mode != expected_mode:
+        raise KleanFinalGateError(
+            "Stage 6 mechanical mode differs from audit input"
+        )
+    before_hashes = _input_hashes(
+        frozen_input,
+        discovery_manifest,
+        generation,
+        candidate,
+    )
+    _require_bound_inputs(audit_binding, before_hashes)
+    try:
+        preflight = klean_preflight.check_generation(
+            frozen_input,
+            discovery_manifest,
+            generation,
+            toolchain_lock=toolchain_lock,
+            run_command=run_command,
+        )
+    except klean_preflight.KleanPreflightError as error:
+        raise KleanFinalGateError(
+            f"deterministic Klean preflight failed: {error}"
+        ) from error
+    preflight_status = preflight.get("status")
+    if preflight_status not in {"PASS", "KLEAN_NO_OBLIGATIONS"}:
+        raise KleanFinalGateError(
+            "Stage 4 Klean preflight is not mechanically auditable"
+        )
+    manifest = _regular_json(
+        generation / "generator-manifest.json", "generator manifest"
+    )
+    target = manifest.get("target")
+    if preflight_status == "KLEAN_NO_OBLIGATIONS":
+        if candidate is not None:
+            raise KleanFinalGateError(
+                "classification-only audit must not use a Stage 5 Lean "
+                "candidate"
+            )
+        if target is not None or preflight.get("obligation_count") != 0:
+            raise KleanFinalGateError(
+                "KLEAN_NO_OBLIGATIONS has a target or nonempty domain set"
+            )
+        after_hashes = _input_hashes(
+            frozen_input,
+            discovery_manifest,
+            generation,
+            candidate,
+        )
+        if after_hashes != before_hashes:
+            raise KleanFinalGateError(
+                "resolved inputs changed during mechanical audit"
+            )
+        _require_bound_inputs(audit_binding, after_hashes)
+        return {
+            "status": "PASS",
+            "mode": "CLASSIFICATION_ONLY",
+            "resolved_input_sha256": audit_binding[
+                "resolved_input_sha256"
+            ],
+            "input_hashes": signed_resolution["hashes"],
+            "semantic_classification": "NOT_EVALUATED",
+            "target": None,
+            "klean_preflight": preflight,
+            "generation_sha256": klean_export.tree_digest(generation),
+            "candidate_sha256": None,
+            "used_axioms": [],
+            "diagnostics": [],
+        }
+    if candidate is None:
+        raise KleanFinalGateError(
+            "proof-bearing audit requires a Stage 5 Lean candidate"
+        )
+    if not isinstance(target, dict):
+        raise KleanFinalGateError("generator target is malformed")
+    _candidate_gate(candidate, target)
+    inventory = _regular_json(
+        generation / "trust-inventory.json", "trust inventory"
+    )
+
+    diagnostics: list[dict[str, Any]] = []
+    with tempfile.TemporaryDirectory(prefix="klean-final-gate-") as temporary:
+        project = Path(temporary) / "project"
+        shutil.copytree(candidate, project)
+        if pipeline_contract.sha256_tree(project) != before_hashes[
+            "lean_workspace_sha256"
+        ]:
+            raise KleanFinalGateError(
+                "candidate changed while copying for mechanical audit"
+            )
+        shutil.rmtree(project / ".lake", ignore_errors=True)
+        shutil.rmtree(project / "Base", ignore_errors=True)
+        shutil.copytree(generation / "generated", project / "Base")
+        audit_source = project / "AxiomAudit.lean"
+        audit_source.write_text(
+            "import Proof\n\n"
+            "namespace Proof\n\n"
+            f"#check (final : {target['statement']})\n"
+            "#print axioms final\n\n"
+            "end Proof\n"
+        )
+        outputs: dict[tuple[str, ...], str] = {}
+        commands = (
+            ["lake", "clean"],
+            ["lake", "build"],
+            ["lake", "env", "lean", "AxiomAudit.lean"],
+        )
+        for command in commands:
+            code, output = run_command(command, cwd=project, timeout=600)
+            diagnostics.append(
+                {
+                    "command": command,
+                    "exit_code": code,
+                    "output_sha256": hashlib.sha256(
+                        output.encode()
+                    ).hexdigest(),
+                    "output_tail": output[-4000:],
+                }
+            )
+            outputs[tuple(command)] = output
+            if code != 0:
+                raise KleanFinalGateError(
+                    f"{' '.join(command)} failed ({code}): {output[-600:]}"
+                )
+        used_axioms = _parse_axioms(
+            outputs[("lake", "env", "lean", "AxiomAudit.lean")]
+        )
+    after_hashes = _input_hashes(
+        frozen_input,
+        discovery_manifest,
+        generation,
+        candidate,
+    )
+    if after_hashes != before_hashes:
+        if (
+            after_hashes.get("lean_workspace_sha256")
+            != before_hashes.get("lean_workspace_sha256")
+        ):
+            raise KleanFinalGateError(
+                "candidate changed during mechanical audit"
+            )
+        raise KleanFinalGateError(
+            "resolved inputs changed during mechanical audit"
+        )
+    _require_bound_inputs(audit_binding, after_hashes)
+    if "sorryAx" in used_axioms:
+        raise KleanFinalGateError("Proof.final depends on forbidden sorryAx")
+    allowed = _allowed_axioms(inventory)
+    unexpected = sorted(
+        axiom
+        for axiom in used_axioms
+        if axiom not in allowed
+    )
+    if unexpected:
+        raise KleanFinalGateError(
+            "Proof.final has unrecorded axiom dependencies: "
+            + ", ".join(unexpected)
+        )
+    return {
+        "status": "PASS",
+        "mode": "CLASSIFICATION_AND_PROOF",
+        "resolved_input_sha256": audit_binding[
+            "resolved_input_sha256"
+        ],
+        "input_hashes": signed_resolution["hashes"],
+        "semantic_classification": "NOT_EVALUATED",
+        "target": target,
+        "klean_preflight": preflight,
+        "generation_sha256": klean_export.tree_digest(generation),
+        "candidate_sha256": klean_export.tree_digest(candidate),
+        "used_axioms": sorted(used_axioms),
+        "diagnostics": diagnostics,
+    }
+
+

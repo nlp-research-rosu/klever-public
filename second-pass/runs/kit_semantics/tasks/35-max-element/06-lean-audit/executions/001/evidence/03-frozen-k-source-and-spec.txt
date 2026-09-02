@@ -1,0 +1,478 @@
+$ nl -ba /reference/k-proof/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // A guarded total twin of Val's partial projection to Int.
+     7	  syntax Int ::= projectIntTotal(Val)
+     8	    [function, total, symbol(projectIntTotal), no-evaluators]
+     9	  rule #Ceil({@V:Val}:>Int)
+    10	    => ({ isInt(@V) #Equals true } #And #Ceil(@V))
+    11	    [simplification]
+    12	  rule projectIntTotal(V:Val) => {V}:>Int
+    13	    requires isInt(V)
+    14	    [concrete, simplification(10), preserves-definedness]
+    15	  rule {V:Val}:>Int => projectIntTotal(V)
+    16	    requires isInt(V)
+    17	    [symbolic(V), simplification, preserves-definedness]
+    18	  rule projectIntTotal(I:Int) => I [simplification]
+    19	
+    20	  // Dispatch twin needed by the symbolic backend.  It restates the equation
+    21	  // already enforced by MPY's static Int rule.
+    22	  rule applyCmp(">", V:Val, M:Int)
+    23	    => projectIntTotal(V) >Int M
+    24	    requires isInt(V)
+    25	    [simplification]
+    26	
+    27	  // ---- Full fixed-semantics max domain -----------------------------------
+    28	
+    29	  syntax Bool ::= isNumericV(Val) [function, total]
+    30	  rule isNumericV(V:Val)
+    31	    => isInt(V) orBool isBool(V) orBool isFloat(V)
+    32	
+    33	  syntax Bool ::= allNumericVS(ValSeq) [function, total]
+    34	  rule allNumericVS(.ValSeq) => true
+    35	  rule allNumericVS(vCons(V:Val, REST:ValSeq))
+    36	    => isNumericV(V) andBool allNumericVS(REST)
+    37	
+    38	  syntax Bool ::= allStrVS(ValSeq) [function, total]
+    39	  rule allStrVS(.ValSeq) => true
+    40	  rule allStrVS(vCons(V:Val, REST:ValSeq))
+    41	    => isStr(V) andBool allStrVS(REST)
+    42	
+    43	  // Guarded total projections for the other three orderable value sorts.
+    44	  syntax Float ::= projectFloatTotal(Val)
+    45	    [function, total, symbol(projectFloatTotal), no-evaluators]
+    46	  rule #Ceil({@V:Val}:>Float)
+    47	    => ({ isFloat(@V) #Equals true } #And #Ceil(@V))
+    48	    [simplification]
+    49	  rule projectFloatTotal(V:Val) => {V}:>Float
+    50	    requires isFloat(V)
+    51	    [concrete, simplification(10), preserves-definedness]
+    52	  rule {V:Val}:>Float => projectFloatTotal(V)
+    53	    requires isFloat(V)
+    54	    [symbolic(V), simplification, preserves-definedness]
+    55	  rule projectFloatTotal(F:Float) => F [simplification]
+    56	
+    57	  // Haskell has no FLOAT.max hook.  Symbolic proofs keep this fixed primitive
+    58	  // opaque and thread its Float result; LLVM ground execution still evaluates
+    59	  // the real hook through the concrete equation.
+    60	  syntax Float ::= maxFOpaque(Float, Float)
+    61	    [function, total, symbol(maxFOpaque), no-evaluators]
+    62	  rule maxFOpaque(F1:Float, F2:Float) => maxFloat(F1, F2) [concrete]
+    63	  rule maxFloat(F1:Float, F2:Float) => maxFOpaque(F1, F2)
+    64	    [symbolic(F1, F2), simplification]
+    65	
+    66	  syntax Bool ::= projectBoolTotal(Val)
+    67	    [function, total, symbol(projectBoolTotal), no-evaluators]
+    68	  rule #Ceil({@V:Val}:>Bool)
+    69	    => ({ isBool(@V) #Equals true } #And #Ceil(@V))
+    70	    [simplification]
+    71	  rule projectBoolTotal(V:Val) => {V}:>Bool
+    72	    requires isBool(V)
+    73	    [concrete, simplification(10), preserves-definedness]
+    74	  rule {V:Val}:>Bool => projectBoolTotal(V)
+    75	    requires isBool(V)
+    76	    [symbolic(V), simplification, preserves-definedness]
+    77	  rule projectBoolTotal(B:Bool) => B [simplification]
+    78	
+    79	  syntax Str ::= projectStrTotal(Val)
+    80	    [function, total, symbol(projectStrTotal), no-evaluators]
+    81	  rule #Ceil({@V:Val}:>Str)
+    82	    => ({ isStr(@V) #Equals true } #And #Ceil(@V))
+    83	    [simplification]
+    84	  rule projectStrTotal(V:Val) => {V}:>Str
+    85	    requires isStr(V)
+    86	    [concrete, simplification(10), preserves-definedness]
+    87	  rule {V:Val}:>Str => projectStrTotal(V)
+    88	    requires isStr(V)
+    89	    [symbolic(V), simplification, preserves-definedness]
+    90	  rule projectStrTotal(S:Str) => S [simplification]
+    91	
+    92	  syntax IntSeq ::= codesOf(Str) [function, total]
+    93	  rule codesOf(str(CS:IntSeq)) => CS
+    94	
+    95	  // A total tagged view of Val.  Its four disjoint guards cover every Val;
+    96	  // only the first three cases are admitted by allNumericVS.
+    97	  syntax NumericView ::= nInt(Int)
+    98	                       | nBool(Bool)
+    99	                       | nFloat(Float)
+   100	                       | nOther(Val)
+   101	  syntax NumericView ::= numericView(Val) [function, total]
+   102	  rule numericView(V:Val) => nInt(projectIntTotal(V))
+   103	    requires isInt(V)
+   104	  rule numericView(V:Val) => nBool(projectBoolTotal(V))
+   105	    requires isBool(V)
+   106	  rule numericView(V:Val) => nFloat(projectFloatTotal(V))
+   107	    requires isFloat(V)
+   108	  rule numericView(V:Val) => nOther(V)
+   109	    requires notBool isNumericV(V)
+   110	
+   111	  // Exhaustive comparison table.  Every numeric equation is the RHS of MPY's
+   112	  // existing static applyCmp dispatch for the corresponding pair of sorts.
+   113	  syntax Bool ::= numericGt(NumericView, NumericView) [function, total]
+   114	  rule numericGt(nInt(I:Int), nInt(J:Int)) => I >Int J
+   115	  rule numericGt(nInt(I:Int), nBool(B:Bool))
+   116	    => I >Int boolAsInt(B)
+   117	  rule numericGt(nBool(B:Bool), nInt(I:Int))
+   118	    => boolAsInt(B) >Int I
+   119	  rule numericGt(nBool(B1:Bool), nBool(B2:Bool))
+   120	    => boolAsInt(B1) >Int boolAsInt(B2)
+   121	  rule numericGt(nFloat(F1:Float), nFloat(F2:Float)) => gtF(F1, F2)
+   122	  rule numericGt(nInt(I:Int), nFloat(F:Float)) => ltFI(F, I)
+   123	  rule numericGt(nFloat(F:Float), nInt(I:Int)) => ltIF(I, F)
+   124	  rule numericGt(nBool(B:Bool), nFloat(F:Float))
+   125	    => ltFI(F, boolAsInt(B))
+   126	  rule numericGt(nFloat(F:Float), nBool(B:Bool))
+   127	    => ltIF(boolAsInt(B), F)
+   128	  rule numericGt(nOther(_:Val), _:NumericView) => false
+   129	  rule numericGt(_:NumericView, nOther(_:Val)) => false
+   130	
+   131	  // Dynamic dispatch twins for the two orderable domains.
+   132	  rule applyCmp(">", V:Val, M:Val)
+   133	    => numericGt(numericView(V), numericView(M))
+   134	    requires isNumericV(V) andBool isNumericV(M)
+   135	    [simplification]
+   136	  rule applyCmp(">", V:Val, M:Val)
+   137	    => strLt(codesOf(projectStrTotal(M)), codesOf(projectStrTotal(V)))
+   138	    requires isStr(V) andBool isStr(M)
+   139	    [simplification]
+   140	
+   141	  // The three value-sort predicates are mutually exclusive in K even though
+   142	  // the symbolic backend does not infer that fact from a Boolean guard.
+   143	  rule isFloat(V:Val) orBool isBool(V) => false
+   144	    requires isInt(V)
+   145	    [simplification]
+   146	  rule isInt(V:Val) orBool isBool(V) => false
+   147	    requires isFloat(V)
+   148	    [simplification]
+   149	  rule isInt(V:Val) orBool isFloat(V) => false
+   150	    requires isBool(V)
+   151	    [simplification]
+   152	
+   153	  // General strict-comparison folds.  They keep the first element on ties,
+   154	  // matching MPY's #maxAccV continuation.
+   155	  syntax Val ::= maxNumericGeneralVS(Val, ValSeq) [function]
+   156	  rule maxNumericGeneralVS(M:Val, .ValSeq) => M
+   157	  rule maxNumericGeneralVS(M:Val, vCons(V:Val, REST:ValSeq))
+   158	    => maxNumericGeneralVS(
+   159	         #if numericGt(numericView(V), numericView(M))
+   160	         #then V
+   161	         #else M
+   162	         #fi,
+   163	         REST
+   164	       )
+   165	
+   166	  syntax Val ::= maxStrGeneralVS(Val, ValSeq) [function]
+   167	  rule maxStrGeneralVS(M:Val, .ValSeq) => M
+   168	  rule maxStrGeneralVS(M:Val, vCons(V:Val, REST:ValSeq))
+   169	    => maxStrGeneralVS(
+   170	         #if strLt(
+   171	               codesOf(projectStrTotal(M)),
+   172	               codesOf(projectStrTotal(V))
+   173	             )
+   174	         #then V
+   175	         #else M
+   176	         #fi,
+   177	         REST
+   178	       )
+   179	
+   180	  // State-specific summaries mirror MPY's specialized accumulator and the
+   181	  // exact point where a mixed numeric value hands execution to #maxAccV.
+   182	  syntax Val ::= maxIntNumericVS(Int, ValSeq) [function]
+   183	  rule maxIntNumericVS(M:Int, .ValSeq) => M
+   184	  rule maxIntNumericVS(M:Int, vCons(V:Val, REST:ValSeq))
+   185	    => maxIntNumericVS(maxInt(M, projectIntTotal(V)), REST)
+   186	    requires isInt(V)
+   187	    [simplification]
+   188	  rule maxIntNumericVS(M:Int, vCons(V:Val, REST:ValSeq))
+   189	    => maxNumericGeneralVS(M, vCons(V, REST))
+   190	    requires isFloat(V) orBool isBool(V)
+   191	    [simplification]
+   192	
+   193	  syntax Val ::= maxFloatNumericVS(Float, ValSeq) [function]
+   194	  rule maxFloatNumericVS(M:Float, .ValSeq) => M
+   195	  rule maxFloatNumericVS(M:Float, vCons(V:Val, REST:ValSeq))
+   196	    => maxFloatNumericVS(
+   197	         maxFloat(M, projectFloatTotal(V)),
+   198	         REST
+   199	       )
+   200	    requires isFloat(V)
+   201	    [simplification]
+   202	  rule maxFloatNumericVS(M:Float, vCons(V:Val, REST:ValSeq))
+   203	    => maxNumericGeneralVS(M, vCons(V, REST))
+   204	    requires isInt(V) orBool isBool(V)
+   205	    [simplification]
+   206	endmodule
+$ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [max-int-numeric-acc]:
+     7	    <k>
+     8	      #maxAcc(list(VS:ValSeq), M:Int)
+     9	      =>
+    10	      maxIntNumericVS(M, VS)
+    11	      ...
+    12	    </k>
+    13	    requires allNumericVS(VS)
+    14	
+    15	  claim [max-float-numeric-acc]:
+    16	    <k>
+    17	      #maxAccF(list(VS:ValSeq), M:Float)
+    18	      =>
+    19	      maxFloatNumericVS(M, VS)
+    20	      ...
+    21	    </k>
+    22	    requires allNumericVS(VS)
+    23	
+    24	  claim [max-general-numeric-acc]:
+    25	    <k>
+    26	      #maxAccV(list(VS:ValSeq), M:Val)
+    27	      =>
+    28	      maxNumericGeneralVS(M, VS)
+    29	      ...
+    30	    </k>
+    31	    requires isNumericV(M) andBool allNumericVS(VS)
+    32	
+    33	  claim [max-element-int-head]:
+    34	    <k>
+    35	      #loadAll(
+    36	        Module(
+    37	          FuncDef(
+    38	            "max_element",
+    39	            Params("l"),
+    40	            Return(Call(Name("max"), Name("l")))
+    41	          )
+    42	        )
+    43	      )
+    44	      ~> Call(Name("max_element"), list(vCons(I:Int, REST:ValSeq)))
+    45	      => maxIntNumericVS(I, REST)
+    46	    </k>
+    47	    <env> 0 </env>
+    48	    <scopes>
+    49	      0 |-> scope(
+    50	        .Map
+    51	        =>
+    52	        "max_element" |->
+    53	          closureVal(
+    54	            ("l", .ParamNames),
+    55	            (Return(Call(Name("max"), Name("l"))) .Stmts),
+    56	            0
+    57	          ),
+    58	        parent(-1)
+    59	      )
+    60	      -1 |-> builtinsScope
+    61	    </scopes>
+    62	    <scopeLoc> 1 </scopeLoc>
+    63	    <heap> .Map </heap>
+    64	    <heapLoc> 0 </heapLoc>
+    65	    <stack> .List </stack>
+    66	    <ret> noRet </ret>
+    67	    <exc> NoExc </exc>
+    68	    <exit-code> 0 </exit-code>
+    69	    requires allNumericVS(REST)
+    70	
+    71	  claim [max-element-float-head]:
+    72	    <k>
+    73	      #loadAll(
+    74	        Module(
+    75	          FuncDef(
+    76	            "max_element",
+    77	            Params("l"),
+    78	            Return(Call(Name("max"), Name("l")))
+    79	          )
+    80	        )
+    81	      )
+    82	      ~> Call(Name("max_element"), list(vCons(F:Float, REST:ValSeq)))
+    83	      => maxFloatNumericVS(F, REST)
+    84	    </k>
+    85	    <env> 0 </env>
+    86	    <scopes>
+    87	      0 |-> scope(
+    88	        .Map
+    89	        =>
+    90	        "max_element" |->
+    91	          closureVal(
+    92	            ("l", .ParamNames),
+    93	            (Return(Call(Name("max"), Name("l"))) .Stmts),
+    94	            0
+    95	          ),
+    96	        parent(-1)
+    97	      )
+    98	      -1 |-> builtinsScope
+    99	    </scopes>
+   100	    <scopeLoc> 1 </scopeLoc>
+   101	    <heap> .Map </heap>
+   102	    <heapLoc> 0 </heapLoc>
+   103	    <stack> .List </stack>
+   104	    <ret> noRet </ret>
+   105	    <exc> NoExc </exc>
+   106	    <exit-code> 0 </exit-code>
+   107	    requires allNumericVS(REST)
+   108	
+   109	  claim [max-element-bool-head]:
+   110	    <k>
+   111	      #loadAll(
+   112	        Module(
+   113	          FuncDef(
+   114	            "max_element",
+   115	            Params("l"),
+   116	            Return(Call(Name("max"), Name("l")))
+   117	          )
+   118	        )
+   119	      )
+   120	      ~> Call(Name("max_element"), list(vCons(B:Bool, REST:ValSeq)))
+   121	      => maxNumericGeneralVS(B, REST)
+   122	    </k>
+   123	    <env> 0 </env>
+   124	    <scopes>
+   125	      0 |-> scope(
+   126	        .Map
+   127	        =>
+   128	        "max_element" |->
+   129	          closureVal(
+   130	            ("l", .ParamNames),
+   131	            (Return(Call(Name("max"), Name("l"))) .Stmts),
+   132	            0
+   133	          ),
+   134	        parent(-1)
+   135	      )
+   136	      -1 |-> builtinsScope
+   137	    </scopes>
+   138	    <scopeLoc> 1 </scopeLoc>
+   139	    <heap> .Map </heap>
+   140	    <heapLoc> 0 </heapLoc>
+   141	    <stack> .List </stack>
+   142	    <ret> noRet </ret>
+   143	    <exc> NoExc </exc>
+   144	    <exit-code> 0 </exit-code>
+   145	    requires allNumericVS(REST)
+   146	
+   147	endmodule
+   148	
+   149	module SPEC-STR
+   150	  imports VERIFICATION
+   151	
+   152	  claim [max-general-str-acc]:
+   153	    <k>
+   154	      #maxAccV(list(VS:ValSeq), M:Val)
+   155	      =>
+   156	      maxStrGeneralVS(M, VS)
+   157	      ...
+   158	    </k>
+   159	    requires isStr(M) andBool allStrVS(VS)
+   160	
+   161	  claim [max-element-str-head]:
+   162	    <k>
+   163	      #loadAll(
+   164	        Module(
+   165	          FuncDef(
+   166	            "max_element",
+   167	            Params("l"),
+   168	            Return(Call(Name("max"), Name("l")))
+   169	          )
+   170	        )
+   171	      )
+   172	      ~> Call(Name("max_element"), list(vCons(S:Str, REST:ValSeq)))
+   173	      => maxStrGeneralVS(S, REST)
+   174	    </k>
+   175	    <env> 0 </env>
+   176	    <scopes>
+   177	      0 |-> scope(
+   178	        .Map
+   179	        =>
+   180	        "max_element" |->
+   181	          closureVal(
+   182	            ("l", .ParamNames),
+   183	            (Return(Call(Name("max"), Name("l"))) .Stmts),
+   184	            0
+   185	          ),
+   186	        parent(-1)
+   187	      )
+   188	      -1 |-> builtinsScope
+   189	    </scopes>
+   190	    <scopeLoc> 1 </scopeLoc>
+   191	    <heap> .Map </heap>
+   192	    <heapLoc> 0 </heapLoc>
+   193	    <stack> .List </stack>
+   194	    <ret> noRet </ret>
+   195	    <exc> NoExc </exc>
+   196	    <exit-code> 0 </exit-code>
+   197	    requires allStrVS(REST)
+   198	endmodule
+$ nl -ba /reference/k-proof/solution.py
+     1	def max_element(l: list):
+     2	    return max(l)
+$ nl -ba /reference/k-proof/prompt.py
+     1	
+     2	
+     3	def max_element(l: list):
+     4	    """Return maximum element in the list.
+     5	    >>> max_element([1, 2, 3])
+     6	    3
+     7	    >>> max_element([5, 3, -5, 2, -3, 3, 9, 0, 123, 1, -10])
+     8	    123
+     9	    """
+$ nl -ba /reference/k-proof/solution.mpy
+     1	Module(
+     2	  FuncDef("max_element", Params("l"),
+     3	    Return(Call(Name("max"), Name("l")))))
+$ nl -ba /reference/k-proof/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py smoke.py > smoke.mpy
+     6	
+     7	python3 smoke.py
+     8	
+     9	kompile --backend llvm reference-semantics/semantics.k \
+    10	  --main-module MPY-KRUN \
+    11	  --syntax-module MPY-SYNTAX \
+    12	  --output-definition runtime-kompiled
+    13	
+    14	krun smoke.mpy --definition runtime-kompiled
+    15	
+    16	kompile --backend haskell verification.k \
+    17	  --main-module VERIFICATION \
+    18	  --syntax-module MPY-SYNTAX \
+    19	  --output-definition verification-kompiled
+    20	
+    21	kprove spec.k \
+    22	  --definition verification-kompiled \
+    23	  --spec-module SPEC
+    24	
+    25	kprove spec.k \
+    26	  --definition verification-kompiled \
+    27	  --spec-module SPEC-STR
+    28	
+    29	if kprove spec-vacuity.k \
+    30	     --definition verification-kompiled \
+    31	     --spec-module SPEC-VACUITY; then
+    32	  echo "ERROR: false-result mutation unexpectedly proved" >&2
+    33	  exit 1
+    34	else
+    35	  echo "EXPECTED FAILURE: false-result mutation was rejected"
+    36	fi
+    37	
+    38	if kprove spec-vacuity.k \
+    39	     --definition verification-kompiled \
+    40	     --spec-module SPEC-VACUITY-KEEP; then
+    41	  echo "ERROR: false keep-branch mutation unexpectedly proved" >&2
+    42	  exit 1
+    43	else
+    44	  echo "EXPECTED FAILURE: false keep-branch mutation was rejected"
+    45	fi
+    46	
+    47	if kprove spec-body-mutation.k \
+    48	     --definition verification-kompiled \
+    49	     --spec-module SPEC-BODY-MUTATION; then
+    50	  echo "ERROR: mutated body unexpectedly proved" >&2
+    51	  exit 1
+    52	else
+    53	  echo "EXPECTED FAILURE: mutated body was rejected"
+    54	fi

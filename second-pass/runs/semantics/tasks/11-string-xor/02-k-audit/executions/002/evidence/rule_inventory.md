@@ -1,0 +1,1034 @@
+# Exhaustive K declaration and rule inventory
+
+Source scope: trusted supplied `semantics.k` and every helper under `semantics/`, plus candidate `verification.k` and `spec.k`.
+
+## Counts
+
+- syntax: 237
+- configuration: 1
+- context: 5
+- rule: 714
+- claim: 2
+- attribute `function`: 158
+- attribute `total`: 115
+- attribute `functional`: 0
+- attribute `symbol`: 25
+- attribute `no-evaluators`: 25
+- attribute `macro`: 4
+- attribute `macro-rec`: 1
+- attribute `strict`: 3
+- attribute `seqstrict`: 1
+- attribute `owise`: 29
+- attribute `concrete`: 48
+- attribute `simplification`: 0
+- priority-bearing declarations/rules: 33
+
+## `/reference/reference-semantics/semantics/assert.k`
+
+- `INV-0001` `rule` lines 6-6; attrs: none; `rule <k> Assert(V:Val) => .K ... </k>`
+- `INV-0002` `rule` lines 8-10; attrs: none; `rule <k> Assert(V:Val) ~> _ => .K </k>`
+- `INV-0003` `rule` lines 13-15; attrs: priority(40); `rule <k> Assert(ref(H:Int)) => Assert(V) ... </k>`
+## `/reference/reference-semantics/semantics/bool.k`
+
+- `INV-0004` `rule` lines 8-9; attrs: none; `rule applyUn("not", V:Val) => notBool truthy(V)`
+- `INV-0005` `rule` lines 10-10; attrs: none; `rule applyCmp("==", B1:Bool, B2:Bool) => B1 ==Bool B2`
+- `INV-0006` `rule` lines 11-15; attrs: none; `rule applyCmp("!=", B1:Bool, B2:Bool) => B1 =/=Bool B2`
+- `INV-0007` `context` lines 16-16; attrs: none; `context BoolOp(_, (HOLE:Expr, _:Exprs))`
+- `INV-0008` `rule` lines 17-17; attrs: none; `rule <k> BoolOp(_:String, (V:Val, .Exprs)) => V ... </k>`
+- `INV-0009` `rule` lines 18-18; attrs: none; `rule <k> BoolOp("and", (V:Val, A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>`
+- `INV-0010` `rule` lines 20-20; attrs: none; `rule <k> BoolOp("and", (V:Val, _:Expr, _:Exprs)) => V ... </k>`
+- `INV-0011` `rule` lines 22-22; attrs: none; `rule <k> BoolOp("or",  (V:Val, _:Expr, _:Exprs)) => V ... </k>`
+- `INV-0012` `rule` lines 24-24; attrs: none; `rule <k> BoolOp("or",  (V:Val, A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>`
+- `INV-0013` `rule` lines 29-30; attrs: priority(40); `rule <k> BoolOp(_:String, (ref(H:Int), .Exprs)) => ref(H) ... </k>`
+- `INV-0014` `rule` lines 31-32; attrs: none; `rule <k> BoolOp("and", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>`
+- `INV-0015` `rule` lines 35-36; attrs: none; `rule <k> BoolOp("and", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k>`
+- `INV-0016` `rule` lines 39-40; attrs: none; `rule <k> BoolOp("or", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k>`
+- `INV-0017` `rule` lines 43-44; attrs: none; `rule <k> BoolOp("or", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>`
+## `/reference/reference-semantics/semantics/builtins.k`
+
+- `INV-0018` `syntax` lines 17-19; attrs: function; `syntax Val ::= applyBuiltin(String, Vals) [function]`
+- `INV-0019` `syntax` lines 20-20; attrs: function; `syntax Int ::= seqLen(Val) [function]`
+- `INV-0020` `rule` lines 21-21; attrs: none; `rule applyBuiltin("len", OBJ:Val, .Vals) => seqLen(OBJ)`
+- `INV-0021` `rule` lines 22-22; attrs: none; `rule seqLen(list(VS:ValSeq))                  => vsLen(VS)`
+- `INV-0022` `rule` lines 23-23; attrs: none; `rule seqLen(tuple(VS:ValSeq))                 => vsLen(VS)`
+- `INV-0023` `rule` lines 24-24; attrs: none; `rule seqLen(str(IS:IntSeq))                   => isLen(IS)`
+- `INV-0024` `rule` lines 25-25; attrs: none; `rule seqLen(setV(DS:IntSeq))                  => isLen(DS)`
+- `INV-0025` `rule` lines 26-31; attrs: none; `rule seqLen(rangeObj(LO:Int, HI:Int, ST:Int)) => rangeLen(LO, HI, ST)`
+- `INV-0026` `rule` lines 32-32; attrs: none; `rule <k> #applyK(toCall(builtinV("list")), (list(VS:ValSeq),  .Vals)) => #alloc(list(VS)) ... </k>`
+- `INV-0027` `rule` lines 33-33; attrs: none; `rule <k> #applyK(toCall(builtinV("list")), (tuple(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>`
+- `INV-0028` `rule` lines 34-34; attrs: none; `rule <k> #applyK(toCall(builtinV("list")), .Vals)                     => #alloc(list(.ValSeq)) ... </k>`
+- `INV-0029` `rule` lines 35-35; attrs: none; `rule <k> #applyK(toCall(builtinV("list")), (str(CS:IntSeq), .Vals))   => #alloc(list(charsOf(CS))) ... </k>`
+- `INV-0030` `syntax` lines 36-36; attrs: function, total; `syntax ValSeq ::= charsOf(IntSeq) [function, total]`
+- `INV-0031` `rule` lines 37-37; attrs: none; `rule charsOf(.IntSeq)                => .ValSeq`
+- `INV-0032` `rule` lines 38-40; attrs: none; `rule charsOf(iCons(C:Int, R:IntSeq)) => vCons(str(iCons(C, .IntSeq)), charsOf(R))`
+- `INV-0033` `rule` lines 41-43; attrs: none; `rule applyBuiltin("set", str(CS:IntSeq), .Vals) => setV(dedupCodes(CS))`
+- `INV-0034` `rule` lines 44-46; attrs: none; `rule applyBuiltin("abs", I:Int, .Vals) => absInt(I)`
+- `INV-0035` `syntax` lines 47-47; attrs: none; `syntax KItem ::= #sumAcc(Iterable, Int) \| #sumCont(Int)`
+- `INV-0036` `rule` lines 48-48; attrs: none; `rule <k> #sumAcc(IT:Iterable, ACC:Int) => #iterNext(IT) ~> #sumCont(ACC) ... </k>`
+- `INV-0037` `rule` lines 49-49; attrs: none; `rule <k> #iterDone ~> #sumCont(ACC:Int) => ACC ... </k>`
+- `INV-0038` `rule` lines 50-51; attrs: none; `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int)`
+- `INV-0039` `syntax` lines 54-54; attrs: function; `syntax Int ::= intOf(Val) [function]`
+- `INV-0040` `rule` lines 55-55; attrs: none; `rule intOf(I:Int)  => I`
+- `INV-0041` `rule` lines 56-58; attrs: none; `rule intOf(B:Bool) => #if B #then 1 #else 0 #fi`
+- `INV-0042` `syntax` lines 59-59; attrs: none; `syntax KItem ::= #allAcc(Iterable) \| "#allCont"`
+- `INV-0043` `rule` lines 60-60; attrs: none; `rule <k> #allAcc(IT:Iterable) => #iterNext(IT) ~> #allCont ... </k>`
+- `INV-0044` `rule` lines 61-61; attrs: none; `rule <k> #iterDone ~> #allCont => true ... </k>`
+- `INV-0045` `rule` lines 62-62; attrs: none; `rule <k> #iterYield(V:Val, R:Iterable) ~> #allCont => #allAcc(R) ... </k>`
+- `INV-0046` `rule` lines 64-64; attrs: none; `rule <k> #iterYield(V:Val, _:Iterable) ~> #allCont => false ... </k>`
+- `INV-0047` `syntax` lines 67-67; attrs: none; `syntax KItem ::= #anyAcc(Iterable) \| "#anyCont"`
+- `INV-0048` `rule` lines 68-68; attrs: none; `rule <k> #anyAcc(IT:Iterable) => #iterNext(IT) ~> #anyCont ... </k>`
+- `INV-0049` `rule` lines 69-69; attrs: none; `rule <k> #iterDone ~> #anyCont => false ... </k>`
+- `INV-0050` `rule` lines 70-70; attrs: none; `rule <k> #iterYield(V:Val, _:Iterable) ~> #anyCont => true ... </k>`
+- `INV-0051` `rule` lines 72-72; attrs: none; `rule <k> #iterYield(V:Val, R:Iterable) ~> #anyCont => #anyAcc(R) ... </k>`
+- `INV-0052` `syntax` lines 76-76; attrs: none; `syntax KItem ::= #maxAcc0(Iterable) \| "#maxCont0" \| #maxAcc(Iterable, Int) \| #maxCont(Int)`
+- `INV-0053` `rule` lines 77-77; attrs: none; `rule <k> #maxAcc0(IT:Iterable) => #iterNext(IT) ~> #maxCont0 ... </k>`
+- `INV-0054` `rule` lines 78-78; attrs: none; `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAcc(R, {V}:>Int) ... </k>`
+- `INV-0055` `rule` lines 80-80; attrs: none; `rule <k> #maxAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #maxCont(M) ... </k>`
+- `INV-0056` `rule` lines 81-81; attrs: none; `rule <k> #iterDone ~> #maxCont(M:Int) => M ... </k>`
+- `INV-0057` `rule` lines 82-83; attrs: none; `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont(M:Int)`
+- `INV-0058` `syntax` lines 86-86; attrs: none; `syntax KItem ::= #minAcc0(Iterable) \| "#minCont0" \| #minAcc(Iterable, Int) \| #minCont(Int)`
+- `INV-0059` `rule` lines 87-87; attrs: none; `rule <k> #minAcc0(IT:Iterable) => #iterNext(IT) ~> #minCont0 ... </k>`
+- `INV-0060` `rule` lines 88-88; attrs: none; `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAcc(R, {V}:>Int) ... </k>`
+- `INV-0061` `rule` lines 90-90; attrs: none; `rule <k> #minAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #minCont(M) ... </k>`
+- `INV-0062` `rule` lines 91-91; attrs: none; `rule <k> #iterDone ~> #minCont(M:Int) => M ... </k>`
+- `INV-0063` `rule` lines 92-93; attrs: none; `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont(M:Int)`
+- `INV-0064` `syntax` lines 97-97; attrs: function; `syntax Int ::= maxVals(Int, Vals) [function]`
+- `INV-0065` `rule` lines 98-98; attrs: none; `rule applyBuiltin("max", I:Int, REST:Vals) => maxVals(I, REST)`
+- `INV-0066` `rule` lines 99-99; attrs: none; `rule maxVals(M:Int, .Vals)           => M`
+- `INV-0067` `rule` lines 100-101; attrs: none; `rule maxVals(M:Int, (I:Int, R:Vals)) => maxVals(maxInt(M, I), R)`
+- `INV-0068` `syntax` lines 102-102; attrs: function; `syntax Int ::= minVals(Int, Vals) [function]`
+- `INV-0069` `rule` lines 103-103; attrs: none; `rule applyBuiltin("min", I:Int, REST:Vals) => minVals(I, REST)`
+- `INV-0070` `rule` lines 104-104; attrs: none; `rule minVals(M:Int, .Vals)           => M`
+- `INV-0071` `rule` lines 105-107; attrs: none; `rule minVals(M:Int, (I:Int, R:Vals)) => minVals(minInt(M, I), R)`
+- `INV-0072` `rule` lines 108-108; attrs: none; `rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(48, iCons(98, binCodes(N))))`
+- `INV-0073` `rule` lines 111-112; attrs: none; `rule applyBuiltin("bin", N:Int, .Vals)`
+- `INV-0074` `syntax` lines 114-114; attrs: function, total; `syntax IntSeq ::= binCodes(Int) [function, total]`
+- `INV-0075` `rule` lines 115-115; attrs: none; `rule binCodes(0) => iCons(48, .IntSeq)`
+- `INV-0076` `rule` lines 116-116; attrs: none; `rule binCodes(N:Int) => binAcc(N, .IntSeq) requires N >Int 0`
+- `INV-0077` `syntax` lines 117-117; attrs: function, total; `syntax IntSeq ::= binAcc(Int, IntSeq) [function, total]`
+- `INV-0078` `rule` lines 118-118; attrs: none; `rule binAcc(0, ACC:IntSeq) => ACC`
+- `INV-0079` `rule` lines 119-120; attrs: none; `rule binAcc(N:Int, ACC:IntSeq)`
+- `INV-0080` `rule` lines 124-125; attrs: none; `rule <k> #applyK(toCall(builtinV("enumerate")), (list(VS:ValSeq), .Vals))`
+- `INV-0081` `syntax` lines 126-126; attrs: function, total; `syntax ValSeq ::= enumVS(ValSeq, Int) [function, total]`
+- `INV-0082` `rule` lines 127-127; attrs: none; `rule enumVS(.ValSeq, _:Int) => .ValSeq`
+- `INV-0083` `rule` lines 128-131; attrs: none; `rule enumVS(vCons(V:Val, R:ValSeq), I:Int)`
+- `INV-0084` `rule` lines 132-133; attrs: none; `rule <k> #applyK(toCall(builtinV("map")), (typeV("str"), list(VS:ValSeq), .Vals))`
+- `INV-0085` `syntax` lines 134-134; attrs: function, total; `syntax ValSeq ::= mapStrVS(ValSeq) [function, total]`
+- `INV-0086` `rule` lines 135-135; attrs: none; `rule mapStrVS(.ValSeq) => .ValSeq`
+- `INV-0087` `rule` lines 136-136; attrs: none; `rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))`
+- `INV-0088` `rule` lines 137-139; attrs: none; `rule mapStrVS(vCons(str(CS:IntSeq), R:ValSeq)) => vCons(str(CS), mapStrVS(R))`
+- `INV-0089` `rule` lines 140-142; attrs: none; `rule applyBuiltin("int", I:Int, .Vals) => I`
+- `INV-0090` `rule` lines 143-143; attrs: none; `rule applyBuiltin("ord", str(iCons(C:Int, .IntSeq)), .Vals) => C`
+- `INV-0091` `rule` lines 144-144; attrs: none; `rule applyBuiltin("chr", I:Int, .Vals) => str(iCons(I, .IntSeq))`
+- `INV-0092` `rule` lines 148-148; attrs: none; `rule applyBuiltin("str", I:Int, .Vals)       => str(strToCodes(Int2String(I)))`
+- `INV-0093` `rule` lines 149-151; attrs: none; `rule applyBuiltin("str", str(CS:IntSeq), .Vals) => str(CS)`
+- `INV-0094` `rule` lines 152-152; attrs: none; `rule applyBuiltin("int", str(iCons(C:Int, .IntSeq)), .Vals) => C -Int 48`
+- `INV-0095` `rule` lines 156-156; attrs: none; `rule applyBuiltin("int", str(CS:IntSeq), .Vals) => intDigAcc(CS, 0)`
+- `INV-0096` `syntax` lines 158-158; attrs: function, total; `syntax Int ::= intDigAcc(IntSeq, Int) [function, total]`
+- `INV-0097` `rule` lines 159-159; attrs: none; `rule intDigAcc(.IntSeq, ACC:Int)             => ACC`
+- `INV-0098` `rule` lines 160-162; attrs: none; `rule intDigAcc(iCons(C:Int, R:IntSeq), ACC:Int) => intDigAcc(R, (ACC *Int 10) +Int (C -Int 48))`
+- `INV-0099` `rule` lines 163-163; attrs: none; `rule applyBuiltin("zip", list(A:ValSeq), list(B:ValSeq), .Vals) => zipObj(A, B)`
+- `INV-0100` `rule` lines 164-166; attrs: none; `rule applyBuiltin("zip", str(A:IntSeq), str(B:IntSeq), .Vals)   => zipObjS(A, B)`
+- `INV-0101` `rule` lines 167-168; attrs: none; `rule <k> #iterNext(zipObj(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq)))`
+- `INV-0102` `rule` lines 169-169; attrs: none; `rule <k> #iterNext(zipObj(.ValSeq, _:ValSeq))               => #iterDone ... </k>`
+- `INV-0103` `rule` lines 170-170; attrs: none; `rule <k> #iterNext(zipObj(vCons(_:Val, _:ValSeq), .ValSeq)) => #iterDone ... </k>`
+- `INV-0104` `rule` lines 171-172; attrs: none; `rule <k> #iterNext(zipObjS(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)))`
+- `INV-0105` `rule` lines 173-173; attrs: none; `rule <k> #iterNext(zipObjS(.IntSeq, _:IntSeq))              => #iterDone ... </k>`
+- `INV-0106` `rule` lines 174-176; attrs: none; `rule <k> #iterNext(zipObjS(iCons(_:Int, _:IntSeq), .IntSeq)) => #iterDone ... </k>`
+- `INV-0107` `rule` lines 177-177; attrs: none; `rule applyBuiltin("range", I:Int, .Vals)               => rangeObj(0, I, 1)`
+- `INV-0108` `rule` lines 178-178; attrs: none; `rule applyBuiltin("range", A:Int, B:Int, .Vals)        => rangeObj(A, B, 1)`
+- `INV-0109` `rule` lines 179-179; attrs: none; `rule applyBuiltin("range", A:Int, B:Int, S:Int, .Vals) => rangeObj(A, B, S)`
+- `INV-0110` `rule` lines 187-187; attrs: none; `rule applyBuiltin("eval", str(CS:IntSeq), .Vals) => evalArith(CS)`
+- `INV-0111` `syntax` lines 188-188; attrs: function; `syntax Int ::= evalArith(IntSeq) [function]`
+- `INV-0112` `rule` lines 189-191; attrs: none; `rule evalArith(CS:IntSeq)`
+- `INV-0113` `syntax` lines 192-193; attrs: none; `syntax OpSeq ::= ".OpSeq" \| oCons(String, OpSeq)`
+- `INV-0114` `syntax` lines 194-194; attrs: function, total; `syntax Bool ::= evDigit(Int) [function, total]`
+- `INV-0115` `rule` lines 195-195; attrs: none; `rule evDigit(C:Int) => C >=Int 48 andBool C <=Int 57`
+- `INV-0116` `syntax` lines 196-196; attrs: function, total; `syntax Bool ::= evHead42(IntSeq) [function, total]`
+- `INV-0117` `rule` lines 197-197; attrs: none; `rule evHead42(iCons(42, _:IntSeq)) => true`
+- `INV-0118` `rule` lines 198-198; attrs: owise; `rule evHead42(_:IntSeq)            => false [owise]`
+- `INV-0119` `syntax` lines 199-199; attrs: function, total; `syntax Bool ::= evHead47(IntSeq) [function, total]`
+- `INV-0120` `rule` lines 200-200; attrs: none; `rule evHead47(iCons(47, _:IntSeq)) => true`
+- `INV-0121` `rule` lines 201-202; attrs: owise; `rule evHead47(_:IntSeq)            => false [owise]`
+- `INV-0122` `syntax` lines 203-203; attrs: function, total; `syntax OpSeq ::= tokOps(IntSeq) [function, total]`
+- `INV-0123` `rule` lines 204-204; attrs: none; `rule tokOps(.IntSeq)                 => .OpSeq`
+- `INV-0124` `rule` lines 205-205; attrs: none; `rule tokOps(iCons(32, R:IntSeq))     => tokOps(R)`
+- `INV-0125` `rule` lines 206-206; attrs: none; `rule tokOps(iCons(C:Int, R:IntSeq))  => tokOps(R) requires evDigit(C)`
+- `INV-0126` `rule` lines 207-207; attrs: none; `rule tokOps(iCons(42, iCons(42, R:IntSeq))) => oCons("**", tokOps(R))`
+- `INV-0127` `rule` lines 208-208; attrs: none; `rule tokOps(iCons(42, R:IntSeq))     => oCons("*", tokOps(R)) requires notBool evHead42(R)`
+- `INV-0128` `rule` lines 209-209; attrs: none; `rule tokOps(iCons(47, iCons(47, R:IntSeq))) => oCons("//", tokOps(R))`
+- `INV-0129` `rule` lines 210-210; attrs: none; `rule tokOps(iCons(47, R:IntSeq))     => oCons("/", tokOps(R)) requires notBool evHead47(R)`
+- `INV-0130` `rule` lines 211-211; attrs: none; `rule tokOps(iCons(43, R:IntSeq))     => oCons("+", tokOps(R))`
+- `INV-0131` `rule` lines 212-213; attrs: none; `rule tokOps(iCons(45, R:IntSeq))     => oCons("-", tokOps(R))`
+- `INV-0132` `syntax` lines 214-215; attrs: function, total; `syntax IntSeq ::= tokNds(IntSeq) [function, total]`
+- `INV-0133` `rule` lines 216-216; attrs: none; `rule tokNds(.IntSeq)                => .IntSeq`
+- `INV-0134` `rule` lines 217-217; attrs: none; `rule tokNds(iCons(32, R:IntSeq))    => tokNds(R)`
+- `INV-0135` `rule` lines 218-218; attrs: none; `rule tokNds(iCons(C:Int, R:IntSeq)) => tokNdAcc(C -Int 48, R) requires evDigit(C)`
+- `INV-0136` `rule` lines 219-219; attrs: none; `rule tokNds(iCons(C:Int, R:IntSeq)) => tokNds(R)`
+- `INV-0137` `rule` lines 221-221; attrs: none; `rule tokNdAcc(A:Int, iCons(C:Int, R:IntSeq)) => tokNdAcc(A *Int 10 +Int (C -Int 48), R)`
+- `INV-0138` `rule` lines 223-224; attrs: owise; `rule tokNdAcc(A:Int, S:IntSeq) => iCons(A, tokNds(S)) [owise]`
+- `INV-0139` `syntax` lines 225-225; attrs: none; `syntax EvPair ::= evp(OpSeq, IntSeq)`
+- `INV-0140` `syntax` lines 226-226; attrs: function, total; `syntax Int ::= firstNdE(EvPair) [function, total]`
+- `INV-0141` `rule` lines 227-227; attrs: none; `rule firstNdE(evp(_:OpSeq, iCons(N:Int, _:IntSeq))) => N`
+- `INV-0142` `rule` lines 228-229; attrs: owise; `rule firstNdE(_:EvPair) => 0 [owise]`
+- `INV-0143` `syntax` lines 230-230; attrs: function, total; `syntax Int ::= applyOpE(String, Int, Int) [function, total]`
+- `INV-0144` `rule` lines 231-231; attrs: none; `rule applyOpE("+",  A:Int, B:Int) => A +Int B`
+- `INV-0145` `rule` lines 232-232; attrs: none; `rule applyOpE("-",  A:Int, B:Int) => A -Int B`
+- `INV-0146` `rule` lines 233-233; attrs: none; `rule applyOpE("*",  A:Int, B:Int) => A *Int B`
+- `INV-0147` `rule` lines 234-234; attrs: none; `rule applyOpE("//", A:Int, B:Int) => A divInt B`
+- `INV-0148` `rule` lines 235-235; attrs: none; `rule applyOpE("**", A:Int, B:Int) => A ^Int B`
+- `INV-0149` `rule` lines 236-237; attrs: owise; `rule applyOpE(_:String, A:Int, _:Int) => A [owise]`
+- `INV-0150` `syntax` lines 238-238; attrs: function, total; `syntax EvPair ::= passPowE(OpSeq, IntSeq) [function, total]`
+- `INV-0151` `rule` lines 239-239; attrs: none; `rule passPowE(.OpSeq, NDS:IntSeq) => evp(.OpSeq, NDS)`
+- `INV-0152` `rule` lines 240-240; attrs: none; `rule passPowE(oCons("**", OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCombE(N, passPowE(OPS, NDS))`
+- `INV-0153` `rule` lines 241-241; attrs: none; `rule passPowE(oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCarryE(O, N, passPowE(OPS, NDS))`
+- `INV-0154` `rule` lines 243-243; attrs: owise; `rule passPowE(_:OpSeq, .IntSeq) => evp(.OpSeq, .IntSeq) [owise]`
+- `INV-0155` `syntax` lines 244-244; attrs: function, total; `syntax EvPair ::= powCombE(Int, EvPair) [function, total]`
+- `INV-0156` `rule` lines 245-245; attrs: none; `rule powCombE(N:Int, evp(OPS:OpSeq, iCons(M:Int, REST:IntSeq))) => evp(OPS, iCons(N ^Int M, REST))`
+- `INV-0157` `rule` lines 246-246; attrs: none; `rule powCombE(N:Int, evp(OPS:OpSeq, .IntSeq)) => evp(OPS, iCons(N, .IntSeq))`
+- `INV-0158` `syntax` lines 247-247; attrs: function, total; `syntax EvPair ::= powCarryE(String, Int, EvPair) [function, total]`
+- `INV-0159` `rule` lines 248-249; attrs: none; `rule powCarryE(O:String, N:Int, evp(OPS:OpSeq, NDS:IntSeq)) => evp(oCons(O, OPS), iCons(N, NDS))`
+- `INV-0160` `syntax` lines 250-250; attrs: function, total; `syntax EvPair ::= passMulE(EvPair) [function, total] \| passAddE(EvPair) [function, total]`
+- `INV-0161` `rule` lines 251-251; attrs: none; `rule passMulE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("mul", N0, OPS, NDS, .OpSeq, .IntSeq)`
+- `INV-0162` `rule` lines 252-252; attrs: none; `rule passMulE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)`
+- `INV-0163` `rule` lines 253-253; attrs: none; `rule passAddE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("add", N0, OPS, NDS, .OpSeq, .IntSeq)`
+- `INV-0164` `rule` lines 254-254; attrs: none; `rule passAddE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)`
+- `INV-0165` `syntax` lines 255-255; attrs: function, total; `syntax EvPair ::= passLGoE(String, Int, OpSeq, IntSeq, OpSeq, IntSeq) [function, total]`
+- `INV-0166` `rule` lines 256-256; attrs: none; `rule passLGoE(_:String, CUR:Int, .OpSeq, _:IntSeq, OO:OpSeq, ON:IntSeq) => evp(OO, appendIE(ON, CUR))`
+- `INV-0167` `rule` lines 257-258; attrs: none; `rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq)`
+- `INV-0168` `rule` lines 260-261; attrs: none; `rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq)`
+- `INV-0169` `rule` lines 263-264; attrs: owise; `rule passLGoE(_:String, CUR:Int, oCons(_:String, _:OpSeq), .IntSeq, OO:OpSeq, ON:IntSeq)`
+- `INV-0170` `syntax` lines 265-265; attrs: function, total; `syntax Bool ::= inLevelE(String, String) [function, total]`
+- `INV-0171` `rule` lines 266-266; attrs: none; `rule inLevelE("mul", O:String) => O ==String "*" orBool O ==String "//" orBool O ==String "/"`
+- `INV-0172` `rule` lines 267-267; attrs: none; `rule inLevelE("add", O:String) => O ==String "+" orBool O ==String "-"`
+- `INV-0173` `rule` lines 268-268; attrs: owise; `rule inLevelE(_:String, _:String) => false [owise]`
+- `INV-0174` `syntax` lines 269-269; attrs: function, total; `syntax OpSeq ::= appendOpE(OpSeq, String) [function, total]`
+- `INV-0175` `rule` lines 270-270; attrs: none; `rule appendOpE(.OpSeq, O:String) => oCons(O, .OpSeq)`
+- `INV-0176` `rule` lines 271-271; attrs: none; `rule appendOpE(oCons(H:String, T:OpSeq), O:String) => oCons(H, appendOpE(T, O))`
+- `INV-0177` `syntax` lines 272-272; attrs: function, total; `syntax IntSeq ::= appendIE(IntSeq, Int) [function, total]`
+- `INV-0178` `rule` lines 273-273; attrs: none; `rule appendIE(.IntSeq, N:Int) => iCons(N, .IntSeq)`
+- `INV-0179` `rule` lines 274-278; attrs: concrete; `rule appendIE(iCons(H:Int, T:IntSeq), N:Int) => iCons(H, appendIE(T, N))`
+- `INV-0180` `syntax` lines 279-279; attrs: none; `syntax KItem ::= "#md5"`
+- `INV-0181` `rule` lines 280-281; attrs: priority(40); `rule <k> Call(Attribute(Name("hashlib"), "md5"), (E:Expr, .Exprs)) => E ~> #md5 ... </k>`
+- `INV-0182` `rule` lines 282-282; attrs: none; `rule <k> str(CS:IntSeq) ~> #md5 => md5Obj(CS) ... </k>`
+- `INV-0183` `syntax` lines 283-283; attrs: none; `syntax Val ::= md5Obj(IntSeq)`
+- `INV-0184` `rule` lines 284-284; attrs: none; `rule applyMethod(md5Obj(CS:IntSeq), "hexdigest", .Vals) => str(md5hexCodes(CS))`
+- `INV-0185` `syntax` lines 285-290; attrs: function, total, symbol, no-evaluators, owise, concrete; `syntax IntSeq ::= md5hexCodes(IntSeq) [function, total, symbol(md5hexCodes), no-evaluators]`
+- `INV-0186` `rule` lines 291-291; attrs: none; `rule applyBuiltin("isinstance", V:Val, typeV("int"), .Vals) => isIntV(V)`
+- `INV-0187` `rule` lines 292-292; attrs: none; `rule applyBuiltin("isinstance", V:Val, typeV("str"), .Vals) => isStrV(V)`
+- `INV-0188` `syntax` lines 293-293; attrs: function; `syntax Bool ::= isIntV(Val) [function] \| isStrV(Val) [function]`
+- `INV-0189` `rule` lines 294-294; attrs: none; `rule isIntV(_:Int)         => true`
+- `INV-0190` `rule` lines 295-295; attrs: owise; `rule isIntV(_:Val)         => false [owise]`
+- `INV-0191` `rule` lines 296-296; attrs: none; `rule isStrV(str(_:IntSeq)) => true`
+- `INV-0192` `rule` lines 297-297; attrs: owise; `rule isStrV(_:Val)         => false [owise]`
+## `/reference/reference-semantics/semantics/call.k`
+
+- `INV-0193` `rule` lines 16-18; attrs: owise; `rule <k> Attribute(V:Val, M:String) => boundMethodV(V, M) ... </k>`
+- `INV-0194` `syntax` lines 19-19; attrs: none; `syntax KItem ::= #callee(Exprs)`
+- `INV-0195` `rule` lines 20-20; attrs: owise; `rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]`
+- `INV-0196` `rule` lines 21-23; attrs: none; `rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>`
+- `INV-0197` `rule` lines 24-25; attrs: none; `rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>`
+- `INV-0198` `rule` lines 26-26; attrs: none; `rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>`
+- `INV-0199` `rule` lines 27-27; attrs: none; `rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ)    ... </k>`
+- `INV-0200` `rule` lines 28-28; attrs: none; `rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ)    ... </k>`
+- `INV-0201` `rule` lines 29-29; attrs: none; `rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ)   ... </k>`
+- `INV-0202` `rule` lines 30-30; attrs: none; `rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ)   ... </k>`
+- `INV-0203` `rule` lines 31-31; attrs: owise; `rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]`
+- `INV-0204` `rule` lines 32-37; attrs: none; `rule <k> #applyK(toCall(typeV(T:String)),     ACC:Vals) => applyBuiltin(T, ACC)  ... </k>`
+- `INV-0205` `rule` lines 38-41; attrs: priority(40); `rule <k> #applyK(toCall(builtinV(BN:String)), (ref(H:Int), REST:Vals))`
+- `INV-0206` `rule` lines 42-44; attrs: none; `rule <k> #applyK(toCall(builtinV(BN:String)), (A:Val, ref(H:Int), REST:Vals))`
+- `INV-0207` `rule` lines 47-51; attrs: priority(40); `rule <k> #applyK(toCall(typeV(T:String)), (ref(H:Int), REST:Vals))`
+- `INV-0208` `syntax` lines 52-52; attrs: function, total; `syntax Bool ::= isMutMethod(String) [function, total]`
+- `INV-0209` `rule` lines 53-55; attrs: none; `rule isMutMethod(M:String)`
+- `INV-0210` `rule` lines 56-58; attrs: none; `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), M:String)), ACC:Vals)`
+- `INV-0211` `rule` lines 63-65; attrs: none; `rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), (ref(H:Int), REST:Vals))`
+- `INV-0212` `rule` lines 69-79; attrs: none; `rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT`
+- `INV-0213` `rule` lines 80-86; attrs: none; `rule <k> #applyK(toCall(closureValC(PNS:ParamNames, CVS:ParamNames, BODY:Stmts, CM:Map)), ACC:Vals) ~> CONT`
+- `INV-0214` `syntax` lines 87-87; attrs: none; `syntax KItem ::= #allocCells(ParamNames)`
+- `INV-0215` `rule` lines 88-88; attrs: none; `rule <k> #allocCells(.ParamNames) => .K ... </k>`
+- `INV-0216` `rule` lines 89-93; attrs: none; `rule <k> #allocCells((CV:String, R:ParamNames)) => #allocCells(R) ... </k>`
+## `/reference/reference-semantics/semantics/comprehension.k`
+
+- `INV-0217` `rule` lines 11-11; attrs: none; `rule ListComp(ELT:Expr, Gs:CompFors) => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)`
+- `INV-0218` `rule` lines 12-13; attrs: none; `rule GenExp(ELT:Expr, Gs:CompFors)   => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)`
+- `INV-0219` `syntax` lines 14-14; attrs: macro; `syntax Stmts ::= compBody(CompFors, Expr) [macro]`
+- `INV-0220` `rule` lines 15-17; attrs: none; `rule compBody(Gs:CompFors, ELT:Expr)`
+- `INV-0221` `syntax` lines 18-18; attrs: macro, macro-rec; `syntax Stmt ::= compNest(CompFors, Expr) [macro-rec]`
+- `INV-0222` `rule` lines 19-20; attrs: none; `rule compNest(.CompFors, ELT:Expr)`
+- `INV-0223` `rule` lines 21-23; attrs: none; `rule compNest((CompFor(T:Expr, ITER:Expr, Fs:Exprs) GRest:CompFors), ELT:Expr)`
+- `INV-0224` `syntax` lines 24-24; attrs: macro; `syntax Expr ::= compGuard(Exprs) [macro]`
+- `INV-0225` `rule` lines 25-25; attrs: none; `rule compGuard(.Exprs)             => Bool(true)`
+- `INV-0226` `rule` lines 26-26; attrs: none; `rule compGuard((F:Expr, Fs:Exprs)) => BoolOp("and", (F, Fs))`
+## `/reference/reference-semantics/semantics/concrete.k`
+
+- `INV-0227` `rule` lines 13-14; attrs: none; `rule <k> Compare(list(A:ValSeq), CmpOp("==", list(B:ValSeq))) => deepEqVS(A, B, HP) ... </k>`
+- `INV-0228` `rule` lines 16-17; attrs: none; `rule <k> Compare(list(A:ValSeq), CmpOp("!=", list(B:ValSeq))) => notBool deepEqVS(A, B, HP) ... </k>`
+- `INV-0229` `syntax` lines 25-25; attrs: none; `syntax Val ::= kvP(Val, Val)`
+- `INV-0230` `syntax` lines 26-27; attrs: none; `syntax KItem ::= #ksort(ValSeq, Val, ValSeq, Bool)`
+- `INV-0231` `rule` lines 28-30; attrs: priority(40); `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals))`
+- `INV-0232` `rule` lines 31-33; attrs: priority(40); `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals))`
+- `INV-0233` `rule` lines 34-35; attrs: none; `rule <k> #ksort(.ValSeq, _:Val, ACC:ValSeq, RB:Bool)`
+- `INV-0234` `rule` lines 36-37; attrs: none; `rule <k> #ksort(vCons(V:Val, R:ValSeq), KV:Val, ACC:ValSeq, RB:Bool)`
+- `INV-0235` `rule` lines 38-39; attrs: none; `rule <k> K:Val ~> #ksIns(V:Val, R:ValSeq, KV:Val, ACC:ValSeq, RB:Bool)`
+- `INV-0236` `syntax` lines 42-42; attrs: function; `syntax ValSeq ::= insPair(ValSeq, Val, Val) [function]`
+- `INV-0237` `rule` lines 43-43; attrs: none; `rule insPair(.ValSeq, K:Val, V:Val) => vCons(kvP(K, V), .ValSeq)`
+- `INV-0238` `rule` lines 44-45; attrs: none; `rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val)`
+- `INV-0239` `rule` lines 47-48; attrs: none; `rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val)`
+- `INV-0240` `syntax` lines 51-51; attrs: function; `syntax Bool ::= kLt(Val, Val) [function]`
+- `INV-0241` `rule` lines 52-52; attrs: none; `rule kLt(I1:Int, I2:Int)             => I1 <Int I2`
+- `INV-0242` `rule` lines 53-53; attrs: none; `rule kLt(F1:Float, F2:Float)         => F1 <Float F2`
+- `INV-0243` `rule` lines 54-55; attrs: none; `rule kLt(str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)`
+- `INV-0244` `syntax` lines 56-56; attrs: function, total; `syntax ValSeq ::= unpairVS(ValSeq) [function, total]`
+- `INV-0245` `rule` lines 57-57; attrs: none; `rule unpairVS(.ValSeq) => .ValSeq`
+- `INV-0246` `rule` lines 58-58; attrs: none; `rule unpairVS(vCons(kvP(_:Val, V:Val), R:ValSeq)) => vCons(V, unpairVS(R))`
+- `INV-0247` `rule` lines 59-59; attrs: owise; `rule unpairVS(vCons(V:Val, R:ValSeq)) => vCons(V, unpairVS(R)) [owise]`
+## `/reference/reference-semantics/semantics/controls.k`
+
+- `INV-0248` `rule` lines 9-11; attrs: none; `rule <k> Assign(Name(X:String), V:Val) => .K ... </k>`
+- `INV-0249` `rule` lines 12-14; attrs: none; `rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k>`
+- `INV-0250` `rule` lines 20-22; attrs: none; `rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k>`
+- `INV-0251` `rule` lines 27-29; attrs: none; `rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k>`
+- `INV-0252` `rule` lines 35-35; attrs: none; `rule <k> ImportFrom("math", NS:ParamNames) => #bindImports(NS) ... </k>`
+- `INV-0253` `rule` lines 36-36; attrs: owise; `rule <k> ImportFrom(_:String, _:ParamNames) => .K ... </k> [owise]`
+- `INV-0254` `syntax` lines 37-37; attrs: none; `syntax KItem ::= #bindImports(ParamNames)`
+- `INV-0255` `rule` lines 38-38; attrs: none; `rule <k> #bindImports(.ParamNames) => .K ... </k>`
+- `INV-0256` `rule` lines 39-41; attrs: none; `rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>`
+- `INV-0257` `rule` lines 43-43; attrs: none; `rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>`
+- `INV-0258` `rule` lines 48-50; attrs: none; `rule <k> Expr(_:Val) => .K ... </k>`
+- `INV-0259` `syntax` lines 51-51; attrs: none; `syntax KItem ::= #branch(Bool, Stmts, Stmts)`
+- `INV-0260` `rule` lines 52-52; attrs: none; `rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>`
+- `INV-0261` `rule` lines 53-53; attrs: none; `rule <k> #branch(true,  T:Stmts, _:Stmts) => T ... </k>`
+- `INV-0262` `rule` lines 54-56; attrs: none; `rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>`
+- `INV-0263` `rule` lines 57-57; attrs: none; `rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k>`
+- `INV-0264` `rule` lines 59-59; attrs: none; `rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k>`
+- `INV-0265` `syntax` lines 65-68; attrs: none; `syntax KItem ::= #loop(Val, Expr, Stmts) \| #loopStep(Expr, Stmts)`
+- `INV-0266` `rule` lines 69-70; attrs: none; `rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>`
+- `INV-0267` `rule` lines 71-71; attrs: none; `rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>`
+- `INV-0268` `rule` lines 72-72; attrs: none; `rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>`
+- `INV-0269` `rule` lines 73-76; attrs: none; `rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)`
+- `INV-0270` `rule` lines 77-77; attrs: none; `rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>`
+- `INV-0271` `rule` lines 78-78; attrs: none; `rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>`
+- `INV-0272` `rule` lines 79-79; attrs: none; `rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k>`
+- `INV-0273` `rule` lines 81-81; attrs: none; `rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k>`
+- `INV-0274` `rule` lines 85-85; attrs: none; `rule <k> #loopLbl(NEXT:K) => NEXT ... </k>`
+- `INV-0275` `rule` lines 86-86; attrs: none; `rule <k> Continue => #cont ... </k>`
+- `INV-0276` `rule` lines 87-87; attrs: none; `rule <k> Break => #brk ... </k>`
+- `INV-0277` `rule` lines 88-88; attrs: none; `rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>`
+- `INV-0278` `rule` lines 89-89; attrs: owise; `rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]`
+- `INV-0279` `rule` lines 90-90; attrs: none; `rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>`
+- `INV-0280` `rule` lines 91-94; attrs: owise, priority(40); `rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]`
+- `INV-0281` `rule` lines 95-97; attrs: priority(40); `rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k>`
+- `INV-0282` `rule` lines 98-100; attrs: priority(40); `rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k>`
+- `INV-0283` `rule` lines 101-105; attrs: priority(40); `rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k>`
+- `INV-0284` `rule` lines 106-108; attrs: priority(40); `rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k>`
+## `/reference/reference-semantics/semantics/core.k`
+
+- `INV-0285` `syntax` lines 13-13; attrs: none; `syntax IntSeq ::= ".IntSeq" \| iCons(Int, IntSeq)`
+- `INV-0286` `syntax` lines 14-14; attrs: none; `syntax ValSeq ::= ".ValSeq" \| vCons(Val, ValSeq)`
+- `INV-0287` `syntax` lines 15-17; attrs: none; `syntax Str    ::= str(IntSeq)`
+- `INV-0288` `syntax` lines 18-24; attrs: none; `syntax Iterable ::= list(ValSeq)`
+- `INV-0289` `syntax` lines 25-35; attrs: function; `syntax Val      ::= Int`
+- `INV-0290` `syntax` lines 36-36; attrs: none; `syntax Parent   ::= "root" \| parent(Int)`
+- `INV-0291` `syntax` lines 37-37; attrs: none; `syntax Scope    ::= scope(Map, Parent)`
+- `INV-0292` `syntax` lines 38-38; attrs: none; `syntax KResult  ::= Val`
+- `INV-0293` `syntax` lines 39-39; attrs: none; `syntax Expr     ::= Val   // cooling puts results back into expression holes`
+- `INV-0294` `syntax` lines 40-40; attrs: none; `syntax Vals     ::= List{Val, ","}`
+- `INV-0295` `syntax` lines 41-41; attrs: none; `syntax Exc      ::= "NoExc" \| "AssertionError"`
+- `INV-0296` `syntax` lines 42-48; attrs: none; `syntax RetState ::= "noRet" \| retV(Val)`
+- `INV-0297` `configuration` lines 49-67; attrs: none; `configuration`
+- `INV-0298` `syntax` lines 68-68; attrs: function, total; `syntax Bool ::= isRefV(Val) [function, total]`
+- `INV-0299` `rule` lines 69-69; attrs: none; `rule isRefV(ref(_:Int)) => true`
+- `INV-0300` `rule` lines 70-74; attrs: owise; `rule isRefV(_:Val)      => false [owise]`
+- `INV-0301` `syntax` lines 75-75; attrs: none; `syntax HeapVal ::= cellV(Val)`
+- `INV-0302` `syntax` lines 76-76; attrs: function, total; `syntax Bool ::= isCellRef(Val) [function, total]`
+- `INV-0303` `rule` lines 77-77; attrs: none; `rule isCellRef(cellRef(_:Int)) => true`
+- `INV-0304` `rule` lines 78-84; attrs: function, owise; `rule isCellRef(_:Val)          => false [owise]`
+- `INV-0305` `rule` lines 85-88; attrs: none; `rule <k> cellRef(H:Int) => V ... </k>`
+- `INV-0306` `syntax` lines 95-95; attrs: none; `syntax Val ::= kwV(String, Val)`
+- `INV-0307` `syntax` lines 96-96; attrs: none; `syntax KItem ::= #kwTag(String)`
+- `INV-0308` `rule` lines 97-97; attrs: none; `rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>`
+- `INV-0309` `rule` lines 98-98; attrs: none; `rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k>`
+- `INV-0310` `syntax` lines 100-100; attrs: function, total; `syntax Bool ::= isKwV(Val) [function, total]`
+- `INV-0311` `rule` lines 101-101; attrs: none; `rule isKwV(kwV(_:String, _:Val)) => true`
+- `INV-0312` `rule` lines 102-105; attrs: owise; `rule isKwV(_:Val)                => false [owise]`
+- `INV-0313` `syntax` lines 106-106; attrs: none; `syntax Val ::= cellsMark(ParamNames)`
+- `INV-0314` `syntax` lines 107-107; attrs: function; `syntax ParamNames ::= cellsOf(Val) [function]`
+- `INV-0315` `rule` lines 108-108; attrs: none; `rule cellsOf(cellsMark(CVS:ParamNames)) => CVS`
+- `INV-0316` `syntax` lines 109-109; attrs: function, total; `syntax Bool ::= pnMember(String, ParamNames) [function, total]`
+- `INV-0317` `rule` lines 110-110; attrs: none; `rule pnMember(_:String, .ParamNames) => false`
+- `INV-0318` `rule` lines 111-112; attrs: none; `rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)`
+- `INV-0319` `syntax` lines 113-113; attrs: none; `syntax KItem ::= #cellW(Val, Val)`
+- `INV-0320` `rule` lines 114-116; attrs: none; `rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k>`
+- `INV-0321` `syntax` lines 117-117; attrs: none; `syntax KItem ::= #alloc(Val)`
+- `INV-0322` `rule` lines 118-120; attrs: none; `rule <k> #alloc(V:Val) => ref(N) ... </k>`
+- `INV-0323` `syntax` lines 124-124; attrs: none; `syntax KItem ::= #loadAll(Module)`
+- `INV-0324` `rule` lines 125-125; attrs: none; `rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>`
+- `INV-0325` `rule` lines 126-126; attrs: none; `rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>`
+- `INV-0326` `rule` lines 127-129; attrs: none; `rule <k> .Stmts => .K ... </k>`
+- `INV-0327` `syntax` lines 130-130; attrs: none; `syntax KItem ::= #look(String, Int)`
+- `INV-0328` `rule` lines 131-131; attrs: none; `rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>`
+- `INV-0329` `rule` lines 132-133; attrs: none; `rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k>`
+- `INV-0330` `rule` lines 145-147; attrs: none; `rule <k> #look(X:String, L:Int) => V ... </k>`
+- `INV-0331` `rule` lines 152-153; attrs: none; `rule <k> #look(X:String, L:Int) => #look(X, P) ... </k>`
+- `INV-0332` `syntax` lines 157-157; attrs: function, total; `syntax Scope ::= "builtinsScope" [function, total]`
+- `INV-0333` `rule` lines 158-184; attrs: none; `rule builtinsScope`
+- `INV-0334` `syntax` lines 185-185; attrs: none; `syntax ApplyK ::= toCall(Val)`
+- `INV-0335` `syntax` lines 186-188; attrs: none; `syntax KItem  ::= #evalArgs(Exprs, Vals, ApplyK)`
+- `INV-0336` `rule` lines 189-189; attrs: none; `rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>`
+- `INV-0337` `rule` lines 190-190; attrs: none; `rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>`
+- `INV-0338` `rule` lines 191-193; attrs: none; `rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>`
+- `INV-0339` `rule` lines 194-194; attrs: none; `rule <k> Int(I:Int)   => I ... </k>`
+- `INV-0340` `rule` lines 195-195; attrs: none; `rule <k> Bool(B:Bool) => B ... </k>`
+- `INV-0341` `rule` lines 196-198; attrs: none; `rule <k> NoneVal      => noneV ... </k>`
+- `INV-0342` `syntax` lines 199-199; attrs: function; `syntax Bool ::= truthy(Val) [function]`
+- `INV-0343` `rule` lines 200-200; attrs: none; `rule truthy(B:Bool)          => B`
+- `INV-0344` `rule` lines 201-201; attrs: none; `rule truthy(noneV)           => false`
+- `INV-0345` `rule` lines 202-202; attrs: none; `rule truthy(I:Int)           => I =/=Int 0`
+- `INV-0346` `rule` lines 203-203; attrs: none; `rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)`
+- `INV-0347` `rule` lines 204-204; attrs: none; `rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)`
+- `INV-0348` `rule` lines 205-207; attrs: none; `rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)`
+- `INV-0349` `syntax` lines 208-208; attrs: function; `syntax Val  ::= applyUn(String, Val) [function]`
+- `INV-0350` `syntax` lines 209-209; attrs: function; `syntax Val  ::= applyBin(String, Val, Val) [function]`
+- `INV-0351` `syntax` lines 210-212; attrs: function; `syntax Bool ::= applyCmp(String, Val, Val) [function]`
+- `INV-0352` `syntax` lines 213-213; attrs: function, total; `syntax Vals ::= appendVal(Vals, Val) [function, total]`
+- `INV-0353` `rule` lines 214-214; attrs: none; `rule appendVal(.Vals, V:Val)              => V , .Vals`
+- `INV-0354` `rule` lines 215-216; attrs: none; `rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)`
+- `INV-0355` `syntax` lines 217-217; attrs: function, total; `syntax ValSeq ::= vals2valSeq(Vals) [function, total]`
+- `INV-0356` `rule` lines 218-218; attrs: none; `rule vals2valSeq(.Vals)            => .ValSeq`
+- `INV-0357` `rule` lines 219-222; attrs: none; `rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))`
+- `INV-0358` `syntax` lines 223-223; attrs: function, total; `syntax Int ::= vsLen(ValSeq) [function, total]`
+- `INV-0359` `rule` lines 224-224; attrs: none; `rule vsLen(.ValSeq)                => 0`
+- `INV-0360` `rule` lines 225-226; attrs: none; `rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)`
+- `INV-0361` `syntax` lines 227-227; attrs: function, total; `syntax Int ::= isLen(IntSeq) [function, total]`
+- `INV-0362` `rule` lines 228-228; attrs: none; `rule isLen(.IntSeq)                => 0`
+- `INV-0363` `rule` lines 229-232; attrs: total; `rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)`
+- `INV-0364` `syntax` lines 233-233; attrs: function, total; `syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]`
+- `INV-0365` `rule` lines 234-234; attrs: none; `rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq`
+- `INV-0366` `rule` lines 235-235; attrs: none; `rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val)    => vCons(V, S)`
+- `INV-0367` `rule` lines 236-236; attrs: none; `rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V))`
+- `INV-0368` `rule` lines 238-238; attrs: none; `rule setVSAt(VS:ValSeq, I:Int, _:Val)             => VS`
+## `/reference/reference-semantics/semantics/dict.k`
+
+- `INV-0369` `syntax` lines 20-22; attrs: none; `syntax Val ::= dictV(ValSeq, ValSeq)`
+- `INV-0370` `syntax` lines 23-25; attrs: none; `syntax KItem ::= #dictAcc(Entries, ValSeq, ValSeq)`
+- `INV-0371` `rule` lines 26-26; attrs: none; `rule <k> DictExpr(ES:Entries) => #dictAcc(ES, .ValSeq, .ValSeq) ... </k>`
+- `INV-0372` `rule` lines 27-27; attrs: none; `rule <k> #dictAcc(.Entries, KS:ValSeq, VS:ValSeq) => dictV(KS, VS) ... </k>`
+- `INV-0373` `rule` lines 28-29; attrs: none; `rule <k> #dictAcc((Entry(K:Expr, V:Expr), REST:Entries), KS:ValSeq, VS:ValSeq)`
+- `INV-0374` `rule` lines 30-31; attrs: none; `rule <k> KV:Val ~> #dictKey(V:Expr, REST:Entries, KS:ValSeq, VS:ValSeq)`
+- `INV-0375` `rule` lines 32-36; attrs: total, concrete; `rule <k> VV:Val ~> #dictVal(KV:Val, REST:Entries, KS:ValSeq, VS:ValSeq)`
+- `INV-0376` `syntax` lines 37-37; attrs: function, total; `syntax Bool ::= dHasKey(ValSeq, Val) [function, total]`
+- `INV-0377` `rule` lines 38-38; attrs: none; `rule dHasKey(.ValSeq, _:Val)                => false`
+- `INV-0378` `rule` lines 39-39; attrs: none; `rule dHasKey(vCons(A:Val, _:ValSeq), K:Val) => true          requires A ==K K`
+- `INV-0379` `rule` lines 40-42; attrs: none; `rule dHasKey(vCons(A:Val, R:ValSeq), K:Val) => dHasKey(R, K) requires notBool (A ==K K)`
+- `INV-0380` `syntax` lines 43-43; attrs: function, total; `syntax ValSeq ::= dPutK(ValSeq, Val) [function, total]`
+- `INV-0381` `rule` lines 44-44; attrs: none; `rule dPutK(KS:ValSeq, K:Val) => KS                                  requires dHasKey(KS, K)`
+- `INV-0382` `rule` lines 45-48; attrs: owise; `rule dPutK(KS:ValSeq, K:Val) => valSeqConcat(KS, vCons(K, .ValSeq)) requires notBool dHasKey(KS, K)`
+- `INV-0383` `syntax` lines 49-49; attrs: function, total; `syntax ValSeq ::= dPutV(ValSeq, ValSeq, Val, Val) [function, total]`
+- `INV-0384` `rule` lines 50-50; attrs: none; `rule dPutV(vCons(A:Val, _:ValSeq), vCons(_:Val, VR:ValSeq), K:Val, V:Val)  => vCons(V, VR)`
+- `INV-0385` `rule` lines 52-52; attrs: none; `rule dPutV(vCons(A:Val, KR:ValSeq), vCons(B:Val, VR:ValSeq), K:Val, V:Val) => vCons(B, dPutV(KR, VR, K, V))`
+- `INV-0386` `rule` lines 54-57; attrs: owise; `rule dPutV(_KS:ValSeq, VS:ValSeq, _K:Val, V:Val) => valSeqConcat(VS, vCons(V, .ValSeq)) [owise]`
+- `INV-0387` `rule` lines 58-62; attrs: priority(40); `rule <k> #applyK(toCall(boundMethodV(dictV(KS:ValSeq, _:ValSeq), "keys")), .Vals)`
+- `INV-0388` `rule` lines 63-63; attrs: none; `rule applyIndexD(dictV(KS:ValSeq, VS:ValSeq), K:Val) => dGet(KS, VS, K)`
+- `INV-0389` `syntax` lines 64-64; attrs: function; `syntax Val ::= applyIndexD(Val, Val) [function]`
+- `INV-0390` `rule` lines 65-69; attrs: priority(45); `rule <k> Subscript(dictV(KS:ValSeq, VS:ValSeq), K:Val) => applyIndexD(dictV(KS, VS), K) ... </k>`
+- `INV-0391` `syntax` lines 70-70; attrs: function; `syntax Val ::= dictSet(Val, Val, Val) [function]`
+- `INV-0392` `rule` lines 71-75; attrs: none; `rule dictSet(dictV(KS:ValSeq, VS:ValSeq), K:Val, V:Val) => dictV(dPutK(KS, K), dPutV(KS, VS, K, V))`
+- `INV-0393` `syntax` lines 76-76; attrs: none; `syntax KItem ::= #dsetK(String, Val)`
+- `INV-0394` `rule` lines 77-77; attrs: none; `rule <k> Assign(Subscript(Name(X:String), K:Expr), VV:Val) => K ~> #dsetK(X, VV) ... </k>`
+- `INV-0395` `rule` lines 78-80; attrs: none; `rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => .K ... </k>`
+- `INV-0396` `rule` lines 82-84; attrs: none; `rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => #dsetV({M[X]}:>Val, KV, VV) ... </k>`
+- `INV-0397` `syntax` lines 86-86; attrs: none; `syntax KItem ::= #dsetV(Val, Val, Val)`
+- `INV-0398` `rule` lines 87-89; attrs: none; `rule <k> #dsetV(ref(H:Int), I:Int, VV:Val) => .K ... </k>`
+- `INV-0399` `syntax` lines 90-90; attrs: function, total; `syntax Int ::= normIdxD(Int, Int) [function, total]`
+- `INV-0400` `rule` lines 91-91; attrs: none; `rule normIdxD(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0`
+- `INV-0401` `rule` lines 92-94; attrs: none; `rule normIdxD(I:Int, _:Int)   => I          requires I >=Int 0`
+- `INV-0402` `rule` lines 95-96; attrs: none; `rule applyCmp("==", dictV(KS1:ValSeq, VS1:ValSeq), dictV(KS2:ValSeq, VS2:ValSeq))`
+- `INV-0403` `syntax` lines 97-97; attrs: function; `syntax Bool ::= dSubset(ValSeq, ValSeq, ValSeq, ValSeq) [function]`
+- `INV-0404` `rule` lines 98-98; attrs: none; `rule dSubset(.ValSeq, .ValSeq, _:ValSeq, _:ValSeq) => true`
+- `INV-0405` `rule` lines 99-100; attrs: none; `rule dSubset(vCons(K:Val, KR:ValSeq), vCons(V:Val, VR:ValSeq), KS2:ValSeq, VS2:ValSeq)`
+- `INV-0406` `syntax` lines 101-101; attrs: function; `syntax Val ::= dGet(ValSeq, ValSeq, Val) [function]`
+- `INV-0407` `rule` lines 102-102; attrs: none; `rule dGet(vCons(A:Val, _:ValSeq), vCons(B:Val, _:ValSeq), K:Val) => B                requires A ==K K`
+- `INV-0408` `rule` lines 103-103; attrs: none; `rule dGet(vCons(A:Val, KR:ValSeq), vCons(_:Val, VR:ValSeq), K:Val) => dGet(KR, VR, K) requires notBool (A ==K K)`
+## `/reference/reference-semantics/semantics/float.k`
+
+- `INV-0409` `syntax` lines 20-20; attrs: none; `syntax Val ::= Float`
+- `INV-0410` `rule` lines 21-23; attrs: no-evaluators, concrete; `rule <k> Float(F:Float) => F ... </k>`
+- `INV-0411` `syntax` lines 24-24; attrs: function, total, symbol, no-evaluators; `syntax Float ::= intFloatDiv(Int, Float) [function, total, symbol(intFloatDiv), no-evaluators]`
+- `INV-0412` `rule` lines 25-26; attrs: concrete; `rule intFloatDiv(I:Int, F:Float) => Int2Float(I, 53, 11) /Float F [concrete]`
+- `INV-0413` `rule` lines 27-29; attrs: concrete; `rule applyBin("/", I:Int, F:Float) => intFloatDiv(I, F)`
+- `INV-0414` `syntax` lines 30-30; attrs: function, total, symbol, no-evaluators; `syntax Float ::= divII(Int, Int) [function, total, symbol(divII), no-evaluators]`
+- `INV-0415` `rule` lines 31-31; attrs: concrete; `rule divII(I1:Int, I2:Int) => Int2Float(I1, 53, 11) /Float Int2Float(I2, 53, 11) [concrete]`
+- `INV-0416` `rule` lines 32-36; attrs: concrete; `rule applyBin("/", I1:Int, I2:Int) => divII(I1, I2)`
+- `INV-0417` `syntax` lines 37-37; attrs: function, total, symbol, no-evaluators; `syntax Float ::= floatMod(Float, Float) [function, total, symbol(floatMod), no-evaluators]`
+- `INV-0418` `rule` lines 38-38; attrs: concrete; `rule floatMod(F1:Float, F2:Float) => F1 -Float (floorFloat(F1 /Float F2) *Float F2) [concrete]`
+- `INV-0419` `rule` lines 39-42; attrs: concrete; `rule applyBin("%", F1:Float, F2:Float) => floatMod(F1, F2)`
+- `INV-0420` `rule` lines 43-43; attrs: none; `rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2`
+- `INV-0421` `rule` lines 44-49; attrs: no-evaluators, concrete; `rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2)`
+- `INV-0422` `syntax` lines 50-50; attrs: function, total, symbol, no-evaluators; `syntax Bool ::= floatLt(Float, Float) [function, total, symbol(floatLt), no-evaluators]`
+- `INV-0423` `rule` lines 51-51; attrs: concrete; `rule floatLt(F1:Float, F2:Float) => F1 <Float F2 [concrete]`
+- `INV-0424` `rule` lines 52-53; attrs: none; `rule applyCmp("<", F1:Float, F2:Float) => floatLt(F1, F2)`
+- `INV-0425` `syntax` lines 54-54; attrs: function, total, symbol, no-evaluators; `syntax Float ::= absF(Float) [function, total, symbol(absF), no-evaluators]`
+- `INV-0426` `rule` lines 55-55; attrs: concrete; `rule absF(F:Float) => absFloat(F) [concrete]`
+- `INV-0427` `rule` lines 56-60; attrs: none; `rule applyBuiltin("abs", F:Float, .Vals) => absF(F)`
+- `INV-0428` `rule` lines 61-64; attrs: none; `rule <k> Import(_:String) => .K ... </k>`
+- `INV-0429` `syntax` lines 65-65; attrs: none; `syntax KItem ::= "#mathCeil"`
+- `INV-0430` `rule` lines 66-66; attrs: priority(40); `rule <k> Call(Attribute(Name("math"), "ceil"), (E:Expr, .Exprs)) => E ~> #mathCeil ... </k> [priority(40)]`
+- `INV-0431` `rule` lines 67-69; attrs: none; `rule <k> V:Val ~> #mathCeil => ceilF(V) ... </k>`
+- `INV-0432` `syntax` lines 70-70; attrs: none; `syntax KItem ::= "#mathFloor"`
+- `INV-0433` `rule` lines 71-71; attrs: priority(40); `rule <k> Call(Attribute(Name("math"), "floor"), (E:Expr, .Exprs)) => E ~> #mathFloor ... </k> [priority(40)]`
+- `INV-0434` `rule` lines 72-72; attrs: none; `rule <k> V:Val ~> #mathFloor => floorFI(V) ... </k>`
+- `INV-0435` `syntax` lines 73-73; attrs: function, total, symbol; `syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]`
+- `INV-0436` `rule` lines 74-74; attrs: concrete; `rule floorFI(I:Int)   => I                        [concrete]`
+- `INV-0437` `rule` lines 75-77; attrs: concrete; `rule floorFI(F:Float) => Float2Int(floorFloat(F)) [concrete]`
+- `INV-0438` `rule` lines 78-78; attrs: none; `rule applyBuiltin("floor", V:Val, .Vals) => floorFI(V)`
+- `INV-0439` `rule` lines 79-81; attrs: none; `rule applyBuiltin("ceil",  V:Val, .Vals) => ceilF(V)`
+- `INV-0440` `syntax` lines 82-82; attrs: none; `syntax KItem ::= #mathPow1(Expr) \| #mathPow2(Val)`
+- `INV-0441` `rule` lines 83-83; attrs: priority(40); `rule <k> Call(Attribute(Name("math"), "pow"), (E1:Expr, E2:Expr, .Exprs)) => E1 ~> #mathPow1(E2) ... </k> [priority(40)]`
+- `INV-0442` `rule` lines 84-84; attrs: none; `rule <k> V1:Val ~> #mathPow1(E2:Expr) => E2 ~> #mathPow2(V1) ... </k>`
+- `INV-0443` `rule` lines 85-85; attrs: none; `rule <k> V2:Val ~> #mathPow2(V1:Val) => powF(toF(V1), toF(V2)) ... </k>`
+- `INV-0444` `syntax` lines 86-86; attrs: function, total, symbol; `syntax Float ::= toF(Val) [function, total, symbol(toF)]`
+- `INV-0445` `rule` lines 87-87; attrs: concrete; `rule toF(F:Float) => F        [concrete]`
+- `INV-0446` `rule` lines 88-92; attrs: concrete; `rule toF(I:Int)   => intToF(I) [concrete]`
+- `INV-0447` `syntax` lines 93-93; attrs: function, total, symbol; `syntax Int ::= ceilF(Val) [function, total, symbol(ceilF)]`
+- `INV-0448` `rule` lines 94-94; attrs: concrete; `rule ceilF(I:Int)   => I                       [concrete]`
+- `INV-0449` `rule` lines 95-98; attrs: concrete; `rule ceilF(F:Float) => Float2Int(ceilFloat(F)) [concrete]`
+- `INV-0450` `rule` lines 99-102; attrs: no-evaluators, concrete; `rule applyUn("-", F:Float) => 0.0 -Float F`
+- `INV-0451` `syntax` lines 103-103; attrs: function, total, symbol, no-evaluators; `syntax Float ::= subF(Float, Float) [function, total, symbol(subF), no-evaluators]`
+- `INV-0452` `rule` lines 104-104; attrs: concrete; `rule subF(F1:Float, F2:Float) => F1 -Float F2 [concrete]`
+- `INV-0453` `rule` lines 105-106; attrs: none; `rule applyBin("-", F1:Float, F2:Float) => subF(F1, F2)`
+- `INV-0454` `syntax` lines 107-107; attrs: function, total, symbol, no-evaluators; `syntax Float ::= divF(Float, Float) [function, total, symbol(divF), no-evaluators]`
+- `INV-0455` `rule` lines 108-108; attrs: concrete; `rule divF(F1:Float, F2:Float) => F1 /Float F2 [concrete]`
+- `INV-0456` `rule` lines 109-110; attrs: none; `rule applyBin("/", F1:Float, F2:Float) => divF(F1, F2)`
+- `INV-0457` `syntax` lines 111-111; attrs: function, total, symbol, no-evaluators; `syntax Float ::= addF(Float, Float) [function, total, symbol(addF), no-evaluators]`
+- `INV-0458` `rule` lines 112-112; attrs: concrete; `rule addF(F1:Float, F2:Float) => F1 +Float F2 [concrete]`
+- `INV-0459` `rule` lines 113-114; attrs: none; `rule applyBin("+", F1:Float, F2:Float) => addF(F1, F2)`
+- `INV-0460` `syntax` lines 115-115; attrs: function, total, symbol, no-evaluators; `syntax Float ::= mulF(Float, Float) [function, total, symbol(mulF), no-evaluators]`
+- `INV-0461` `rule` lines 116-116; attrs: concrete; `rule mulF(F1:Float, F2:Float) => F1 *Float F2 [concrete]`
+- `INV-0462` `rule` lines 117-118; attrs: none; `rule applyBin("*", F1:Float, F2:Float) => mulF(F1, F2)`
+- `INV-0463` `syntax` lines 119-119; attrs: function, total, symbol, no-evaluators; `syntax Float ::= powF(Float, Float) [function, total, symbol(powF), no-evaluators]`
+- `INV-0464` `rule` lines 120-120; attrs: concrete; `rule powF(F1:Float, F2:Float) => F1 ^Float F2 [concrete]`
+- `INV-0465` `rule` lines 121-124; attrs: none; `rule applyBin("**", F1:Float, F2:Float) => powF(F1, F2)`
+- `INV-0466` `syntax` lines 125-125; attrs: function, total, symbol, no-evaluators; `syntax Bool ::= gtF(Float, Float) [function, total, symbol(gtF), no-evaluators]`
+- `INV-0467` `rule` lines 126-126; attrs: concrete; `rule gtF(F1:Float, F2:Float) => F1 >Float F2 [concrete]`
+- `INV-0468` `rule` lines 127-127; attrs: none; `rule applyCmp(">",  F1:Float, F2:Float) => gtF(F1, F2)`
+- `INV-0469` `rule` lines 128-128; attrs: none; `rule applyCmp(">=", F1:Float, F2:Float) => notBool floatLt(F1, F2)`
+- `INV-0470` `rule` lines 129-131; attrs: none; `rule applyCmp("<=", F1:Float, F2:Float) => notBool gtF(F1, F2)`
+- `INV-0471` `rule` lines 132-132; attrs: none; `rule applyBin("**", I:Int, F:Float) => powF(intToF(I), F)`
+- `INV-0472` `rule` lines 133-133; attrs: none; `rule applyBin("**", F:Float, I:Int) => powF(F, intToF(I))`
+- `INV-0473` `rule` lines 134-134; attrs: none; `rule applyBin("-",  I:Int, F:Float) => subF(intToF(I), F)`
+- `INV-0474` `rule` lines 135-135; attrs: none; `rule applyBin("-",  F:Float, I:Int) => subF(F, intToF(I))`
+- `INV-0475` `rule` lines 136-136; attrs: none; `rule applyBin("+",  I:Int, F:Float) => addF(intToF(I), F)`
+- `INV-0476` `rule` lines 137-137; attrs: none; `rule applyBin("+",  F:Float, I:Int) => addF(F, intToF(I))`
+- `INV-0477` `rule` lines 138-138; attrs: none; `rule applyBin("*",  I:Int, F:Float) => mulF(intToF(I), F)`
+- `INV-0478` `rule` lines 139-141; attrs: concrete; `rule applyBin("*",  F:Float, I:Int) => mulF(F, intToF(I))`
+- `INV-0479` `syntax` lines 142-142; attrs: function, total, symbol, no-evaluators; `syntax Bool ::= eqF(Float, Float) [function, total, symbol(eqF), no-evaluators]`
+- `INV-0480` `rule` lines 143-143; attrs: concrete; `rule eqF(F1:Float, F2:Float) => F1 ==Float F2 [concrete]`
+- `INV-0481` `rule` lines 144-144; attrs: none; `rule applyCmp("==", I:Int, F:Float) => eqF(intToF(I), F)`
+- `INV-0482` `rule` lines 145-145; attrs: none; `rule applyCmp("==", F:Float, I:Int) => eqF(F, intToF(I))`
+- `INV-0483` `rule` lines 146-146; attrs: none; `rule applyCmp("!=", I:Int, F:Float) => notBool eqF(intToF(I), F)`
+- `INV-0484` `rule` lines 147-147; attrs: none; `rule applyCmp("!=", F:Float, I:Int) => notBool eqF(F, intToF(I))`
+- `INV-0485` `rule` lines 148-148; attrs: none; `rule applyCmp("<",  I:Int, F:Float) => floatLt(intToF(I), F)`
+- `INV-0486` `rule` lines 149-149; attrs: none; `rule applyCmp("<",  F:Float, I:Int) => floatLt(F, intToF(I))`
+- `INV-0487` `rule` lines 150-150; attrs: none; `rule applyCmp(">",  I:Int, F:Float) => gtF(intToF(I), F)`
+- `INV-0488` `rule` lines 151-153; attrs: none; `rule applyCmp(">",  F:Float, I:Int) => gtF(F, intToF(I))`
+- `INV-0489` `rule` lines 154-154; attrs: none; `rule applyCmp("==", V:Val, noneV) => V ==K noneV`
+- `INV-0490` `rule` lines 155-159; attrs: concrete; `rule applyCmp("!=", V:Val, noneV) => notBool (V ==K noneV)`
+- `INV-0491` `syntax` lines 160-160; attrs: function, total, symbol, no-evaluators; `syntax Float ::= decStrToF(IntSeq) [function, total, symbol(decStrToF), no-evaluators]`
+- `INV-0492` `rule` lines 161-161; attrs: concrete; `rule decStrToF(iCons(45, CS:IntSeq)) => 0.0 -Float decStrToF(CS) [concrete]`
+- `INV-0493` `rule` lines 162-163; attrs: none; `rule decStrToF(CS:IntSeq)`
+- `INV-0494` `syntax` lines 165-165; attrs: function; `syntax Int ::= headIS(IntSeq) [function]`
+- `INV-0495` `rule` lines 166-166; attrs: none; `rule headIS(iCons(C:Int, _:IntSeq)) => C`
+- `INV-0496` `syntax` lines 167-167; attrs: function, total; `syntax Int ::= intPart(IntSeq) [function, total] \| intPartAcc(IntSeq, Int) [function, total]`
+- `INV-0497` `rule` lines 168-168; attrs: none; `rule intPart(CS:IntSeq) => intPartAcc(CS, 0)`
+- `INV-0498` `rule` lines 169-169; attrs: none; `rule intPartAcc(.IntSeq, A:Int) => A`
+- `INV-0499` `rule` lines 170-170; attrs: none; `rule intPartAcc(iCons(46, _:IntSeq), A:Int) => A`
+- `INV-0500` `rule` lines 171-171; attrs: none; `rule intPartAcc(iCons(C:Int, R:IntSeq), A:Int) => intPartAcc(R, A *Int 10 +Int (C -Int 48))`
+- `INV-0501` `syntax` lines 173-173; attrs: function, total; `syntax Int ::= fracPart(IntSeq) [function, total] \| fracAcc(IntSeq, Int) [function, total]`
+- `INV-0502` `rule` lines 174-174; attrs: none; `rule fracPart(.IntSeq) => 0`
+- `INV-0503` `rule` lines 175-175; attrs: none; `rule fracPart(iCons(46, R:IntSeq)) => fracAcc(R, 0)`
+- `INV-0504` `rule` lines 176-176; attrs: none; `rule fracPart(iCons(C:Int, R:IntSeq)) => fracPart(R) requires C =/=Int 46`
+- `INV-0505` `rule` lines 177-177; attrs: none; `rule fracAcc(.IntSeq, A:Int) => A`
+- `INV-0506` `rule` lines 178-178; attrs: none; `rule fracAcc(iCons(C:Int, R:IntSeq), A:Int) => fracAcc(R, A *Int 10 +Int (C -Int 48))`
+- `INV-0507` `syntax` lines 179-179; attrs: function, total; `syntax Int ::= fracScale(IntSeq) [function, total] \| fscAcc(IntSeq, Int) [function, total]`
+- `INV-0508` `rule` lines 180-180; attrs: none; `rule fracScale(.IntSeq) => 1`
+- `INV-0509` `rule` lines 181-181; attrs: none; `rule fracScale(iCons(46, R:IntSeq)) => fscAcc(R, 1)`
+- `INV-0510` `rule` lines 182-182; attrs: none; `rule fracScale(iCons(C:Int, R:IntSeq)) => fracScale(R) requires C =/=Int 46`
+- `INV-0511` `rule` lines 183-183; attrs: none; `rule fscAcc(.IntSeq, A:Int) => A`
+- `INV-0512` `rule` lines 184-184; attrs: none; `rule fscAcc(iCons(_:Int, R:IntSeq), A:Int) => fscAcc(R, A *Int 10)`
+- `INV-0513` `rule` lines 185-185; attrs: none; `rule applyBuiltin("float", str(CS:IntSeq), .Vals) => decStrToF(CS)`
+- `INV-0514` `rule` lines 186-186; attrs: none; `rule applyBuiltin("float", I:Int, .Vals)          => intToF(I)`
+- `INV-0515` `rule` lines 187-189; attrs: none; `rule applyBuiltin("float", F:Float, .Vals)        => F`
+- `INV-0516` `syntax` lines 190-190; attrs: function, total, symbol, no-evaluators; `syntax Float ::= divFloatIntV(Float, Int) [function, total, symbol(divFloatIntV), no-evaluators]`
+- `INV-0517` `rule` lines 191-191; attrs: concrete; `rule divFloatIntV(F:Float, I:Int) => F /Float Int2Float(I, 53, 11) [concrete]`
+- `INV-0518` `rule` lines 192-194; attrs: none; `rule applyBin("/", F:Float, I:Int) => divFloatIntV(F, I)`
+- `INV-0519` `syntax` lines 195-195; attrs: function, total, symbol, no-evaluators; `syntax Float ::= intToF(Int) [function, total, symbol(intToF), no-evaluators]`
+- `INV-0520` `rule` lines 196-196; attrs: concrete; `rule intToF(I:Int) => Int2Float(I, 53, 11) [concrete]`
+- `INV-0521` `rule` lines 197-197; attrs: none; `rule applyBin("+", I:Int, F:Float) => addF(intToF(I), F)`
+- `INV-0522` `rule` lines 198-198; attrs: none; `rule applyBin("+", F:Float, I:Int) => addF(F, intToF(I))`
+- `INV-0523` `rule` lines 199-199; attrs: none; `rule applyBin("-", I:Int, F:Float) => subF(intToF(I), F)`
+- `INV-0524` `rule` lines 200-200; attrs: none; `rule applyBin("-", F:Float, I:Int) => subF(F, intToF(I))`
+- `INV-0525` `rule` lines 201-201; attrs: none; `rule applyBin("*", I:Int, F:Float) => mulF(intToF(I), F)`
+- `INV-0526` `rule` lines 202-202; attrs: none; `rule applyBin("*", F:Float, I:Int) => mulF(F, intToF(I))`
+- `INV-0527` `rule` lines 203-203; attrs: none; `rule applyCmp("<", I:Int, F:Float) => floatLt(intToF(I), F)`
+- `INV-0528` `rule` lines 204-204; attrs: none; `rule applyCmp("<", F:Float, I:Int) => floatLt(F, intToF(I))`
+- `INV-0529` `rule` lines 205-205; attrs: none; `rule applyCmp(">", I:Int, F:Float) => gtF(intToF(I), F)`
+- `INV-0530` `rule` lines 206-208; attrs: none; `rule applyCmp(">", F:Float, I:Int) => gtF(F, intToF(I))`
+- `INV-0531` `syntax` lines 209-209; attrs: function, total, symbol, no-evaluators; `syntax Int ::= truncF(Float) [function, total, symbol(truncF), no-evaluators]`
+- `INV-0532` `rule` lines 210-210; attrs: concrete; `rule truncF(F:Float) => #if F >=Float 0.0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi [concrete]`
+- `INV-0533` `rule` lines 211-212; attrs: none; `rule applyBuiltin("int", F:Float, .Vals) => truncF(F)`
+- `INV-0534` `rule` lines 213-213; attrs: none; `rule applyBuiltin("float", I:Int, .Vals)   => intToF(I)`
+- `INV-0535` `rule` lines 214-216; attrs: none; `rule applyBuiltin("float", F:Float, .Vals) => F`
+- `INV-0536` `syntax` lines 217-217; attrs: function, total, symbol, no-evaluators; `syntax Int ::= roundF(Float) [function, total, symbol(roundF), no-evaluators]`
+- `INV-0537` `rule` lines 218-222; attrs: concrete; `rule roundF(F:Float)`
+- `INV-0538` `syntax` lines 223-223; attrs: function, total, symbol, no-evaluators; `syntax Float ::= roundFN(Float, Int) [function, total, symbol(roundFN), no-evaluators]`
+- `INV-0539` `rule` lines 224-226; attrs: concrete; `rule roundFN(F:Float, N:Int)`
+- `INV-0540` `rule` lines 227-227; attrs: none; `rule applyBuiltin("round", F:Float, .Vals)        => roundF(F)`
+- `INV-0541` `rule` lines 228-229; attrs: none; `rule applyBuiltin("round", F:Float, N:Int, .Vals) => roundFN(F, N)`
+- `INV-0542` `syntax` lines 230-230; attrs: function, total, symbol, no-evaluators; `syntax Float ::= sqrtF(Float) [function, total, symbol(sqrtF), no-evaluators]`
+- `INV-0543` `rule` lines 231-231; attrs: concrete; `rule sqrtF(F:Float) => sqrtFloat(F) [concrete]`
+- `INV-0544` `syntax` lines 232-232; attrs: none; `syntax KItem ::= "#mathSqrt"`
+- `INV-0545` `rule` lines 233-233; attrs: priority(40); `rule <k> Call(Attribute(Name("math"), "sqrt"), (E:Expr, .Exprs)) => E ~> #mathSqrt ... </k> [priority(40)]`
+- `INV-0546` `rule` lines 234-234; attrs: none; `rule <k> F:Float ~> #mathSqrt => sqrtF(F) ... </k>`
+- `INV-0547` `rule` lines 235-242; attrs: concrete; `rule <k> I:Int ~> #mathSqrt => sqrtF(intToF(I)) ... </k>`
+- `INV-0548` `syntax` lines 243-243; attrs: none; `syntax KItem ::= #maxAccF(Iterable, Float) \| #maxContF(Float)`
+- `INV-0549` `rule` lines 244-244; attrs: none; `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAccF(R, {V}:>Float) ... </k> requires isFloat(V)`
+- `INV-0550` `rule` lines 245-245; attrs: none; `rule <k> #maxAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #maxContF(M) ... </k>`
+- `INV-0551` `rule` lines 246-246; attrs: none; `rule <k> #iterDone ~> #maxContF(M:Float) => M ... </k>`
+- `INV-0552` `rule` lines 247-247; attrs: none; `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxContF(M:Float) => #maxAccF(R, maxFloat(M, {V}:>Float)) ... </k>`
+- `INV-0553` `syntax` lines 250-250; attrs: none; `syntax KItem ::= #minAccF(Iterable, Float) \| #minContF(Float)`
+- `INV-0554` `rule` lines 251-251; attrs: none; `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAccF(R, {V}:>Float) ... </k> requires isFloat(V)`
+- `INV-0555` `rule` lines 252-252; attrs: none; `rule <k> #minAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #minContF(M) ... </k>`
+- `INV-0556` `rule` lines 253-253; attrs: none; `rule <k> #iterDone ~> #minContF(M:Float) => M ... </k>`
+- `INV-0557` `rule` lines 254-254; attrs: none; `rule <k> #iterYield(V:Val, R:Iterable) ~> #minContF(M:Float) => #minAccF(R, minFloat(M, {V}:>Float)) ... </k>`
+- `INV-0558` `syntax` lines 261-261; attrs: none; `syntax KItem ::= #sumAccF(Iterable, Float) \| #sumContF(Float)`
+- `INV-0559` `rule` lines 262-263; attrs: none; `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int)`
+- `INV-0560` `rule` lines 265-265; attrs: none; `rule <k> #sumAccF(IT:Iterable, ACC:Float) => #iterNext(IT) ~> #sumContF(ACC) ... </k>`
+- `INV-0561` `rule` lines 266-266; attrs: none; `rule <k> #iterDone ~> #sumContF(ACC:Float) => ACC ... </k>`
+- `INV-0562` `rule` lines 267-268; attrs: none; `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float)`
+- `INV-0563` `rule` lines 270-271; attrs: none; `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float)`
+## `/reference/reference-semantics/semantics/functions.k`
+
+- `INV-0564` `syntax` lines 8-13; attrs: none; `syntax KItem ::= frame(continuation: K, callerEnv: Int, savedLoc: Int)`
+- `INV-0565` `rule` lines 14-17; attrs: none; `rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k>`
+- `INV-0566` `syntax` lines 18-18; attrs: none; `syntax Expr ::= closureExpr(ParamNames, Stmts)`
+- `INV-0567` `rule` lines 19-26; attrs: none; `rule <k> closureExpr(PNS:ParamNames, BODY:Stmts) => closureVal(PNS, BODY, L) ... </k>`
+- `INV-0568` `syntax` lines 27-30; attrs: none; `syntax Val ::= closureValC(ParamNames, ParamNames, Stmts, Map)`
+- `INV-0569` `syntax` lines 31-32; attrs: none; `syntax KItem ::= #mkClosure(String, ParamNames, ParamNames, ParamNames, Stmts, Map)`
+- `INV-0570` `rule` lines 33-35; attrs: none; `rule <k> FuncDef(F:String, Params(PNS:ParamNames), CellVars(CVS:ParamNames),`
+- `INV-0571` `rule` lines 36-40; attrs: none; `rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames,`
+- `INV-0572` `rule` lines 42-46; attrs: none; `rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames,`
+- `INV-0573` `rule` lines 47-49; attrs: none; `rule <k> Lambda(Params(PNS:ParamNames), E:Expr)`
+- `INV-0574` `rule` lines 50-52; attrs: none; `rule <k> Lambda(Params(PNS:ParamNames), CellVars(CVS:ParamNames),`
+- `INV-0575` `rule` lines 53-57; attrs: none; `rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames,`
+- `INV-0576` `rule` lines 59-62; attrs: none; `rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map)`
+- `INV-0577` `rule` lines 63-63; attrs: none; `rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>`
+- `INV-0578` `rule` lines 64-67; attrs: none; `rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k>`
+- `INV-0579` `rule` lines 68-71; attrs: none; `rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals))`
+- `INV-0580` `rule` lines 78-79; attrs: none; `rule <k> Return(V:Val) ~> _ => #pop </k>`
+- `INV-0581` `rule` lines 80-84; attrs: none; `rule <k> #endcall => #pop ... </k>`
+- `INV-0582` `rule` lines 85-90; attrs: none; `rule <k> #pop => V ~> CONT </k>`
+## `/reference/reference-semantics/semantics/int.k`
+
+- `INV-0583` `rule` lines 7-8; attrs: none; `rule applyUn("-", I:Int) => 0 -Int I`
+- `INV-0584` `rule` lines 9-10; attrs: none; `rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2`
+- `INV-0585` `rule` lines 11-11; attrs: none; `rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi`
+- `INV-0586` `rule` lines 12-12; attrs: none; `rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I`
+- `INV-0587` `rule` lines 13-13; attrs: none; `rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2`
+- `INV-0588` `rule` lines 14-14; attrs: none; `rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2`
+- `INV-0589` `rule` lines 15-15; attrs: none; `rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)`
+- `INV-0590` `rule` lines 16-16; attrs: none; `rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2`
+- `INV-0591` `rule` lines 17-18; attrs: none; `rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0`
+- `INV-0592` `syntax` lines 19-19; attrs: function; `syntax Int ::= pyMod(Int, Int) [function]`
+- `INV-0593` `rule` lines 20-21; attrs: none; `rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2`
+- `INV-0594` `rule` lines 22-22; attrs: none; `rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2`
+- `INV-0595` `rule` lines 23-23; attrs: none; `rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2`
+- `INV-0596` `rule` lines 24-24; attrs: none; `rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2`
+- `INV-0597` `rule` lines 25-25; attrs: none; `rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2`
+- `INV-0598` `rule` lines 26-26; attrs: none; `rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2`
+- `INV-0599` `rule` lines 27-27; attrs: none; `rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2`
+## `/reference/reference-semantics/semantics/iter.k`
+
+- `INV-0600` `syntax` lines 8-8; attrs: none; `syntax KItem ::= #iterNext(Iterable) \| "#iterDone" \| #iterYield(Val, Iterable)`
+## `/reference/reference-semantics/semantics/list.k`
+
+- `INV-0601` `rule` lines 9-9; attrs: none; `rule <k> #iterNext(list(.ValSeq))                => #iterDone ... </k>`
+- `INV-0602` `rule` lines 10-12; attrs: none; `rule <k> #iterNext(list(vCons(V:Val, R:ValSeq))) => #iterYield(V, list(R)) ... </k>`
+- `INV-0603` `syntax` lines 13-13; attrs: none; `syntax ApplyK ::= "toList"`
+- `INV-0604` `rule` lines 14-14; attrs: none; `rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>`
+- `INV-0605` `rule` lines 15-17; attrs: none; `rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>`
+- `INV-0606` `syntax` lines 18-18; attrs: function, total; `syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]`
+- `INV-0607` `rule` lines 19-19; attrs: none; `rule valSeqConcat(.ValSeq, T:ValSeq)                => T`
+- `INV-0608` `rule` lines 20-23; attrs: priority(45); `rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))`
+- `INV-0609` `rule` lines 24-26; attrs: priority(45); `rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k>`
+- `INV-0610` `rule` lines 27-27; attrs: none; `rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B`
+- `INV-0611` `rule` lines 28-32; attrs: concrete; `rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B)`
+- `INV-0612` `syntax` lines 33-33; attrs: function, total; `syntax Bool ::= hasRefVS(ValSeq) [function, total]`
+- `INV-0613` `rule` lines 34-34; attrs: none; `rule hasRefVS(.ValSeq)                => false`
+- `INV-0614` `rule` lines 35-36; attrs: none; `rule hasRefVS(vCons(V:Val, R:ValSeq)) => isRefV(V) orBool hasRefVS(R)`
+- `INV-0615` `syntax` lines 37-38; attrs: function; `syntax Bool ::= deepEqVS(ValSeq, ValSeq, Map) [function]`
+- `INV-0616` `rule` lines 39-39; attrs: none; `rule deepEqVS(.ValSeq, .ValSeq, _:Map)                   => true`
+- `INV-0617` `rule` lines 40-40; attrs: none; `rule deepEqVS(.ValSeq, vCons(_:Val, _:ValSeq), _:Map)    => false`
+- `INV-0618` `rule` lines 41-41; attrs: none; `rule deepEqVS(vCons(_:Val, _:ValSeq), .ValSeq, _:Map)    => false`
+- `INV-0619` `rule` lines 42-44; attrs: none; `rule deepEqVS(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq), HP:Map)`
+- `INV-0620` `rule` lines 45-45; attrs: none; `rule deepEqV(ref(H:Int), B:Val, HP:Map) => deepEqV({HP[H]}:>Val, B, HP)`
+- `INV-0621` `rule` lines 47-47; attrs: none; `rule deepEqV(A:Val, ref(H:Int), HP:Map) => deepEqV(A, {HP[H]}:>Val, HP)`
+- `INV-0622` `rule` lines 49-49; attrs: none; `rule deepEqV(list(A:ValSeq), list(B:ValSeq), HP:Map) => deepEqVS(A, B, HP)`
+- `INV-0623` `rule` lines 50-52; attrs: owise; `rule deepEqV(A:Val, B:Val, _:Map) => A ==K B [owise]`
+- `INV-0624` `rule` lines 53-57; attrs: priority(40); `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "append")), (V:Val, .Vals)) => noneV ... </k>`
+- `INV-0625` `syntax` lines 58-58; attrs: none; `syntax KItem ::= #memberAcc(Val, Iterable) \| #memberCont(Val) \| "#notB"`
+- `INV-0626` `rule` lines 59-59; attrs: none; `rule <k> Compare(LV:Val, CmpOp("in",     list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ... </k>`
+- `INV-0627` `rule` lines 60-60; attrs: none; `rule <k> Compare(LV:Val, CmpOp("not in", list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ~> #notB ... </k>`
+- `INV-0628` `rule` lines 61-61; attrs: none; `rule <k> #memberAcc(V:Val, IT:Iterable) => #iterNext(IT) ~> #memberCont(V) ... </k>`
+- `INV-0629` `rule` lines 62-62; attrs: none; `rule <k> #iterDone ~> #memberCont(_V:Val) => false ... </k>`
+- `INV-0630` `rule` lines 63-63; attrs: none; `rule <k> #iterYield(E:Val, _:Iterable) ~> #memberCont(V:Val) => true ... </k>`
+- `INV-0631` `rule` lines 65-65; attrs: none; `rule <k> #iterYield(E:Val, R:Iterable) ~> #memberCont(V:Val) => #memberAcc(V, R) ... </k>`
+- `INV-0632` `rule` lines 67-67; attrs: none; `rule <k> B:Bool ~> #notB => notBool B ... </k>`
+## `/reference/reference-semantics/semantics/methods.k`
+
+- `INV-0633` `syntax` lines 10-12; attrs: function; `syntax Val ::= applyMethod(Val, String, Vals) [function]`
+- `INV-0634` `rule` lines 13-13; attrs: none; `rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)`
+- `INV-0635` `rule` lines 14-14; attrs: none; `rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)`
+- `INV-0636` `rule` lines 15-15; attrs: none; `rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)`
+- `INV-0637` `rule` lines 16-18; attrs: none; `rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS)`
+- `INV-0638` `rule` lines 19-19; attrs: none; `rule applyMethod(str(CS:IntSeq), "lower",    .Vals) => str(mapLower(CS))`
+- `INV-0639` `rule` lines 20-20; attrs: none; `rule applyMethod(str(CS:IntSeq), "upper",    .Vals) => str(mapUpper(CS))`
+- `INV-0640` `rule` lines 21-25; attrs: none; `rule applyMethod(str(CS:IntSeq), "swapcase", .Vals) => str(mapSwap(CS))`
+- `INV-0641` `rule` lines 26-26; attrs: none; `rule applyMethod(str(SEP:IntSeq), "join", list(VS:ValSeq), .Vals) => str(joinCodes(SEP, VS))`
+- `INV-0642` `syntax` lines 27-27; attrs: function, total; `syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]`
+- `INV-0643` `rule` lines 28-28; attrs: none; `rule joinCodes(_:IntSeq, .ValSeq) => .IntSeq`
+- `INV-0644` `rule` lines 29-29; attrs: none; `rule joinCodes(_:IntSeq, vCons(str(CS:IntSeq), .ValSeq)) => CS`
+- `INV-0645` `rule` lines 30-33; attrs: none; `rule joinCodes(SEP:IntSeq, vCons(str(CS:IntSeq), vCons(V:Val, R:ValSeq)))`
+- `INV-0646` `rule` lines 34-34; attrs: none; `rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)`
+- `INV-0647` `syntax` lines 35-35; attrs: function; `syntax Int ::= cntSub(IntSeq, IntSeq) [function]`
+- `INV-0648` `rule` lines 36-36; attrs: none; `rule cntSub(.IntSeq, _:IntSeq) => 0`
+- `INV-0649` `rule` lines 37-37; attrs: none; `rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC)`
+- `INV-0650` `rule` lines 39-39; attrs: none; `rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => cntSub(R, PC)`
+- `INV-0651` `syntax` lines 41-41; attrs: function, total; `syntax IntSeq ::= dropIS(IntSeq, Int) [function, total]`
+- `INV-0652` `rule` lines 42-42; attrs: none; `rule dropIS(S:IntSeq, N:Int) => S requires N <=Int 0`
+- `INV-0653` `rule` lines 43-43; attrs: owise; `rule dropIS(.IntSeq, _:Int) => .IntSeq [owise]`
+- `INV-0654` `rule` lines 44-46; attrs: none; `rule dropIS(iCons(_:Int, R:IntSeq), N:Int) => dropIS(R, N -Int 1) requires N >Int 0`
+- `INV-0655` `rule` lines 47-47; attrs: none; `rule applyMethod(str(CS:IntSeq), "strip", .Vals) => str(revIS(trimWS(revIS(trimWS(CS)))))`
+- `INV-0656` `syntax` lines 48-48; attrs: function, total; `syntax IntSeq ::= trimWS(IntSeq) [function, total]`
+- `INV-0657` `rule` lines 49-49; attrs: none; `rule trimWS(.IntSeq) => .IntSeq`
+- `INV-0658` `rule` lines 50-50; attrs: none; `rule trimWS(iCons(C:Int, R:IntSeq)) => trimWS(R) requires isWSC(C)`
+- `INV-0659` `rule` lines 51-51; attrs: none; `rule trimWS(iCons(C:Int, R:IntSeq)) => iCons(C, R) requires notBool isWSC(C)`
+- `INV-0660` `syntax` lines 52-52; attrs: function, total; `syntax IntSeq ::= revIS(IntSeq) [function, total] \| revISAcc(IntSeq, IntSeq) [function, total]`
+- `INV-0661` `rule` lines 53-53; attrs: none; `rule revIS(S:IntSeq) => revISAcc(S, .IntSeq)`
+- `INV-0662` `rule` lines 54-54; attrs: none; `rule revISAcc(.IntSeq, A:IntSeq) => A`
+- `INV-0663` `rule` lines 55-57; attrs: none; `rule revISAcc(iCons(C:Int, R:IntSeq), A:IntSeq) => revISAcc(R, iCons(C, A))`
+- `INV-0664` `rule` lines 58-60; attrs: none; `rule applyMethod(str(CS:IntSeq), "encode", str(_:IntSeq), .Vals) => str(CS)`
+- `INV-0665` `rule` lines 61-63; attrs: concrete; `rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)`
+- `INV-0666` `rule` lines 64-64; attrs: none; `rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)`
+- `INV-0667` `syntax` lines 65-65; attrs: function, total; `syntax Int ::= cntOccVS(ValSeq, Val) [function, total]`
+- `INV-0668` `rule` lines 66-66; attrs: none; `rule cntOccVS(.ValSeq, _:Val)                => 0`
+- `INV-0669` `rule` lines 67-67; attrs: none; `rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V`
+- `INV-0670` `rule` lines 68-71; attrs: none; `rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => cntOccVS(R, V)        requires notBool (A ==K V)`
+- `INV-0671` `rule` lines 72-74; attrs: priority(40); `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals)`
+- `INV-0672` `syntax` lines 75-75; attrs: function; `syntax ValSeq ::= splitWS(IntSeq, IntSeq, ValSeq) [function]  // remaining, current token, result`
+- `INV-0673` `rule` lines 76-76; attrs: none; `rule splitWS(.IntSeq, CUR:IntSeq, ACC:ValSeq) => flushTok(ACC, CUR)`
+- `INV-0674` `rule` lines 77-77; attrs: none; `rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, .IntSeq, flushTok(ACC, CUR))`
+- `INV-0675` `rule` lines 79-79; attrs: none; `rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, seqConcat(CUR, iCons(C, .IntSeq)), ACC)`
+- `INV-0676` `syntax` lines 82-82; attrs: function; `syntax ValSeq ::= flushTok(ValSeq, IntSeq) [function]`
+- `INV-0677` `rule` lines 83-83; attrs: none; `rule flushTok(ACC:ValSeq, .IntSeq)            => ACC`
+- `INV-0678` `rule` lines 84-84; attrs: none; `rule flushTok(ACC:ValSeq, iCons(C:Int, T:IntSeq)) => valSeqConcat(ACC, vCons(str(iCons(C, T)), .ValSeq))`
+- `INV-0679` `syntax` lines 85-85; attrs: function, total; `syntax Bool ::= isWSC(Int) [function, total]`
+- `INV-0680` `rule` lines 86-88; attrs: none; `rule isWSC(C:Int) => C ==Int 32 orBool C ==Int 9 orBool C ==Int 10 orBool C ==Int 13`
+- `INV-0681` `rule` lines 89-93; attrs: priority(39); `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (kwV("sep", str(S:IntSeq)), .Vals))`
+- `INV-0682` `rule` lines 94-96; attrs: priority(40); `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (str(iCons(SEP:Int, .IntSeq)), .Vals))`
+- `INV-0683` `syntax` lines 97-97; attrs: function; `syntax ValSeq ::= splitSep(IntSeq, Int, IntSeq) [function]  // remaining, sep code, current token`
+- `INV-0684` `rule` lines 98-98; attrs: none; `rule splitSep(.IntSeq, _SEP:Int, CUR:IntSeq)              => vCons(str(CUR), .ValSeq)`
+- `INV-0685` `rule` lines 99-99; attrs: none; `rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => vCons(str(CUR), splitSep(R, SEP, .IntSeq))`
+- `INV-0686` `rule` lines 101-101; attrs: none; `rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => splitSep(R, SEP, seqConcat(CUR, iCons(C, .IntSeq)))`
+- `INV-0687` `rule` lines 104-105; attrs: none; `rule applyMethod(str(CS:IntSeq), "replace", str(iCons(A:Int, .IntSeq)), str(iCons(B:Int, .IntSeq)), .Vals)`
+- `INV-0688` `syntax` lines 106-106; attrs: function, total; `syntax IntSeq ::= replaceC(IntSeq, Int, Int) [function, total]`
+- `INV-0689` `rule` lines 107-107; attrs: none; `rule replaceC(.IntSeq, _:Int, _:Int)             => .IntSeq`
+- `INV-0690` `rule` lines 108-108; attrs: none; `rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(B, replaceC(R, A, B)) requires C ==Int A`
+- `INV-0691` `rule` lines 109-111; attrs: none; `rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(C, replaceC(R, A, B)) requires notBool (C ==Int A)`
+- `INV-0692` `syntax` lines 112-112; attrs: function, total; `syntax Bool ::= isUpperC(Int) [function, total]`
+- `INV-0693` `rule` lines 113-114; attrs: none; `rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90`
+- `INV-0694` `syntax` lines 115-115; attrs: function, total; `syntax Bool ::= isLowerC(Int) [function, total]`
+- `INV-0695` `rule` lines 116-117; attrs: none; `rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122`
+- `INV-0696` `syntax` lines 118-118; attrs: function, total; `syntax Bool ::= isAlphaC(Int) [function, total]`
+- `INV-0697` `rule` lines 119-120; attrs: none; `rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)`
+- `INV-0698` `syntax` lines 121-121; attrs: function, total; `syntax Bool ::= isDigitC(Int) [function, total]`
+- `INV-0699` `rule` lines 122-123; attrs: none; `rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57`
+- `INV-0700` `syntax` lines 124-124; attrs: function, total; `syntax Bool ::= hasUpper(IntSeq) [function, total]`
+- `INV-0701` `rule` lines 125-125; attrs: none; `rule hasUpper(.IntSeq) => false`
+- `INV-0702` `rule` lines 126-127; attrs: none; `rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)`
+- `INV-0703` `syntax` lines 128-128; attrs: function, total; `syntax Bool ::= hasLower(IntSeq) [function, total]`
+- `INV-0704` `rule` lines 129-129; attrs: none; `rule hasLower(.IntSeq) => false`
+- `INV-0705` `rule` lines 130-131; attrs: none; `rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)`
+- `INV-0706` `syntax` lines 132-132; attrs: function, total; `syntax Bool ::= allAlpha(IntSeq) [function, total]`
+- `INV-0707` `rule` lines 133-133; attrs: none; `rule allAlpha(.IntSeq) => true`
+- `INV-0708` `rule` lines 134-135; attrs: none; `rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)`
+- `INV-0709` `syntax` lines 136-136; attrs: function, total; `syntax Bool ::= allDigit(IntSeq) [function, total]`
+- `INV-0710` `rule` lines 137-137; attrs: none; `rule allDigit(.IntSeq) => true`
+- `INV-0711` `rule` lines 138-139; attrs: none; `rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)`
+- `INV-0712` `syntax` lines 140-141; attrs: function, total; `syntax Int ::= lowerC(Int) [function, total]`
+- `INV-0713` `rule` lines 142-142; attrs: none; `rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)`
+- `INV-0714` `rule` lines 143-144; attrs: owise; `rule lowerC(C:Int) => C         [owise]`
+- `INV-0715` `syntax` lines 145-145; attrs: function, total; `syntax Int ::= upperC(Int) [function, total]`
+- `INV-0716` `rule` lines 146-146; attrs: none; `rule upperC(C:Int) => C -Int 32 requires isLowerC(C)`
+- `INV-0717` `rule` lines 147-148; attrs: owise; `rule upperC(C:Int) => C         [owise]`
+- `INV-0718` `syntax` lines 149-149; attrs: function, total; `syntax Int ::= swapC(Int) [function, total]`
+- `INV-0719` `rule` lines 150-150; attrs: none; `rule swapC(C:Int) => C +Int 32 requires isUpperC(C)`
+- `INV-0720` `rule` lines 151-151; attrs: none; `rule swapC(C:Int) => C -Int 32 requires isLowerC(C)`
+- `INV-0721` `rule` lines 152-153; attrs: owise; `rule swapC(C:Int) => C         [owise]`
+- `INV-0722` `syntax` lines 154-154; attrs: function, total; `syntax IntSeq ::= mapLower(IntSeq) [function, total]`
+- `INV-0723` `rule` lines 155-155; attrs: none; `rule mapLower(.IntSeq) => .IntSeq`
+- `INV-0724` `rule` lines 156-157; attrs: none; `rule mapLower(iCons(C:Int, S:IntSeq)) => iCons(lowerC(C), mapLower(S))`
+- `INV-0725` `syntax` lines 158-158; attrs: function, total; `syntax IntSeq ::= mapUpper(IntSeq) [function, total]`
+- `INV-0726` `rule` lines 159-159; attrs: none; `rule mapUpper(.IntSeq) => .IntSeq`
+- `INV-0727` `rule` lines 160-161; attrs: none; `rule mapUpper(iCons(C:Int, S:IntSeq)) => iCons(upperC(C), mapUpper(S))`
+- `INV-0728` `syntax` lines 162-162; attrs: function, total; `syntax IntSeq ::= mapSwap(IntSeq) [function, total]`
+- `INV-0729` `rule` lines 163-163; attrs: none; `rule mapSwap(.IntSeq) => .IntSeq`
+- `INV-0730` `rule` lines 164-165; attrs: none; `rule mapSwap(iCons(C:Int, S:IntSeq)) => iCons(swapC(C), mapSwap(S))`
+- `INV-0731` `syntax` lines 166-166; attrs: function, total; `syntax Bool ::= startsWith(IntSeq, IntSeq) [function, total]`
+- `INV-0732` `rule` lines 167-167; attrs: none; `rule startsWith(.IntSeq, _:IntSeq)               => true`
+- `INV-0733` `rule` lines 168-168; attrs: none; `rule startsWith(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+- `INV-0734` `rule` lines 169-169; attrs: none; `rule startsWith(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool startsWith(As, Bs)`
+## `/reference/reference-semantics/semantics/operators.k`
+
+- `INV-0735` `rule` lines 10-11; attrs: none; `rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>`
+- `INV-0736` `rule` lines 12-14; attrs: none; `rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>`
+- `INV-0737` `context` lines 15-15; attrs: none; `context Compare(HOLE, _)`
+- `INV-0738` `context` lines 16-16; attrs: none; `context Compare(_:Val, CmpOp(_, HOLE))`
+- `INV-0739` `rule` lines 17-18; attrs: owise; `rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]`
+- `INV-0740` `rule` lines 19-19; attrs: none; `rule applyCmp("is",     V:Val, noneV) => V ==K noneV`
+- `INV-0741` `rule` lines 20-24; attrs: priority(40); `rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)`
+- `INV-0742` `rule` lines 25-27; attrs: priority(40); `rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k>`
+- `INV-0743` `rule` lines 28-29; attrs: none; `rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k>`
+- `INV-0744` `rule` lines 34-35; attrs: none; `rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k>`
+- `INV-0745` `rule` lines 38-39; attrs: none; `rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k>`
+- `INV-0746` `rule` lines 44-46; attrs: priority(40); `rule <k> UnaryOp(OP:String, ref(H:Int)) => UnaryOp(OP, V) ... </k>`
+## `/reference/reference-semantics/semantics/range.k`
+
+- `INV-0747` `syntax` lines 9-9; attrs: function, total; `syntax Bool ::= inRange(Int, Int, Int) [function, total]`
+- `INV-0748` `rule` lines 10-11; attrs: none; `rule inRange(I:Int, HI:Int, ST:Int) => (ST >Int 0 andBool I <Int HI) orBool (ST <Int 0 andBool I >Int HI)`
+- `INV-0749` `syntax` lines 12-12; attrs: function; `syntax Int ::= rangeLen(Int, Int, Int) [function]`
+- `INV-0750` `rule` lines 13-13; attrs: none; `rule rangeLen(LO:Int, HI:Int, ST:Int) => (HI -Int LO +Int ST -Int 1) /Int ST`
+- `INV-0751` `rule` lines 15-15; attrs: none; `rule rangeLen(LO:Int, HI:Int, ST:Int) => (LO -Int HI -Int ST -Int 1) /Int (0 -Int ST)`
+- `INV-0752` `rule` lines 17-17; attrs: none; `rule rangeLen(LO:Int, HI:Int, ST:Int) => 0`
+- `INV-0753` `rule` lines 20-21; attrs: none; `rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int))`
+- `INV-0754` `rule` lines 23-23; attrs: none; `rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterDone ... </k>`
+## `/reference/reference-semantics/semantics/set.k`
+
+- `INV-0755` `syntax` lines 8-10; attrs: none; `syntax Val ::= setV(IntSeq)`
+- `INV-0756` `syntax` lines 11-11; attrs: function, total; `syntax Bool ::= codeIn(Int, IntSeq) [function, total]`
+- `INV-0757` `rule` lines 12-12; attrs: none; `rule codeIn(_:Int, .IntSeq)                => false`
+- `INV-0758` `rule` lines 13-15; attrs: none; `rule codeIn(C:Int, iCons(H:Int, T:IntSeq)) => C ==Int H orBool codeIn(C, T)`
+- `INV-0759` `syntax` lines 16-17; attrs: function, total; `syntax IntSeq ::= dedupCodes(IntSeq)         [function, total]`
+- `INV-0760` `rule` lines 18-18; attrs: none; `rule dedupCodes(CS:IntSeq) => dedupFrom(CS, .IntSeq)`
+- `INV-0761` `rule` lines 19-19; attrs: none; `rule dedupFrom(.IntSeq, ACC:IntSeq) => ACC`
+- `INV-0762` `rule` lines 20-20; attrs: none; `rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, ACC)`
+- `INV-0763` `rule` lines 22-22; attrs: none; `rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, snocCode(ACC, C))`
+- `INV-0764` `syntax` lines 25-25; attrs: function, total; `syntax IntSeq ::= snocCode(IntSeq, Int) [function, total]`
+- `INV-0765` `rule` lines 26-26; attrs: none; `rule snocCode(.IntSeq, C:Int)                => iCons(C, .IntSeq)`
+- `INV-0766` `rule` lines 27-30; attrs: none; `rule snocCode(iCons(H:Int, T:IntSeq), C:Int) => iCons(H, snocCode(T, C))`
+- `INV-0767` `syntax` lines 31-31; attrs: function, total; `syntax Bool ::= subsetCodes(IntSeq, IntSeq) [function, total]`
+- `INV-0768` `rule` lines 32-32; attrs: none; `rule subsetCodes(.IntSeq, _:IntSeq)                => true`
+- `INV-0769` `rule` lines 33-34; attrs: none; `rule subsetCodes(iCons(C:Int, S:IntSeq), B:IntSeq) => codeIn(C, B) andBool subsetCodes(S, B)`
+- `INV-0770` `syntax` lines 35-35; attrs: function, total; `syntax Bool ::= sameSet(IntSeq, IntSeq) [function, total]`
+- `INV-0771` `rule` lines 36-38; attrs: none; `rule sameSet(A:IntSeq, B:IntSeq) => subsetCodes(A, B) andBool subsetCodes(B, A)`
+- `INV-0772` `rule` lines 39-39; attrs: none; `rule applyCmp("==", setV(A:IntSeq), setV(B:IntSeq)) => sameSet(A, B)`
+## `/reference/reference-semantics/semantics/sort.k`
+
+- `INV-0773` `syntax` lines 18-18; attrs: function, total, symbol, no-evaluators; `syntax ValSeq ::= sortVS(ValSeq) [function, total, symbol(sortVS), no-evaluators]`
+- `INV-0774` `syntax` lines 19-19; attrs: function; `syntax ValSeq ::= insVS(Int, ValSeq) [function]`
+- `INV-0775` `rule` lines 20-20; attrs: concrete; `rule sortVS(.ValSeq)                => .ValSeq          [concrete]`
+- `INV-0776` `rule` lines 21-21; attrs: concrete; `rule sortVS(vCons(X:Int, R:ValSeq)) => insVS(X, sortVS(R)) [concrete]`
+- `INV-0777` `rule` lines 22-22; attrs: concrete; `rule insVS(X:Int, .ValSeq)                => vCons(X, .ValSeq) [concrete]`
+- `INV-0778` `rule` lines 23-23; attrs: concrete; `rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]`
+- `INV-0779` `rule` lines 24-25; attrs: concrete; `rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X  >Int Y [concrete]`
+- `INV-0780` `syntax` lines 26-26; attrs: function; `syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]`
+- `INV-0781` `rule` lines 27-27; attrs: concrete; `rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]`
+- `INV-0782` `rule` lines 28-28; attrs: concrete; `rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]`
+- `INV-0783` `rule` lines 29-29; attrs: none; `rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(A), vCons(str(B), R))`
+- `INV-0784` `rule` lines 31-31; attrs: none; `rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(B), insVSs(A, R))`
+- `INV-0785` `rule` lines 36-39; attrs: none; `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), .Vals))`
+- `INV-0786` `rule` lines 40-48; attrs: concrete, priority(40), priority(40); `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "sort")), .Vals) => noneV ... </k>`
+- `INV-0787` `syntax` lines 49-50; attrs: function, total, symbol, no-evaluators; `syntax ValSeq ::= sortKeyVS(ValSeq, Val) [function, total, symbol(sortKeyVS), no-evaluators]`
+- `INV-0788` `syntax` lines 51-52; attrs: function, total; `syntax ValSeq ::= revVS(ValSeq) [function, total]`
+- `INV-0789` `rule` lines 53-53; attrs: none; `rule revVS(S:ValSeq) => revVSAcc(S, .ValSeq)`
+- `INV-0790` `rule` lines 54-54; attrs: none; `rule revVSAcc(.ValSeq, A:ValSeq) => A`
+- `INV-0791` `rule` lines 55-56; attrs: none; `rule revVSAcc(vCons(V:Val, R:ValSeq), A:ValSeq) => revVSAcc(R, vCons(V, A))`
+- `INV-0792` `syntax` lines 57-57; attrs: function, total; `syntax ValSeq ::= condRev(ValSeq, Bool) [function, total]`
+- `INV-0793` `rule` lines 58-58; attrs: none; `rule condRev(S:ValSeq, false) => S`
+- `INV-0794` `rule` lines 59-60; attrs: none; `rule condRev(S:ValSeq, true)  => revVS(S)`
+- `INV-0795` `rule` lines 61-62; attrs: none; `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals))`
+- `INV-0796` `rule` lines 63-64; attrs: none; `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals))`
+- `INV-0797` `rule` lines 65-71; attrs: total, concrete; `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("reverse", RB:Bool), .Vals))`
+## `/reference/reference-semantics/semantics/str.k`
+
+- `INV-0798` `rule` lines 8-8; attrs: none; `rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>`
+- `INV-0799` `rule` lines 9-12; attrs: none; `rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))`
+- `INV-0800` `syntax` lines 13-13; attrs: function; `syntax IntSeq ::= strToCodes(String) [function]`
+- `INV-0801` `rule` lines 14-14; attrs: none; `rule <k> Str(S:String) => str(strToCodes(S)) ... </k>`
+- `INV-0802` `rule` lines 15-15; attrs: none; `rule strToCodes("") => .IntSeq`
+- `INV-0803` `rule` lines 16-16; attrs: none; `rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))`
+- `INV-0804` `syntax` lines 20-20; attrs: function, total; `syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]`
+- `INV-0805` `rule` lines 21-21; attrs: none; `rule seqConcat(.IntSeq, T:IntSeq)                => T`
+- `INV-0806` `rule` lines 22-23; attrs: none; `rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))`
+- `INV-0807` `rule` lines 24-24; attrs: none; `rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))`
+- `INV-0808` `rule` lines 25-25; attrs: none; `rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B`
+- `INV-0809` `rule` lines 26-28; attrs: none; `rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)`
+- `INV-0810` `rule` lines 29-29; attrs: none; `rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)`
+- `INV-0811` `rule` lines 30-31; attrs: none; `rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)`
+- `INV-0812` `syntax` lines 32-32; attrs: function, total; `syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]`
+- `INV-0813` `rule` lines 33-33; attrs: none; `rule strPrefix(.IntSeq, _:IntSeq)               => true`
+- `INV-0814` `rule` lines 34-34; attrs: none; `rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+- `INV-0815` `rule` lines 35-36; attrs: none; `rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)`
+- `INV-0816` `syntax` lines 37-37; attrs: function, total; `syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]`
+- `INV-0817` `rule` lines 38-38; attrs: none; `rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)`
+- `INV-0818` `rule` lines 39-39; attrs: none; `rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)`
+- `INV-0819` `rule` lines 40-40; attrs: none; `rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs)`
+- `INV-0820` `syntax` lines 48-48; attrs: function, total; `syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]`
+- `INV-0821` `rule` lines 49-49; attrs: none; `rule strLt(.IntSeq, .IntSeq)                => false`
+- `INV-0822` `rule` lines 50-50; attrs: none; `rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true`
+- `INV-0823` `rule` lines 51-51; attrs: none; `rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+- `INV-0824` `rule` lines 52-52; attrs: none; `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true          requires A  <Int B`
+- `INV-0825` `rule` lines 53-53; attrs: none; `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false         requires A  >Int B`
+- `INV-0826` `rule` lines 54-55; attrs: none; `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B`
+- `INV-0827` `rule` lines 56-56; attrs: none; `rule applyCmp("<",  str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)`
+- `INV-0828` `rule` lines 57-57; attrs: none; `rule applyCmp(">",  str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)`
+- `INV-0829` `rule` lines 58-58; attrs: none; `rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)`
+- `INV-0830` `rule` lines 59-59; attrs: none; `rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)`
+## `/reference/reference-semantics/semantics/subscript.k`
+
+- `INV-0831` `syntax` lines 11-11; attrs: function, total; `syntax Val ::= valSeqAt(ValSeq, Int) [function, total]`
+- `INV-0832` `rule` lines 12-12; attrs: none; `rule valSeqAt(vCons(V:Val, _:ValSeq), 0)     => V`
+- `INV-0833` `rule` lines 13-13; attrs: none; `rule valSeqAt(vCons(_:Val, S:ValSeq), I:Int) => valSeqAt(S, I -Int 1)`
+- `INV-0834` `syntax` lines 16-16; attrs: function; `syntax Int ::= intSeqAt(IntSeq, Int) [function]`
+- `INV-0835` `rule` lines 17-17; attrs: none; `rule intSeqAt(iCons(C:Int, _:IntSeq), 0)     => C`
+- `INV-0836` `rule` lines 18-18; attrs: none; `rule intSeqAt(iCons(_:Int, S:IntSeq), I:Int) => intSeqAt(S, I -Int 1)`
+- `INV-0837` `syntax` lines 21-21; attrs: function, total; `syntax Int ::= normIdx(Int, Int) [function, total]`
+- `INV-0838` `rule` lines 22-22; attrs: none; `rule normIdx(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0`
+- `INV-0839` `rule` lines 23-26; attrs: strict; `rule normIdx(I:Int, _:Int)   => I          requires I >=Int 0`
+- `INV-0840` `context` lines 27-27; attrs: none; `context Subscript(HOLE, _)`
+- `INV-0841` `context` lines 28-30; attrs: none; `context Subscript(_:Val, HOLE:Expr)`
+- `INV-0842` `rule` lines 31-34; attrs: priority(40); `rule <k> Subscript(ref(H:Int), IX:Index) => Subscript(V, IX) ... </k>`
+- `INV-0843` `rule` lines 35-36; attrs: none; `rule <k> Subscript(OBJ:Val, I:Int) => applyIndex(OBJ, I) ... </k>`
+- `INV-0844` `syntax` lines 37-37; attrs: function; `syntax Val ::= applyIndex(Val, Int) [function]`
+- `INV-0845` `rule` lines 38-38; attrs: none; `rule applyIndex(list(VS:ValSeq),  I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))`
+- `INV-0846` `rule` lines 39-39; attrs: none; `rule applyIndex(tuple(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))`
+- `INV-0847` `rule` lines 40-43; attrs: none; `rule applyIndex(str(IS:IntSeq),   I:Int)`
+- `INV-0848` `syntax` lines 44-48; attrs: none; `syntax KItem ::= #evalB(Bound) \| "#toSome"`
+- `INV-0849` `syntax` lines 49-49; attrs: none; `syntax OptInt ::= "noB" \| someB(Int)`
+- `INV-0850` `rule` lines 50-50; attrs: none; `rule <k> #evalB(NoBound)  => noB ... </k>`
+- `INV-0851` `rule` lines 51-51; attrs: none; `rule <k> #evalB(E:Expr)   => E ~> #toSome ... </k>`
+- `INV-0852` `rule` lines 52-53; attrs: none; `rule <k> I:Int ~> #toSome => someB(I) ... </k>`
+- `INV-0853` `rule` lines 54-54; attrs: none; `rule <k> Subscript(OBJ:Val, Slice(LO:Bound, HI:Bound, ST:Bound)) => #evalB(LO) ~> #slLo(OBJ, HI, ST) ... </k>`
+- `INV-0854` `rule` lines 55-55; attrs: none; `rule <k> LO:OptInt ~> #slLo(OBJ:Val, HI:Bound, ST:Bound)   => #evalB(HI) ~> #slHi(OBJ, LO, ST) ... </k>`
+- `INV-0855` `rule` lines 56-57; attrs: none; `rule <k> HI:OptInt ~> #slHi(OBJ:Val, LO:OptInt, ST:Bound)  => #evalB(ST) ~> #slStep(OBJ, LO, HI) ... </k>`
+- `INV-0856` `rule` lines 58-60; attrs: priority(45); `rule <k> ST:OptInt ~> #slStep(list(VS:ValSeq), LO:OptInt, HI:OptInt)`
+- `INV-0857` `rule` lines 61-62; attrs: none; `rule <k> ST:OptInt ~> #slStep(OBJ:Val, LO:OptInt, HI:OptInt) => doSlice(OBJ, LO, HI, ST) ... </k>`
+- `INV-0858` `syntax` lines 63-63; attrs: function; `syntax Val ::= doSlice(Val, OptInt, OptInt, OptInt) [function]`
+- `INV-0859` `rule` lines 64-65; attrs: none; `rule doSlice(list(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt)`
+- `INV-0860` `rule` lines 66-67; attrs: none; `rule doSlice(tuple(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt)`
+- `INV-0861` `rule` lines 68-71; attrs: none; `rule doSlice(str(IS:IntSeq), LO:OptInt, HI:OptInt, ST:OptInt)`
+- `INV-0862` `syntax` lines 72-72; attrs: function, total; `syntax Int ::= slStep(OptInt) [function, total]`
+- `INV-0863` `rule` lines 73-73; attrs: none; `rule slStep(noB)          => 1`
+- `INV-0864` `rule` lines 74-75; attrs: none; `rule slStep(someB(S:Int)) => S`
+- `INV-0865` `syntax` lines 76-76; attrs: function; `syntax Int ::= slStart(OptInt, OptInt, Int) [function]`
+- `INV-0866` `rule` lines 77-77; attrs: none; `rule slStart(noB,          ST:OptInt, _LEN:Int) => 0`
+- `INV-0867` `rule` lines 79-79; attrs: none; `rule slStart(noB,          ST:OptInt, LEN:Int)  => LEN -Int 1`
+- `INV-0868` `rule` lines 81-82; attrs: none; `rule slStart(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))`
+- `INV-0869` `syntax` lines 83-83; attrs: function; `syntax Int ::= slStop(OptInt, OptInt, Int) [function]`
+- `INV-0870` `rule` lines 84-84; attrs: none; `rule slStop(noB,          ST:OptInt, LEN:Int)  => LEN`
+- `INV-0871` `rule` lines 86-86; attrs: none; `rule slStop(noB,          ST:OptInt, _LEN:Int) => -1`
+- `INV-0872` `rule` lines 88-89; attrs: none; `rule slStop(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))`
+- `INV-0873` `syntax` lines 90-90; attrs: function, total; `syntax Int ::= slAdjust(Int, Int, Int) [function, total]`
+- `INV-0874` `rule` lines 91-91; attrs: none; `rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampLo(I +Int LEN, STEP)`
+- `INV-0875` `rule` lines 93-93; attrs: none; `rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampHi(I, LEN, STEP)`
+- `INV-0876` `syntax` lines 96-96; attrs: function, total; `syntax Int ::= clampLo(Int, Int) [function, total]`
+- `INV-0877` `rule` lines 97-97; attrs: none; `rule clampLo(J:Int, _STEP:Int) => J`
+- `INV-0878` `rule` lines 99-99; attrs: none; `rule clampLo(J:Int, STEP:Int)  => #if STEP <Int 0 #then -1 #else 0 #fi`
+- `INV-0879` `syntax` lines 102-102; attrs: function, total; `syntax Int ::= clampHi(Int, Int, Int) [function, total]`
+- `INV-0880` `rule` lines 103-103; attrs: none; `rule clampHi(I:Int, LEN:Int, _STEP:Int) => I`
+- `INV-0881` `rule` lines 105-105; attrs: none; `rule clampHi(I:Int, LEN:Int, STEP:Int)  => #if STEP <Int 0 #then LEN -Int 1 #else LEN #fi`
+- `INV-0882` `syntax` lines 109-109; attrs: function; `syntax ValSeq ::= buildVS(ValSeq, Int, Int, Int) [function]`
+- `INV-0883` `rule` lines 110-111; attrs: none; `rule buildVS(VS:ValSeq, I:Int, STOP:Int, STEP:Int)`
+- `INV-0884` `rule` lines 113-113; attrs: none; `rule buildVS(_:ValSeq, I:Int, STOP:Int, STEP:Int) => .ValSeq`
+- `INV-0885` `syntax` lines 116-116; attrs: function; `syntax IntSeq ::= buildIS(IntSeq, Int, Int, Int) [function]`
+- `INV-0886` `rule` lines 117-118; attrs: none; `rule buildIS(IS:IntSeq, I:Int, STOP:Int, STEP:Int)`
+- `INV-0887` `rule` lines 120-120; attrs: none; `rule buildIS(_:IntSeq, I:Int, STOP:Int, STEP:Int) => .IntSeq`
+## `/reference/reference-semantics/semantics/syntax.k`
+
+- `INV-0888` `syntax` lines 9-31; attrs: macro, strict, seqstrict; `syntax Expr ::= "Int"      "(" Int ")"`
+- `INV-0889` `syntax` lines 32-32; attrs: none; `syntax CmpOp    ::= "CmpOp" "(" String "," Expr ")"`
+- `INV-0890` `syntax` lines 33-33; attrs: none; `syntax Entry    ::= "Entry" "(" Expr "," Expr ")"`
+- `INV-0891` `syntax` lines 34-34; attrs: none; `syntax Entries  ::= List{Entry, ","}`
+- `INV-0892` `syntax` lines 35-35; attrs: none; `syntax CompFor  ::= "CompFor" "(" Expr "," Expr "," Exprs ")"`
+- `INV-0893` `syntax` lines 36-36; attrs: none; `syntax CompFors ::= List{CompFor, ""}`
+- `INV-0894` `syntax` lines 37-37; attrs: none; `syntax Exprs    ::= List{Expr, ","}`
+- `INV-0895` `syntax` lines 38-38; attrs: none; `syntax Index    ::= Expr \| "Slice" "(" Bound "," Bound "," Bound ")"`
+- `INV-0896` `syntax` lines 39-40; attrs: none; `syntax Bound    ::= Expr \| "NoBound"`
+- `INV-0897` `syntax` lines 41-55; attrs: strict; `syntax Stmt ::= "Assign"    "(" Expr "," Expr ")" [strict(2)]`
+- `INV-0898` `syntax` lines 56-56; attrs: none; `syntax Stmts      ::= List{Stmt, ""}`
+- `INV-0899` `syntax` lines 57-57; attrs: none; `syntax Params     ::= "Params" "(" ParamNames ")"`
+- `INV-0900` `syntax` lines 58-58; attrs: none; `syntax CellVars   ::= "CellVars" "(" ParamNames ")"`
+- `INV-0901` `syntax` lines 59-59; attrs: none; `syntax FreeVars   ::= "FreeVars" "(" ParamNames ")"`
+- `INV-0902` `syntax` lines 60-60; attrs: none; `syntax ParamNames ::= List{String, ","}`
+- `INV-0903` `syntax` lines 61-61; attrs: none; `syntax Module     ::= "Module" "(" Stmts ")"`
+## `/reference/reference-semantics/semantics/tuple.k`
+
+- `INV-0904` `rule` lines 10-10; attrs: none; `rule <k> #iterNext(tuple(.ValSeq))                => #iterDone ... </k>`
+- `INV-0905` `rule` lines 11-13; attrs: none; `rule <k> #iterNext(tuple(vCons(V:Val, R:ValSeq))) => #iterYield(V, tuple(R)) ... </k>`
+- `INV-0906` `syntax` lines 14-14; attrs: none; `syntax ApplyK ::= "toTuple"`
+- `INV-0907` `rule` lines 15-15; attrs: none; `rule <k> TupleExpr(ES:Exprs) => #evalArgs(ES, .Vals, toTuple) ... </k>`
+- `INV-0908` `rule` lines 16-17; attrs: none; `rule <k> #applyK(toTuple, ACC:Vals) => tuple(vals2valSeq(ACC)) ... </k>`
+- `INV-0909` `rule` lines 18-19; attrs: none; `rule applyCmp("==", tuple(A:ValSeq), tuple(B:ValSeq)) => A ==K B`
+- `INV-0910` `rule` lines 20-20; attrs: none; `rule <k> Compare(LV:Val, CmpOp("in",     tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ... </k>`
+- `INV-0911` `rule` lines 21-22; attrs: none; `rule <k> Compare(LV:Val, CmpOp("not in", tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ~> #notB ... </k>`
+- `INV-0912` `rule` lines 23-23; attrs: none; `rule applyMethod(tuple(VS:ValSeq), "index", V:Val, .Vals) => idxOfVS(VS, V, 0)`
+- `INV-0913` `syntax` lines 24-24; attrs: function; `syntax Int ::= idxOfVS(ValSeq, Val, Int) [function]`
+- `INV-0914` `rule` lines 25-25; attrs: none; `rule idxOfVS(vCons(A:Val, _:ValSeq), V:Val, I:Int) => I requires A ==K V`
+- `INV-0915` `rule` lines 26-26; attrs: none; `rule idxOfVS(vCons(A:Val, R:ValSeq), V:Val, I:Int) => idxOfVS(R, V, I +Int 1)`
+- `INV-0916` `rule` lines 28-30; attrs: none; `rule applyCmp("!=", tuple(A:ValSeq), tuple(B:ValSeq)) => notBool (A ==K B)`
+- `INV-0917` `syntax` lines 31-31; attrs: none; `syntax KItem ::= #bindTgt(Expr, Val)`
+- `INV-0918` `rule` lines 32-34; attrs: none; `rule <k> #bindTgt(Name(X:String), V:Val) => .K ... </k>`
+- `INV-0919` `rule` lines 35-37; attrs: none; `rule <k> #bindTgt(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k>`
+- `INV-0920` `rule` lines 42-42; attrs: none; `rule <k> #bindTgt(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+- `INV-0921` `rule` lines 43-43; attrs: none; `rule <k> #bindTgt(TupleExpr(TS:Exprs), list(VS:ValSeq))  => #unpackSeq(TS, VS) ... </k>`
+- `INV-0922` `rule` lines 44-48; attrs: priority(40); `rule <k> #bindTgt(TupleExpr(TS:Exprs), ref(H:Int)) => #bindTgt(TupleExpr(TS), V) ... </k>`
+- `INV-0923` `syntax` lines 49-49; attrs: none; `syntax KItem ::= #unpackSeq(Exprs, ValSeq)`
+- `INV-0924` `rule` lines 50-50; attrs: none; `rule <k> Assign(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+- `INV-0925` `rule` lines 51-51; attrs: none; `rule <k> Assign(TupleExpr(TS:Exprs), list(VS:ValSeq))  => #unpackSeq(TS, VS) ... </k>`
+- `INV-0926` `rule` lines 52-54; attrs: priority(40); `rule <k> Assign(TupleExpr(TS:Exprs), ref(H:Int)) => Assign(TupleExpr(TS), V) ... </k>`
+- `INV-0927` `rule` lines 55-56; attrs: none; `rule <k> #unpackSeq((T:Expr, TS:Exprs), vCons(V:Val, VS:ValSeq))`
+- `INV-0928` `rule` lines 57-57; attrs: none; `rule <k> #unpackSeq(.Exprs, .ValSeq) => .K ... </k>`
+## `/candidate/verification.k`
+
+- `INV-0929` `syntax` lines 8-8; attrs: function, total; `syntax Bool ::= binaryCode(Int) [function, total]`
+- `INV-0930` `rule` lines 9-10; attrs: none; `rule binaryCode(C:Int) => C ==Int 48 orBool C ==Int 49`
+- `INV-0931` `syntax` lines 11-11; attrs: function; `syntax Int ::= xorCode(Int, Int) [function]`
+- `INV-0932` `rule` lines 12-12; attrs: none; `rule xorCode(A:Int, B:Int) => 48`
+- `INV-0933` `rule` lines 14-14; attrs: none; `rule xorCode(A:Int, B:Int) => 49`
+- `INV-0934` `syntax` lines 17-17; attrs: function, total; `syntax IntSeq ::= xorAcc(IntSeq, IntSeq, IntSeq) [function, total]`
+- `INV-0935` `rule` lines 18-18; attrs: none; `rule xorAcc(P:IntSeq, .IntSeq, _:IntSeq) => P`
+- `INV-0936` `rule` lines 19-19; attrs: none; `rule xorAcc(P:IntSeq, iCons(_:Int, _:IntSeq), .IntSeq) => P`
+- `INV-0937` `rule` lines 20-23; attrs: none; `rule xorAcc(P:IntSeq, iCons(A:Int, AS:IntSeq), iCons(B:Int, BS:IntSeq))`
+- `INV-0938` `syntax` lines 24-24; attrs: function, total; `syntax Bool ::= binaryCodes(IntSeq) [function, total]`
+- `INV-0939` `rule` lines 25-25; attrs: none; `rule binaryCodes(.IntSeq) => true`
+- `INV-0940` `rule` lines 26-30; attrs: total; `rule binaryCodes(iCons(C:Int, REST:IntSeq))`
+- `INV-0941` `syntax` lines 31-32; attrs: function, total; `syntax IntSeq ::= xorLastX(IntSeq, IntSeq, IntSeq) [function, total]`
+- `INV-0942` `rule` lines 33-33; attrs: none; `rule xorLastX(.IntSeq, _:IntSeq, X:IntSeq) => X`
+- `INV-0943` `rule` lines 34-34; attrs: none; `rule xorLastX(iCons(_:Int, _:IntSeq), .IntSeq, X:IntSeq) => X`
+- `INV-0944` `rule` lines 35-36; attrs: none; `rule xorLastX(iCons(A:Int, AS:IntSeq), iCons(_:Int, BS:IntSeq), _:IntSeq)`
+- `INV-0945` `rule` lines 37-37; attrs: none; `rule xorLastY(.IntSeq, _:IntSeq, Y:IntSeq) => Y`
+- `INV-0946` `rule` lines 38-38; attrs: none; `rule xorLastY(iCons(_:Int, _:IntSeq), .IntSeq, Y:IntSeq) => Y`
+- `INV-0947` `rule` lines 39-42; attrs: function; `rule xorLastY(iCons(_:Int, AS:IntSeq), iCons(B:Int, BS:IntSeq), _:IntSeq)`
+- `INV-0948` `syntax` lines 43-43; attrs: function; `syntax Expr ::= "stringXorTarget" [function]`
+- `INV-0949` `rule` lines 44-45; attrs: none; `rule stringXorTarget => TupleExpr(Name("x"), Name("y"))`
+- `INV-0950` `syntax` lines 46-46; attrs: function; `syntax Stmts ::= "stringXorLoopBody" [function]`
+- `INV-0951` `rule` lines 47-51; attrs: none; `rule stringXorLoopBody`
+- `INV-0952` `syntax` lines 52-52; attrs: function; `syntax Stmts ::= "stringXorBody" [function]`
+- `INV-0953` `rule` lines 53-61; attrs: none; `rule stringXorBody`
+- `INV-0954` `syntax` lines 62-62; attrs: function; `syntax Val ::= "stringXorClosure" [function]`
+- `INV-0955` `rule` lines 63-65; attrs: none; `rule stringXorClosure`
+- `INV-0956` `syntax` lines 66-66; attrs: function; `syntax Module ::= "stringXorModule" [function]`
+- `INV-0957` `rule` lines 67-70; attrs: none; `rule stringXorModule`
+## `/candidate/spec.k`
+
+- `INV-0958` `claim` lines 6-27; attrs: none; `claim [loop-invariant]:`
+- `INV-0959` `claim` lines 32-51; attrs: none; `claim [solution-correct]:`

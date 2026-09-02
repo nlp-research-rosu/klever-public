@@ -1,0 +1,38 @@
+requires "verification.k"
+
+module PROGRAM-PINNING
+  imports VERIFICATION
+
+  claim <k> triangleProgram() =>
+    Module(
+      Import("math")
+      FuncDef("triangle_area", Params("a", "b", "c"),
+        If(BoolOp(
+          "or",
+          Compare(BinOp("+", Name("a"), Name("b")), CmpOp("<=", Name("c"))),
+          Compare(BinOp("+", Name("a"), Name("c")), CmpOp("<=", Name("b"))),
+          Compare(BinOp("+", Name("b"), Name("c")), CmpOp("<=", Name("a")))),
+          Return(UnaryOp("-", Int(1))),
+          .Stmts)
+        Assign(
+          Name("semi_perimeter"),
+          BinOp(
+            "/",
+            BinOp("+", BinOp("+", Name("a"), Name("b")), Name("c")),
+            Int(2)))
+        Assign(
+          Name("area"),
+          Call(
+            Attribute(Name("math"), "sqrt"),
+            BinOp(
+              "*",
+              BinOp(
+                "*",
+                BinOp(
+                  "*",
+                  Name("semi_perimeter"),
+                  BinOp("-", Name("semi_perimeter"), Name("a"))),
+                BinOp("-", Name("semi_perimeter"), Name("b"))),
+              BinOp("-", Name("semi_perimeter"), Name("c")))))
+        Return(Call(Name("round"), Name("area"), Int(2))))) </k>
+endmodule

@@ -1,0 +1,281 @@
+PWD: /audit-output
+COMMAND: ./evidence/static_inventory.sh
+START_UTC: 2026-07-23T16:48:37Z
+Local K source/helper inventory
+semantic.k
+spec.k
+verification.k
+
+NUMBERED SOURCE: semantic.k
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports BOOL-SYNTAX
+     6	  imports STRING-SYNTAX
+     7	
+     8	  syntax Program ::= "Module" "(" Stmts ")"
+     9	  syntax Stmts ::= List{Stmt, ""}
+    10	  syntax Exprs ::= List{Expr, ","}
+    11	
+    12	  syntax Stmt ::= "FuncDef" "(" String "," "Params" "(" String ")" "," Stmts ")"
+    13	                | "Assign" "(" Expr "," Expr ")"
+    14	                | "While" "(" Expr "," Stmts ")"
+    15	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    16	                | "Return" "(" Expr ")"
+    17	
+    18	  syntax Expr ::= "Name" "(" String ")"
+    19	                | "Int" "(" Int ")"
+    20	                | "Bool" "(" Bool ")"
+    21	                | "ListExpr" "(" Exprs ")"
+    22	                | "BinOp" "(" String "," Expr "," Expr ")"
+    23	                | "Compare" "(" Expr "," Cmp ")"
+    24	  syntax Cmp ::= "CmpOp" "(" String "," Expr ")"
+    25	endmodule
+    26	
+    27	module MPY
+    28	  imports MPY-SYNTAX
+    29	  imports INT
+    30	  imports BOOL
+    31	
+    32	  // Runtime list values.  A non-associative representation keeps both concrete
+    33	  // execution and symbolic matching deterministic.
+    34	  syntax PList ::= "nil"
+    35	                 | "cons" "(" Int "," PList ")"
+    36	                 | "chooseCons" "(" Bool "," Int "," PList ")" [function, total]
+    37	
+    38	  rule chooseCons(true, C, P) => cons(C, P)
+    39	  rule chooseCons(false, _, P) => P
+    40	
+    41	  configuration
+    42	    <mpy>
+    43	      <k> $PGM:Program </k>
+    44	      <n> $N:Int </n>
+    45	      <result> .K </result>
+    46	    </mpy>
+    47	
+    48	  syntax KItem ::= "scan" "(" Int "," Int ")"
+    49	                 | "trial" "(" Int "," Int "," Bool "," Int ")"
+    50	                 | "prependIf" "(" Int "," Bool ")"
+    51	                 | "returnValue"
+    52	
+    53	  // This rule is deliberately a checked lowering: its left-hand side is the
+    54	  // complete constructor tree emitted in solution.mpy.  Any source mutation
+    55	  // changes that tree and therefore cannot enter the verified transition
+    56	  // system below.
+    57	  rule <k>
+    58	    Module(
+    59	      FuncDef("count_up_to", Params("n"),
+    60	        Assign(Name("primes"), ListExpr(.Exprs))
+    61	        Assign(Name("candidate"), Int(2))
+    62	        While(Compare(Name("candidate"), CmpOp("<", Name("n"))),
+    63	          Assign(Name("is_prime"), Bool(true))
+    64	          Assign(Name("divisor"), Int(2))
+    65	          While(Compare(
+    66	            BinOp("*", Name("divisor"), Name("divisor")),
+    67	            CmpOp("<=", Name("candidate"))),
+    68	            If(Compare(
+    69	              BinOp("%", Name("candidate"), Name("divisor")),
+    70	              CmpOp("==", Int(0))),
+    71	              Assign(Name("is_prime"), Bool(false)) .Stmts,
+    72	              .Stmts)
+    73	            Assign(Name("divisor"),
+    74	              BinOp("+", Name("divisor"), Int(1))))
+    75	          If(Name("is_prime"),
+    76	            Assign(Name("primes"),
+    77	              BinOp("+", Name("primes"),
+    78	                ListExpr(Name("candidate"), .Exprs))) .Stmts,
+    79	            .Stmts)
+    80	          Assign(Name("candidate"),
+    81	            BinOp("+", Name("candidate"), Int(1))))
+    82	        Return(Name("primes"))))
+    83	    => scan(2, N) ~> returnValue
+    84	    ... </k>
+    85	    <n> N </n>
+    86	
+    87	  // candidate >= n: the result suffix is empty.
+    88	  rule <k> scan(C, N) => nil ... </k>
+    89	       requires C >=Int N
+    90	
+    91	  // candidate < n: test all divisors beginning at 2.
+    92	  rule <k> scan(C, N) => trial(C, 2, true, N) ... </k>
+    93	       requires C <Int N
+    94	
+    95	  // The divisor loop has passed sqrt(candidate).
+    96	  rule <k> trial(C, D, B, N)
+    97	        => scan(C +Int 1, N) ~> prependIf(C, B) ... </k>
+    98	       requires D *Int D >Int C
+    99	
+   100	  // A found divisor permanently clears the primality flag, just as the
+   101	  // Python assignment is_prime = False does.
+   102	  rule <k> trial(C, D, _B, N)
+   103	        => trial(C, D +Int 1, false, N) ... </k>
+   104	       requires D *Int D <=Int C
+   105	        andBool C %Int D ==Int 0
+   106	        andBool D =/=Int 0
+   107	
+   108	  // Otherwise advance to the next possible divisor.
+   109	  rule <k> trial(C, D, B, N)
+   110	        => trial(C, D +Int 1, B, N) ... </k>
+   111	       requires D *Int D <=Int C
+   112	        andBool C %Int D =/=Int 0
+   113	        andBool D =/=Int 0
+   114	
+   115	  rule <k> P:PList ~> prependIf(C, B) => chooseCons(B, C, P) ... </k>
+   116	
+   117	  rule <k> P:PList ~> returnValue => .K ... </k>
+   118	       <result> .K => P </result>
+   119	endmodule
+
+NUMBERED SOURCE: verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // noFactor(C,D) states that C has no divisor in the closed interval
+     7	  // [D, floor(sqrt(C))].  These three equations are disjoint and total for
+     8	  // C >= 2 and D >= 2, precisely the domain used by the implementation.
+     9	  syntax Bool ::= "noFactor" "(" Int "," Int ")" [function, total]
+    10	
+    11	  rule noFactor(C, D) => true
+    12	       requires D *Int D >Int C
+    13	
+    14	  rule noFactor(C, D) => false
+    15	       requires D *Int D <=Int C
+    16	        andBool C %Int D ==Int 0
+    17	        andBool D =/=Int 0
+    18	
+    19	  rule noFactor(C, D) => noFactor(C, D +Int 1)
+    20	       requires D *Int D <=Int C
+    21	        andBool C %Int D =/=Int 0
+    22	        andBool D =/=Int 0
+    23	
+    24	  // Mathematical prime predicate and the ascending list of all primes in
+    25	  // [C,N).  primesBelow(N) is the task's required result.
+    26	  syntax Bool ::= "isPrime" "(" Int ")" [function, total]
+    27	  rule isPrime(C) => false requires C <Int 2
+    28	  rule isPrime(C) => noFactor(C, 2) requires C >=Int 2
+    29	
+    30	  syntax PList ::= "primesFrom" "(" Int "," Int ")" [function, total]
+    31	                 | "primesBelow" "(" Int ")" [function, total]
+    32	
+    33	  rule primesFrom(C, N) => nil
+    34	       requires C >=Int N
+    35	
+    36	  rule primesFrom(C, N)
+    37	       => chooseCons(isPrime(C), C, primesFrom(C +Int 1, N))
+    38	       requires C <Int N
+    39	        andBool C >=Int 2
+    40	
+    41	  rule primesBelow(N) => primesFrom(2, N)
+    42	endmodule
+
+NUMBERED SOURCE: spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Inner-loop invariant: B records whether any already-visited divisor was
+     7	  // found; noFactor(C,D) describes exactly the unvisited suffix.
+     8	  claim [trial-correct]:
+     9	    <k> trial(C, D, B, N) ~> K
+    10	      => scan(C +Int 1, N)
+    11	         ~> prependIf(C, B andBool noFactor(C, D)) ~> K
+    12	    </k>
+    13	    requires C >=Int 2 andBool D >=Int 2
+    14	
+    15	  // Outer-loop invariant: scan(C,N) returns every and only prime in [C,N),
+    16	  // in increasing order.
+    17	  claim [scan-correct]:
+    18	    <k> scan(C, N) ~> K
+    19	      => primesFrom(C, N) ~> K
+    20	    </k>
+    21	    requires C >=Int 2
+    22	
+    23	  // End-to-end claim over every non-negative input.  The complete source AST
+    24	  // below is identical to solution.mpy; semantic.k only lowers this tree.
+    25	  claim [count-up-to-correct]:
+    26	    <k>
+    27	      Module(
+    28	        FuncDef("count_up_to", Params("n"),
+    29	          Assign(Name("primes"), ListExpr(.Exprs))
+    30	          Assign(Name("candidate"), Int(2))
+    31	          While(Compare(Name("candidate"), CmpOp("<", Name("n"))),
+    32	            Assign(Name("is_prime"), Bool(true))
+    33	            Assign(Name("divisor"), Int(2))
+    34	            While(Compare(
+    35	              BinOp("*", Name("divisor"), Name("divisor")),
+    36	              CmpOp("<=", Name("candidate"))),
+    37	              If(Compare(
+    38	                BinOp("%", Name("candidate"), Name("divisor")),
+    39	                CmpOp("==", Int(0))),
+    40	                Assign(Name("is_prime"), Bool(false)) .Stmts,
+    41	                .Stmts)
+    42	              Assign(Name("divisor"),
+    43	                BinOp("+", Name("divisor"), Int(1))))
+    44	            If(Name("is_prime"),
+    45	              Assign(Name("primes"),
+    46	                BinOp("+", Name("primes"),
+    47	                  ListExpr(Name("candidate"), .Exprs))) .Stmts,
+    48	              .Stmts)
+    49	            Assign(Name("candidate"),
+    50	              BinOp("+", Name("candidate"), Int(1))))
+    51	          Return(Name("primes"))))
+    52	      => .K
+    53	    </k>
+    54	    <n> N </n>
+    55	    <result> .K => primesBelow(N) </result>
+    56	    requires N >=Int 0
+    57	endmodule
+
+Declarations, configuration, rules, and claims
+rg: regex parse error:
+    (?:^[[:space:]]*(syntax|configuration|rule|claim)|\\[(function|total|functional|simplification|concrete|priority|owise|anywhere|macro|macro-rec|symbol|hook|trusted))
+                                                        ^
+error: unclosed character class
+
+Sensitive attribute scan
+function:
+/tmp/audit-work/96-count-up-to/verification.k:9:  syntax Bool ::= "noFactor" "(" Int "," Int ")" [function, total]
+/tmp/audit-work/96-count-up-to/verification.k:26:  syntax Bool ::= "isPrime" "(" Int ")" [function, total]
+/tmp/audit-work/96-count-up-to/verification.k:30:  syntax PList ::= "primesFrom" "(" Int "," Int ")" [function, total]
+/tmp/audit-work/96-count-up-to/verification.k:31:                 | "primesBelow" "(" Int ")" [function, total]
+/tmp/audit-work/96-count-up-to/semantic.k:36:                 | "chooseCons" "(" Bool "," Int "," PList ")" [function, total]
+total:
+/tmp/audit-work/96-count-up-to/verification.k:7:  // [D, floor(sqrt(C))].  These three equations are disjoint and total for
+/tmp/audit-work/96-count-up-to/verification.k:9:  syntax Bool ::= "noFactor" "(" Int "," Int ")" [function, total]
+/tmp/audit-work/96-count-up-to/verification.k:26:  syntax Bool ::= "isPrime" "(" Int ")" [function, total]
+/tmp/audit-work/96-count-up-to/verification.k:30:  syntax PList ::= "primesFrom" "(" Int "," Int ")" [function, total]
+/tmp/audit-work/96-count-up-to/verification.k:31:                 | "primesBelow" "(" Int ")" [function, total]
+/tmp/audit-work/96-count-up-to/semantic.k:36:                 | "chooseCons" "(" Bool "," Int "," PList ")" [function, total]
+functional:
+simplification:
+concrete:
+/tmp/audit-work/96-count-up-to/semantic.k:32:  // Runtime list values.  A non-associative representation keeps both concrete
+priority:
+opaque:
+anywhere:
+owise:
+macro:
+trusted:
+
+Constructors used in submitted solution.mpy
+rg: PCRE2: error compiling pattern at offset 32: missing closing parenthesis
+
+Literal operators and identifiers used in submitted solution.mpy
+"%"
+"*"
+"+"
+"<"
+"<="
+"=="
+"candidate"
+"count_up_to"
+"divisor"
+"is_prime"
+"n"
+"primes"
+EXIT_STATUS: 0
+END_UTC: 2026-07-23T16:48:37Z

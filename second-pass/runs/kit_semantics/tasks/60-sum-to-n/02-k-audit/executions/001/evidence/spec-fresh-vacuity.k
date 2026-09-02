@@ -1,0 +1,31 @@
+requires "verification.k"
+
+module SPEC-FRESH-VACUITY
+  imports VERIFICATION
+
+  // N=2 satisfies the positive entry domain. The real result is 3, not 4.
+  claim [false-ground-result]:
+    <k> Call(Name("sum_to_n"), Int(2)) => ?R:Int </k>
+    <env> 0 </env>
+    <scopes>
+      (0 |-> scope(
+         "sum_to_n" |-> closureVal(
+           "n", .ParamNames,
+           Assign(Name("total"), Int(0))
+           While(Compare(Name("n"), CmpOp(">", Int(0))),
+             AugAssign(Name("total"), "+", Name("n"))
+             AugAssign(Name("n"), "-", Int(1)))
+           Return(Name("total")),
+           0),
+         parent(-1))
+       -1 |-> builtinsScope)
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    ensures ?R ==Int 4
+endmodule

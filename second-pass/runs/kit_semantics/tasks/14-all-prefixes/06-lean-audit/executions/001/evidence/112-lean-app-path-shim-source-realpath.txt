@@ -1,0 +1,106 @@
+     1	#define _GNU_SOURCE
+     2	
+     3	#include <dlfcn.h>
+     4	#include <errno.h>
+     5	#include <stddef.h>
+     6	#include <stdlib.h>
+     7	#include <string.h>
+     8	#include <unistd.h>
+     9	
+    10	extern char *program_invocation_short_name;
+    11	
+    12	typedef ssize_t (*readlink_fn)(const char *, char *, size_t);
+    13	typedef char *(*realpath_fn)(const char *, char *);
+    14	
+    15	static const char toolchain_bin[] =
+    16	    "/opt/elan/toolchains/leanprover--lean4---v4.22.0/bin/";
+    17	
+    18	static size_t audit_app_path(char *buffer, size_t size) {
+    19	    size_t prefix_len = strlen(toolchain_bin);
+    20	    size_t name_len = strlen(program_invocation_short_name);
+    21	    size_t total = prefix_len + name_len;
+    22	
+    23	    if (size <= total) {
+    24	        errno = ENAMETOOLONG;
+    25	        return 0;
+    26	    }
+    27	    memcpy(buffer, toolchain_bin, prefix_len);
+    28	    memcpy(buffer + prefix_len, program_invocation_short_name, name_len);
+    29	    buffer[total] = '\0';
+    30	    return total;
+    31	}
+    32	
+    33	static int is_lean_application_path(const char *path) {
+    34	    return strcmp(path, "/proc/self/exe") == 0 &&
+    35	           program_invocation_short_name != NULL &&
+    36	           (strcmp(program_invocation_short_name, "lean") == 0 ||
+    37	            strcmp(program_invocation_short_name, "lake") == 0 ||
+    38	            strcmp(program_invocation_short_name, "leanc") == 0);
+    39	}
+    40	
+    41	ssize_t readlink(const char *path, char *buffer, size_t size) {
+    42	    static readlink_fn real_readlink = NULL;
+    43	
+    44	    if (real_readlink == NULL) {
+    45	        real_readlink = (readlink_fn)dlsym(RTLD_NEXT, "readlink");
+    46	    }
+    47	
+    48	    if (is_lean_application_path(path)) {
+    49	        char resolved[512];
+    50	        size_t total = audit_app_path(resolved, sizeof(resolved));
+    51	        if (total == 0 || size < total) {
+    52	            errno = ENAMETOOLONG;
+    53	            return -1;
+    54	        }
+    55	        memcpy(buffer, resolved, total);
+    56	        return (ssize_t)total;
+    57	    }
+    58	
+    59	    if (real_readlink == NULL) {
+    60	        errno = ENOSYS;
+    61	        return -1;
+    62	    }
+    63	    return real_readlink(path, buffer, size);
+    64	}
+    65	
+    66	char *realpath(const char *path, char *resolved) {
+    67	    static realpath_fn real_realpath = NULL;
+    68	
+    69	    if (real_realpath == NULL) {
+    70	        real_realpath = (realpath_fn)dlsym(RTLD_NEXT, "realpath");
+    71	    }
+    72	
+    73	    if (is_lean_application_path(path)) {
+    74	        char *output = resolved;
+    75	        if (output == NULL) {
+    76	            output = malloc(512);
+    77	            if (output == NULL) {
+    78	                errno = ENOMEM;
+    79	                return NULL;
+    80	            }
+    81	        }
+    82	        if (audit_app_path(output, 512) == 0) {
+    83	            if (resolved == NULL) {
+    84	                free(output);
+    85	            }
+    86	            return NULL;
+    87	        }
+    88	        return output;
+    89	    }
+    90	
+    91	    if (real_realpath == NULL) {
+    92	        errno = ENOSYS;
+    93	        return NULL;
+    94	    }
+    95	    return real_realpath(path, resolved);
+    96	}
+    97	
+    98	char *__realpath_chk(const char *path, char *resolved, size_t resolved_len) {
+    99	    if (is_lean_application_path(path)) {
+   100	        if (audit_app_path(resolved, resolved_len) == 0) {
+   101	            return NULL;
+   102	        }
+   103	        return resolved;
+   104	    }
+   105	    return realpath(path, resolved);
+   106	}

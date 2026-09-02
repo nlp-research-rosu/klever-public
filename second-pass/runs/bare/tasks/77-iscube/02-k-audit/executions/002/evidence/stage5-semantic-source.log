@@ -1,0 +1,104 @@
+COMMAND: nl -ba semantic.k
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports BOOL-SYNTAX
+     6	  imports STRING-SYNTAX
+     7	
+     8	  syntax Pgm ::= "Module" "(" Stmts ")"
+     9	
+    10	  // Statement lists are juxtaposed by py2mpy.py; the separator is empty.
+    11	  syntax Stmts ::= List{Stmt, ""}
+    12	
+    13	  syntax Params ::= "Params" "(" String ")"
+    14	
+    15	  syntax Expr ::= "Int" "(" Int ")"
+    16	                | "Name" "(" String ")"
+    17	                | "UnaryOp" "(" String "," Expr ")" [strict(2)]
+    18	                | "BinOp" "(" String "," Expr "," Expr ")" [strict(2,3)]
+    19	                | "Compare" "(" Expr "," CmpOp ")" [strict(1)]
+    20	
+    21	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    22	
+    23	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    24	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    25	                | "Assign" "(" Expr "," Expr ")"
+    26	                | "While" "(" Expr "," Stmts ")"
+    27	                | "Return" "(" Expr ")"
+    28	endmodule
+    29	
+    30	module MPY
+    31	  imports MPY-SYNTAX
+    32	  imports INT
+    33	  imports BOOL
+    34	  imports MAP
+    35	
+    36	  syntax Value ::= "IntVal" "(" Int ")"
+    37	                 | "BoolVal" "(" Bool ")"
+    38	  syntax KResult ::= Value
+    39	  syntax Expr ::= Value
+    40	
+    41	  syntax Function ::= "function" "(" String "," Stmts ")"
+    42	
+    43	  syntax KItem ::= "exec" "(" Stmts ")"
+    44	                 | "invoke" "(" Value ")"
+    45	                 | "assignTo" "(" String ")"
+    46	                 | "ifKont" "(" Stmts "," Stmts ")"
+    47	                 | "whileKont" "(" Expr "," Stmts ")"
+    48	                 | "compareKont" "(" String "," Int ")"
+    49	                 | "returnKont"
+    50	
+    51	  configuration
+    52	    <mpy>
+    53	      <k> $PGM:Pgm ~> invoke(IntVal($N:Int)) </k>
+    54	      <funs> .Map </funs>
+    55	      <env> .Map </env>
+    56	      <result> .K </result>
+    57	    </mpy>
+    58	
+    59	  // Module loading and the single-argument function call used by this task.
+    60	  rule Module(STMTS) => exec(STMTS)
+    61	  rule exec(.Stmts) => .K
+    62	  rule exec(S:Stmt REST:Stmts) => S ~> exec(REST)
+    63	
+    64	  rule <k> FuncDef(F, Params(P), BODY) => .K ...</k>
+    65	       <funs> .Map => F |-> function(P, BODY) </funs>
+    66	
+    67	  rule <k> invoke(IntVal(A)) => exec(BODY) ...</k>
+    68	       <funs> ... "iscube" |-> function(P, BODY) ...</funs>
+    69	       <env> .Map => P |-> IntVal(A) </env>
+    70	
+    71	  // Expression evaluation.  Strictness gives left-to-right evaluation for
+    72	  // unary and binary operators; comparisons explicitly evaluate their RHS.
+    73	  rule <k> Int(I) => IntVal(I) ...</k>
+    74	  rule <k> Name(X) => V ...</k>
+    75	       <env> ... X |-> V:Value ...</env>
+    76	
+    77	  rule UnaryOp("-", IntVal(I)) => IntVal(0 -Int I)
+    78	  rule BinOp("+", IntVal(I), IntVal(J)) => IntVal(I +Int J)
+    79	  rule BinOp("*", IntVal(I), IntVal(J)) => IntVal(I *Int J)
+    80	
+    81	  rule Compare(IntVal(I), CmpOp(OP, E)) => E ~> compareKont(OP, I)
+    82	
+    83	  rule IntVal(J) ~> compareKont("<", I) => BoolVal(I <Int J)
+    84	  rule IntVal(J) ~> compareKont("==", I) => BoolVal(I ==Int J)
+    85	
+    86	  // Statements and control flow.
+    87	  rule Assign(Name(X), E) => E ~> assignTo(X)
+    88	  rule <k> V:Value ~> assignTo(X) => .K ...</k>
+    89	       <env> RHO => RHO [ X <- V ] </env>
+    90	
+    91	  rule If(COND, THEN, ELSE) => COND ~> ifKont(THEN, ELSE)
+    92	  rule BoolVal(true)  ~> ifKont(THEN, _ELSE) => exec(THEN)
+    93	  rule BoolVal(false) ~> ifKont(_THEN, ELSE) => exec(ELSE)
+    94	
+    95	  rule While(COND, BODY) => COND ~> whileKont(COND, BODY)
+    96	  rule BoolVal(true)  ~> whileKont(COND, BODY) => exec(BODY) ~> While(COND, BODY)
+    97	  rule BoolVal(false) ~> whileKont(_COND, _BODY) => .K
+    98	
+    99	  rule Return(E) => E ~> returnKont
+   100	  rule <k> V:Value ~> returnKont ~> _REST => .K </k>
+   101	       <result> .K => V </result>
+   102	endmodule
+EXIT_STATUS: 0

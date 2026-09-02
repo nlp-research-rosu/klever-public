@@ -1,0 +1,555 @@
+Script started on 2026-07-31 07:44:16-05:00 [<not executed on terminal>]
+  791 /reference/tools/k_rule_inventory.py
+  709 /reference/tools/klean_preflight.py
+ 1088 /reference/tools/audit_contract.py
+ 2588 total
+#!/usr/bin/env python3
+"""Canonical lexical inventory of simplification rules in verification.k."""
+
+from __future__ import annotations
+
+import dataclasses
+import hashlib
+import json
+import re
+import stat
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+_MODULE_NAME_RE = re.compile(
+    r"^[ \t]+(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"(?:[ \t]+\[[^\]\r\n]*\])?[ \t]*$"
+)
+_TRAILING_ATTRIBUTES_RE = re.compile(
+    r"\[(?P<attributes>[^\[\]]*)\][ \t\r\n]*\Z", re.S
+)
+_CELL_TAG_RE = re.compile(
+    r"<(?P<close>/)?(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"[ \t]*(?P<self_close>/)?>"
+)
+_OUTER_SENTENCE_KEYWORDS = {
+    "imports",
+    "syntax",
+    "rule",
+    "configuration",
+    "context",
+    "claim",
+    "alias",
+}
+
+
+class KRuleInventoryError(RuntimeError):
+    """Raised when verification.k cannot produce a canonical inventory."""
+
+
+@dataclass(frozen=True)
+class KRule:
+    source_rule_id: str
+    module: str
+    start_line: int
+    end_line: int
+    normalized_sha256: str
+    attributes: list[str]
+    text: str
+
+
+@dataclass(frozen=True)
+class _Sentence:
+    keyword: str
+    start: int
+
+
+@dataclass(frozen=True)
+class _Module:
+    name: str
+    content_start: int
+    content_end: int
+    imports: tuple[str, ...]
+    sentences: tuple[_Sentence, ...]
+
+
+@dataclass(frozen=True)
+class _RuleSpan:
+    rule: KRule
+    start_offset: int
+    end_offset: int
+    attribute_start: int | None
+    attribute_end: int | None
+
+
+def canonical_json_sha256(document: Any) -> str:
+    encoded = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _mask_non_code(text: str) -> str:
+    """Mask comments and string bodies without changing source offsets."""
+
+    output = list(text)
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                state = "code"
+            else:
+                output[index] = " "
+            index += 1
+            continue
+        if state == "string":
+            if character == "\\" and following:
+                output[index] = " "
+                output[index + 1] = " "
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            elif character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                output[index] = output[index + 1] = " "
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                output[index] = output[index + 1] = " "
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output[index] = output[index + 1] = " "
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output[index] = output[index + 1] = " "
+            state = "block-comment"
+            block_depth = 1
+            index += 2
+            continue
+        if character == '"':
+            state = "string"
+        index += 1
+    return "".join(output)
+
+
+def _line_ranges(text: str, start: int = 0) -> list[tuple[int, int, int]]:
+    ranges: list[tuple[int, int, int]] = []
+    line_start = start
+    while line_start < len(text):
+        newline = text.find("\n", line_start)
+        next_start = len(text) if newline < 0 else newline + 1
+        line_end = len(text) if newline < 0 else newline
+        content_end = (
+            line_end - 1
+            if line_end > line_start and text[line_end - 1] == "\r"
+            else line_end
+        )
+        ranges.append((line_start, content_end, next_start))
+        if newline < 0:
+            break
+        line_start = next_start
+    return ranges
+
+
+def _line_heads(text: str) -> list[tuple[int, int, str, str]]:
+    """Return physical-line word heads without assigning K grammar meaning."""
+
+    heads: list[tuple[int, int, str, str]] = []
+    for line_start, content_end, _next_start in _line_ranges(text):
+        index = line_start
+        while index < content_end and text[index] in " \t":
+            index += 1
+        word_end = index
+        while word_end < content_end and (
+            text[word_end].isalnum() or text[word_end] in "_'"
+        ):
+            word_end += 1
+        if word_end > index:
+            heads.append(
+                (
+                    line_start,
+                    content_end,
+                    text[index:word_end],
+                    text[word_end:content_end],
+                )
+            )
+    return heads
+
+
+def _line_word(line: str) -> tuple[str, str, int]:
+    stripped = line.lstrip()
+    indent = len(line) - len(stripped)
+    word_end = 0
+    while word_end < len(stripped) and (
+        stripped[word_end].isalnum() or stripped[word_end] in "_'"
+    ):
+        word_end += 1
+    return stripped[:word_end], stripped[word_end:], indent + word_end
+
+
+def _rule_continuation(line: str) -> tuple[str, int] | None:
+    stripped = line.lstrip()
+    if stripped.startswith("["):
+        return "attributes", len(line) - len(stripped)
+    word, rest, word_end = _line_word(line)
+    for keyword in ("requires", "ensures"):
+        if word == keyword and (
+            not rest
+            or not (
+                rest[0].isalnum()
+                or rest[0] in "_'"
+            )
+        ):
+            return keyword, word_end
+    return None
+
+
+def _starts_outer_transition(line: str) -> bool:
+    keyword, rest, _word_end = _line_word(line)
+    separated = bool(rest) and rest[0] in " \t"
+    if keyword == "module":
+        return separated and _MODULE_NAME_RE.fullmatch(rest) is not None
+    if keyword == "endmodule":
+        return not rest.strip()
+    if keyword == "rule":
+        return not rest or separated
+    return keyword in _OUTER_SENTENCE_KEYWORDS and separated
+
+
+def _terminal_attribute_line(line: str) -> bool:
+    match = _TRAILING_ATTRIBUTES_RE.search(line)
+    if match is None:
+        return False
+    start = match.start()
+    return start == 0 or line[start - 1].isspace()
+
+
+def _scan_rule_delimiters(
+    line: str,
+    delimiters: list[str],
+) -> None:
+    closing = {")": "(", "]": "[", "}": "{"}
+    index = 0
+    while index < len(line):
+        if line[index] == "<":
+            cell = _CELL_TAG_RE.match(line, index)
+            if cell is not None:
+                marker = f"<{cell.group('name')}>"
+                if cell.group("close"):
+                    if delimiters and delimiters[-1] == marker:
+                        delimiters.pop()
+                elif not cell.group("self_close"):
+                    delimiters.append(marker)
+                index = cell.end()
+                continue
+        character = line[index]
+        if character in "([{":
+            delimiters.append(character)
+        elif character in closing:
+            if delimiters and delimiters[-1] == closing[character]:
+                delimiters.pop()
+        index += 1
+
+
+def _rule_bubble_end(masked_text: str, start: int) -> int:
+    """Find when an outer rule bubble returns control to outer parsing."""
+
+    seen_rewrite = False
+    clause_has_content = False
+    candidate_end: int | None = None
+    delimiters: list[str] = []
+    ranges = _line_ranges(masked_text, start)
+    for line_start, line_end, next_start in ranges:
+        line = masked_text[line_start:line_end]
+        if not line.strip():
+            continue
+
+        continuation = (
+            _rule_continuation(line)
+            if seen_rewrite and candidate_end is not None
+            else None
+        )
+        if candidate_end is not None:
+            if continuation is None and _starts_outer_transition(line):
+                return candidate_end
+            candidate_end = None
+
+        content_start = 0
+        if continuation is not None:
+            kind, content_start = continuation
+            if kind in {"requires", "ensures"}:
+                clause_has_content = False
+
+        if not seen_rewrite:
+            rewrite = line.find("=>")
+            if rewrite >= 0:
+                seen_rewrite = True
+                content_start = rewrite + 2
+            else:
+                content_start = len(line)
+
+        _scan_rule_delimiters(line, delimiters)
+        if seen_rewrite and line[content_start:].strip():
+            clause_has_content = True
+
+        if (
+            seen_rewrite
+            and clause_has_content
+            and not delimiters
+            and _terminal_attribute_line(line)
+        ):
+            return next_start
+        if seen_rewrite and clause_has_content and not delimiters:
+            candidate_end = next_start
+    if candidate_end is not None:
+        return candidate_end
+    return len(masked_text) + 1
+
+
+def _modules(masked_text: str) -> tuple[_Module, ...]:
+    modules: list[_Module] = []
+    open_module: tuple[
+        str, int, list[str], list[_Sentence]
+    ] | None = None
+    open_rule_until = 0
+    for line_start, line_end, keyword, rest in _line_heads(masked_text):
+        if line_start < open_rule_until:
+            continue
+        open_rule_until = 0
+        separated = bool(rest) and rest[0] in " \t"
+        if keyword == "module":
+            if not separated:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            named = _MODULE_NAME_RE.fullmatch(rest)
+            if named is None or open_module is not None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            open_module = (named.group("name"), line_end, [], [])
+            continue
+        if keyword == "endmodule":
+            if rest.strip():
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            if open_module is None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            name, content_start, imports, sentences = open_module
+            modules.append(
+                _Module(
+                    name=name,
+                    content_start=content_start,
+                    content_end=line_start,
+                    imports=tuple(imports),
+                    sentences=tuple(sentences),
+                )
+            )
+            open_module = None
+            continue
+        if open_module is not None and keyword == "rule":
+            open_module[3].append(
+                _Sentence(keyword=keyword, start=line_start)
+            )
+            open_rule_until = _rule_bubble_end(masked_text, line_start)
+            continue
+        if open_module is not None and keyword == "imports" and separated:
+            imported = rest.strip().split()
+            if len(imported) != 1:
+                raise KRuleInventoryError(
+                    "verification.k has malformed imports"
+                )
+            open_module[2].append(imported[0])
+        if (
+            open_module is not None
+            and keyword in _OUTER_SENTENCE_KEYWORDS
+            and separated
+        ):
+            open_module[3].append(
+                _Sentence(keyword=keyword, start=line_start)
+            )
+    if not modules or open_module is not None:
+        raise KRuleInventoryError(
+            "verification.k has malformed module boundaries"
+        )
+    return tuple(modules)
+
+
+def _verification_module(
+    modules: tuple[_Module, ...], selected_name: str | None = None
+) -> _Module:
+    if selected_name is not None:
+        selected = [module for module in modules if module.name == selected_name]
+        if len(selected) != 1:
+            raise KRuleInventoryError(
+                "prove.sh selects an unknown verification main module: "
+                + selected_name
+            )
+        return selected[0]
+    candidates = [
+        module
+        for module in modules
+        if module.name.endswith("VERIFICATION")
+        and not module.name.endswith("-SYNTAX")
+    ]
+    if len(candidates) != 1:
+        raise KRuleInventoryError(
+            "verification.k must contain exactly one verification module"
+        )
+    return candidates[0]
+
+
+def _last_verification_main_module(workspace: Path) -> str | None:
+
+PREFLIGHT_API
+/reference/tools/audit_contract.py
+6:import argparse
+7:import hashlib
+120:    digest = hashlib.sha256()
+126:        raise AuditContractError(f"cannot hash regular file {path}: {error}") from error
+130:def _optional_regular_file_hash(path: Path) -> str | None:
+181:            f"tree file changed size while hashing: {path} "
+212:    digest = hashlib.sha256()
+233:def _optional_tree_hash(root: Path) -> str | None:
+246:def legacy_content_tree_hash(root: Path) -> str:
+247:    """Reproduce the schema-v1 seed-tree hash used by imported runs."""
+250:    digest = hashlib.sha256()
+302:def _manifest_input_hash(manifest: dict[str, Any], name: str) -> object:
+309:def build_resolution_and_hashes(
+323:    candidate_prompt_hash = _optional_regular_file_hash(candidate / "prompt.py")
+324:    candidate_translator_hash = _optional_regular_file_hash(candidate / "py2mpy.py")
+325:    candidate_semantics_hash = _optional_tree_hash(candidate / "reference-semantics")
+326:    trusted_prompt_hash = sha256_file(prompt)
+327:    trusted_translator_hash = sha256_file(translator)
+328:    trusted_semantics_hash = sha256_tree(semantics) if semantics is not None else None
+330:    hashes = {
+331:        "candidate_tree_sha256": sha256_tree(candidate),
+334:        "trusted_prompt_sha256": trusted_prompt_hash,
+335:        "candidate_prompt_sha256": candidate_prompt_hash,
+336:        "trusted_translator_sha256": trusted_translator_hash,
+337:        "candidate_translator_sha256": candidate_translator_hash,
+338:        "trusted_reference_semantics_sha256": trusted_semantics_hash,
+339:        "candidate_reference_semantics_sha256": candidate_semantics_hash,
+352:        "candidate_prompt_matches_trusted": candidate_prompt_hash == trusted_prompt_hash,
+354:            candidate_translator_hash == trusted_translator_hash
+357:            candidate_semantics_hash == trusted_semantics_hash
+361:        "manifest_prompt_hash_matches_trusted": (
+362:            _manifest_input_hash(manifest, "problem_prompt_sha256")
+363:            == trusted_prompt_hash
+365:        "manifest_translator_hash_matches_trusted": (
+366:            _manifest_input_hash(manifest, "translator_sha256")
+367:            == trusted_translator_hash
+369:        "manifest_reference_semantics_hash_matches_trusted": (
+370:            _manifest_input_hash(manifest, "reference_semantics_sha256")
+371:            == trusted_semantics_hash
+396:        "hashes": hashes,
+430:    resolution = build_resolution_and_hashes(
+504:    fixes); each task manifest records the tree hash of the version its
+517:            "task manifest does not record its reference-semantics hash"
+528:            "task's recorded reference-semantics hash is not a registered "
+580:    expected_workspace_hash = (
+605:    candidate_hash = pipeline_contract.sha256_tree(workspace)
+606:    if expected_workspace_hash != candidate_hash:
+654:    resolution = build_resolution_and_hashes(
+669:        manifest_semantics_hash = pipeline_contract.sha256_tree(semantics)
+670:        accepted_manifest_hashes = {manifest_semantics_hash}
+672:            legacy_semantics_hash = legacy_content_tree_hash(semantics)
+673:            resolution["hashes"][
+675:            ] = legacy_semantics_hash
+676:            accepted_manifest_hashes.add(legacy_semantics_hash)
+677:        resolution["hashes"][
+679:        ] = manifest_semantics_hash
+681:            "manifest_reference_semantics_hash_matches_trusted"
+683:            _manifest_input_hash(manifest, "reference_semantics_sha256")
+684:            in accepted_manifest_hashes
+692:    resolution["hashes"].update(
+706:        resolution["hashes"]["generation_runtime_metrics_sha256"] = sha256_file(
+710:        resolution["hashes"]["generation_usage_sha256"] = sha256_file(
+830:        current_hash = pipeline_contract.sha256_tree(execution)
+833:    if current_hash != selected.get("artifact_sha256"):
+855:        "selected_artifact_sha256": current_hash,
+963:def _resolve_command(args: argparse.Namespace) -> int:
+974:def _resolve_stage2_command(args: argparse.Namespace) -> int:
+987:def _prepare_stage2_command(args: argparse.Namespace) -> int:
+1002:def _eligibility_command(args: argparse.Namespace) -> int:
+1015:def _verdict_command(args: argparse.Namespace) -> int:
+1045:def build_parser() -> argparse.ArgumentParser:
+1046:    parser = argparse.ArgumentParser(description=__doc__)
+1082:def main(argv: list[str] | None = None) -> int:
+
+/reference/tools/klean_preflight.py
+6:import argparse
+7:import hashlib
+43:    generated_tree_sha256: str
+57:                hashlib.sha256(
+75:            stage3_discovery_manifest_sha256=hashlib.sha256(
+78:            generated_tree_sha256=klean_export.tree_digest(generated),
+108:    if current.generated_tree_sha256 != expected.generated_tree_sha256:
+228:    discovery_hash = hashlib.sha256(discovery_manifest.read_bytes()).hexdigest()
+233:            "Stage 1/Stage 3 inventory hash changed after deterministic export"
+236:        validated, discovery_hash
+242:    if input_manifest.get("verification_sha256") != hashlib.sha256(
+245:        raise KleanPreflightError("verification.k hash changed after export")
+272:            raise KleanPreflightError("generated Lean conjunct hash changed")
+305:    if generator_manifest.get("obligation_map_sha256") != hashlib.sha256(
+308:        raise KleanPreflightError("generated obligation map hash changed")
+389:def check_generation(
+434:    input_hash = snapshot.stage1_workspace_sha256
+435:    discovery_hash = snapshot.stage3_discovery_manifest_sha256
+436:    generated_hash = snapshot.generated_tree_sha256
+437:    sidecar_hashes = dict(snapshot.sidecar_sha256)
+442:    if input_manifest.get("frozen_input_sha256") != input_hash:
+443:        raise KleanPreflightError("frozen Stage 1 input hash changed")
+444:    if input_manifest.get("stage1_workspace_sha256") != input_hash:
+445:        raise KleanPreflightError("Stage 1 workspace hash changed")
+448:        != discovery_hash
+451:            "validated Stage 3 discovery manifest hash changed"
+453:    if generator_manifest.get("generated_tree_sha256") != generated_hash:
+454:        raise KleanPreflightError("generated project hash changed")
+460:    if provenance.get("stage1_workspace_sha256") != input_hash:
+464:    if provenance.get("stage3_discovery_manifest_sha256") != discovery_hash:
+549:        "frozen_input_sha256": input_hash,
+550:        "stage3_discovery_manifest_sha256": discovery_hash,
+551:        "generated_tree_sha256": generated_hash,
+552:        "trust_inventory_sha256": sidecar_hashes[
+556:    for field, expected_hash in export_bindings.items():
+557:        if export_result.get(field) != expected_hash:
+559:                "trust inventory hash"
+577:                    "output_sha256": hashlib.sha256(output.encode()).hexdigest(),
+591:        "frozen_input_sha256": input_hash,
+592:        "stage1_workspace_sha256": input_hash,
+593:        "stage3_discovery_manifest_sha256": discovery_hash,
+594:        "generated_tree_sha256": generated_hash,
+620:            stage1_hash = klean_export.tree_digest(frozen_input)
+622:            stage1_hash = None
+624:            stage3_hash = hashlib.sha256(
+628:            stage3_hash = None
+633:            "stage1_workspace_sha256": stage1_hash,
+634:            "stage3_discovery_manifest_sha256": stage3_hash,
+679:def main(argv: list[str] | None = None) -> int:
+680:    parser = argparse.ArgumentParser(description=__doc__)
+
+Script done on 2026-07-31 07:44:16-05:00 [COMMAND_EXIT_CODE="0"]

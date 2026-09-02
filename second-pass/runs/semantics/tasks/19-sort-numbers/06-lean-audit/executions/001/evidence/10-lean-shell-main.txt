@@ -1,0 +1,106 @@
+@[export lean_shell_main]
+private def shellMain
+    (args : List String)
+    (useStdin : Bool := false)
+    (onlyDeps : Bool := false)
+    (onlySrcDeps : Bool := false)
+    (depsJson : Bool := false)
+    (opts : Options := {})
+    (trustLevel : UInt32 := 0)
+    (rootDir? : Option System.FilePath := none)
+    (setupFileName? : Option System.FilePath := none)
+    (oleanFileName? : Option System.FilePath := none)
+    (ileanFileName? : Option System.FilePath := none)
+    (cFileName? : Option System.FilePath := none)
+    (bcFileName? : Option System.FilePath := none)
+    (jsonOutput : Bool := false)
+    (errorOnKinds : Array Name := #[])
+    (printStats : Bool := false)
+    (run : Bool := false)
+    : IO UInt32 := do
+  if onlyDeps && depsJson then
+    let fns ←
+      if useStdin then
+        (← IO.getStdin).lines
+      else
+        pure args.toArray
+    printImportsJson fns
+    return 0
+  let (fileName?, args) :=
+    match args with
+    | fileName :: args => (some fileName, args)
+    | [] => (none, args)
+  if !run && !args.isEmpty then
+    IO.eprintln "Expected exactly one file name"
+    displayHelp (useStderr := true)
+    return 1
+  let fileName ←
+    if let some fileName := fileName? then
+      pure fileName
+    else if useStdin then
+      pure "<stdin>"
+    else
+      IO.eprintln "Expected exactly one file name"
+      displayHelp (useStderr := true)
+      return 1
+  let contents ← decodeLossyUTF8 <$> do
+    if useStdin then
+      (← IO.getStdin).readBinToEnd
+    else
+      IO.FS.readBinFile fileName
+  if onlyDeps then
+    Elab.printImports contents fileName
+    return 0
+  if onlySrcDeps then
+    Elab.printImportSrcs contents fileName
+    return 0
+  -- Quick and dirty `#lang` support
+  ---TODO: make it extensible, and add `lean4md`
+  let contents ←
+    if contents.startsWith "#lang" then
+      let endLinePos := contents.posOf '\n'
+      let langId := contents.extract ⟨6⟩ endLinePos |>.trim
+      if langId == "lean4" then
+        pure () -- do nothing for now
+      else
+        IO.eprintln s!"unknown language '{langId}'\n";
+        return 1
+      -- Remove up to `\n`
+      pure <| contents.extract endLinePos contents.endPos
+    else
+      pure contents
+  let setup? ← setupFileName?.mapM ModuleSetup.load
+  let mainModuleName ←
+    if let some setup := setup? then
+      pure setup.name
+    else if let some fileName := fileName? then
+      try moduleNameOfFileName fileName rootDir? catch e =>
+        if oleanFileName?.isNone && ileanFileName?.isNone then
+          pure `_stdin
+        else
+          throw e
+    else
+      pure `_stdin
+  let env? ← Elab.runFrontend contents opts fileName mainModuleName trustLevel
+      oleanFileName? ileanFileName? jsonOutput errorOnKinds #[] printStats setup?
+  if let some env := env? then
+    if run then
+      return ← runMain env opts args
+    if let some c := cFileName? then
+      let .ok out ← IO.FS.Handle.mk c .write |>.toBaseIO
+        | IO.eprintln s!"failed to create '{c}'"
+          return 1
+      profileitIO "C code generation" opts do
+        let data ← IO.ofExcept <| IR.emitC env mainModuleName
+        out.write data.toUTF8
+    if let some bc := bcFileName? then
+      initLLVM
+      profileitIO "LLVM code generation" opts do
+        emitLLVM env mainModuleName bc
+  displayCumulativeProfilingTimes
+  if Internal.hasAddressSanitizer () then
+    return if env?.isSome then 0 else 1
+  else
+    -- When not using the address/leak sanitizer, we interrupt execution without garbage collecting.
+    -- This is useful when profiling improvements to Lean startup time.
+    IO.Process.exit <| if env?.isSome then 0 else 1

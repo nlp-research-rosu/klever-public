@@ -1,0 +1,6 @@
+# solution.py — canonical verbatim minus the docstring (the double sort with
+# the ones-count-of-bin lambda key).
+
+
+def sort_array(arr):
+    return sorted(sorted(arr), key=lambda x: bin(x)[2:].count('1'))

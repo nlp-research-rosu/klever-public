@@ -1,0 +1,238 @@
+verification.k:
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION-SYNTAX
+     4	  imports MPY-SYNTAX
+     5	
+     6	  syntax Stmts ::= "filterLoopBody" [macro]
+     7	  syntax Stmts ::= "filterBody" [macro]
+     8	
+     9	endmodule
+    10	
+    11	module VERIFICATION
+    12	  imports MPY
+    13	  imports VERIFICATION-SYNTAX
+    14	
+    15	  syntax ValSeq ::= filterAcc(ValSeq, ValSeq) [function, total]
+    16	
+    17	  rule filterLoopBody
+    18	    => If(
+    19	         Call(
+    20	           Name("isinstance"),
+    21	           (Name("value"), Name("int"), .Exprs)),
+    22	         (Expr(
+    23	            Call(
+    24	              Attribute(Name("result"), "append"),
+    25	              (Name("value"), .Exprs)))
+    26	          .Stmts),
+    27	         .Stmts)
+    28	
+    29	  rule filterBody
+    30	    => (Expr(
+    31	          Str("Filter a list to the values that are instances of ``int``."))
+    32	        Assign(Name("result"), ListExpr(.Exprs))
+    33	        For(Name("value"), Name("values"), filterLoopBody)
+    34	        Return(Name("result"))
+    35	        .Stmts)
+    36	
+    37	  // Dynamic-sort dispatch twin for the fixed isIntV equations:
+    38	  // Int -> true, Bool -> true, and every other Val constructor -> false.
+    39	  rule isIntV(V:Val) => isInt(V) orBool isBool(V) [simplification]
+    40	
+    41	  // Tail-recursive mathematical filter with an explicit running accumulator.
+    42	  rule filterAcc(.ValSeq, ACC:ValSeq) => ACC
+    43	  rule filterAcc(vCons(V:Val, REST:ValSeq), ACC:ValSeq)
+    44	    => #if isIntV(V)
+    45	       #then filterAcc(
+    46	               REST,
+    47	               valSeqConcat(ACC, vCons(V, .ValSeq)))
+    48	       #else filterAcc(REST, ACC)
+    49	       #fi
+    50	endmodule
+spec.k:
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [filter-loop]:
+     7	    <k>
+     8	      #loop(list(REST:ValSeq), Name("value"), filterLoopBody)
+     9	      ~> (Return(Name("result")) .Stmts)
+    10	      ~> #endcall
+    11	      => ref(0)
+    12	    </k>
+    13	    <env> 1 => 0 </env>
+    14	    <scopes>
+    15	      -1 |-> builtinsScope
+    16	      0 |-> scope(
+    17	        "filter_integers" |->
+    18	          closureVal(("values", .ParamNames), filterBody, 0),
+    19	        parent(-1))
+    20	      1 |-> scope(
+    21	        "values" |-> list(ORIGINAL:ValSeq)
+    22	        "result" |-> ref(0)
+    23	        "value" |-> OLD:Val,
+    24	        parent(0))
+    25	      =>
+    26	      -1 |-> builtinsScope
+    27	      0 |-> scope(
+    28	        "filter_integers" |->
+    29	          closureVal(("values", .ParamNames), filterBody, 0),
+    30	        parent(-1))
+    31	    </scopes>
+    32	    <scopeLoc> 2 => 1 </scopeLoc>
+    33	    <heap>
+    34	      0 |-> list(ACC:ValSeq)
+    35	      =>
+    36	      0 |-> list(filterAcc(REST, ACC))
+    37	    </heap>
+    38	    <heapLoc> 1 </heapLoc>
+    39	    <stack>
+    40	      ListItem(frame(.K, 0, 1))
+    41	      =>
+    42	      .List
+    43	    </stack>
+    44	    <ret> noRet </ret>
+    45	    <exc> NoExc </exc>
+    46	    <exit-code> 0 </exit-code>
+    47	
+    48	  claim [filter-entry]:
+    49	    <k>
+    50	      Call(
+    51	        Name("filter_integers"),
+    52	        (list(INPUT:ValSeq), .Exprs))
+    53	      =>
+    54	      ref(0)
+    55	    </k>
+    56	    <env> 0 </env>
+    57	    <scopes>
+    58	      -1 |-> builtinsScope
+    59	      0 |-> scope(
+    60	        "filter_integers" |->
+    61	          closureVal(("values", .ParamNames), filterBody, 0),
+    62	        parent(-1))
+    63	    </scopes>
+    64	    <scopeLoc> 1 </scopeLoc>
+    65	    <heap>
+    66	      .Map
+    67	      =>
+    68	      0 |-> list(filterAcc(INPUT, .ValSeq))
+    69	    </heap>
+    70	    <heapLoc> 0 => 1 </heapLoc>
+    71	    <stack> .List </stack>
+    72	    <ret> noRet </ret>
+    73	    <exc> NoExc </exc>
+    74	    <exit-code> 0 </exit-code>
+    75	endmodule
+solution.py:
+     1	from typing import List, Any
+     2	
+     3	
+     4	def filter_integers(values: List[Any]) -> List[int]:
+     5	    """Filter a list to the values that are instances of ``int``."""
+     6	    result = []
+     7	    for value in values:
+     8	        if isinstance(value, int):
+     9	            result.append(value)
+    10	    return result
+solution.mpy:
+     1	Module(
+     2	  ImportFrom("typing", "List", "Any")
+     3	  FuncDef("filter_integers", Params("values"),
+     4	    Expr(
+     5	      Str("Filter a list to the values that are instances of ``int``."))
+     6	    Assign(Name("result"), ListExpr())
+     7	    For(Name("value"), Name("values"),
+     8	      If(Call(Name("isinstance"), Name("value"), Name("int")),
+     9	        Expr(Call(Attribute(Name("result"), "append"), Name("value"))),
+    10	        ))
+    11	    Return(Name("result"))))
+prove.sh:
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	cd "$(dirname "$0")"
+     5	
+     6	python3 py2mpy.py solution.py > solution.mpy
+     7	python3 py2mpy.py concrete-tests.py > concrete-tests.mpy
+     8	python3 differential-test.py
+     9	
+    10	kompile reference-semantics/semantics.k \
+    11	  --backend llvm \
+    12	  --main-module MPY-KRUN \
+    13	  --syntax-module MPY-SYNTAX \
+    14	  --output-definition runtime-kompiled
+    15	
+    16	krun concrete-tests.mpy --definition runtime-kompiled \
+    17	  | tee concrete-tests.krun.out
+    18	rg -U '<k>\s*\.K\s*</k>' concrete-tests.krun.out
+    19	rg -U '<exc>\s*NoExc\s*</exc>' concrete-tests.krun.out
+    20	rg -U '<exit-code>\s*0\s*</exit-code>' concrete-tests.krun.out
+    21	
+    22	kompile --backend haskell verification.k \
+    23	  --main-module VERIFICATION \
+    24	  --syntax-module MPY-SYNTAX \
+    25	  --output-definition verification-kompiled
+    26	
+    27	kprove spec.k \
+    28	  --definition verification-kompiled \
+    29	  --spec-module SPEC \
+    30	  | tee target.kprove.out
+    31	rg '^#Top$' target.kprove.out
+    32	
+    33	if kprove spec-vacuity.k \
+    34	     --definition verification-kompiled \
+    35	     --spec-module SPEC-VACUITY \
+    36	     > spec-vacuity.kprove.out 2>&1
+    37	then
+    38	  echo "ERROR: false-result mutation unexpectedly proved" >&2
+    39	  exit 1
+    40	else
+    41	  mutation_status=$?
+    42	  cat spec-vacuity.kprove.out
+    43	  rg 'WarnStuckClaimState' spec-vacuity.kprove.out
+    44	  echo "false-result mutation: expected exit ${mutation_status}"
+    45	fi
+    46	
+    47	if kprove spec-body-mutation.k \
+    48	     --definition verification-kompiled \
+    49	     --spec-module SPEC-BODY-MUTATION \
+    50	     > spec-body-mutation.kprove.out 2>&1
+    51	then
+    52	  echo "ERROR: body mutation unexpectedly proved" >&2
+    53	  exit 1
+    54	else
+    55	  mutation_status=$?
+    56	  cat spec-body-mutation.kprove.out
+    57	  rg 'WarnStuckClaimState' spec-body-mutation.kprove.out
+    58	  echo "body mutation: expected exit ${mutation_status}"
+    59	fi
+    60	
+    61	if kprove spec-classifier-mutation.k \
+    62	     --definition verification-kompiled \
+    63	     --spec-module SPEC-CLASSIFIER-MUTATION \
+    64	     > spec-classifier-mutation.kprove.out 2>&1
+    65	then
+    66	  echo "ERROR: integer-discarded mutation unexpectedly proved" >&2
+    67	  exit 1
+    68	else
+    69	  mutation_status=$?
+    70	  cat spec-classifier-mutation.kprove.out
+    71	  rg 'WarnStuckClaimState' spec-classifier-mutation.kprove.out
+    72	  echo "integer-discarded mutation: expected exit ${mutation_status}"
+    73	fi
+    74	
+    75	if kprove spec-noninteger-mutation.k \
+    76	     --definition verification-kompiled \
+    77	     --spec-module SPEC-NONINTEGER-MUTATION \
+    78	     > spec-noninteger-mutation.kprove.out 2>&1
+    79	then
+    80	  echo "ERROR: string-retained mutation unexpectedly proved" >&2
+    81	  exit 1
+    82	else
+    83	  mutation_status=$?
+    84	  cat spec-noninteger-mutation.kprove.out
+    85	  rg 'WarnStuckClaimState' spec-noninteger-mutation.kprove.out
+    86	  echo "string-retained mutation: expected exit ${mutation_status}"
+    87	fi

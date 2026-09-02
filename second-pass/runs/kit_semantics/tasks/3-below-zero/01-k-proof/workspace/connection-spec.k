@@ -1,0 +1,110 @@
+requires "verification-base.k"
+
+module CONNECTION-SPEC
+  imports VERIFICATION-BASE
+
+  // First segment of the exact call connection: fixed MPY lookup, argument
+  // evaluation, parameter binding, local initialization, and For-to-#loop.
+  claim [call-prefix-connection]:
+    <k>
+      Call(Name("below_zero"), list(INPUT:ValSeq))
+      =>
+      For(Name("operation"), list(INPUT),
+        AugAssign(Name("balance"), "+", Name("operation"))
+        If(Compare(Name("balance"), CmpOp("<", Int(0))),
+          Return(Bool(true)), .Stmts))
+      ~> Return(Bool(false)) .Stmts ~> #endcall
+    </k>
+    <env> 0 => 1 </env>
+    <scopes>
+      0 |-> scope(
+        "below_zero" |-> closureVal(
+          "operations", .ParamNames,
+          Assign(Name("balance"), Int(0))
+          Assign(Name("operation"), Int(0))
+          For(Name("operation"), Name("operations"),
+            AugAssign(Name("balance"), "+", Name("operation"))
+            If(Compare(Name("balance"), CmpOp("<", Int(0))),
+              Return(Bool(true)), .Stmts))
+          Return(Bool(false)),
+          0),
+        parent(-1))
+      -1 |-> BUILTINS:Scope
+      =>
+      1 |-> scope(
+        "operations" |-> list(INPUT)
+        "balance" |-> 0
+        "operation" |-> 0,
+        parent(0))
+      0 |-> scope(
+        "below_zero" |-> closureVal(
+          "operations", .ParamNames,
+          Assign(Name("balance"), Int(0))
+          Assign(Name("operation"), Int(0))
+          For(Name("operation"), Name("operations"),
+            AugAssign(Name("balance"), "+", Name("operation"))
+            If(Compare(Name("balance"), CmpOp("<", Int(0))),
+              Return(Bool(true)), .Stmts))
+          Return(Bool(false)),
+          0),
+        parent(-1))
+      -1 |-> BUILTINS
+    </scopes>
+    <scopeLoc> 1 => 2 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List => ListItem(frame(.K, 0, 1)) </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    requires allInts(INPUT)
+
+  // Fixed one-step lowering of the already-evaluated For node.
+  claim [for-to-loop-connection]:
+    <k>
+      For(Name("operation"), list(VS:ValSeq),
+        AugAssign(Name("balance"), "+", Name("operation"))
+        If(Compare(Name("balance"), CmpOp("<", Int(0))),
+          Return(Bool(true)), .Stmts))
+      ~> Return(Bool(false)) .Stmts ~> #endcall
+      =>
+      #loop(list(VS), Name("operation"),
+        AugAssign(Name("balance"), "+", Name("operation"))
+        If(Compare(Name("balance"), CmpOp("<", Int(0))),
+          Return(Bool(true)), .Stmts))
+      ~> Return(Bool(false)) .Stmts ~> #endcall
+    </k>
+
+  // Second segment: the loop, early return, and frame pop execute under the
+  // supplied semantics for every finite integer sequence.
+  claim [loop-connection]:
+    <k>
+      #loop(list(VS:ValSeq), Name("operation"),
+        AugAssign(Name("balance"), "+", Name("operation"))
+        If(Compare(Name("balance"), CmpOp("<", Int(0))),
+          Return(Bool(true)), .Stmts))
+      ~> Return(Bool(false)) .Stmts ~> #endcall
+      => belowFrom(BALANCE, VS)
+    </k>
+    <env> 1 => 0 </env>
+    <scopes>
+      1 |-> scope(
+        "operations" |-> list(ORIGINAL:ValSeq)
+        "balance" |-> BALANCE:Int
+        "operation" |-> OLD:Val,
+        parent(0))
+      0 |-> MODULE:Scope
+      -1 |-> BUILTINS:Scope
+      =>
+      0 |-> MODULE
+      -1 |-> BUILTINS
+    </scopes>
+    <scopeLoc> 2 => 1 </scopeLoc>
+    <heap> HEAP:Map </heap>
+    <heapLoc> NEXT:Int </heapLoc>
+    <stack> ListItem(frame(.K, 0, 1)) => .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    requires allInts(VS)
+endmodule

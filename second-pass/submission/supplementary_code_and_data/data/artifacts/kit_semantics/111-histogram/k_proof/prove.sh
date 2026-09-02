@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+python3 py2mpy.py solution.py > solution.mpy
+diff -u solution.mpy <(python3 py2mpy.py solution.py)
+python3 concrete_tests.py
+python3 differential_test.py
+
+kompile reference-semantics/semantics.k \
+  --backend llvm \
+  --main-module MPY-KRUN \
+  --syntax-module MPY-SYNTAX \
+  --output-definition runtime-kompiled
+krun concrete_tests.mpy --definition runtime-kompiled
+
+kompile verification.k \
+  --backend haskell \
+  --main-module VERIFICATION \
+  --syntax-module VERIFICATION \
+  --output-definition verification-kompiled
+kprove spec.k \
+  --definition verification-kompiled \
+  --spec-module SPEC \
+  --claims SPEC.first-count-loop
+kprove spec.k \
+  --definition verification-kompiled \
+  --spec-module SPEC \
+  --claims SPEC.second-count-loop
+kprove spec.k \
+  --definition verification-kompiled \
+  --spec-module SPEC
+
+if kprove spec-vacuity.k \
+     --definition verification-kompiled \
+     --spec-module SPEC-VACUITY; then
+  echo "ERROR: false-result mutation unexpectedly proved" >&2
+  exit 1
+else
+  echo "EXPECTED FAILURE: false-result mutation was rejected"
+fi
+
+if krun body_mutation_tests.mpy --definition runtime-kompiled; then
+  echo "ERROR: body mutation unexpectedly passed its assertion" >&2
+  exit 1
+else
+  echo "EXPECTED FAILURE: body mutation changed the result"
+fi

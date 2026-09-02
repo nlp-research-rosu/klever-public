@@ -1,0 +1,276 @@
+Script started on 2026-07-27 23:34:33-05:00 [<not executed on terminal>]
+    )
+
+
+def _patch_lake_build_directory(package: Path) -> None:
+    lakefile = package / "lakefile.toml"
+    if not lakefile.is_file() or lakefile.is_symlink():
+        raise KleanExportError("generated package is missing regular lakefile.toml")
+    text = lakefile.read_text()
+    build_setting = 'buildDir = "/tmp/klean-generated-build"\n'
+    stack_setting = (
+        'moreLeanArgs = ["-D maxRecDepth=100000", "-s", "65536"]\n'
+    )
+    if build_setting in text and stack_setting in text:
+        return
+    setting = ""
+    if build_setting not in text:
+        setting += build_setting
+    if stack_setting not in text:
+        setting += stack_setting
+    marker = "[[lean_lib]]"
+    if marker in text:
+        text = text.replace(marker, setting + "\n" + marker, 1)
+    else:
+        text = text.rstrip() + "\n" + setting
+    lakefile.write_text(text)
+
+
+def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+    if not root.is_dir() or root.is_symlink():
+        raise KleanExportError(f"tree root must be a real directory: {root}")
+    entries: list[tuple[str, str, Path]] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        for child in os.scandir(directory):
+            path = Path(child.path)
+            mode = child.stat(follow_symlinks=False).st_mode
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise KleanExportError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    return sorted(entries)
+
+
+def tree_digest(root: Path) -> str:
+    digest = hashlib.sha256()
+    for relative, kind, path in _tree_entries(Path(root)):
+        digest.update(relative.encode() + b"\0" + kind.encode() + b"\0")
+        if kind == "file":
+            digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def _regular_json(path: Path) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise KleanExportError(f"required JSON is not a regular file: {path}")
+    try:
+        document = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise KleanExportError(f"malformed JSON: {path}") from error
+    if not isinstance(document, dict):
+        raise KleanExportError(f"JSON must be an object: {path}")
+    return document
+
+
+def _run_command(
+    command: list[str] | str,
+    *,
+    cwd: Path | None,
+    timeout: int,
+    env: dict[str, str],
+    shell: bool = False,
+) -> tuple[int, str]:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            timeout=timeout,
+            shell=shell,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        return result.returncode, result.stdout
+
+pipeline sha256_tree
+190:def sha256_tree(root: Path) -> str:
+            "config": parsed.name,
+            "model": parsed.model,
+            "effort": parsed.effort,
+            "condition": {
+                "name": parsed.condition.name,
+                "kit": parsed.condition.kit,
+                "semantics": parsed.condition.semantics,
+            },
+            "timeouts": {
+                "k_initial_s": 3600,
+                "k_total_s": 7200,
+                "lemma_initial_s": 1200,
+                "lemma_total_s": 1200,
+                "lean_initial_s": 3600,
+                "lean_total_s": 7200,
+            },
+            "tasks": [document["problem_id"] for document in inputs],
+            "runtime": {
+                "codex_cli_version": CODEX_CLI_VERSION,
+                "k_version": K_VERSION,
+                "runtimeverification_k_commit": K_COMMIT,
+                "pyk_version": PYK_VERSION,
+                "lean_toolchain": LEAN_TOOLCHAIN,
+                "klean_toolchain_lock_sha256": sha256_file(
+                    toolchain_lock_path
+                ),
+            },
+        }
+        if parsed.condition.kit:
+            lock = _read_regular_json(
+                repo / "data/kit-skills.lock.json", "Kit bundle lock"
+            )
+            try:
+                run_manifest["kit"] = {
+                    "commit": lock["commit"],
+                    "skills_tree": lock["skills_tree"],
+                }
+            except KeyError as error:
+                raise PipelineContractError(
+                    "Kit bundle lock is missing commit or skills_tree"
+                ) from error
+        write_json_atomic(run_staging / "run.json", run_manifest)
+        (run_staging / "task-list.txt").write_text(
+            "".join(f"{document['problem_id']}\n" for document in inputs)
+        )
+
+        run_staging.rename(destination)
+        state_staging.rename(state_destination)
+    except BaseException:
+        if run_staging.exists():
+            shutil.rmtree(run_staging)
+        if state_staging.exists():
+            shutil.rmtree(state_staging)
+        if destination.exists() and not state_destination.exists():
+            shutil.rmtree(destination)
+        raise
+    return destination.resolve(strict=True)
+
+
+def _require_direct_directory(parent: Path, name: str, label: str) -> Path:
+    parent = require_real_directory(parent, f"parent of {label}")
+    child = require_real_directory(parent / name, label)
+    if child.parent != parent:
+        raise PipelineContractError(
+            f"{label} must be a direct real child of {parent}: {name!r}"
+        )
+    return child
+
+
+def _resolve_task_state(
+    repo: Path, run_id: str, problem_id: str
+) -> tuple[Path, Path, dict[str, Any]]:
+    repo = require_real_directory(Path(repo), "repository")
+    run_id = validate_safe_component(run_id, "run ID")
+    problem_id = validate_safe_component(problem_id, "problem ID")
+    runs = require_real_directory(repo / "runs", "runs root")
+    run = _require_direct_directory(runs, run_id, "run")
+    tasks = require_real_directory(run / "tasks", "tasks root")
+    task = _require_direct_directory(tasks, problem_id, "task")
+    state_root = require_real_directory(repo / "runner-state", "runner-state root")
+    run_state = _require_direct_directory(state_root, run_id, "run state")
+    state = _require_direct_directory(run_state, problem_id, "task state")
+    manifest = _read_regular_json(run / "run.json", "run manifest")
+    if manifest.get("run_id") != run_id:
+        raise PipelineContractError("run manifest ID does not match its directory")
+    if problem_id not in manifest.get("tasks", []):
+        raise PipelineContractError("task is not declared by the run manifest")
+    runtime = manifest.get("runtime")
+    if runtime is None:
+        if manifest.get("legacy_import") is not True:
+            raise PipelineContractError(
+                "run manifest is missing frozen toolchain provenance"
+            )
+    else:
+        lock_path = require_regular_file(
+            repo / "data/klean-toolchain.lock.json",
+            "frozen toolchain lock",
+        )
+        lock = _read_regular_json(lock_path, "frozen toolchain lock")
+        expected_runtime = {
+            "codex_cli_version": CODEX_CLI_VERSION,
+
+klean final gate hash assembly
+def _audit_input_binding(path: Path) -> dict[str, Any]:
+    document = _regular_json(path, "Stage 6 audit input")
+    try:
+        resolution, digest = (
+            stage6_resolution_contract.verify_audit_input(document)
+        )
+    except (
+        stage6_resolution_contract.Stage6ResolutionContractError
+    ) as error:
+        raise KleanFinalGateError(str(error)) from error
+    mode = resolution.get("mode")
+    hashes = resolution.get("hashes")
+    if (
+        mode not in {
+            "CLASSIFICATION_ONLY",
+            "CLASSIFICATION_AND_PROOF",
+        }
+        or not isinstance(hashes, dict)
+    ):
+        raise KleanFinalGateError(
+            "Stage 6 audit input binding is malformed"
+        )
+    return {
+        "resolution": resolution,
+        "resolved_input_sha256": digest,
+    }
+
+
+def _input_hashes(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    candidate: Path | None,
+) -> dict[str, Any]:
+    try:
+        return {
+            "k_workspace_sha256": pipeline_contract.sha256_tree(
+                frozen_input
+            ),
+            "stage1_export_sha256": klean_export.tree_digest(
+                frozen_input
+            ),
+            "discovery_manifest_sha256": (
+                pipeline_contract.sha256_file(discovery_manifest)
+            ),
+            "klean_generation_sha256": (
+                pipeline_contract.sha256_tree(generation)
+            ),
+            "lean_workspace_sha256": (
+                pipeline_contract.sha256_tree(candidate)
+                if candidate is not None
+                else None
+            ),
+        }
+    except (
+        OSError,
+        klean_export.KleanExportError,
+        pipeline_contract.PipelineContractError,
+    ) as error:
+        raise KleanFinalGateError(
+            "cannot hash Stage 6 mechanical inputs"
+        ) from error
+
+
+def _require_bound_inputs(
+    audit_input: dict[str, Any],
+    observed: dict[str, Any],
+) -> None:
+    expected = audit_input["resolution"]["hashes"]
+    for key, digest in observed.items():
+        if expected.get(key) != digest:
+            raise KleanFinalGateError(
+                f"Stage 6 {key} differs from audit input"
+            )
+
+
+
+Script done on 2026-07-27 23:34:33-05:00 [COMMAND_EXIT_CODE="0"]

@@ -1,0 +1,120 @@
+Audit mode and mounted-input checks
+===================================
+
+Command:
+  printf '%s\n' "$AUDIT_MODE"
+Result:
+  CLASSIFICATION_ONLY
+
+Command:
+  test ! -e /candidate && echo 'candidate=ABSENT' || echo 'candidate=PRESENT'
+Result:
+  candidate=ABSENT
+
+Producer provenance
+===================
+
+Command:
+  sha256sum /reference/generation-tools/klean_export.py /reference/generation-tools/klean.py
+Result:
+  bbd11ce0fe6ac12ea89d4bdc70c260044bc9f87c987ff310684b637ea6464a07  /reference/generation-tools/klean_export.py
+  42a38e6d65b74af3536acc49947b7cfbac809406bdfe5549841e3132af5a5c4d  /reference/generation-tools/klean.py
+
+Inventory reconstruction
+========================
+
+Command:
+  PYTHONPATH=/reference python - <<'PY'
+  from pathlib import Path
+  from tools.k_rule_inventory import inventory_verification
+  print(inventory_verification(Path('/reference/k-proof')))
+  PY
+
+The normalized result is recorded in 02-inventory-reconstruction.txt.
+
+Stage 4 preflight, first attempt
+================================
+
+Command:
+  PYTHONPATH=/reference python - <<'PY'
+  from pathlib import Path
+  from tools.klean_preflight import check_generation
+  check_generation(
+      Path('/reference/k-proof'),
+      Path('/reference/lemma-discovery.json'),
+      Path('/reference/klean-generation'),
+      toolchain_lock=Path('/reference/klean-toolchain.lock.json'),
+  )
+  PY
+Result:
+  tools.klean_preflight.KleanPreflightError: lake clean failed (1):
+  error: could not detect the configuration of the Lake installation
+
+Lean environment diagnosis
+==========================
+
+Command:
+  command -v lake; command -v lean; lake --version; lean --version
+Result:
+  /opt/elan/bin/lake
+  /opt/elan/bin/lean
+  Lake version 5.0.0-src+ba2cbbf (Lean version 4.22.0)
+  error: failed to locate application
+
+Command:
+  python - <<'PY'
+  import os
+  print(os.getpid(), os.readlink('/proc/self/exe'), os.readlink(f'/proc/{os.getpid()}/exe'))
+  PY
+Result:
+  FileNotFoundError: [Errno 2] No such file or directory: '/proc/3/exe'
+
+The audit PID namespace reports an inner PID (3), while its read-only /proc is
+mounted from the outer namespace. Lean 4.22 uses /proc/<getpid()>/exe. The
+narrow shim in 05-lean-proc-self-shim.c redirects only that exact self lookup
+to /proc/self/exe. No mounted evidence was changed.
+
+Command:
+  gcc -shared -fPIC -O2 -Wall -Wextra \
+    -o /tmp/audit-work/lean-proc-self-shim.so \
+    /tmp/audit-work/lean-proc-self-shim.c -ldl
+  PATH=/tmp/audit-work/lean-shim-bin:$PATH lean --version
+Result:
+  Lean (version 4.22.0, x86_64-unknown-linux-gnu,
+  commit ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05, Release)
+
+Stage 4 preflight, successful rerun
+===================================
+
+Command:
+  PATH=/tmp/audit-work/lean-shim-bin:$PATH PYTHONPATH=/reference python - <<'PY'
+  import json
+  from pathlib import Path
+  from tools.klean_preflight import check_generation
+  result = check_generation(
+      Path('/reference/k-proof'),
+      Path('/reference/lemma-discovery.json'),
+      Path('/reference/klean-generation'),
+      toolchain_lock=Path('/reference/klean-toolchain.lock.json'),
+  )
+  print(json.dumps(result, indent=2, sort_keys=True))
+  PY
+Result:
+  Exit 0. Exact returned document: 06-preflight-rerun.json
+
+Independent target extraction
+=============================
+
+Command:
+  PYTHONPATH=/reference python - <<'PY'
+  import json
+  from pathlib import Path
+  from tools import klean_export
+  generated=Path('/reference/klean-generation/generated')
+  mapping=json.loads((generated/'obligation-map.json').read_text())
+  print(klean_export.target_statement(generated))
+  print(klean_export.expected_target_definition(mapping))
+  PY
+Result:
+  None
+  None

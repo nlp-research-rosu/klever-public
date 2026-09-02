@@ -1,0 +1,1275 @@
+
+$ bash -lc for\ f\ in\ /reference/prompt.py\ /reference/canonical.py\ /reference/py2mpy.py\ /candidate/solution.py\ /candidate/solution.mpy\ /candidate/spec.k\ /candidate/verification.k\ /candidate/prove.sh\ /candidate/concrete-tests.mpy\;\ do\ echo\ \"=====\ \$f\ =====\"\;\ nl\ -ba\ \"\$f\"\;\ done
+===== /reference/prompt.py =====
+     1	
+     2	def match_parens(lst):
+     3	    '''
+     4	    You are given a list of two strings, both strings consist of open
+     5	    parentheses '(' or close parentheses ')' only.
+     6	    Your job is to check if it is possible to concatenate the two strings in
+     7	    some order, that the resulting string will be good.
+     8	    A string S is considered to be good if and only if all parentheses in S
+     9	    are balanced. For example: the string '(())()' is good, while the string
+    10	    '())' is not.
+    11	    Return 'Yes' if there's a way to make a good string, and return 'No' otherwise.
+    12	
+    13	    Examples:
+    14	    match_parens(['()(', ')']) == 'Yes'
+    15	    match_parens([')', ')']) == 'No'
+    16	    '''
+===== /reference/canonical.py =====
+     1	# canonical.py — the UNMODIFIED HumanEval/119 reference solution (from the dataset).
+     2	# Co-located with solution.py (the proof rewrite) to make the original<->rewrite link
+     3	# explicit & auditable.  entry point: match_parens
+     4	
+     5	
+     6	def match_parens(lst):
+     7	    '''
+     8	    You are given a list of two strings, both strings consist of open
+     9	    parentheses '(' or close parentheses ')' only.
+    10	    Your job is to check if it is possible to concatenate the two strings in
+    11	    some order, that the resulting string will be good.
+    12	    A string S is considered to be good if and only if all parentheses in S
+    13	    are balanced. For example: the string '(())()' is good, while the string
+    14	    '())' is not.
+    15	    Return 'Yes' if there's a way to make a good string, and return 'No' otherwise.
+    16	
+    17	    Examples:
+    18	    match_parens(['()(', ')']) == 'Yes'
+    19	    match_parens([')', ')']) == 'No'
+    20	    '''
+    21	    def check(s):
+    22	        val = 0
+    23	        for i in s:
+    24	            if i == '(':
+    25	                val = val + 1
+    26	            else:
+    27	                val = val - 1
+    28	            if val < 0:
+    29	                return False
+    30	        return True if val == 0 else False
+    31	
+    32	    S1 = lst[0] + lst[1]
+    33	    S2 = lst[1] + lst[0]
+    34	    return 'Yes' if check(S1) or check(S2) else 'No'
+===== /reference/py2mpy.py =====
+     1	#!/usr/bin/env python3
+     2	"""py2mpy — a *pure* CPython-AST -> K-constructor transliterator.
+     3	
+     4	Reads a .py file and prints the matching `.mpy` term: a Lisp-indented tree of K
+     5	constructors that a (future) K semantics will parse. The design rule is strict:
+     6	
+     7	    PURE TRANSLITERATION. Every Python AST node maps to exactly one K
+     8	    constructor with the same structure. The front-end makes NO semantic
+     9	    decisions — it does not desugar, simplify, normalize, or "interpret"
+    10	    anything. All meaning lives in the K semantics that consumes the term.
+    11	
+    12	Consequences of that rule (vs. a "helpful" front-end):
+    13	
+    14	  * `is` / `is not` transliterate to `CmpOp("is", ...)` / `CmpOp("is not", ...)`
+    15	    — NOT to `==` / `!=`. K decides what identity means.
+    16	  * a chained comparison `a < b < c` stays a single `Compare` carrying the
+    17	    chain (`Compare(a, CmpOp("<", b), CmpOp("<", c))`) — it is NOT pre-expanded
+    18	    into `a < b and b < c`.
+    19	  * a method call `x.append(v)` stays `Call(Attribute(Name("x"), "append"), v)`
+    20	    — there is no special `MethodCall` constructor folding the receiver in.
+    21	  * `a[i] = v` stays `Assign(Subscript(Name("a"), Name("i")), v)` — the target
+    22	    is just an expression in store position; no special `SubscriptAssign`.
+    23	
+    24	The only choices the transliterator makes are unavoidably *syntactic* — e.g. a
+    25	`bool` literal becomes `Bool(...)` not `Int(...)`, because that is the literal's
+    26	actual Python type as read off the AST, not a semantic judgement.
+    27	
+    28	Anything outside the covered subset raises `Unsupported`, naming the node, so
+    29	coverage gaps fail loudly instead of being silently dropped.
+    30	
+    31	Usage:
+    32	    python scripts/py2mpy.py FILE.py          # print the .mpy term (default)
+    33	    python scripts/py2mpy.py FILE.py --ast    # print the Python AST (ast.dump)
+    34	"""
+    35	from __future__ import annotations
+    36	
+    37	import argparse
+    38	import symtable
+    39	import ast
+    40	import json
+    41	import sys
+    42	
+    43	
+    44	class Unsupported(Exception):
+    45	    """Raised for any AST node the transliterator does not cover."""
+    46	
+    47	
+    48	# ---------------------------------------------------------------------------
+    49	# Term model: a .mpy term is a tree of these three node kinds.
+    50	#   Ctor(name, *args)  -> `name(arg, arg, ...)`  (comma-separated args)
+    51	#   Seq([item, ...])   -> a statement list: juxtaposed, no parens, no commas
+    52	#   str                -> a leaf token already in K surface form
+    53	#                         (a quoted string `"op"`, a number `0`, `true`, `Break`)
+    54	# ---------------------------------------------------------------------------
+    55	class Ctor:
+    56	    __slots__ = ("name", "args")
+    57	
+    58	    def __init__(self, name: str, *args):
+    59	        self.name = name
+    60	        self.args = list(args)
+    61	
+    62	
+    63	class Seq:
+    64	    __slots__ = ("items",)
+    65	
+    66	    def __init__(self, items):
+    67	        self.items = list(items)
+    68	
+    69	
+    70	def q(s: str) -> str:
+    71	    """A Python string as a K String token (double-quoted, escaped)."""
+    72	    return json.dumps(s)
+    73	
+    74	
+    75	# --- Operator spellings (string tokens carried inside constructors) ----------
+    76	# These are transliterations of the operator *symbol*, not its meaning.
+    77	_BINOP = {
+    78	    ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
+    79	    ast.FloorDiv: "//", ast.Mod: "%", ast.Pow: "**",
+    80	    ast.BitOr: "|", ast.BitAnd: "&", ast.BitXor: "^",
+    81	    ast.LShift: "<<", ast.RShift: ">>", ast.MatMult: "@",
+    82	}
+    83	_UNARY = {ast.USub: "-", ast.UAdd: "+", ast.Not: "not", ast.Invert: "~"}
+    84	_BOOLOP = {ast.And: "and", ast.Or: "or"}
+    85	_CMPOP = {
+    86	    ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
+    87	    ast.Gt: ">", ast.GtE: ">=", ast.Is: "is", ast.IsNot: "is not",
+    88	    ast.In: "in", ast.NotIn: "not in",
+    89	}
+    90	
+    91	
+    92	# ---------------------------------------------------------------------------
+    93	# Closure scopes (Python's own symtable, faithfully exposed)
+    94	# ---------------------------------------------------------------------------
+    95	# (name, lineno) -> (cellvars, freevars, nested). A def/lambda gets the
+    96	# ANNOTATED node form iff it is nested inside a function or has cells/frees;
+    97	# module-level capture-free defs keep the old shape (zero churn).
+    98	SCOPES: dict = {}
+    99	
+   100	
+   101	def _frees(table):
+   102	    return set(table.get_frees()) if isinstance(table, symtable.Function) else set()
+   103	
+   104	
+   105	def _deep_frees(table):
+   106	    out = _frees(table)
+   107	    for g in table.get_children():
+   108	        out |= _deep_frees(g) - set(table.get_locals())
+   109	    return out
+   110	
+   111	
+   112	def _walk_symtable(table, depth=0):
+   113	    for child in table.get_children():
+   114	        if child.get_type() in ("function", "lambda"):
+   115	            frees = sorted(_frees(child))
+   116	            cells = sorted(
+   117	                s for s in child.get_locals()
+   118	                if any(s in _deep_frees(g) for g in child.get_children())
+   119	            )
+   120	            SCOPES[(child.get_name(), child.get_lineno())] = (
+   121	                cells, frees, depth > 0 or table.get_type() != "module")
+   122	        _walk_symtable(child, depth + (1 if child.get_type() in ("function", "lambda") else 0))
+   123	
+   124	
+   125	def scope_info(name, lineno):
+   126	    return SCOPES.get((name, lineno))
+   127	
+   128	
+   129	# ---------------------------------------------------------------------------
+   130	# Expressions
+   131	# ---------------------------------------------------------------------------
+   132	def emit_expr(node: ast.expr):
+   133	    if isinstance(node, ast.Constant):
+   134	        v = node.value
+   135	        if v is None:
+   136	            return "NoneVal"
+   137	        if isinstance(v, bool):                 # MUST precede int (bool ⊂ int)
+   138	            return Ctor("Bool", "true" if v else "false")
+   139	        if isinstance(v, int):
+   140	            return Ctor("Int", str(v))
+   141	        if isinstance(v, float):
+   142	            return Ctor("Float", repr(v))
+   143	        if isinstance(v, str):
+   144	            return Ctor("Str", q(v))
+   145	        raise Unsupported(f"Constant {type(v).__name__}")
+   146	
+   147	    if isinstance(node, ast.Name):
+   148	        return Ctor("Name", q(node.id))
+   149	
+   150	    if isinstance(node, ast.Lambda):
+   151	        a = node.args
+   152	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   153	            raise Unsupported("complex lambda signature")
+   154	        names = [p.arg for p in (a.posonlyargs + a.args)]
+   155	        params = Ctor("Params", *(q(n) for n in names))
+   156	        info = scope_info("lambda", node.lineno)
+   157	        if info and (info[0] or info[1] or info[2]):
+   158	            cells, frees, _ = info
+   159	            return Ctor("Lambda", params,
+   160	                        Ctor("CellVars", *(q(n) for n in cells)),
+   161	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   162	                        emit_expr(node.body))
+   163	        return Ctor("Lambda", params, emit_expr(node.body))
+   164	
+   165	    if isinstance(node, ast.BinOp):
+   166	        op = _BINOP.get(type(node.op))
+   167	        if op is None:
+   168	            raise Unsupported(f"BinOp {type(node.op).__name__}")
+   169	        return Ctor("BinOp", q(op), emit_expr(node.left), emit_expr(node.right))
+   170	
+   171	    if isinstance(node, ast.UnaryOp):
+   172	        op = _UNARY.get(type(node.op))
+   173	        if op is None:
+   174	            raise Unsupported(f"UnaryOp {type(node.op).__name__}")
+   175	        return Ctor("UnaryOp", q(op), emit_expr(node.operand))
+   176	
+   177	    if isinstance(node, ast.BoolOp):
+   178	        op = _BOOLOP[type(node.op)]
+   179	        return Ctor("BoolOp", q(op), *(emit_expr(v) for v in node.values))
+   180	
+   181	    if isinstance(node, ast.Compare):
+   182	        # Faithful, non-desugared: left operand + a chain of (op, comparator).
+   183	        # Single comparison => one CmpOp; `a < b < c` => two CmpOps.
+   184	        chain = [
+   185	            Ctor("CmpOp", q(_op_or_raise(_CMPOP, op, "Compare")), emit_expr(c))
+   186	            for op, c in zip(node.ops, node.comparators)
+   187	        ]
+   188	        return Ctor("Compare", emit_expr(node.left), *chain)
+   189	
+   190	    if isinstance(node, ast.List):
+   191	        return Ctor("ListExpr", *(emit_expr(e) for e in node.elts))
+   192	
+   193	    if isinstance(node, ast.Tuple):
+   194	        return Ctor("TupleExpr", *(emit_expr(e) for e in node.elts))
+   195	
+   196	    if isinstance(node, ast.Set):
+   197	        return Ctor("SetExpr", *(emit_expr(e) for e in node.elts))
+   198	
+   199	    if isinstance(node, ast.Dict):
+   200	        entries = []
+   201	        for k, v in zip(node.keys, node.values):
+   202	            if k is None:
+   203	                raise Unsupported("dict unpacking {**x}")
+   204	            entries.append(Ctor("Entry", emit_expr(k), emit_expr(v)))
+   205	        return Ctor("DictExpr", *entries)
+   206	
+   207	    if isinstance(node, ast.Subscript):
+   208	        return Ctor("Subscript", emit_expr(node.value), emit_index(node.slice))
+   209	
+   210	    if isinstance(node, ast.Attribute):
+   211	        return Ctor("Attribute", emit_expr(node.value), q(node.attr))
+   212	
+   213	    if isinstance(node, ast.Call):
+   214	        if any(isinstance(a, ast.Starred) for a in node.args):
+   215	            raise Unsupported("*args unpacking")
+   216	        if any(kw.arg is None for kw in node.keywords):
+   217	            raise Unsupported("**kwargs unpacking")
+   218	        # Call grammar is `Call(Expr, Exprs)` — the comma is mandatory, so a zero-arg
+   219	        # call must render as `Call(f, )` (empty Exprs), NOT `Call(f)` (which won't parse).
+   220	        args = [emit_expr(a) for a in node.args]
+   221	        args += [Ctor("KwArg", q(kw.arg), emit_expr(kw.value)) for kw in node.keywords]
+   222	        args = args or [""]
+   223	        return Ctor("Call", emit_expr(node.func), *args)
+   224	
+   225	    if isinstance(node, ast.IfExp):
+   226	        # AST field order: test, body, orelse — kept verbatim.
+   227	        return Ctor("IfExp", emit_expr(node.test),
+   228	                    emit_expr(node.body), emit_expr(node.orelse))
+   229	
+   230	    if isinstance(node, ast.ListComp):
+   231	        return Ctor("ListComp", emit_expr(node.elt), _gens(node.generators))
+   232	    if isinstance(node, ast.SetComp):
+   233	        return Ctor("SetComp", emit_expr(node.elt), _gens(node.generators))
+   234	    if isinstance(node, ast.GeneratorExp):
+   235	        return Ctor("GenExp", emit_expr(node.elt), _gens(node.generators))
+   236	    if isinstance(node, ast.DictComp):
+   237	        return Ctor("DictComp", emit_expr(node.key), emit_expr(node.value),
+   238	                    _gens(node.generators))
+   239	
+   240	    raise Unsupported(f"Expr {type(node).__name__}")
+   241	
+   242	
+   243	def _op_or_raise(table, op, label):
+   244	    spelled = table.get(type(op))
+   245	    if spelled is None:
+   246	        raise Unsupported(f"{label} {type(op).__name__}")
+   247	    return spelled
+   248	
+   249	
+   250	def _compfor(g):
+   251	    """A single generator -> CompFor(target, iter, <ifs as Exprs; .Exprs if none>)."""
+   252	    if getattr(g, "is_async", 0):
+   253	        raise Unsupported("async comprehension")
+   254	    ifs = [emit_expr(c) for c in g.ifs] or [Ctor("Bool", "true")]
+   255	    return Ctor("CompFor", emit_expr(g.target), emit_expr(g.iter), *ifs)
+   256	
+   257	
+   258	def _gens(generators):
+   259	    """The generator list -> a juxtaposed CompFors (a Seq of CompFor)."""
+   260	    return Seq([_compfor(g) for g in generators])
+   261	
+   262	
+   263	def emit_index(node: ast.expr):
+   264	    """Subscript index position: an `ast.Slice` -> `Slice(...)`, else the expr."""
+   265	    # Python <3.9 wrapped the index in ast.Index; unwrap if present.
+   266	    inner = getattr(ast, "Index", None)
+   267	    if inner is not None and isinstance(node, inner):
+   268	        node = node.value
+   269	    if isinstance(node, ast.Slice):
+   270	        def bound(b):
+   271	            # omitted bound (absent field) OR an explicit None constant -> NoBound.
+   272	            # Python treats `a[None:5]` exactly like `a[:5]`; only a *value* None
+   273	            # (Constant(None) outside a slice) becomes NoneVal. Keeping the two
+   274	            # distinct lets NoneVal be a real value without perturbing slices.
+   275	            if b is None or (isinstance(b, ast.Constant) and b.value is None):
+   276	                return "NoBound"
+   277	            return emit_expr(b)
+   278	        return Ctor("Slice", bound(node.lower), bound(node.upper), bound(node.step))
+   279	    return emit_expr(node)
+   280	
+   281	
+   282	# ---------------------------------------------------------------------------
+   283	# Statements
+   284	# ---------------------------------------------------------------------------
+   285	def emit_stmt(node: ast.stmt):
+   286	    if isinstance(node, ast.FunctionDef):
+   287	        a = node.args
+   288	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   289	            raise Unsupported("complex function signature (defaults/varargs/kwonly)")
+   290	        if node.decorator_list:
+   291	            raise Unsupported("decorators")
+   292	        names = [p.arg for p in (a.posonlyargs + a.args)]  # type annotations ignored
+   293	        params = Ctor("Params", *(q(n) for n in names))
+   294	        info = scope_info(node.name, node.lineno)
+   295	        if info and (info[0] or info[1] or info[2]):
+   296	            cells, frees, _ = info
+   297	            return Ctor("FuncDef", q(node.name), params,
+   298	                        Ctor("CellVars", *(q(n) for n in cells)),
+   299	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   300	                        emit_stmts(node.body))
+   301	        return Ctor("FuncDef", q(node.name), params, emit_stmts(node.body))
+   302	
+   303	    if isinstance(node, ast.Return):
+   304	        if node.value is None:
+   305	            return Ctor("Return")
+   306	        return Ctor("Return", emit_expr(node.value))
+   307	
+   308	    if isinstance(node, ast.Assign):
+   309	        if len(node.targets) != 1:
+   310	            raise Unsupported("chained assignment (a = b = ...)")
+   311	        # Target is just an expression in store position (Name / Tuple / Subscript / Attribute).
+   312	        return Ctor("Assign", emit_expr(node.targets[0]), emit_expr(node.value))
+   313	
+   314	    if isinstance(node, ast.AugAssign):
+   315	        op = _BINOP.get(type(node.op))
+   316	        if op is None:
+   317	            raise Unsupported(f"AugAssign {type(node.op).__name__}")
+   318	        return Ctor("AugAssign", emit_expr(node.target), q(op), emit_expr(node.value))
+   319	
+   320	    if isinstance(node, ast.If):
+   321	        return Ctor("If", emit_expr(node.test),
+   322	                    emit_stmts(node.body), emit_stmts(node.orelse))
+   323	
+   324	    if isinstance(node, ast.For):
+   325	        if node.orelse:
+   326	            raise Unsupported("for-else")
+   327	        return Ctor("For", emit_expr(node.target), emit_expr(node.iter),
+   328	                    emit_stmts(node.body))
+   329	
+   330	    if isinstance(node, ast.While):
+   331	        if node.orelse:
+   332	            raise Unsupported("while-else")
+   333	        return Ctor("While", emit_expr(node.test), emit_stmts(node.body))
+   334	
+   335	    if isinstance(node, ast.Break):
+   336	        return "Break"
+   337	    if isinstance(node, ast.Continue):
+   338	        return "Continue"
+   339	    if isinstance(node, ast.Pass):
+   340	        return "Pass"
+   341	
+   342	    if isinstance(node, ast.Assert):
+   343	        if node.msg is not None:
+   344	            return Ctor("Assert", emit_expr(node.test), emit_expr(node.msg))
+   345	        return Ctor("Assert", emit_expr(node.test))
+   346	
+   347	    if isinstance(node, ast.Expr):
+   348	        return Ctor("Expr", emit_expr(node.value))
+   349	
+   350	    if isinstance(node, ast.Import):
+   351	        return Ctor("Import", *(q(n.name) for n in node.names))
+   352	    if isinstance(node, ast.ImportFrom):
+   353	        mod = node.module if node.module is not None else ""
+   354	        return Ctor("ImportFrom", q(mod), *(q(n.name) for n in node.names))
+   355	
+   356	    raise Unsupported(f"Stmt {type(node).__name__}")
+   357	
+   358	
+   359	def emit_stmts(stmts) -> Seq:
+   360	    return Seq([emit_stmt(s) for s in stmts])
+   361	
+   362	
+   363	def emit_module(tree: ast.Module) -> Ctor:
+   364	    return Ctor("Module", emit_stmts(tree.body))
+   365	
+   366	
+   367	# ---------------------------------------------------------------------------
+   368	# Lisp-style pretty printer
+   369	# ---------------------------------------------------------------------------
+   370	WIDTH = 72  # an expression constructor wider than this breaks onto its own lines
+   371	
+   372	
+   373	def render(node, ind: int = 0) -> str:
+   374	    if isinstance(node, str):
+   375	        return node
+   376	
+   377	    if isinstance(node, Seq):
+   378	        if not node.items:
+   379	            return ""
+   380	        pad = "  " * ind
+   381	        return ("\n" + pad).join(render(it, ind) for it in node.items)
+   382	
+   383	    # Ctor
+   384	    cind = ind + 1
+   385	    cpad = "  " * cind
+   386	    has_block = any(isinstance(a, Seq) for a in node.args)
+   387	
+   388	    if not has_block:
+   389	        inline = node.name + "(" + ", ".join(render(a, ind) for a in node.args) + ")"
+   390	        if "\n" not in inline and len("  " * ind) + len(inline) <= WIDTH:
+   391	            return inline
+   392	        parts = [render(a, cind) for a in node.args]
+   393	        return node.name + "(\n" + cpad + (",\n" + cpad).join(parts) + ")"
+   394	
+   395	    # Has a statement block: inline the args before the first block, then put
+   396	    # each remaining arg (blocks included) on its own indented line.
+   397	    first = next(i for i, a in enumerate(node.args) if isinstance(a, Seq))
+   398	    head = node.args[:first]
+   399	    rest = node.args[first:]
+   400	    open_line = node.name + "(" + ", ".join(render(a, ind) for a in head) + ("," if head else "")
+   401	    lines = []
+   402	    for k, a in enumerate(rest):
+   403	        comma = "," if k < len(rest) - 1 else ""
+   404	        lines.append(cpad + render(a, cind) + comma)
+   405	    return open_line + "\n" + "\n".join(lines) + ")"
+   406	
+   407	
+   408	# ---------------------------------------------------------------------------
+   409	# CLI
+   410	# ---------------------------------------------------------------------------
+   411	def main(argv=None) -> int:
+   412	    ap = argparse.ArgumentParser(
+   413	        prog="py2mpy",
+   414	        description="Pure CPython-AST -> K-constructor transliterator.",
+   415	    )
+   416	    ap.add_argument("file", help="Python source file")
+   417	    ap.add_argument("--ast", action="store_true",
+   418	                    help="print the Python AST (ast.dump) instead of the .mpy term")
+   419	    args = ap.parse_args(argv)
+   420	
+   421	    with open(args.file, "r", encoding="utf-8") as fh:
+   422	        src = fh.read()
+   423	    tree = ast.parse(src, filename=args.file)
+   424	    _walk_symtable(symtable.symtable(src, args.file, "exec"))
+   425	
+   426	    if args.ast:
+   427	        print(ast.dump(tree, indent=2))
+   428	    else:
+   429	        print(render(emit_module(tree)))
+   430	    return 0
+   431	
+   432	
+   433	if __name__ == "__main__":
+   434	    sys.exit(main())
+===== /candidate/solution.py =====
+     1	def is_good(s):
+     2	    balance = 0
+     3	    for char in s:
+     4	        if char == '(':
+     5	            balance += 1
+     6	        else:
+     7	            balance -= 1
+     8	        if balance < 0:
+     9	            return ''
+    10	    if balance == 0:
+    11	        return 'T'
+    12	    return ''
+    13	
+    14	
+    15	def match_parens(lst):
+    16	    if is_good(lst[0] + lst[1]):
+    17	        return 'Yes'
+    18	    if is_good(lst[1] + lst[0]):
+    19	        return 'Yes'
+    20	    return 'No'
+===== /candidate/solution.mpy =====
+     1	Module(
+     2	  FuncDef("is_good", Params("s"),
+     3	    Assign(Name("balance"), Int(0))
+     4	    For(Name("char"), Name("s"),
+     5	      If(Compare(Name("char"), CmpOp("==", Str("("))),
+     6	        AugAssign(Name("balance"), "+", Int(1)),
+     7	        AugAssign(Name("balance"), "-", Int(1)))
+     8	      If(Compare(Name("balance"), CmpOp("<", Int(0))),
+     9	        Return(Str("")),
+    10	        ))
+    11	    If(Compare(Name("balance"), CmpOp("==", Int(0))),
+    12	      Return(Str("T")),
+    13	      )
+    14	    Return(Str("")))
+    15	  FuncDef("match_parens", Params("lst"),
+    16	    If(Call(
+    17	      Name("is_good"),
+    18	      BinOp(
+    19	        "+",
+    20	        Subscript(Name("lst"), Int(0)),
+    21	        Subscript(Name("lst"), Int(1)))),
+    22	      Return(Str("Yes")),
+    23	      )
+    24	    If(Call(
+    25	      Name("is_good"),
+    26	      BinOp(
+    27	        "+",
+    28	        Subscript(Name("lst"), Int(1)),
+    29	        Subscript(Name("lst"), Int(0)))),
+    30	      Return(Str("Yes")),
+    31	      )
+    32	    Return(Str("No"))))
+===== /candidate/spec.k =====
+     1	requires "verification.k"
+     2	
+     3	module MATCH-PARENS-SPEC
+     4	  imports MATCH-PARENS-VERIFICATION
+     5	
+     6	  // Inductive invariant for the semantics' #loop iterator state.  The local
+     7	  // map may already contain "char" after the first iteration.
+     8	  claim
+     9	    <k> #loop(str(S:IntSeq), Name("char"), isGoodLoopBody)
+    10	         ~> If(Compare(Name("balance"), CmpOp("==", Int(0))),
+    11	              Return(Str("T")) .Stmts,
+    12	              .Stmts)
+    13	         ~> Return(Str(""))
+    14	         ~> #endcall
+    15	      => goodValue(S, B) ~> CONT
+    16	    </k>
+    17	    <env> N => CALLER </env>
+    18	    <scopes>
+    19	      BASE:Map
+    20	      (N |-> scope(
+    21	        ("s" |-> str(INPUT:IntSeq))
+    22	        ("balance" |-> B)
+    23	        ("char" |-> OLDCHAR:Val),
+    24	        parent(0)))
+    25	      => BASE
+    26	    </scopes>
+    27	    <scopeLoc> N +Int 1 => N </scopeLoc>
+    28	    <heap> HEAP </heap>
+    29	    <heapLoc> HEAPLOC </heapLoc>
+    30	    <stack>
+    31	      ListItem(frame(CONT, CALLER, N)) REST
+    32	      => REST
+    33	    </stack>
+    34	    <ret> noRet </ret>
+    35	    <exc> NoExc </exc>
+    36	    <exit-code> 0 </exit-code>
+    37	    requires B >=Int 0
+    38	     andBool notBool (N in_keys(BASE))
+    39	    [label(loopCorrect), circularity]
+    40	
+    41	  // Entry form of the loop, before the first iteration has introduced the
+    42	  // local "char" binding.  One semantic iteration reaches loopCorrect.
+    43	  claim
+    44	    <k> #loop(str(S:IntSeq), Name("char"), isGoodLoopBody)
+    45	         ~> If(Compare(Name("balance"), CmpOp("==", Int(0))),
+    46	              Return(Str("T")) .Stmts,
+    47	              .Stmts)
+    48	         ~> Return(Str(""))
+    49	         ~> #endcall
+    50	      => goodValue(S, B) ~> CONT
+    51	    </k>
+    52	    <env> N => CALLER </env>
+    53	    <scopes>
+    54	      BASE:Map
+    55	      (N |-> scope(
+    56	        ("s" |-> str(INPUT:IntSeq))
+    57	        ("balance" |-> B),
+    58	        parent(0)))
+    59	      => BASE
+    60	    </scopes>
+    61	    <scopeLoc> N +Int 1 => N </scopeLoc>
+    62	    <heap> HEAP </heap>
+    63	    <heapLoc> HEAPLOC </heapLoc>
+    64	    <stack>
+    65	      ListItem(frame(CONT, CALLER, N)) REST
+    66	      => REST
+    67	    </stack>
+    68	    <ret> noRet </ret>
+    69	    <exc> NoExc </exc>
+    70	    <exit-code> 0 </exit-code>
+    71	    requires B >=Int 0
+    72	     andBool notBool (N in_keys(BASE))
+    73	    [label(loopFirstCorrect)]
+    74	
+    75	  // Correctness of the helper's real closure body and call-frame lifecycle.
+    76	  claim
+    77	    <k> #applyK(toCall(isGoodClosure), (str(S:IntSeq), .Vals))
+    78	         ~> CONT
+    79	      => goodValue(S, 0) ~> CONT
+    80	    </k>
+    81	    <env> CALLER </env>
+    82	    <scopes> SCOPES </scopes>
+    83	    <scopeLoc> N </scopeLoc>
+    84	    <heap> HEAP </heap>
+    85	    <heapLoc> HEAPLOC </heapLoc>
+    86	    <stack> STACK </stack>
+    87	    <ret> noRet </ret>
+    88	    <exc> NoExc </exc>
+    89	    <exit-code> 0 </exit-code>
+    90	    requires notBool (N in_keys(SCOPES))
+    91	    [label(isGoodCorrect)]
+    92	
+    93	  // The recursive mathematical scan and the helper's two string witnesses
+    94	  // induce the same branch choice.
+    95	  claim
+    96	    <k> #forceGood(S:IntSeq, B:Int)
+    97	         ~> goodValue(S, B:Int)
+    98	         ~> #goodBranch(THEN:Stmts, ELSE:Stmts)
+    99	         ~> CONT
+   100	      => #expectedBranch(goodFrom(S, B), THEN, ELSE)
+   101	         ~> CONT
+   102	    </k>
+   103	    <env> ENV </env>
+   104	    <scopes> SCOPES </scopes>
+   105	    <scopeLoc> SCOPELOC </scopeLoc>
+   106	    <heap> HEAP </heap>
+   107	    <heapLoc> HEAPLOC </heapLoc>
+   108	    <stack> STACK </stack>
+   109	    <ret> RET </ret>
+   110	    <exc> EXC </exc>
+   111	    <exit-code> EXITCODE </exit-code>
+   112	    requires B >=Int 0
+   113	    [label(goodBranchCorrect), circularity]
+   114	
+   115	  // Functional correctness of the requested HumanEval entry point.
+   116	  claim
+   117	    <k> #applyK(
+   118	          toCall(matchParensClosure),
+   119	          (list(vCons(str(A:IntSeq),
+   120	                      vCons(str(B:IntSeq), .ValSeq))), .Vals))
+   121	         ~> CONT
+   122	      => expectedAnswer(A, B) ~> CONT
+   123	    </k>
+   124	    <env> CALLER </env>
+   125	    <scopes>
+   126	      BASE:Map
+   127	      (0 |-> scope(
+   128	        ("is_good" |-> isGoodClosure) MODULELOCALS:Map,
+   129	        parent(-1)))
+   130	    </scopes>
+   131	    <scopeLoc> N </scopeLoc>
+   132	    <heap> HEAP </heap>
+   133	    <heapLoc> HEAPLOC </heapLoc>
+   134	    <stack> STACK </stack>
+   135	    <ret> noRet </ret>
+   136	    <exc> NoExc </exc>
+   137	    <exit-code> 0 </exit-code>
+   138	    requires parensOnly(A) andBool parensOnly(B)
+   139	     andBool N >=Int 1
+   140	     andBool notBool (N +Int 1 in_keys(BASE))
+   141	     andBool notBool (N in_keys(
+   142	       BASE (0 |-> scope(
+   143	         ("is_good" |-> isGoodClosure) MODULELOCALS,
+   144	         parent(-1)))))
+   145	    [label(matchParensCorrect)]
+   146	endmodule
+===== /candidate/verification.k =====
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module MATCH-PARENS-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Symbolic normalization of a fresh Map insertion (the hooked operation
+     7	  // already normalizes when the map is ground).
+     8	  rule BASE:Map [ N:Int <- SCOPE:Scope ]
+     9	    => BASE (N |-> SCOPE)
+    10	    requires notBool (N in_keys(BASE))
+    11	    [simplification]
+    12	
+    13	  // Symbolic counterpart of deleting a freshly allocated scope at #pop.
+    14	  // Ground Map update already has this behavior through the MAP hook.
+    15	  rule ((BASE:Map (N:Int |-> _SCOPE:Scope)) [ N <- undef ]) => BASE
+    16	    requires notBool (N in_keys(BASE))
+    17	    [simplification]
+    18	
+    19	  // Targeted symbolic forms of the literal assignment and arithmetic updates
+    20	  // in is_good.  They avoid strictness freezers around primitive Int tokens.
+    21	  rule <k> (Assign(Name("balance"), Int(0)):Stmt) => .K ... </k>
+    22	       <env> L:Int </env>
+    23	       <scopes>
+    24	         ... L |-> scope(
+    25	           M:Map => M [ "balance" <- 0 ],
+    26	           P:Parent) ...
+    27	       </scopes>
+    28	    requires notBool ("$cells" in_keys(M))
+    29	    [priority(40)]
+    30	
+    31	  rule <k> (AugAssign(Name("balance"), "+", Int(1)):Stmt)
+    32	        => .K ... </k>
+    33	       <env> L:Int </env>
+    34	       <scopes>
+    35	         ... L |-> scope(
+    36	           M:Map => M [ "balance" <- B +Int 1 ],
+    37	           P:Parent) ...
+    38	       </scopes>
+    39	    requires "balance" in_keys(M)
+    40	     andBool {M["balance"]}:>Val ==K B
+    41	     andBool notBool ("$cells" in_keys(M))
+    42	    [priority(40)]
+    43	
+    44	  rule <k> (AugAssign(Name("balance"), "-", Int(1)):Stmt)
+    45	        => .K ... </k>
+    46	       <env> L:Int </env>
+    47	       <scopes>
+    48	         ... L |-> scope(
+    49	           M:Map => M [ "balance" <- B -Int 1 ],
+    50	           P:Parent) ...
+    51	       </scopes>
+    52	    requires "balance" in_keys(M)
+    53	     andBool {M["balance"]}:>Val ==K B
+    54	     andBool notBool ("$cells" in_keys(M))
+    55	    [priority(40)]
+    56	
+    57	  rule <k> (For(Name("char"), Name("s"), BODY:Stmts):Stmt)
+    58	        => #loop(str(S), Name("char"), BODY) ... </k>
+    59	       <env> L:Int </env>
+    60	       <scopes>
+    61	         ... L |-> scope(("s" |-> str(S:IntSeq)) _LOCALS:Map,
+    62	                         _PARENT:Parent) ...
+    63	       </scopes>
+    64	    [priority(40)]
+    65	
+    66	  // Fused frame-entry form for is_good: MPY-CALL frame allocation,
+    67	  // parameter binding, and the literal balance assignment, ending at the
+    68	  // actual loop proved in spec.k.
+    69	  rule <k> #applyK(toCall(GOOD:Val), (str(S:IntSeq), .Vals))
+    70	           ~> CONT
+    71	        => #loop(str(S), Name("char"), isGoodLoopBody)
+    72	           ~> If(Compare(Name("balance"), CmpOp("==", Int(0))),
+    73	                Return(Str("T")) .Stmts,
+    74	                .Stmts)
+    75	           ~> Return(Str(""))
+    76	           ~> #endcall </k>
+    77	       <env> CALLER:Int => N </env>
+    78	       <scopes>
+    79	         BASE:Map
+    80	         => BASE (N |-> scope(
+    81	              ("s" |-> str(S)) ("balance" |-> 0),
+    82	              parent(0)))
+    83	       </scopes>
+    84	       <scopeLoc> N:Int => N +Int 1 </scopeLoc>
+    85	       <stack>
+    86	         STACK:List
+    87	         => ListItem(frame(CONT, CALLER, N)) STACK
+    88	       </stack>
+    89	    requires GOOD ==K isGoodClosure
+    90	     andBool notBool (N in_keys(BASE))
+    91	    [priority(40)]
+    92	
+    93	  // Symbolic call/branch continuation for the two exact calls made by
+    94	  // match_parens.  This is the reference Call + strict If behavior specialized
+    95	  // to the constructor-valued truthy/falsey strings returned by is_good.
+    96	  syntax KItem ::= #goodBranch(Stmts, Stmts)
+    97	                 | #forceBranch(IntSeq, Stmts, Stmts)
+    98	                 | #forceGood(IntSeq, Int)
+    99	                 | #runIsGood(IntSeq)
+   100	
+   101	  rule <k> (If(
+   102	              Call(Name("is_good"),
+   103	                BinOp("+",
+   104	                  Subscript(Name("lst"), Int(0)),
+   105	                  Subscript(Name("lst"), Int(1)))),
+   106	              THEN:Stmts, ELSE:Stmts):Stmt)
+   107	        => #runIsGood(seqConcat(A, B))
+   108	           ~> #forceBranch(seqConcat(A, B), THEN, ELSE) ... </k>
+   109	       <env> L:Int </env>
+   110	       <scopes>
+   111	         ... L |-> scope(
+   112	               "lst" |-> list(vCons(str(A:IntSeq),
+   113	                               vCons(str(B:IntSeq), .ValSeq))),
+   114	               parent(0))
+   115	             0 |-> scope(
+   116	               ("is_good" |-> GOOD:Val) _MODULE:Map,
+   117	               parent(-1)) ...
+   118	       </scopes>
+   119	    requires GOOD ==K isGoodClosure
+   120	    [priority(40)]
+   121	
+   122	  rule <k> (If(
+   123	              Call(Name("is_good"),
+   124	                BinOp("+",
+   125	                  Subscript(Name("lst"), Int(1)),
+   126	                  Subscript(Name("lst"), Int(0)))),
+   127	              THEN:Stmts, ELSE:Stmts):Stmt)
+   128	        => #runIsGood(seqConcat(B, A))
+   129	           ~> #forceBranch(seqConcat(B, A), THEN, ELSE) ... </k>
+   130	       <env> L:Int </env>
+   131	       <scopes>
+   132	         ... L |-> scope(
+   133	               "lst" |-> list(vCons(str(A:IntSeq),
+   134	                               vCons(str(B:IntSeq), .ValSeq))),
+   135	               parent(0))
+   136	             0 |-> scope(
+   137	               ("is_good" |-> GOOD:Val) _MODULE:Map,
+   138	               parent(-1)) ...
+   139	       </scopes>
+   140	    requires GOOD ==K isGoodClosure
+   141	    [priority(40)]
+   142	
+   143	  // Modular use of the separately proved isGoodCorrect claim.
+   144	  rule <k> #runIsGood(S:IntSeq) => goodValue(S, 0) ... </k>
+   145	
+   146	  rule <k> V:Val ~> #forceBranch(S:IntSeq, THEN:Stmts, ELSE:Stmts)
+   147	        => #forceGood(S, 0) ~> V ~> #goodBranch(THEN, ELSE) ... </k>
+   148	
+   149	  rule <k> str(iCons(84, .IntSeq))
+   150	           ~> #goodBranch(THEN:Stmts, _ELSE:Stmts)
+   151	        => THEN ... </k>
+   152	  rule <k> str(.IntSeq)
+   153	           ~> #goodBranch(_THEN:Stmts, ELSE:Stmts)
+   154	        => ELSE ... </k>
+   155	
+   156	  syntax KItem ::= #expectedBranch(Bool, Stmts, Stmts)
+   157	  rule <k> #expectedBranch(B:Bool, THEN:Stmts, _ELSE:Stmts)
+   158	        => THEN ... </k>
+   159	    requires B
+   160	  rule <k> #expectedBranch(B:Bool, _THEN:Stmts, ELSE:Stmts)
+   161	        => ELSE ... </k>
+   162	    requires notBool B
+   163	
+   164	  // Lockstep structural driver used to prove goodBranchCorrect.  V is kept
+   165	  // abstract on the LHS (rather than placing a function symbol under a rewrite
+   166	  // pattern), with equality pinning it to the mathematical helper result.
+   167	  rule <k> #forceGood(.IntSeq, B:Int)
+   168	           ~> _V:Val
+   169	           ~> #goodBranch(THEN:Stmts, ELSE:Stmts)
+   170	        => #expectedBranch(B ==Int 0, THEN, ELSE) ... </k>
+   171	
+   172	  rule <k> #forceGood(iCons(40, R:IntSeq), B:Int)
+   173	           ~> _V:Val
+   174	           ~> #goodBranch(THEN:Stmts, ELSE:Stmts)
+   175	        => #forceGood(R, B +Int 1)
+   176	           ~> goodValue(R, B +Int 1)
+   177	           ~> #goodBranch(THEN, ELSE) ... </k>
+   178	    requires B >=Int 0
+   179	
+   180	  rule <k> #forceGood(iCons(C:Int, R0:IntSeq), B:Int)
+   181	           ~> _V:Val
+   182	           ~> #goodBranch(THEN:Stmts, ELSE:Stmts)
+   183	        => #expectedBranch(false, THEN, ELSE) ... </k>
+   184	    requires C =/=Int 40
+   185	     andBool B -Int 1 <Int 0
+   186	     andBool B >=Int 0
+   187	
+   188	  rule <k> #forceGood(iCons(C:Int, R:IntSeq), B:Int)
+   189	           ~> _V:Val
+   190	           ~> #goodBranch(THEN:Stmts, ELSE:Stmts)
+   191	        => #forceGood(R, B -Int 1)
+   192	           ~> goodValue(R, B -Int 1)
+   193	           ~> #goodBranch(THEN, ELSE) ... </k>
+   194	    requires C =/=Int 40
+   195	     andBool B -Int 1 >=Int 0
+   196	     andBool B >=Int 0
+   197	
+   198	  // The same strictness limitation affects Return after a literal Str has
+   199	  // become a constructor Val.  All returns in solution.py are string
+   200	  // literals, so fuse literal evaluation with MPY-FUNCTIONS' Return rule.
+   201	  rule <k> (Return(Str(S:String)):Stmt) ~> _ => #pop </k>
+   202	       <ret> noRet => retV(str(strToCodes(S))) </ret>
+   203	    [priority(40)]
+   204	
+   205	  // Proof-only symbolic execution lemmas for the three comparisons used by
+   206	  // the program.  The reference semantics' generated strictness coolers only
+   207	  // recognize constructor results, so hooked comparisons over symbolic Ints
+   208	  // otherwise remain under a freezer.  These rules are the corresponding
+   209	  // MPY lookup/applyCmp/If transitions fused into one step.
+   210	  rule <k> Compare(Name("char"), CmpOp("==", Str("(")))
+   211	        => true ... </k>
+   212	       <env> L:Int </env>
+   213	       <scopes>
+   214	         ... L |-> scope(
+   215	           ("char" |-> str(iCons(C:Int, .IntSeq))) _LOCALS:Map,
+   216	           _PARENT:Parent) ...
+   217	       </scopes>
+   218	    requires C ==Int 40
+   219	    [priority(40)]
+   220	
+   221	  rule <k> Compare(Name("char"), CmpOp("==", Str("(")))
+   222	        => false ... </k>
+   223	       <env> L:Int </env>
+   224	       <scopes>
+   225	         ... L |-> scope(
+   226	           ("char" |-> str(iCons(C:Int, .IntSeq))) _LOCALS:Map,
+   227	           _PARENT:Parent) ...
+   228	       </scopes>
+   229	    requires C =/=Int 40
+   230	    [priority(40)]
+   231	
+   232	  rule <k> Compare(Name("balance"), CmpOp("<", Int(0)))
+   233	        => true ... </k>
+   234	       <env> L:Int </env>
+   235	       <scopes>
+   236	         ... L |-> scope(("balance" |-> B:Int) _LOCALS:Map,
+   237	                         _PARENT:Parent) ...
+   238	       </scopes>
+   239	    requires B <Int 0
+   240	    [priority(40)]
+   241	
+   242	  rule <k> Compare(Name("balance"), CmpOp("<", Int(0)))
+   243	        => false ... </k>
+   244	       <env> L:Int </env>
+   245	       <scopes>
+   246	         ... L |-> scope(("balance" |-> B:Int) _LOCALS:Map,
+   247	                         _PARENT:Parent) ...
+   248	       </scopes>
+   249	    requires B >=Int 0
+   250	    [priority(40)]
+   251	
+   252	  rule <k> Compare(Name("balance"), CmpOp("==", Int(0)))
+   253	        => true ... </k>
+   254	       <env> L:Int </env>
+   255	       <scopes>
+   256	         ... L |-> scope(("balance" |-> B:Int) _LOCALS:Map,
+   257	                         _PARENT:Parent) ...
+   258	       </scopes>
+   259	    requires B ==Int 0
+   260	    [priority(40)]
+   261	
+   262	  rule <k> Compare(Name("balance"), CmpOp("==", Int(0)))
+   263	        => false ... </k>
+   264	       <env> L:Int </env>
+   265	       <scopes>
+   266	         ... L |-> scope(("balance" |-> B:Int) _LOCALS:Map,
+   267	                         _PARENT:Parent) ...
+   268	       </scopes>
+   269	    requires B =/=Int 0
+   270	    [priority(40)]
+   271	
+   272	  rule <k> (If(Compare(Name("char"), CmpOp("==", Str("("))),
+   273	               THEN:Stmts, _ELSE:Stmts):Stmt) => THEN ... </k>
+   274	       <env> L:Int </env>
+   275	       <scopes>
+   276	         ... L |-> scope(
+   277	           ("char" |-> str(iCons(C:Int, .IntSeq))) _LOCALS:Map,
+   278	           _PARENT:Parent) ...
+   279	       </scopes>
+   280	    requires C ==Int 40
+   281	    [priority(40)]
+   282	
+   283	  rule <k> (If(Compare(Name("char"), CmpOp("==", Str("("))),
+   284	               _THEN:Stmts, ELSE:Stmts):Stmt) => ELSE ... </k>
+   285	       <env> L:Int </env>
+   286	       <scopes>
+   287	         ... L |-> scope(
+   288	           ("char" |-> str(iCons(C:Int, .IntSeq))) _LOCALS:Map,
+   289	           _PARENT:Parent) ...
+   290	       </scopes>
+   291	    requires C =/=Int 40
+   292	    [priority(40)]
+   293	
+   294	  rule <k> (If(Compare(Name("balance"), CmpOp("<", Int(0))),
+   295	               THEN:Stmts, _ELSE:Stmts):Stmt) => THEN ... </k>
+   296	       <env> L:Int </env>
+   297	       <scopes>
+   298	         ... L |-> scope(("balance" |-> B:Int) _LOCALS:Map,
+   299	                         _PARENT:Parent) ...
+   300	       </scopes>
+   301	    requires B <Int 0
+   302	    [priority(40)]
+   303	
+   304	  rule <k> (If(Compare(Name("balance"), CmpOp("<", Int(0))),
+   305	               _THEN:Stmts, ELSE:Stmts):Stmt) => ELSE ... </k>
+   306	       <env> L:Int </env>
+   307	       <scopes>
+   308	         ... L |-> scope(("balance" |-> B:Int) _LOCALS:Map,
+   309	                         _PARENT:Parent) ...
+   310	       </scopes>
+   311	    requires B >=Int 0
+   312	    [priority(40)]
+   313	
+   314	  rule <k> (If(Compare(Name("balance"), CmpOp("==", Int(0))),
+   315	               THEN:Stmts, _ELSE:Stmts):Stmt) => THEN ... </k>
+   316	       <env> L:Int </env>
+   317	       <scopes>
+   318	         ... L |-> scope(("balance" |-> B:Int) _LOCALS:Map,
+   319	                         _PARENT:Parent) ...
+   320	       </scopes>
+   321	    requires B ==Int 0
+   322	    [priority(40)]
+   323	
+   324	  rule <k> (If(Compare(Name("balance"), CmpOp("==", Int(0))),
+   325	               _THEN:Stmts, ELSE:Stmts):Stmt) => ELSE ... </k>
+   326	       <env> L:Int </env>
+   327	       <scopes>
+   328	         ... L |-> scope(("balance" |-> B:Int) _LOCALS:Map,
+   329	                         _PARENT:Parent) ...
+   330	       </scopes>
+   331	    requires B =/=Int 0
+   332	    [priority(40)]
+   333	
+   334	  // The exact statement bodies emitted in solution.mpy.  Giving them names
+   335	  // keeps the configuration patterns in spec.k readable.
+   336	  syntax Stmts ::= "isGoodLoopBody" [function]
+   337	  rule isGoodLoopBody
+   338	    => If(Compare(Name("char"), CmpOp("==", Str("("))),
+   339	          AugAssign(Name("balance"), "+", Int(1)) .Stmts,
+   340	          AugAssign(Name("balance"), "-", Int(1)) .Stmts)
+   341	       If(Compare(Name("balance"), CmpOp("<", Int(0))),
+   342	          Return(Str("")) .Stmts,
+   343	          .Stmts)
+   344	       .Stmts
+   345	
+   346	  syntax Stmts ::= "isGoodBody" [function]
+   347	  rule isGoodBody
+   348	    => Assign(Name("balance"), Int(0))
+   349	       For(Name("char"), Name("s"), isGoodLoopBody)
+   350	       If(Compare(Name("balance"), CmpOp("==", Int(0))),
+   351	          Return(Str("T")) .Stmts,
+   352	          .Stmts)
+   353	       Return(Str(""))
+   354	       .Stmts
+   355	
+   356	  syntax Stmts ::= "matchParensBody" [function]
+   357	  rule matchParensBody
+   358	    => If(Call(Name("is_good"),
+   359	              BinOp("+",
+   360	                    Subscript(Name("lst"), Int(0)),
+   361	                    Subscript(Name("lst"), Int(1)))),
+   362	          Return(Str("Yes")) .Stmts,
+   363	          .Stmts)
+   364	       If(Call(Name("is_good"),
+   365	              BinOp("+",
+   366	                    Subscript(Name("lst"), Int(1)),
+   367	                    Subscript(Name("lst"), Int(0)))),
+   368	          Return(Str("Yes")) .Stmts,
+   369	          .Stmts)
+   370	       Return(Str("No"))
+   371	       .Stmts
+   372	
+   373	  syntax Val ::= "isGoodClosure" [function]
+   374	  rule isGoodClosure
+   375	    => closureVal(("s", .ParamNames), isGoodBody, 0)
+   376	
+   377	  syntax Val ::= "matchParensClosure" [function]
+   378	  rule matchParensClosure
+   379	    => closureVal(("lst", .ParamNames), matchParensBody, 0)
+   380	
+   381	  // Mathematical balance scan corresponding to is_good.  The implementation
+   382	  // treats every non-'(' character as ')'; the entry theorem restricts inputs
+   383	  // to the two characters promised by the HumanEval contract.
+   384	  syntax Bool ::= goodFrom(IntSeq, Int) [function, total]
+   385	  rule goodFrom(.IntSeq, B:Int) => B ==Int 0
+   386	  rule goodFrom(iCons(C:Int, R:IntSeq), B:Int)
+   387	    => #if C ==Int 40
+   388	       #then goodFrom(R, B +Int 1)
+   389	       #else #if B -Int 1 <Int 0
+   390	             #then false
+   391	             #else goodFrom(R, B -Int 1)
+   392	             #fi
+   393	       #fi
+   394	
+   395	  syntax Val ::= goodValue(IntSeq, Int) [function, total]
+   396	  rule goodValue(.IntSeq, B:Int)
+   397	    => #if B ==Int 0
+   398	       #then str(strToCodes("T"))
+   399	       #else str(.IntSeq)
+   400	       #fi
+   401	  rule goodValue(iCons(C:Int, R:IntSeq), B:Int)
+   402	    => #if C ==Int 40
+   403	       #then goodValue(R, B +Int 1)
+   404	       #else #if B -Int 1 <Int 0
+   405	             #then str(.IntSeq)
+   406	             #else goodValue(R, B -Int 1)
+   407	             #fi
+   408	       #fi
+   409	
+   410	  syntax Bool ::= parensOnly(IntSeq) [function, total]
+   411	  rule parensOnly(.IntSeq) => true
+   412	  rule parensOnly(iCons(C:Int, R:IntSeq))
+   413	    => (C ==Int 40 orBool C ==Int 41) andBool parensOnly(R)
+   414	
+   415	  syntax Val ::= expectedAnswer(IntSeq, IntSeq) [function]
+   416	  rule expectedAnswer(A:IntSeq, B:IntSeq) => str(strToCodes("Yes"))
+   417	    requires goodFrom(seqConcat(A, B), 0)
+   418	      orBool goodFrom(seqConcat(B, A), 0)
+   419	  rule expectedAnswer(A:IntSeq, B:IntSeq) => str(strToCodes("No"))
+   420	    requires notBool (goodFrom(seqConcat(A, B), 0)
+   421	      orBool goodFrom(seqConcat(B, A), 0))
+   422	endmodule
+===== /candidate/prove.sh =====
+     1	#!/usr/bin/env bash
+     2	set -euxo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	
+     6	kompile reference-semantics/semantics.k \
+     7	  --backend llvm \
+     8	  --main-module MPY-KRUN \
+     9	  --syntax-module MPY-SYNTAX \
+    10	  --output-definition runtime-kompiled
+    11	
+    12	krun concrete-tests.mpy \
+    13	  --definition runtime-kompiled \
+    14	  --output none
+    15	
+    16	kompile verification.k \
+    17	  --backend haskell \
+    18	  --main-module MATCH-PARENS-VERIFICATION \
+    19	  --syntax-module MPY-SYNTAX \
+    20	  --output-definition verification-kompiled
+    21	
+    22	kprove spec.k \
+    23	  --definition verification-kompiled \
+    24	  --spec-module MATCH-PARENS-SPEC \
+    25	  --claims loopCorrect \
+    26	  --output pretty
+    27	
+    28	kprove spec.k \
+    29	  --definition verification-kompiled \
+    30	  --spec-module MATCH-PARENS-SPEC \
+    31	  --claims loopCorrect,loopFirstCorrect \
+    32	  --trusted loopCorrect \
+    33	  --output pretty
+    34	
+    35	kprove spec.k \
+    36	  --definition verification-kompiled \
+    37	  --spec-module MATCH-PARENS-SPEC \
+    38	  --claims loopCorrect,loopFirstCorrect,isGoodCorrect \
+    39	  --trusted loopCorrect,loopFirstCorrect \
+    40	  --output pretty
+    41	
+    42	kprove spec.k \
+    43	  --definition verification-kompiled \
+    44	  --spec-module MATCH-PARENS-SPEC \
+    45	  --claims goodBranchCorrect \
+    46	  --output pretty
+    47	
+    48	kprove spec.k \
+    49	  --definition verification-kompiled \
+    50	  --spec-module MATCH-PARENS-SPEC \
+    51	  --claims loopCorrect,loopFirstCorrect,isGoodCorrect,goodBranchCorrect,matchParensCorrect \
+    52	  --trusted loopCorrect,loopFirstCorrect,isGoodCorrect,goodBranchCorrect \
+    53	  --output pretty
+===== /candidate/concrete-tests.mpy =====
+     1	Module(
+     2	  FuncDef("is_good", Params("s"),
+     3	    Assign(Name("balance"), Int(0))
+     4	    For(Name("char"), Name("s"),
+     5	      If(Compare(Name("char"), CmpOp("==", Str("("))),
+     6	        AugAssign(Name("balance"), "+", Int(1)),
+     7	        AugAssign(Name("balance"), "-", Int(1)))
+     8	      If(Compare(Name("balance"), CmpOp("<", Int(0))),
+     9	        Return(Str("")),
+    10	        ))
+    11	    If(Compare(Name("balance"), CmpOp("==", Int(0))),
+    12	      Return(Str("T")),
+    13	      )
+    14	    Return(Str("")))
+    15	  FuncDef("match_parens", Params("lst"),
+    16	    If(Call(
+    17	      Name("is_good"),
+    18	      BinOp(
+    19	        "+",
+    20	        Subscript(Name("lst"), Int(0)),
+    21	        Subscript(Name("lst"), Int(1)))),
+    22	      Return(Str("Yes")),
+    23	      )
+    24	    If(Call(
+    25	      Name("is_good"),
+    26	      BinOp(
+    27	        "+",
+    28	        Subscript(Name("lst"), Int(1)),
+    29	        Subscript(Name("lst"), Int(0)))),
+    30	      Return(Str("Yes")),
+    31	      )
+    32	    Return(Str("No")))
+    33	  Assert(Compare(
+    34	    Call(Name("match_parens"), ListExpr(Str("()("), Str(")"))),
+    35	    CmpOp("==", Str("Yes"))))
+    36	  Assert(Compare(
+    37	    Call(Name("match_parens"), ListExpr(Str(")"), Str(")"))),
+    38	    CmpOp("==", Str("No"))))
+    39	  Assert(Compare(
+    40	    Call(Name("match_parens"), ListExpr(Str(""), Str(""))),
+    41	    CmpOp("==", Str("Yes"))))
+    42	  Assert(Compare(
+    43	    Call(Name("match_parens"), ListExpr(Str(")"), Str("("))),
+    44	    CmpOp("==", Str("Yes"))))
+    45	  Assert(Compare(
+    46	    Call(Name("match_parens"), ListExpr(Str("(()"), Str("("))),
+    47	    CmpOp("==", Str("No")))))
+[exit 0]
+
+$ bash -lc python3\ -c\ \'import\ os\;\ from\ pathlib\ import\ Path\;\ bases=\[Path\(\"/reference/reference-semantics\"\)\,Path\(\"/candidate/reference-semantics\"\)\]\;\ \[\(print\(\"TREE_TYPES\"\,b\)\,\[\(print\(\(\"symlink\"\ if\ p.is_symlink\(\)\ else\ \"dir\"\ if\ p.is_dir\(\)\ else\ \"file\"\ if\ p.is_file\(\)\ else\ \"other\"\)\,p.relative_to\(b\)\)\)\ for\ root\,dirs\,files\ in\ os.walk\(b\,followlinks=False\)\ for\ p\ in\ \[Path\(root\,n\)\ for\ n\ in\ sorted\(dirs+files\)\]\]\)\ for\ b\ in\ bases\]\'
+TREE_TYPES /reference/reference-semantics
+dir semantics
+file semantics.k
+file semantics/assert.k
+file semantics/bool.k
+file semantics/builtins.k
+file semantics/call.k
+file semantics/comprehension.k
+file semantics/concrete.k
+file semantics/controls.k
+file semantics/core.k
+file semantics/dict.k
+file semantics/float.k
+file semantics/functions.k
+file semantics/int.k
+file semantics/iter.k
+file semantics/list.k
+file semantics/methods.k
+file semantics/operators.k
+file semantics/range.k
+file semantics/set.k
+file semantics/sort.k
+file semantics/str.k
+file semantics/subscript.k
+file semantics/syntax.k
+file semantics/tuple.k
+TREE_TYPES /candidate/reference-semantics
+dir semantics
+file semantics.k
+file semantics/assert.k
+file semantics/bool.k
+file semantics/builtins.k
+file semantics/call.k
+file semantics/comprehension.k
+file semantics/concrete.k
+file semantics/controls.k
+file semantics/core.k
+file semantics/dict.k
+file semantics/float.k
+file semantics/functions.k
+file semantics/int.k
+file semantics/iter.k
+file semantics/list.k
+file semantics/methods.k
+file semantics/operators.k
+file semantics/range.k
+file semantics/set.k
+file semantics/sort.k
+file semantics/str.k
+file semantics/subscript.k
+file semantics/syntax.k
+file semantics/tuple.k
+[exit 0]
+
+$ bash -lc if\ test\ -e\ /tmp/audit-work/audit-119-match-parens\ \|\|\ test\ -L\ /tmp/audit-work/audit-119-match-parens\;\ then\ find\ /tmp/audit-work/audit-119-match-parens\ -mindepth\ 1\ -maxdepth\ 2\ -printf\ \"%y\ %p\ -\>\ %l\\n\"\ \|\ LC_ALL=C\ sort\;\ else\ echo\ SCRATCH_TARGET_ABSENT\;\ fi
+SCRATCH_TARGET_ABSENT
+[exit 0]

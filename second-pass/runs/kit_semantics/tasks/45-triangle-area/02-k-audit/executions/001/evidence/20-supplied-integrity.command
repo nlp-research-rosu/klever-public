@@ -1,0 +1,1 @@
+diff -ru --no-dereference /reference/reference-semantics /candidate/reference-semantics && cmp -s /reference/prompt.py /candidate/prompt.py && cmp -s /reference/py2mpy.py /candidate/py2mpy.py && test -z "$(find -P /candidate/reference-semantics -type l -print -quit)"

@@ -1,0 +1,8447 @@
+# Exhaustive K source inventory
+
+Files: 26
+Sentences: 937
+Kinds: claim=5, configuration=1, context=5, rule=697, syntax=229
+Dispositions: FIXED_RELEVANT=66, FIXED_UNUSED=840, FIXED_UNUSED_OPAQUE=22, LOCAL_DEFINITIONAL_SUMMARY=2, LOCAL_INVOCATION_SYNTAX=1, LOCAL_OPERATIONAL_BRIDGE=1, TARGET_CLAIM=5
+Simplification rules: 0
+Function declarations: 146
+Functional declarations: 0
+Macro declarations: 4
+Total declarations: 108
+Opaque/no-evaluators declarations: 22
+Priority rules: 45
+
+## K-0001 — reference-semantics/semantics/assert.k:6-7
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `90fd8cb48806b565c7efda64556bc1f3741e4c215670728e20119ee4302ac5f5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Assert(V:Val) => .K ... </k> requires truthy(V)`
+
+## K-0002 — reference-semantics/semantics/assert.k:8-11
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `dfe24d6909cafaa624ffd02ce638b5285dda809ae92d1bf8f64b9ef11388019b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Assert(V:Val) ~> _ => .K </k> <exc> NoExc => AssertionError </exc> <exit-code> _ => 1 </exit-code> requires notBool truthy(V)`
+
+## K-0003 — reference-semantics/semantics/assert.k:13-15
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `94ec1f9b321539df9f19af2581391cdb32c7dc4d56895d3d9732706d61c6e039`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Assert(ref(H:Int)) => Assert(V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## K-0004 — reference-semantics/semantics/bool.k:8
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f6a9f817afd56c9168797a3f098cd08c12966f18447d1e0f9d1a05f16ae677c4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyUn("not", V:Val) => notBool truthy(V)`
+
+## K-0005 — reference-semantics/semantics/bool.k:10
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `27c7ab07384784839a8a863b3f9933be214b73575a7e3e811e125c3d99a0370a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("==", B1:Bool, B2:Bool) => B1 ==Bool B2`
+
+## K-0006 — reference-semantics/semantics/bool.k:11
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f0788e13f0abae37612da8abb60d3691cbb09b5d03a086f76272e5f320394b16`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("!=", B1:Bool, B2:Bool) => B1 =/=Bool B2`
+
+## K-0007 — reference-semantics/semantics/bool.k:16
+
+- Kind: context
+- Attributes: none
+- Normalized SHA-256: `4bad2e2ff81c39e87091eef691d33bff23a6d7adf29b55aafe2a261e9e7aa33a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `context BoolOp(_, (HOLE:Expr, _:Exprs))`
+
+## K-0008 — reference-semantics/semantics/bool.k:17
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `dd652a87b5666794e2e19a88c80917f8819ce783aae50f826a5d468e4a188544`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> BoolOp(_:String, (V:Val, .Exprs)) => V ... </k>`
+
+## K-0009 — reference-semantics/semantics/bool.k:18-19
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c903d941fb7314ce9a808ef44e64dbb8c65585c74cc3935c843f59b30f0db2cb`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> BoolOp("and", (V:Val, A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k> requires truthy(V)`
+
+## K-0010 — reference-semantics/semantics/bool.k:20-21
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `609b42dde8cecff47044578c95dfa8dfa3b51a7bc1edc878294ab4d92055e5d3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> BoolOp("and", (V:Val, _:Expr, _:Exprs)) => V ... </k> requires notBool truthy(V)`
+
+## K-0011 — reference-semantics/semantics/bool.k:22-23
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `66ef890f68fe08fb9cafa68cd0f292cad9db3d564aa5d15542c90c9baecd8c27`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> BoolOp("or", (V:Val, _:Expr, _:Exprs)) => V ... </k> requires truthy(V)`
+
+## K-0012 — reference-semantics/semantics/bool.k:24-25
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e45c8c057789286197d69af32767cdf68380f59b006ded43e79dd0f3a34d2fa3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> BoolOp("or", (V:Val, A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k> requires notBool truthy(V)`
+
+## K-0013 — reference-semantics/semantics/bool.k:29-30
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `570c438ed2f88db94f853171689a61a4a3efbf6632bd00359e59635b287cdd42`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> BoolOp(_:String, (ref(H:Int), .Exprs)) => ref(H) ... </k> [priority(40)]`
+
+## K-0014 — reference-semantics/semantics/bool.k:31-34
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `b20811d55420feb532235075af2164c6b7e8f9483e24f63346f384cc07354bdb`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> BoolOp("and", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires truthy(V) [priority(40)]`
+
+## K-0015 — reference-semantics/semantics/bool.k:35-38
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `1da617ae289768882fb6780ddef9c967f8b30389f7e29694fbe4143e85146236`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> BoolOp("and", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool truthy(V) [priority(40)]`
+
+## K-0016 — reference-semantics/semantics/bool.k:39-42
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `2eb620e8bf34c458becc919febceee04cab4f37e1a1ed7956f119a8b1265009e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> BoolOp("or", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k> <heap> ... H |-> V:Val ... </heap> requires truthy(V) [priority(40)]`
+
+## K-0017 — reference-semantics/semantics/bool.k:43-46
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `86c2967b9fc68899e77c31f07a35e2359123a4ec12bb59c71db0aed88426d464`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> BoolOp("or", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool truthy(V) [priority(40)]`
+
+## K-0018 — reference-semantics/semantics/builtins.k:17
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `8eb9b94daf324cbcdff3d902ceb5c8dbcc3d289d7d5094d452546c2cee988dbf`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= applyBuiltin(String, Vals) [function]`
+
+## K-0019 — reference-semantics/semantics/builtins.k:20
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `f6cf3d1713c13dac8d22e5399684f39be014bb52fc407729a141920e9ac6961a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= seqLen(Val) [function]`
+
+## K-0020 — reference-semantics/semantics/builtins.k:21
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4c33466e09a76b7760813815674e6ffbb94166ddb7069d042ef42b3ce95e3265`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("len", OBJ:Val, .Vals) => seqLen(OBJ)`
+
+## K-0021 — reference-semantics/semantics/builtins.k:22
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0aaba3d3b63a12047950734de1d7f6d68d726a77712db94d2c7f79f9ee9d9546`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule seqLen(list(VS:ValSeq)) => vsLen(VS)`
+
+## K-0022 — reference-semantics/semantics/builtins.k:23
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f5cd3a9a635bc85b291d7c33464d791ed4d02eeec6bc95e77180d1ef1e153748`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule seqLen(tuple(VS:ValSeq)) => vsLen(VS)`
+
+## K-0023 — reference-semantics/semantics/builtins.k:24
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d643ec5ddd399eb71ffb1b400c91340247b2e06423439b55fc984555dfe96583`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule seqLen(str(IS:IntSeq)) => isLen(IS)`
+
+## K-0024 — reference-semantics/semantics/builtins.k:25
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `fe3adc7a7e150cfcc668226bda4a9a9ff6fc4b01786d0c6f9d7a62c2dfda0bc1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule seqLen(setV(DS:IntSeq)) => isLen(DS)`
+
+## K-0025 — reference-semantics/semantics/builtins.k:26
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b762a4c2dc2a978a5b58cf17653c01ed5b351a867462311dab5fe0f48fffd44c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule seqLen(rangeObj(LO:Int, HI:Int, ST:Int)) => rangeLen(LO, HI, ST)`
+
+## K-0026 — reference-semantics/semantics/builtins.k:32
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `200f6d489286304114b4e127922e5d267a6472b44933e2526b01f03abf54d849`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("list")), (list(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>`
+
+## K-0027 — reference-semantics/semantics/builtins.k:33
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d4c8072f0224b4363a94ae3ac318b3b18ad05c41f2b433fe526f8d020ae141b5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("list")), (tuple(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>`
+
+## K-0028 — reference-semantics/semantics/builtins.k:34
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0b80f78f2b97822d5ac436de4244defd9d61c478add9ea00843e45329c8953de`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("list")), .Vals) => #alloc(list(.ValSeq)) ... </k>`
+
+## K-0029 — reference-semantics/semantics/builtins.k:35
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8b7fa386647f39a38debea703feca31b12a6d50ea85d8dc708c95c98f1d29cf8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("list")), (str(CS:IntSeq), .Vals)) => #alloc(list(charsOf(CS))) ... </k>`
+
+## K-0030 — reference-semantics/semantics/builtins.k:36
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `01aff6eecdd49ca279cb4378e0ba39cf9a5e1da377c6bda52586943e73543839`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= charsOf(IntSeq) [function, total]`
+
+## K-0031 — reference-semantics/semantics/builtins.k:37
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b46c475391e590ad418923d8208c753f459b5f2ab076283ed1a0377e31df6588`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule charsOf(.IntSeq) => .ValSeq`
+
+## K-0032 — reference-semantics/semantics/builtins.k:38
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a2c1d74e5b751f7bfb3585ac3dc7672108ca19a654a1bae5d8f2511b6574dce6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule charsOf(iCons(C:Int, R:IntSeq)) => vCons(str(iCons(C, .IntSeq)), charsOf(R))`
+
+## K-0033 — reference-semantics/semantics/builtins.k:41
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `9f9f03920225a3d36e948401883e4279fdf90907b29131aea12dec5c1ae84228`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("set", str(CS:IntSeq), .Vals) => setV(dedupCodes(CS))`
+
+## K-0034 — reference-semantics/semantics/builtins.k:44
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d43957f0423a89cd90b617e2424f1c0c53f903e8a496d7350c11f5dccb463b90`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("abs", I:Int, .Vals) => absInt(I)`
+
+## K-0035 — reference-semantics/semantics/builtins.k:47
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `8faa5250ed2b829b2c57a81708a1e0b4c8fc5683bff408e6fae108fe3ec4e60f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #sumAcc(Iterable, Int) | #sumCont(Int)`
+
+## K-0036 — reference-semantics/semantics/builtins.k:48
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `cd531bdb9afa464c73c67f8946bbe64957682a3d5dd078d0bf22a556ccc572e6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #sumAcc(IT:Iterable, ACC:Int) => #iterNext(IT) ~> #sumCont(ACC) ... </k>`
+
+## K-0037 — reference-semantics/semantics/builtins.k:49
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `74ff8e8be84218b889ef85b902de5efaea860b572c8a5da8306df05a1b3c4947`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterDone ~> #sumCont(ACC:Int) => ACC ... </k>`
+
+## K-0038 — reference-semantics/semantics/builtins.k:50-52
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1ea66d1c87c6d6c2367b5978e8c39eabd2c37f53f7517b4ff6a7dd95934f21a0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int) => #sumAcc(R, ACC +Int intOf(V)) ... </k> requires isInt(V) orBool isBool(V)`
+
+## K-0039 — reference-semantics/semantics/builtins.k:54
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `0355f95a50a6608682b1c8b9e304799a37a3ed6f4f6f81f8cc0d968f5ff678a4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= intOf(Val) [function]`
+
+## K-0040 — reference-semantics/semantics/builtins.k:55
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `619051750e3b8e9f67feace8a633ecf86a9daf0eac32615563f871a0069e9e1c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule intOf(I:Int) => I`
+
+## K-0041 — reference-semantics/semantics/builtins.k:56
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `39b97d83aa9d3c94c8143b6537ebc15c6c0513d4fa61118dbea15c2129e10bd2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule intOf(B:Bool) => #if B #then 1 #else 0 #fi`
+
+## K-0042 — reference-semantics/semantics/builtins.k:59
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `ed695fa0c4dbae8a1436b754495b020fb468e206c2b6448c21a61316bf0da571`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #allAcc(Iterable) | "#allCont"`
+
+## K-0043 — reference-semantics/semantics/builtins.k:60
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e7fc3b9b3a8439566a4974be9e36608e65f380fca9cc34bcc9c6b41e522e9c16`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #allAcc(IT:Iterable) => #iterNext(IT) ~> #allCont ... </k>`
+
+## K-0044 — reference-semantics/semantics/builtins.k:61
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b74e515d3e67d8a52e1d0a061bb0432a2bf1de1b43995cc280a0ee2003d49c36`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterDone ~> #allCont => true ... </k>`
+
+## K-0045 — reference-semantics/semantics/builtins.k:62-63
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `beb3eb90ee0ff2e9d13f424eb92b4dc8263fba7700c6690beba2d2aafb4299ad`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, R:Iterable) ~> #allCont => #allAcc(R) ... </k> requires truthy(V)`
+
+## K-0046 — reference-semantics/semantics/builtins.k:64-65
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `942b3c5ca9399a49d2fbd6ab4fa1a405dd4a7cf4516ff56af02970e4f30aa9a1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, _:Iterable) ~> #allCont => false ... </k> requires notBool truthy(V)`
+
+## K-0047 — reference-semantics/semantics/builtins.k:67
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `fbd45cd7894ab0316f890fc61b1b5354b41eabbba062394cbcbf820f53d00eb0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #anyAcc(Iterable) | "#anyCont"`
+
+## K-0048 — reference-semantics/semantics/builtins.k:68
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ca3f3bc3212a4bde9db710ca67b9ff4f7372092a568008c9e263f36654c478be`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #anyAcc(IT:Iterable) => #iterNext(IT) ~> #anyCont ... </k>`
+
+## K-0049 — reference-semantics/semantics/builtins.k:69
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c0ee3d29de0f584789682596e1516d301ee7f3cd73ca05694f3f10b3a978063a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterDone ~> #anyCont => false ... </k>`
+
+## K-0050 — reference-semantics/semantics/builtins.k:70-71
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `6d518d4a9ce768d209c77a938fe801e5d4cb6a5bf65b95ed6c13bd7ec71209b5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, _:Iterable) ~> #anyCont => true ... </k> requires truthy(V)`
+
+## K-0051 — reference-semantics/semantics/builtins.k:72-73
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `bad6f62e127821f6a2817452066c9e25d7e239ffd6aca6ee789c523fd7fab761`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, R:Iterable) ~> #anyCont => #anyAcc(R) ... </k> requires notBool truthy(V)`
+
+## K-0052 — reference-semantics/semantics/builtins.k:76
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `e3461106d962a1af387b25dc9d0efaf45f25429c84e747320080d55a256fe3c6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #maxAcc0(Iterable) | "#maxCont0" | #maxAcc(Iterable, Int) | #maxCont(Int)`
+
+## K-0053 — reference-semantics/semantics/builtins.k:77
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `59848da8989bf29361886195ec4d734aee2bb375e15be945b163e8bebe9dc86b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #maxAcc0(IT:Iterable) => #iterNext(IT) ~> #maxCont0 ... </k>`
+
+## K-0054 — reference-semantics/semantics/builtins.k:78-79
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ea3939e11faecfbdaf2e2a14e81ed6135343d312f3de159e633f02b0fad02cd1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAcc(R, {V}:>Int) ... </k> requires isInt(V)`
+
+## K-0055 — reference-semantics/semantics/builtins.k:80
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `66b9fabf71fa1c3cb5935e7c758b7835d42c078229bef95a9d00258c2be25942`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #maxAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #maxCont(M) ... </k>`
+
+## K-0056 — reference-semantics/semantics/builtins.k:81
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `45675f8137ef759c03793ddbc5f29ba0c26e9b63dbb20548eff076acbe7f1e57`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterDone ~> #maxCont(M:Int) => M ... </k>`
+
+## K-0057 — reference-semantics/semantics/builtins.k:82-84
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `fee6fab3ed0c3bb5c60e6322b9837a3f13ea7f3cf846ea670e1197e10b84ddf1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont(M:Int) => #maxAcc(R, maxInt(M, {V}:>Int)) ... </k> requires isInt(V)`
+
+## K-0058 — reference-semantics/semantics/builtins.k:86
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `612c7bdfd2d38320c9120a5ad0911e5880488eb2a92ab68e87ac7a0a9bdcc60d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #minAcc0(Iterable) | "#minCont0" | #minAcc(Iterable, Int) | #minCont(Int)`
+
+## K-0059 — reference-semantics/semantics/builtins.k:87
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `eb6389d2a176f8e9c2eb65f49175e5c400253651be9a571add590da6ce3ba770`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #minAcc0(IT:Iterable) => #iterNext(IT) ~> #minCont0 ... </k>`
+
+## K-0060 — reference-semantics/semantics/builtins.k:88-89
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `626486127c454c5cc6f3c1fdbae17950f6a96239e28e9d72fdd6322a77112532`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAcc(R, {V}:>Int) ... </k> requires isInt(V)`
+
+## K-0061 — reference-semantics/semantics/builtins.k:90
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `20c0d7b936a1ae717e1b498c544d3e56d529de8b54a671c87468ea52c0180f02`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #minAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #minCont(M) ... </k>`
+
+## K-0062 — reference-semantics/semantics/builtins.k:91
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `3f472924a83dcd925a34d32704d5cb43591b3115643998243b00b590ffd0789e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterDone ~> #minCont(M:Int) => M ... </k>`
+
+## K-0063 — reference-semantics/semantics/builtins.k:92-94
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `bc45b19ab65f68a5462d0a1d6a08ebdfe81fe39a215be0fc1f953d0fa64c0f59`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont(M:Int) => #minAcc(R, minInt(M, {V}:>Int)) ... </k> requires isInt(V)`
+
+## K-0064 — reference-semantics/semantics/builtins.k:97
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `4282c4747876bd11b0e0b06b2e4a8b6d9a709d9fb7d61a124e4e6e221a9cf49a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= maxVals(Int, Vals) [function]`
+
+## K-0065 — reference-semantics/semantics/builtins.k:98
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `16f482b70cca4e393239fcfc21ef383ea47184220924e70160efcc4f10351c27`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("max", I:Int, REST:Vals) => maxVals(I, REST)`
+
+## K-0066 — reference-semantics/semantics/builtins.k:99
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d3dcf3e3dfc110b7a7e46a508da6b501013718660c4909102ecb99372daeeb5e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule maxVals(M:Int, .Vals) => M`
+
+## K-0067 — reference-semantics/semantics/builtins.k:100
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f1bf63869c2f8c3b4f48e5d002007a959d31bd3f9c39589cedd372e8e8c2c1fd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule maxVals(M:Int, (I:Int, R:Vals)) => maxVals(maxInt(M, I), R)`
+
+## K-0068 — reference-semantics/semantics/builtins.k:102
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `8b1e9d6e3b83d5fbb06102823efcc1bd5eceebe50248a0519155605df3d8928e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= minVals(Int, Vals) [function]`
+
+## K-0069 — reference-semantics/semantics/builtins.k:103
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `92b52ecacf4f7bcc94c1774bbf2f8c46491933333083bff18d1fba94099a53f7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("min", I:Int, REST:Vals) => minVals(I, REST)`
+
+## K-0070 — reference-semantics/semantics/builtins.k:104
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a772c1fa6c19d7e20de4bfb312290a4fec8361e25da92cf256eec367e779d438`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule minVals(M:Int, .Vals) => M`
+
+## K-0071 — reference-semantics/semantics/builtins.k:105
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e2ec20f0d229a3fd46d735b18b8a0ee08220b23884f0342f4ab1e7bad1f47fd4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule minVals(M:Int, (I:Int, R:Vals)) => minVals(minInt(M, I), R)`
+
+## K-0072 — reference-semantics/semantics/builtins.k:108-109
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f074a4057f894d07bdb18c671e40b98ce268cb5f06e178b8b1df0a5ce94d78b1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(48, iCons(98, binCodes(N)))) requires N >=Int 0`
+
+## K-0073 — reference-semantics/semantics/builtins.k:111-113
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `edb0bd1ec983404de3c2e8d866c12554270e0f9fc01dbc7307d5ba0ff1510fb4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(45, iCons(48, iCons(98, binCodes(0 -Int N))))) requires N <Int 0`
+
+## K-0074 — reference-semantics/semantics/builtins.k:114
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `c616aba4766ff2aaf0704be23847369aa1831eaf4276066d724101d505f66734`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= binCodes(Int) [function, total]`
+
+## K-0075 — reference-semantics/semantics/builtins.k:115
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4e15dfee6cc651ddde7fae203da6c1cac63f9526f0a298a0e12298cece607136`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule binCodes(0) => iCons(48, .IntSeq)`
+
+## K-0076 — reference-semantics/semantics/builtins.k:116
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7e1227c3ef64530774984a9128b2c12c553bcb563b0a0b83bc5b6e1c346beaa4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule binCodes(N:Int) => binAcc(N, .IntSeq) requires N >Int 0`
+
+## K-0077 — reference-semantics/semantics/builtins.k:117
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `939453dbc7b8105a40a22f0da3eb1cc17b459109ddb7ba032b38664edc20227c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= binAcc(Int, IntSeq) [function, total]`
+
+## K-0078 — reference-semantics/semantics/builtins.k:118
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7503c649eb67d40e57fdd7614dcfa3de4a3e4715eee89ab6ca8ce6dea1dc7de8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule binAcc(0, ACC:IntSeq) => ACC`
+
+## K-0079 — reference-semantics/semantics/builtins.k:119-121
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `efeb5c897e8487629a79c256d49983335a83473cf175b0045c4f216205457e64`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule binAcc(N:Int, ACC:IntSeq) => binAcc((N -Int pyMod(N, 2)) /Int 2, iCons(48 +Int pyMod(N, 2), ACC)) requires N >Int 0`
+
+## K-0080 — reference-semantics/semantics/builtins.k:124-125
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e69569e78ca6c9783320125b87ca20dec101ecd113e50d4ddf36a1172c8a3f10`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("enumerate")), (list(VS:ValSeq), .Vals)) => #alloc(list(enumVS(VS, 0))) ... </k>`
+
+## K-0081 — reference-semantics/semantics/builtins.k:126
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `aeb5f1496dff1950ec1446b3259063e01a84eb972208b260c0d6f09ce9506bf5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= enumVS(ValSeq, Int) [function, total]`
+
+## K-0082 — reference-semantics/semantics/builtins.k:127
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4833a908272d7c487063f0cfa562afde5a3451844e05cf3fe38d54ed348f1bc0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule enumVS(.ValSeq, _:Int) => .ValSeq`
+
+## K-0083 — reference-semantics/semantics/builtins.k:128-129
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0cee6f21712826f9e30bfcc68d6c885e40d14b9045c3a333a1e57bbf2c9e9bf8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule enumVS(vCons(V:Val, R:ValSeq), I:Int) => vCons(tuple(vCons(I, vCons(V, .ValSeq))), enumVS(R, I +Int 1))`
+
+## K-0084 — reference-semantics/semantics/builtins.k:132-133
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `67a2cd9a593398acdc821b86ca3300583dcd23fa6ba78888d4175a6e18b99b8e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("map")), (typeV("str"), list(VS:ValSeq), .Vals)) => #alloc(list(mapStrVS(VS))) ... </k>`
+
+## K-0085 — reference-semantics/semantics/builtins.k:134
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `0513f86f41d97840aa4c9001828f9522be7fdfe0d34a81d66b1c7cb69dd19429`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= mapStrVS(ValSeq) [function, total]`
+
+## K-0086 — reference-semantics/semantics/builtins.k:135
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `289c1f88138532f4849f1759636f258f7a27e847636d3570f4d47118be315292`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule mapStrVS(.ValSeq) => .ValSeq`
+
+## K-0087 — reference-semantics/semantics/builtins.k:136
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `74f471f298eebc641fbb40d2d7b15dd6178b5ded64b3cfb82bf8ed4d84d78288`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))`
+
+## K-0088 — reference-semantics/semantics/builtins.k:137
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8b0d47ce433fea65abfc5080685dec76b40765ae0f0836606a6466a8f4b6d110`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule mapStrVS(vCons(str(CS:IntSeq), R:ValSeq)) => vCons(str(CS), mapStrVS(R))`
+
+## K-0089 — reference-semantics/semantics/builtins.k:140
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b502e27ccb7e70d3d0a2e09783f066f4a4199bdc131eaa6db5282f73de7bcf42`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("int", I:Int, .Vals) => I`
+
+## K-0090 — reference-semantics/semantics/builtins.k:143
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c4bb6edca9516337358f2cb7225d3ce0895ec4e19972031b438ad7517dc71f51`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("ord", str(iCons(C:Int, .IntSeq)), .Vals) => C`
+
+## K-0091 — reference-semantics/semantics/builtins.k:144-145
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `565ee223fc875740d05f14540260374c2a614be686b7723f6000af374557021c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("chr", I:Int, .Vals) => str(iCons(I, .IntSeq)) requires 0 <=Int I andBool I <Int 128`
+
+## K-0092 — reference-semantics/semantics/builtins.k:148
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `514da827df957adc87a8c30d89c93d9a906eed57147f164b61a8a54c2c49c17f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("str", I:Int, .Vals) => str(strToCodes(Int2String(I)))`
+
+## K-0093 — reference-semantics/semantics/builtins.k:149
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `948b6cbe0695cfe94b8a31e2a58d02aa03c8a62802c57ab38a3e80df3efb72a6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("str", str(CS:IntSeq), .Vals) => str(CS)`
+
+## K-0094 — reference-semantics/semantics/builtins.k:152-153
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `408dbad09118e5726d1ddcda09a1e1db36af28cf1ac81ba6dd6dda73cf3e123d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("int", str(iCons(C:Int, .IntSeq)), .Vals) => C -Int 48 requires 48 <=Int C andBool C <=Int 57`
+
+## K-0095 — reference-semantics/semantics/builtins.k:156-157
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4c392478d60ededfeaea2f2717127374ee4de6f5a2cee983a551b6a261a62936`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("int", str(CS:IntSeq), .Vals) => intDigAcc(CS, 0) requires isLen(CS) >=Int 2`
+
+## K-0096 — reference-semantics/semantics/builtins.k:158
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `5400597dd0d27beb9fb8b90889ee5e284a9ef3f9ae1719cc1cdcf297cc5222df`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= intDigAcc(IntSeq, Int) [function, total]`
+
+## K-0097 — reference-semantics/semantics/builtins.k:159
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `cef2f51a1185af0e38fce7f93e28a99eb22f0be9c4ef005088f534a14a65a1f0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule intDigAcc(.IntSeq, ACC:Int) => ACC`
+
+## K-0098 — reference-semantics/semantics/builtins.k:160
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `dedabaa457bf359116f8d27bebf165da20b17a1e3b75c9c15f8a16c2d3d6c967`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule intDigAcc(iCons(C:Int, R:IntSeq), ACC:Int) => intDigAcc(R, (ACC *Int 10) +Int (C -Int 48))`
+
+## K-0099 — reference-semantics/semantics/builtins.k:163
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d3b8ae0c04fe1c9c52482cb2873d5b12f4fc0b6fc09c01fe1cf2ebea8995dfca`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("zip", list(A:ValSeq), list(B:ValSeq), .Vals) => zipObj(A, B)`
+
+## K-0100 — reference-semantics/semantics/builtins.k:164
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2cbf6b6b0ab8eb00f2d03dd679d47dc208a10254ede7888e949ba68bc0f2647d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("zip", str(A:IntSeq), str(B:IntSeq), .Vals) => zipObjS(A, B)`
+
+## K-0101 — reference-semantics/semantics/builtins.k:167-168
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8cb29bfb42109534d81a22b5819beef8ed9a62984dad98ebe78256c04f9a4b56`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterNext(zipObj(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq))) => #iterYield(tuple(vCons(A, vCons(B, .ValSeq))), zipObj(As, Bs)) ... </k>`
+
+## K-0102 — reference-semantics/semantics/builtins.k:169
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d3f91e2ffaf39ce4f03a5e18eb107ed02f5379adc28549af9402f06bfd0d7405`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterNext(zipObj(.ValSeq, _:ValSeq)) => #iterDone ... </k>`
+
+## K-0103 — reference-semantics/semantics/builtins.k:170
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `84cabfd28956dc3a489c060c4e01deda2dd393855e02d4eae64649ac5a7a0885`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterNext(zipObj(vCons(_:Val, _:ValSeq), .ValSeq)) => #iterDone ... </k>`
+
+## K-0104 — reference-semantics/semantics/builtins.k:171-172
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b15b1c71a43b0ecd1a5f031d0b9b6159b355c026147d91a86c62a681c739b4a3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterNext(zipObjS(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq))) => #iterYield(tuple(vCons(str(iCons(A, .IntSeq)), vCons(str(iCons(B, .IntSeq)), .ValSeq))), zipObjS(As, Bs)) ... </k>`
+
+## K-0105 — reference-semantics/semantics/builtins.k:173
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `33a124c306f4818a23bfa8b93078f972ca5fe71009360eb7b42d6c31f47a686f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterNext(zipObjS(.IntSeq, _:IntSeq)) => #iterDone ... </k>`
+
+## K-0106 — reference-semantics/semantics/builtins.k:174
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2c19868ffadb8b3b6cf83f9bbbddd427e3f3c07e9eda8f4824232ce673f783b1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterNext(zipObjS(iCons(_:Int, _:IntSeq), .IntSeq)) => #iterDone ... </k>`
+
+## K-0107 — reference-semantics/semantics/builtins.k:177
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d63eee230cc9124e2b956cf84c0efc0ef84ef3867b12f9b9df52b748d85d91d9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("range", I:Int, .Vals) => rangeObj(0, I, 1)`
+
+## K-0108 — reference-semantics/semantics/builtins.k:178
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b65792b63b52a804483b77517d47b25ef8655aae8d19555474c96a58fbf9ace9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("range", A:Int, B:Int, .Vals) => rangeObj(A, B, 1)`
+
+## K-0109 — reference-semantics/semantics/builtins.k:179-180
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1a090f192c71906ae8a53a9a17b6af7dd7a7847ec0531efe995d8b63f1fe202d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("range", A:Int, B:Int, S:Int, .Vals) => rangeObj(A, B, S) requires S =/=Int 0`
+
+## K-0110 — reference-semantics/semantics/builtins.k:187
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `3115789003f5fd3304efbfa147941564256ce839d48ae9c7ec4ab0817276c8a7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("eval", str(CS:IntSeq), .Vals) => evalArith(CS)`
+
+## K-0111 — reference-semantics/semantics/builtins.k:188
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `ac5c7747453bcef9f306787c450027d49b33b7ccc8424f568c0a59340f7be95b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= evalArith(IntSeq) [function]`
+
+## K-0112 — reference-semantics/semantics/builtins.k:189-190
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `05258192fa0b32d9593bf71dc22e3c593e89bc6fdaa642ed42a7771ac6d9e9d4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule evalArith(CS:IntSeq) => firstNdE(passAddE(passMulE(passPowE(tokOps(CS), tokNds(CS)))))`
+
+## K-0113 — reference-semantics/semantics/builtins.k:192
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `82f289aff1572a4406a04b267222ab0133343ece15b934ac425fb05cc70ffb83`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax OpSeq ::= ".OpSeq" | oCons(String, OpSeq)`
+
+## K-0114 — reference-semantics/semantics/builtins.k:194
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `b174a010e1cc48fc9c87f146d63c9f0b5fe2cc39edccb9bccec656443882ed7e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= evDigit(Int) [function, total]`
+
+## K-0115 — reference-semantics/semantics/builtins.k:195
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `3e38e9b3918ab5f217a28ee11803a976860adc4a4a43d7e5f0a8dbe20d6f746d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule evDigit(C:Int) => C >=Int 48 andBool C <=Int 57`
+
+## K-0116 — reference-semantics/semantics/builtins.k:196
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `7322fabc33c94db411ece339632320083ba49717b78a26188e9cc33fd0ba692a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= evHead42(IntSeq) [function, total]`
+
+## K-0117 — reference-semantics/semantics/builtins.k:197
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8943c2a4d63090268d6e9b4908ea537fadc1b77bb23ba953b72c8e042d469510`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule evHead42(iCons(42, _:IntSeq)) => true`
+
+## K-0118 — reference-semantics/semantics/builtins.k:198
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `ef5ec403ed147812d1bd9f3325693a9ac662c6a3aef47a6bf14e8d5190abc55f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule evHead42(_:IntSeq) => false [owise]`
+
+## K-0119 — reference-semantics/semantics/builtins.k:199
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `0c7954767f99543b9df8d794bd317db6dd33a660a59579479ada56d88fcac4e4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= evHead47(IntSeq) [function, total]`
+
+## K-0120 — reference-semantics/semantics/builtins.k:200
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `238e1f40d90ae25e3e018df6ad041e714bf374ab5bfa3a169df3a4b92a4fa8d7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule evHead47(iCons(47, _:IntSeq)) => true`
+
+## K-0121 — reference-semantics/semantics/builtins.k:201
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `04deaa8cfac7193805033d5c37fc46a154d3af657a803979e8659429be3ed3f4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule evHead47(_:IntSeq) => false [owise]`
+
+## K-0122 — reference-semantics/semantics/builtins.k:203
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `d6d582239dd5c12601e35b409a04def1e7d471de1e96122e7a75d07a819d4c1c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax OpSeq ::= tokOps(IntSeq) [function, total]`
+
+## K-0123 — reference-semantics/semantics/builtins.k:204
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `cad0dda355df9f6c2c3fbf0f644adbc93b074ef979896386fd045b8091234f08`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokOps(.IntSeq) => .OpSeq`
+
+## K-0124 — reference-semantics/semantics/builtins.k:205
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ac016e542b1831592a1a686c1b0a738366687014df9199482098b3e77f6c30e3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokOps(iCons(32, R:IntSeq)) => tokOps(R)`
+
+## K-0125 — reference-semantics/semantics/builtins.k:206
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `aeb40dc57a6a9ca90fb15f3fcf3fcc10f89ce4d1d4c49272a37a4d8343f060b7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokOps(iCons(C:Int, R:IntSeq)) => tokOps(R) requires evDigit(C)`
+
+## K-0126 — reference-semantics/semantics/builtins.k:207
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `011c9edcd2e8becfa114c58f13dac94960765c17469779243288ff3af8abb706`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokOps(iCons(42, iCons(42, R:IntSeq))) => oCons("**", tokOps(R))`
+
+## K-0127 — reference-semantics/semantics/builtins.k:208
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `884a4ea6adfc5704309ee57dbca06b293133aa5b5775c4d95a3a350ed7fc4e68`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokOps(iCons(42, R:IntSeq)) => oCons("*", tokOps(R)) requires notBool evHead42(R)`
+
+## K-0128 — reference-semantics/semantics/builtins.k:209
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `005eaf8a7dd6285a798e4e70b662f6a95ea2eabcc597d42dfe99af4f1b29d569`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokOps(iCons(47, iCons(47, R:IntSeq))) => oCons("//", tokOps(R))`
+
+## K-0129 — reference-semantics/semantics/builtins.k:210
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `edd2b8a2a0651a0e4b655497b9bf536a4a11f57b4d0cb97754d0f845c043691e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokOps(iCons(47, R:IntSeq)) => oCons("/", tokOps(R)) requires notBool evHead47(R)`
+
+## K-0130 — reference-semantics/semantics/builtins.k:211
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f7ba86c9174eaf528b4f3e33a5846502a86b837eecceb24f00ef5942591d3400`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokOps(iCons(43, R:IntSeq)) => oCons("+", tokOps(R))`
+
+## K-0131 — reference-semantics/semantics/builtins.k:212
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `bb5f349b145f18042d9eb38d1c2b885bcf7d5fa4c8a17d054ec61880783ff8c8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokOps(iCons(45, R:IntSeq)) => oCons("-", tokOps(R))`
+
+## K-0132 — reference-semantics/semantics/builtins.k:214-215
+
+- Kind: syntax
+- Attributes: function, total, function, total
+- Normalized SHA-256: `996ffada5296e40c9ff29122dea45b0714f97763abd44a448e4cae918e431124`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= tokNds(IntSeq) [function, total] | tokNdAcc(Int, IntSeq) [function, total]`
+
+## K-0133 — reference-semantics/semantics/builtins.k:216
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4254b9f7b231f8c53a5ef902854240392e5b7aa9141683eacb32daf4e6d00f8a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokNds(.IntSeq) => .IntSeq`
+
+## K-0134 — reference-semantics/semantics/builtins.k:217
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1f722e6081e13a2c683b2e70fa6a9f75d3dd005bd0291ac24504f408c991231b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokNds(iCons(32, R:IntSeq)) => tokNds(R)`
+
+## K-0135 — reference-semantics/semantics/builtins.k:218
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2378510f6563de1061f2178b6a21c8a76a60c0e7f601ed9be70103eddf86cf55`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokNds(iCons(C:Int, R:IntSeq)) => tokNdAcc(C -Int 48, R) requires evDigit(C)`
+
+## K-0136 — reference-semantics/semantics/builtins.k:219-220
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `50035ba8e9693ff062b7f58199809435b47b07e07ad6cf5fa711cf0f6116d97a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokNds(iCons(C:Int, R:IntSeq)) => tokNds(R) requires notBool evDigit(C) andBool C =/=Int 32`
+
+## K-0137 — reference-semantics/semantics/builtins.k:221-222
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `84ee76f78e1498edefe6d1611109aef0d8fd648750f4b4fffaf7c722a42cceb2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokNdAcc(A:Int, iCons(C:Int, R:IntSeq)) => tokNdAcc(A *Int 10 +Int (C -Int 48), R) requires evDigit(C)`
+
+## K-0138 — reference-semantics/semantics/builtins.k:223
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `a5f697b9adb7c8b0ca4ee6f23007fde8a5d61e94f3066d3bc35c79caa8395ade`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule tokNdAcc(A:Int, S:IntSeq) => iCons(A, tokNds(S)) [owise]`
+
+## K-0139 — reference-semantics/semantics/builtins.k:225
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `906d0c17f2fb826efe4efc82beb72a4d68f990ca14e99999640dfb946f7e6e6e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax EvPair ::= evp(OpSeq, IntSeq)`
+
+## K-0140 — reference-semantics/semantics/builtins.k:226
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `cdf7f8b500cfb4398499c7e394562a0b14477808f647c6ee721f498aa1fb9416`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= firstNdE(EvPair) [function, total]`
+
+## K-0141 — reference-semantics/semantics/builtins.k:227
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `493a0efa8ace14cbd61f46bf3d0e7a35639532c12c55fe97b0345c3e214172e5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule firstNdE(evp(_:OpSeq, iCons(N:Int, _:IntSeq))) => N`
+
+## K-0142 — reference-semantics/semantics/builtins.k:228
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `99460cf0fcab8942aa7842de35e012e3fdd575d398f6e967cca26cb5484b00d4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule firstNdE(_:EvPair) => 0 [owise]`
+
+## K-0143 — reference-semantics/semantics/builtins.k:230
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `f15a46d2a8840cf972edcb93b43af177e7e040743128ac33ac7d277186128d3e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= applyOpE(String, Int, Int) [function, total]`
+
+## K-0144 — reference-semantics/semantics/builtins.k:231
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f63fbddd422856e31b02a9c40bda9546a7ca97e32f6882614dce3d8b31c510bd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyOpE("+", A:Int, B:Int) => A +Int B`
+
+## K-0145 — reference-semantics/semantics/builtins.k:232
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f3a95c1d102c50f4032535bff45410e55febd09f74eb9827e891934b7f295bdd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyOpE("-", A:Int, B:Int) => A -Int B`
+
+## K-0146 — reference-semantics/semantics/builtins.k:233
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `83add421a5319e45071f11d85962bb7bd95b6234a6b3e5dcd5a7ea1413d5fcd0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyOpE("*", A:Int, B:Int) => A *Int B`
+
+## K-0147 — reference-semantics/semantics/builtins.k:234
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `fe469f129f991e5bf72cb167734210674f0a824b896f3d490090150f7e8c8ff7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyOpE("//", A:Int, B:Int) => A divInt B`
+
+## K-0148 — reference-semantics/semantics/builtins.k:235
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `45890407b0492b0c493d87a536fe5c8c5b2638dec4e8ca3e6807a4de200feeba`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyOpE("**", A:Int, B:Int) => A ^Int B`
+
+## K-0149 — reference-semantics/semantics/builtins.k:236
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `77542379cedbe6f215bafd871a01024c1a53e4aaddb0e5c13b5a86a9ea4f4d23`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyOpE(_:String, A:Int, _:Int) => A [owise]`
+
+## K-0150 — reference-semantics/semantics/builtins.k:238
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `7039540535a2a934e1476e82610824ca18f40978dc212deea8d2425979e582b3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax EvPair ::= passPowE(OpSeq, IntSeq) [function, total]`
+
+## K-0151 — reference-semantics/semantics/builtins.k:239
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `337779ec32074914e6e27bc5f85de1641f10d2afc874b25642ccdc76406e7431`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule passPowE(.OpSeq, NDS:IntSeq) => evp(.OpSeq, NDS)`
+
+## K-0152 — reference-semantics/semantics/builtins.k:240
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `cfc7aaf386852d921b5c016af8b582faecaf7ed85c957e07e8a45a0a8d382eb4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule passPowE(oCons("**", OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCombE(N, passPowE(OPS, NDS))`
+
+## K-0153 — reference-semantics/semantics/builtins.k:241-242
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ebdd09e2ea6731f368c4b9e8b304b8c76ccf56cd81e1b37f5f296c16fade183c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule passPowE(oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCarryE(O, N, passPowE(OPS, NDS)) requires O =/=String "**"`
+
+## K-0154 — reference-semantics/semantics/builtins.k:243
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `25a4663fe177b1bb7951e46a96f911fa2cbb67bb09b33e61fd15260ab70bb461`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule passPowE(_:OpSeq, .IntSeq) => evp(.OpSeq, .IntSeq) [owise]`
+
+## K-0155 — reference-semantics/semantics/builtins.k:244
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `6a975303e128a6b1b0e7d23b8e37d9f1ae2ad9e69d282f2fa22132f46c7e50ae`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax EvPair ::= powCombE(Int, EvPair) [function, total]`
+
+## K-0156 — reference-semantics/semantics/builtins.k:245
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b0fe3350706d64a2ed9d52bc609d637f07d7662af49a883fd8a47391ce0ee69b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule powCombE(N:Int, evp(OPS:OpSeq, iCons(M:Int, REST:IntSeq))) => evp(OPS, iCons(N ^Int M, REST))`
+
+## K-0157 — reference-semantics/semantics/builtins.k:246
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2474e1e106b7656c99a940038d99b9f219abc2e34fdc07fc22cc1333f730fd6e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule powCombE(N:Int, evp(OPS:OpSeq, .IntSeq)) => evp(OPS, iCons(N, .IntSeq))`
+
+## K-0158 — reference-semantics/semantics/builtins.k:247
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `ccb2ec4ebb2f9efa05e40d029742beb8cfb1dbdf2fff046fcc8a3189f9b95ab3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax EvPair ::= powCarryE(String, Int, EvPair) [function, total]`
+
+## K-0159 — reference-semantics/semantics/builtins.k:248
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1b1d231b33e55aff0eed8c4c991c12970b36112c2714d56965864a761949ca78`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule powCarryE(O:String, N:Int, evp(OPS:OpSeq, NDS:IntSeq)) => evp(oCons(O, OPS), iCons(N, NDS))`
+
+## K-0160 — reference-semantics/semantics/builtins.k:250
+
+- Kind: syntax
+- Attributes: function, total, function, total
+- Normalized SHA-256: `b236e49f85be5349a9675f896a77076f773e9504b7f97d14a6c867bb11b778eb`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax EvPair ::= passMulE(EvPair) [function, total] | passAddE(EvPair) [function, total]`
+
+## K-0161 — reference-semantics/semantics/builtins.k:251
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e5919eeb7c7e9743f9ab2b65f117ba635202f5d7d4f266e5f792fd9922c4a5e2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule passMulE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("mul", N0, OPS, NDS, .OpSeq, .IntSeq)`
+
+## K-0162 — reference-semantics/semantics/builtins.k:252
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `6b1d3c71e798a33a869fa96af0ff246045b0d50f1cbae9d6e0b730faf9318ba3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule passMulE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)`
+
+## K-0163 — reference-semantics/semantics/builtins.k:253
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c3f2a5ab71feddf57b9ec4f6ac41ce023d2c3d261b228d3a481ecf75b457f517`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule passAddE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("add", N0, OPS, NDS, .OpSeq, .IntSeq)`
+
+## K-0164 — reference-semantics/semantics/builtins.k:254
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8842e532de290ccc6229328d1ff7b4e0a8bb81f4b6833a6abe2359f186fcca76`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule passAddE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)`
+
+## K-0165 — reference-semantics/semantics/builtins.k:255
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `3b8c247c3782a565e300e94a2fb42976e6b99be17f945b42d7f555f31696d32f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax EvPair ::= passLGoE(String, Int, OpSeq, IntSeq, OpSeq, IntSeq) [function, total]`
+
+## K-0166 — reference-semantics/semantics/builtins.k:256
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1232a86fdb86335bf2e99f4e74879b87030f1e6babb381980e59583e8d66bbbd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule passLGoE(_:String, CUR:Int, .OpSeq, _:IntSeq, OO:OpSeq, ON:IntSeq) => evp(OO, appendIE(ON, CUR))`
+
+## K-0167 — reference-semantics/semantics/builtins.k:257-259
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `92900e548ab821e30402231e0b637fe980c7ed5e2ebede9607e633fcfe9bbc0b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq) => passLGoE(L, applyOpE(O, CUR, N), OPS, NDS, OO, ON) requires inLevelE(L, O)`
+
+## K-0168 — reference-semantics/semantics/builtins.k:260-262
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c0996a5da68b6484bf1ac4d41cdc3a32977bc0440dc5f581a55d52c998a9c2fc`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq) => passLGoE(L, N, OPS, NDS, appendOpE(OO, O), appendIE(ON, CUR)) requires notBool inLevelE(L, O)`
+
+## K-0169 — reference-semantics/semantics/builtins.k:263-264
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `25373bd79114d67d6211714316bd46dbda4015954530bfc878fcbc55103a98b6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule passLGoE(_:String, CUR:Int, oCons(_:String, _:OpSeq), .IntSeq, OO:OpSeq, ON:IntSeq) => evp(OO, appendIE(ON, CUR)) [owise]`
+
+## K-0170 — reference-semantics/semantics/builtins.k:265
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `241368398e21fbed55a3fe2220ff3fd74d5176a9b6d12d755f6576d4485dd3c9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= inLevelE(String, String) [function, total]`
+
+## K-0171 — reference-semantics/semantics/builtins.k:266
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `55734e1ee04564bb05f5a1222d96d045ca785db371f0dd1e412700b3137b2e2b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule inLevelE("mul", O:String) => O ==String "*" orBool O ==String "//" orBool O ==String "/"`
+
+## K-0172 — reference-semantics/semantics/builtins.k:267
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d4ca4934e9e1b81eff61ec775162bde071bd8f9fb90a53610d86e3fad50df9b9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule inLevelE("add", O:String) => O ==String "+" orBool O ==String "-"`
+
+## K-0173 — reference-semantics/semantics/builtins.k:268
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `7c8e03ff739bc71b7303f7f870446e7a75c52ec1b6e9ebcb29253ca4d8ee4dd7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule inLevelE(_:String, _:String) => false [owise]`
+
+## K-0174 — reference-semantics/semantics/builtins.k:269
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `b9870a621ad1be4d3a7c365468aea378f44ec26954b7e9c188db758ca114faf5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax OpSeq ::= appendOpE(OpSeq, String) [function, total]`
+
+## K-0175 — reference-semantics/semantics/builtins.k:270
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7a7e56f7388050cd1919f7e222333ac3b98c776e784b8539d083a19bb64848f6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule appendOpE(.OpSeq, O:String) => oCons(O, .OpSeq)`
+
+## K-0176 — reference-semantics/semantics/builtins.k:271
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d0623558f5e85944ab1fcd7335be39840a83c46b7d5428876c7833b4f89b5384`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule appendOpE(oCons(H:String, T:OpSeq), O:String) => oCons(H, appendOpE(T, O))`
+
+## K-0177 — reference-semantics/semantics/builtins.k:272
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `5895024c900ed926efd37641fc7f49c57eb17dfb01becd0b3a37b5314cd99ee0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= appendIE(IntSeq, Int) [function, total]`
+
+## K-0178 — reference-semantics/semantics/builtins.k:273
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0a8e13361178e515263f1d8ae563297c568b0362c79d97efdfcea3c88117f181`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule appendIE(.IntSeq, N:Int) => iCons(N, .IntSeq)`
+
+## K-0179 — reference-semantics/semantics/builtins.k:274
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2c035f9af86e86c90dceae5d624636087a8c735ce127971a132daf92bdf0615e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule appendIE(iCons(H:Int, T:IntSeq), N:Int) => iCons(H, appendIE(T, N))`
+
+## K-0180 — reference-semantics/semantics/builtins.k:279
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `daf634ba2a452a465a8979ce59cb66a1fadf69f201135b26bbf668a0b140cee6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= "#md5"`
+
+## K-0181 — reference-semantics/semantics/builtins.k:280-281
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `90e43d1cdca9942e8d565f5b758ce9eaca408ff1488d1b026ed7535b2f126c98`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Call(Attribute(Name("hashlib"), "md5"), (E:Expr, .Exprs)) => E ~> #md5 ... </k> [priority(40)]`
+
+## K-0182 — reference-semantics/semantics/builtins.k:282
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `3dea3e5b7893d5a8de66b418ef62a7720a4922b0196b3bf6f60da7b3ce209a46`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> str(CS:IntSeq) ~> #md5 => md5Obj(CS) ... </k>`
+
+## K-0183 — reference-semantics/semantics/builtins.k:283
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `697d07fdfb4368b871b79100399c9f9a6e5a9fe6cabea49f874000787d63e6c6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= md5Obj(IntSeq)`
+
+## K-0184 — reference-semantics/semantics/builtins.k:284
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `314edc78f759a075f1de50ee2835fb29fabb540ba0d03224597f229c4569402c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(md5Obj(CS:IntSeq), "hexdigest", .Vals) => str(md5hexCodes(CS))`
+
+## K-0185 — reference-semantics/semantics/builtins.k:285
+
+- Kind: syntax
+- Attributes: function, total, symbol(md5hexCodes), no-evaluators
+- Normalized SHA-256: `a3cdf84d6e5d13f256ac988f2211c33cbc5225e3070fe7f6edd86031ec49d033`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax IntSeq ::= md5hexCodes(IntSeq) [function, total, symbol(md5hexCodes), no-evaluators]`
+
+## K-0186 — reference-semantics/semantics/builtins.k:291
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `89ae05ae7446b64459d70500af804820a1dd08a2e026be0482e5c3a785017dc4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("isinstance", V:Val, typeV("int"), .Vals) => isIntV(V)`
+
+## K-0187 — reference-semantics/semantics/builtins.k:292
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `42f642e09611be70a172dc68c2006d70fc21a4a1e53a226708cb78c84dba1a46`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("isinstance", V:Val, typeV("str"), .Vals) => isStrV(V)`
+
+## K-0188 — reference-semantics/semantics/builtins.k:293
+
+- Kind: syntax
+- Attributes: function, function
+- Normalized SHA-256: `09de746af4b8bd37b0903d806cc36bc62183fa7c6cdd818358b1c420b1dc7ec0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= isIntV(Val) [function] | isStrV(Val) [function]`
+
+## K-0189 — reference-semantics/semantics/builtins.k:294
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2ac5e818e75ed1e69b10857f6e1ed2743ebfd6951704a2a8d6e3c80587f0c9d7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isIntV(_:Int) => true`
+
+## K-0190 — reference-semantics/semantics/builtins.k:295
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `f15a463d63cd54777bc476ff03776ffce12d190ab1be45d29626140b9f9050a0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isIntV(_:Val) => false [owise]`
+
+## K-0191 — reference-semantics/semantics/builtins.k:296
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d3c0ce1552b2b2853fc67dafe979d0d00417538151d66cb0639225f240b23ade`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isStrV(str(_:IntSeq)) => true`
+
+## K-0192 — reference-semantics/semantics/builtins.k:297
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `2615ec2618f0391f9b62aa9efedfcbbcf86240359ce34270a42c1eff00c42f51`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isStrV(_:Val) => false [owise]`
+
+## K-0193 — reference-semantics/semantics/call.k:16
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d87ce6dbcf1598b90f4bc4f3058c54e69fbde50d90330ae6e3fe492d0738e4f5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Attribute(V:Val, M:String) => boundMethodV(V, M) ... </k>`
+
+## K-0194 — reference-semantics/semantics/call.k:19
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `2e4b9931b31d9e16cfac26853c8ae9d20f6a224c0926e14661fb1687c29a28c5`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax KItem ::= #callee(Exprs)`
+
+## K-0195 — reference-semantics/semantics/call.k:20
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `1e7cf6c3f022cb177607930a786e4fdcc401edb04cf97903c0420352b69ecead`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]`
+
+## K-0196 — reference-semantics/semantics/call.k:21
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d344c79af57e19c5023e40861264648db2128f01a139e9febfedbc3989375cc4`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>`
+
+## K-0197 — reference-semantics/semantics/call.k:24
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ba0da2a7daa02786dc1db5e4224e2e2046dc13fd8f9cff675b66fa21b3e64cc3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>`
+
+## K-0198 — reference-semantics/semantics/call.k:26
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `9355577d2cbe61131a734689308fa7e966bed71322d4c012ae085359653437bb`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>`
+
+## K-0199 — reference-semantics/semantics/call.k:27
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `3025de8570574393890a15cd4f12f44326ef7035d98ea1863952a74ca2d7cbc9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ) ... </k>`
+
+## K-0200 — reference-semantics/semantics/call.k:28
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1037499b709e78e085a8b68b9987663bcdf69479642265b39e785065ededf234`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ) ... </k>`
+
+## K-0201 — reference-semantics/semantics/call.k:29
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `02fe785764c60fec71b80c32baec17fb47386ffadce73ce8e553347e5a1b256a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ) ... </k>`
+
+## K-0202 — reference-semantics/semantics/call.k:30
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `74e89a0d00ed78beed19cdbd21ab3aaa7c5ab7de10987d90eb0aab39276408d6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ) ... </k>`
+
+## K-0203 — reference-semantics/semantics/call.k:31
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `6240ee6cdac44c092bb0f74980dbda8676b27a5f3bac089732a70dcd47a4c708`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]`
+
+## K-0204 — reference-semantics/semantics/call.k:32
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `3b14275e942ad2406e47fafdf0bc5b12c503152bb2458e1d816f05de75d4e76c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(typeV(T:String)), ACC:Vals) => applyBuiltin(T, ACC) ... </k>`
+
+## K-0205 — reference-semantics/semantics/call.k:38-41
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `ec48bd542dafde0731f10023c7e8a58229ab63adb1bd359ea5681429656834f0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV(BN:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(builtinV(BN)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## K-0206 — reference-semantics/semantics/call.k:42-46
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `fb1cf54c5dbfdb0f99a6409366ad776e35891ccfd2497bccfa83c674b0a2e3a0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV(BN:String)), (A:Val, ref(H:Int), REST:Vals)) => #applyK(toCall(builtinV(BN)), (A, V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(A) [priority(40)]`
+
+## K-0207 — reference-semantics/semantics/call.k:47-50
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `a9d4dc84230bdfe22c691298fae2d1618f5fc7865a7e0d9d565fac3fdb49d9de`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(typeV(T:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(typeV(T)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## K-0208 — reference-semantics/semantics/call.k:52
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `d5c2626ac8a700308c530f067a7ff9b69d436d8a00d27e497c985cb0c3eb667a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= isMutMethod(String) [function, total]`
+
+## K-0209 — reference-semantics/semantics/call.k:53-55
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a17ba7979cef1d057abc61b1483baeb2ee9d71f001bb8ddf447c76f472cac862`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isMutMethod(M:String) => M ==String "append" orBool M ==String "sort" orBool M ==String "extend" orBool M ==String "insert" orBool M ==String "pop" orBool M ==String "remove"`
+
+## K-0210 — reference-semantics/semantics/call.k:56-60
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `d8161291d4091122c816d0f4649fc6a6055f3deb879d9cd7ada7ad8db258da3e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), M:String)), ACC:Vals) => #applyK(toCall(boundMethodV(V, M)), ACC) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isMutMethod(M) [priority(40)]`
+
+## K-0211 — reference-semantics/semantics/call.k:63-67
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `09356ec82fd2127acd32fe51cc12c08df5f60172d990f6013518fe390a64a805`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(boundMethodV(OBJ, M)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isMutMethod(M) andBool notBool isRefV(OBJ) [priority(40)]`
+
+## K-0212 — reference-semantics/semantics/call.k:69-74
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7fadec633abe2d6cc321f466d5542a4882ed2b171584876f4a5503e0f2f0b6dd`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT => #bindP(PNS, ACC) ~> BODY ~> #endcall </k> <env> CALLERL:Int => NEWL </env> <scopes> STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes> <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc> <stack> .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>`
+
+## K-0213 — reference-semantics/semantics/call.k:80-85
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7306d23062980cefa4e0056c4fe1a45863ac7775e7f649a466aa5dd82a183ad8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(closureValC(PNS:ParamNames, CVS:ParamNames, BODY:Stmts, CM:Map)), ACC:Vals) ~> CONT => #allocCells(CVS) ~> #bindP(PNS, ACC) ~> BODY ~> #endcall </k> <env> CALLERL:Int => NEWL </env> <scopes> STORE:Map => STORE [ NEWL <- scope(CM [ "$cells" <- cellsMark(CVS) ], parent(0)) ] </scopes> <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc> <stack> .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>`
+
+## K-0214 — reference-semantics/semantics/call.k:87
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `66b816d7dbbcb9d731590143b3d24bb779b4f8884fc7b5bb7f970cefaffb7f05`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #allocCells(ParamNames)`
+
+## K-0215 — reference-semantics/semantics/call.k:88
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ab5f4beee335a8e71b2964a9d669bbe365a142f028d53ec7fe526ddc46ec1346`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #allocCells(.ParamNames) => .K ... </k>`
+
+## K-0216 — reference-semantics/semantics/call.k:89-94
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `99f0ab53a196e864a8605f370dc660d907094cb17705130aa9e0412305c41b4e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #allocCells((CV:String, R:ParamNames)) => #allocCells(R) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ CV <- cellRef(N) ], _) ... </scopes> <heap> H:Map => (N |-> cellV(noneV)) H </heap> <heapLoc> N:Int => N +Int 1 </heapLoc> requires notBool N in_keys(H)`
+
+## K-0217 — reference-semantics/semantics/comprehension.k:11
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4645372e277c8411d291e3fcff391daaf3c5a73e3ef74cbf6ce8cdc816de97ff`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule ListComp(ELT:Expr, Gs:CompFors) => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)`
+
+## K-0218 — reference-semantics/semantics/comprehension.k:12
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `dfe1627b5b2d14083bdc7e8e60dc6edade669ab733ae4de7d3d009155bba9b1c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule GenExp(ELT:Expr, Gs:CompFors) => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)`
+
+## K-0219 — reference-semantics/semantics/comprehension.k:14
+
+- Kind: syntax
+- Attributes: macro
+- Normalized SHA-256: `824d607beedb6356c5932cea164d2188bc5585db6eb430ba265d3b4c19c55484`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Stmts ::= compBody(CompFors, Expr) [macro]`
+
+## K-0220 — reference-semantics/semantics/comprehension.k:15-16
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `815fb636c44d46ef130d1d585ae0f6e7c042c7c23b3138b6b8feebbda26f0016`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule compBody(Gs:CompFors, ELT:Expr) => Assign(Name("$acc"), ListExpr(.Exprs)) compNest(Gs, ELT) Return(Name("$acc"))`
+
+## K-0221 — reference-semantics/semantics/comprehension.k:18
+
+- Kind: syntax
+- Attributes: macro-rec
+- Normalized SHA-256: `7d588d134f4b785d98fc64c4e16c825bbe11c41d9d7d37f0e06cd1f66093fb24`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Stmt ::= compNest(CompFors, Expr) [macro-rec]`
+
+## K-0222 — reference-semantics/semantics/comprehension.k:19-20
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `03f45d480d0d06cf77afcdeb723bc2177d6d2533783069d42825cb413d76531b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule compNest(.CompFors, ELT:Expr) => Assign(Name("$acc"), BinOp("+", Name("$acc"), ListExpr(ELT)))`
+
+## K-0223 — reference-semantics/semantics/comprehension.k:21-22
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `671328ad859bd1a7e54293519ef2dd7b8f94a3e2eb80653af5d234e41ded35fd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule compNest((CompFor(T:Expr, ITER:Expr, Fs:Exprs) GRest:CompFors), ELT:Expr) => For(T, ITER, If(compGuard(Fs), compNest(GRest, ELT), .Stmts))`
+
+## K-0224 — reference-semantics/semantics/comprehension.k:24
+
+- Kind: syntax
+- Attributes: macro
+- Normalized SHA-256: `2ecdbee509dd4259654a9d1406ac80f7ab26ed49249fa5c649e11cb66b7d4134`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Expr ::= compGuard(Exprs) [macro]`
+
+## K-0225 — reference-semantics/semantics/comprehension.k:25
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7be24aff205ffb3a829f7c70337726d7e6fc199609e4725ea5482bdc37aa6960`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule compGuard(.Exprs) => Bool(true)`
+
+## K-0226 — reference-semantics/semantics/comprehension.k:26
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `93505f664b89633f28cdf7cccc72842555b929b721d95b861d75f48ffe8f9c05`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule compGuard((F:Expr, Fs:Exprs)) => BoolOp("and", (F, Fs))`
+
+## K-0227 — reference-semantics/semantics/concrete.k:13-15
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `78076bacc78720fc602e7b25b88636bc05c71f4f55ac29db5925d92160d7a201`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Compare(list(A:ValSeq), CmpOp("==", list(B:ValSeq))) => deepEqVS(A, B, HP) ... </k> <heap> HP:Map </heap> requires hasRefVS(A) orBool hasRefVS(B)`
+
+## K-0228 — reference-semantics/semantics/concrete.k:16-18
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7706073edc7c048bc228f39e7645b4da7ce4ef35d29cb580a8973a7fd5fccda9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Compare(list(A:ValSeq), CmpOp("!=", list(B:ValSeq))) => notBool deepEqVS(A, B, HP) ... </k> <heap> HP:Map </heap> requires hasRefVS(A) orBool hasRefVS(B)`
+
+## K-0229 — reference-semantics/semantics/concrete.k:25
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `2a90169184182c410fe4c2ce341278c2dedd8d7d6f8601a991c3dc2e0b42f634`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= kvP(Val, Val)`
+
+## K-0230 — reference-semantics/semantics/concrete.k:26-27
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `1123d008aaa05868ae1bd9f44f1bac7b039bcfd54a355e3a6c0524c25f9511c4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #ksort(ValSeq, Val, ValSeq, Bool) | #ksIns(Val, ValSeq, Val, ValSeq, Bool)`
+
+## K-0231 — reference-semantics/semantics/concrete.k:28-30
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `5caca2001b70c524ea38688e440ed76456f74d57b74521fe63fa22c57282e7fb`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals)) => #ksort(VS, KV, .ValSeq, false) ... </k> [priority(40)]`
+
+## K-0232 — reference-semantics/semantics/concrete.k:31-33
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `2c4b50fac01d6a9ecc6c1fdf5696919d9b2f327f3a2d7493c862cbc759bff019`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals)) => #ksort(VS, KV, .ValSeq, RB) ... </k> [priority(40)]`
+
+## K-0233 — reference-semantics/semantics/concrete.k:34-35
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `9a2cac29747255880807afe9acc45f2b2e308ac69028e6393d992dd0175f4953`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #ksort(.ValSeq, _:Val, ACC:ValSeq, RB:Bool) => #alloc(list(condRev(unpairVS(ACC), RB))) ... </k>`
+
+## K-0234 — reference-semantics/semantics/concrete.k:36-37
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1b960e24430bc3c08bafcd916076e9f70a53e324baf5eab208a6fa4342b62bcf`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #ksort(vCons(V:Val, R:ValSeq), KV:Val, ACC:ValSeq, RB:Bool) => KV ~> #callee((V, .Exprs)) ~> #ksIns(V, R, KV, ACC, RB) ... </k>`
+
+## K-0235 — reference-semantics/semantics/concrete.k:38-40
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `833a30eb0045ffa9f4482cd525f45fec95d0ee22f4acc75221904edaaa8c4f69`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> K:Val ~> #ksIns(V:Val, R:ValSeq, KV:Val, ACC:ValSeq, RB:Bool) => #ksort(R, KV, insPair(ACC, K, V), RB) ... </k> requires notBool isKwV(K)`
+
+## K-0236 — reference-semantics/semantics/concrete.k:42
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `55dc07274299e7b58a622feb28c763987b5c35ead1b9d2cf9165912436433038`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= insPair(ValSeq, Val, Val) [function]`
+
+## K-0237 — reference-semantics/semantics/concrete.k:43
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1b9c47e83939876546f307ade1ff83df08d7a46c8ba0d6c86b5ae1a324438de2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule insPair(.ValSeq, K:Val, V:Val) => vCons(kvP(K, V), .ValSeq)`
+
+## K-0238 — reference-semantics/semantics/concrete.k:44-46
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `111715f3eff9f38ddf862ece9e09eaf0f1f1fa5519269ffa30ff97f1262fd2c5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val) => vCons(kvP(K, V), vCons(kvP(K2, V2), R)) requires kLt(K, K2)`
+
+## K-0239 — reference-semantics/semantics/concrete.k:47-49
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b54f5a2a0368082cd3815636a2789e87a023e14a1045d731dae576117c2c24ca`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val) => vCons(kvP(K2, V2), insPair(R, K, V)) requires notBool kLt(K, K2)`
+
+## K-0240 — reference-semantics/semantics/concrete.k:51
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `a74ccb7aaf4fb0873480901bff971b092c9dbd03f69b4a4430f9e6813bad457d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= kLt(Val, Val) [function]`
+
+## K-0241 — reference-semantics/semantics/concrete.k:52
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2123b754255b1230f17f2af7056ef3e688448f578117a29add63f4f6fe4fdfe1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule kLt(I1:Int, I2:Int) => I1 <Int I2`
+
+## K-0242 — reference-semantics/semantics/concrete.k:53
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `fa99ec9f191b01e0ecb3f93a16c85f2ffac702c2766211bb459d8f273a015d27`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule kLt(F1:Float, F2:Float) => F1 <Float F2`
+
+## K-0243 — reference-semantics/semantics/concrete.k:54
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `608ffd1665edfb59d472955da76f6ec8ad22974711f47c9d1117cc0cb9476b0a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule kLt(str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)`
+
+## K-0244 — reference-semantics/semantics/concrete.k:56
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `4f9bc29fa28a4ee808049a44a900983a4a13f51e3667cf63740414c413645975`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= unpairVS(ValSeq) [function, total]`
+
+## K-0245 — reference-semantics/semantics/concrete.k:57
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a2e6dd066c677c3fbb8ae42e1bb4c4e08b35e98d6758e9817a1c0e32f2ed298d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule unpairVS(.ValSeq) => .ValSeq`
+
+## K-0246 — reference-semantics/semantics/concrete.k:58
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `84d1ae0473a111b622b6e1cdad885d3b2af53ee0c5cea2bb9e91888301892032`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule unpairVS(vCons(kvP(_:Val, V:Val), R:ValSeq)) => vCons(V, unpairVS(R))`
+
+## K-0247 — reference-semantics/semantics/concrete.k:59
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `7ae54fdad398cb576570dee684b0148c5f7a140e6fef4af4509048db2f3d63e7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule unpairVS(vCons(V:Val, R:ValSeq)) => vCons(V, unpairVS(R)) [owise]`
+
+## K-0248 — reference-semantics/semantics/controls.k:9-11
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a78b31a11fb1e616fc20d1b741f692cbede4e634503bf6d86c3e2f97a09b36ca`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Assign(Name(X:String), V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>`
+
+## K-0249 — reference-semantics/semantics/controls.k:12-18
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `46fcacaf0429bbd96797c91ccdd68360486d7b3010e19fd46b9b1fc6f7f2ff23`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool X in_keys(M) andBool isCellRef({M[X]}:>Val) [priority(40)]`
+
+## K-0250 — reference-semantics/semantics/controls.k:20-23
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1e640b8d853e579664c8c301af0a56de1912bc58c576eae9f925e9c9c6dec3ec`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes> requires X in_keys(M)`
+
+## K-0251 — reference-semantics/semantics/controls.k:27-31
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `7147c074cc9cb6f74d3ad90db7f0673993fca88868eba320ae3ff6392a144183`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires X in_keys(M) andBool isRefV({M[X]}:>Val) [priority(40)]`
+
+## K-0252 — reference-semantics/semantics/controls.k:35
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f402a7269397fca0b1ac21aed748b760050ba708a163d261f974e913771da3c2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> ImportFrom("math", NS:ParamNames) => #bindImports(NS) ... </k>`
+
+## K-0253 — reference-semantics/semantics/controls.k:36
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `52700f6597b29ddb0bc621e8272d2fed465b14604d21641c831c107ffb9411fd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> ImportFrom(_:String, _:ParamNames) => .K ... </k> [owise]`
+
+## K-0254 — reference-semantics/semantics/controls.k:37
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `88b5590c6cf0d241359de642778c97d21462b7df276d7ff9da14b483221cd040`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #bindImports(ParamNames)`
+
+## K-0255 — reference-semantics/semantics/controls.k:38
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `775670eae46ffc1b3ac3c61cc6400e6a17c0e758ff2a08cda58bb08045a0ad4d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #bindImports(.ParamNames) => .K ... </k>`
+
+## K-0256 — reference-semantics/semantics/controls.k:39-42
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `16792e79fae547f357c72fda3710d3fb1eea03d5131e31991975acacb404b3d6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ N <- builtinV(N) ], _) ... </scopes> requires N ==String "floor" orBool N ==String "ceil"`
+
+## K-0257 — reference-semantics/semantics/controls.k:43-44
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `3234af4514ced04c4f8b05a1f8085f484ff9c93c612855d95586435d7e5850f6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k> requires notBool (N ==String "floor" orBool N ==String "ceil")`
+
+## K-0258 — reference-semantics/semantics/controls.k:48
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `eb3ba2f76867b95c4abb23256e465f313b6b4ca7174ac2d67d90fcac852634ce`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Expr(_:Val) => .K ... </k>`
+
+## K-0259 — reference-semantics/semantics/controls.k:51
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `7b0fe50a62195a3b0fef8fb68b9e36bec75ecac9e75acf69e84b5201a689d177`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax KItem ::= #branch(Bool, Stmts, Stmts)`
+
+## K-0260 — reference-semantics/semantics/controls.k:52
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `cbe0a65ca8b486f863733c806119e1f4a10dbab29dfe59f18e11ba8a0eba3c24`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>`
+
+## K-0261 — reference-semantics/semantics/controls.k:53
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `590ba86f9c098d790a320da93c083cc8f802c9ca35711eb1cc2cd74245b5ba9f`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> #branch(true, T:Stmts, _:Stmts) => T ... </k>`
+
+## K-0262 — reference-semantics/semantics/controls.k:54
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ff7557d947a08ac40c7ceee538b9daef506db3c2a78baeba82da06f1656f45bc`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>`
+
+## K-0263 — reference-semantics/semantics/controls.k:57-58
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7a11b92d5f399aa2ed578a0cd9ca0621ef427ca8023e7c60717b9100e28a1915`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k> requires truthy(V)`
+
+## K-0264 — reference-semantics/semantics/controls.k:59-60
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2c6960d060e5fcfe5e42abf4fd64450cf89ef155afcb0dca8235b3f52f500c50`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k> requires notBool truthy(V)`
+
+## K-0265 — reference-semantics/semantics/controls.k:65-67
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `527ed693357cc917d7a66c85117620efd2d6e9d63fd3c513d857d75f32c5c84e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts) | #while(Expr, Stmts) | #whileCond(Expr, Stmts) | #loopLbl(K) | "#cont" | "#brk"`
+
+## K-0266 — reference-semantics/semantics/controls.k:69
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `54e2c3c93eb9e29b84ab176aea9ecc6ea72a430e4d0191059235eb51231c0480`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>`
+
+## K-0267 — reference-semantics/semantics/controls.k:71
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f6431203e70c43ecb8a36acee40238048e5ae9c14481a6f5e8cb0b7b1d58b46e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>`
+
+## K-0268 — reference-semantics/semantics/controls.k:72
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e22f89d510cff7d36192b2a2ccfeaaf725796c8c8c827450ae307c7947ef155a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>`
+
+## K-0269 — reference-semantics/semantics/controls.k:73-74
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `27623a04cbed0ba606c977978c4830e1e59af1e07b6fec606273bc5bdcb4af68`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts) => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>`
+
+## K-0270 — reference-semantics/semantics/controls.k:77
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `cc778d0a7dee57761ad2083c164374f1ca61a417f970a113330d7964d8a869df`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>`
+
+## K-0271 — reference-semantics/semantics/controls.k:78
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `6b4a239ea0168f84cd9b863978fae9d5c0b970eabaf77a73c6bbda53ca569539`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>`
+
+## K-0272 — reference-semantics/semantics/controls.k:79-80
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7954a0aef08296979e388406314e89fd6e2dba4ea575dad2bf1408e922ce13cf`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k> requires truthy(V)`
+
+## K-0273 — reference-semantics/semantics/controls.k:81-82
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e3419f8eee7f79e8c4514487daf45e1127400563d7aff94b6e8ed3a55819f81f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k> requires notBool truthy(V)`
+
+## K-0274 — reference-semantics/semantics/controls.k:85
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `bb87d59b209abee2097a69ac0521f4f49fc8162769983885860572a9797f7f3a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #loopLbl(NEXT:K) => NEXT ... </k>`
+
+## K-0275 — reference-semantics/semantics/controls.k:86
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7987cb734506ffbd385ee94489bf6138d7d3e170c7e1bcf045a5de280ba0bb83`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Continue => #cont ... </k>`
+
+## K-0276 — reference-semantics/semantics/controls.k:87
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0c6690a88f1d95c9312e4548a2245797efb3794c54bd0b998bc299250012679e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Break => #brk ... </k>`
+
+## K-0277 — reference-semantics/semantics/controls.k:88
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8617466b01468a24391f6c8144aa24fad531384c5ac6b67bf45ac202c9903691`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>`
+
+## K-0278 — reference-semantics/semantics/controls.k:89
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `5cabf37fa715399227a3a3ac10bbe5848811a4674872d38789dbcaaf8a962b70`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]`
+
+## K-0279 — reference-semantics/semantics/controls.k:90
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `5b9a5f06df03d210661bd4242bc729c182e9d98bf2ac35665f7d2c1cba2048f8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>`
+
+## K-0280 — reference-semantics/semantics/controls.k:91
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `0b85dbffe4321627cffb340315f61d81a4a2767a8fa809a199a66008d70b5b51`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]`
+
+## K-0281 — reference-semantics/semantics/controls.k:95-97
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `ff65bd7ea83de9c1aac2201a6aacd05085c15bf4f7a8368a115d11754dd3088a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## K-0282 — reference-semantics/semantics/controls.k:98-100
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `a42c325234497da9c2b931fb7600707181b79378e75ed4242f79fffa971045ec`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## K-0283 — reference-semantics/semantics/controls.k:101-103
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `3a707c519f219172023ab73ba36f7a45ad608c0cbd0ab287d62524bb1619fa8f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## K-0284 — reference-semantics/semantics/controls.k:106-108
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `32f13b8026fc2ebda6564a756c9a8580ce60ecbf5ede2d77d9b9482ba95abf50`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## K-0285 — reference-semantics/semantics/core.k:13
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `2768b2d6c3a17c8dc96cd3fe2032aaa71938dc7e459f3302d39650b2eb1e8be4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)`
+
+## K-0286 — reference-semantics/semantics/core.k:14
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `3571b0fa24f69901cc16fe43a413976e68db54b0f47c1857bba7bb311aec6578`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)`
+
+## K-0287 — reference-semantics/semantics/core.k:15
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `16488dd300402a20f9d382a29903e46194c238e5367cc4b2e92182d7abb0bfa2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Str ::= str(IntSeq)`
+
+## K-0288 — reference-semantics/semantics/core.k:18-23
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `2b8233305aeadb8aa309b4bcf0520698e22aaa7d3de66e0d3c007bb3c8dac0f7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Iterable ::= list(ValSeq) | tuple(ValSeq) | Str | rangeObj(Int, Int, Int) | zipObj(ValSeq, ValSeq) | zipObjS(IntSeq, IntSeq)`
+
+## K-0289 — reference-semantics/semantics/core.k:25-34
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `e92cb7e4014d3d2bd9d2d9b1c6d90b41b3c47f425f665780398dfc7662f232b1`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Val ::= Int | Bool | "noneV" | Iterable | ref(Int) | cellRef(Int) | closureVal(ParamNames, Stmts, Int) | typeV(String) | builtinV(String) | boundMethodV(Val, String)`
+
+## K-0290 — reference-semantics/semantics/core.k:36
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `c240ca8787f6f25f24fbb9d017955e365cc667750c631f7869bfa2650e3482b3`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Parent ::= "root" | parent(Int)`
+
+## K-0291 — reference-semantics/semantics/core.k:37
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `1a4b85e2b644f529e4a00633d558310cb6a0598e944493db599c6b028d03d8c2`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Scope ::= scope(Map, Parent)`
+
+## K-0292 — reference-semantics/semantics/core.k:38
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `190af4b16650786b1d561fa05c1505a6458261cbbc813b67fce1d8382447ed18`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax KResult ::= Val`
+
+## K-0293 — reference-semantics/semantics/core.k:39
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `0e85532827dc67c834bad9f81e8121a2914d717bcd0022d47056849294f017bc`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Expr ::= Val`
+
+## K-0294 — reference-semantics/semantics/core.k:40
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `c9cee1981af78d22be358515c3d40c43ddf113a6e501732215323e86c69df803`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Vals ::= List{Val, ","}`
+
+## K-0295 — reference-semantics/semantics/core.k:41
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `1a9977b6818762a6c75f12776156fc9cf31d7c72a74adfb8e1e05fc0ecf94339`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Exc ::= "NoExc" | "AssertionError"`
+
+## K-0296 — reference-semantics/semantics/core.k:42
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `de0c80b21d8eb36cf36d606cf767f2a520411bf5a1d3616806c99a959bbd8f5b`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax RetState ::= "noRet" | retV(Val)`
+
+## K-0297 — reference-semantics/semantics/core.k:49-60
+
+- Kind: configuration
+- Attributes: none
+- Normalized SHA-256: `e2e69e72a4960a3aefd72d7c1b3b75d039e9fff8be3ccccdc17f464c8d395f8b`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `configuration <k> #loadAll($PGM:Module) </k> <env> 0 </env> <scopes> 0 |-> scope(.Map, parent(-1)) -1 |-> builtinsScope </scopes> <scopeLoc> 1 </scopeLoc> <heap> .Map </heap> <heapLoc> 0 </heapLoc> <stack> .List </stack> <ret> noRet </ret> <exc> NoExc </exc> <exit-code exit=""> 0 </exit-code>`
+
+## K-0298 — reference-semantics/semantics/core.k:68
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `3338ad77ca0049a96dfe1eaeb080b4c41c6be71c0c3b3f745920c8a3f234cec0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= isRefV(Val) [function, total]`
+
+## K-0299 — reference-semantics/semantics/core.k:69
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d1ee5822bc201a81a9e53ef1bbc95650db6ed80ae67b039110a99e1244587cac`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isRefV(ref(_:Int)) => true`
+
+## K-0300 — reference-semantics/semantics/core.k:70
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `0c7cce155ae3e6320c5d4bd48b2c693b895f7dacaa77c81e46772701bf682ece`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isRefV(_:Val) => false [owise]`
+
+## K-0301 — reference-semantics/semantics/core.k:75
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `21cd98225d729d9f7639156eab6a245a02779ba0a9d8b21e9f073c0ff26f5274`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax HeapVal ::= cellV(Val)`
+
+## K-0302 — reference-semantics/semantics/core.k:76
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `a9d42f86eb00022dec3e226b09600aaa48f1a7be55f597845133e1bd191296a1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= isCellRef(Val) [function, total]`
+
+## K-0303 — reference-semantics/semantics/core.k:77
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d10f04444db1ef0234b6d965704225f982b943f5f876e0dd2b84ca6cb186d00d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isCellRef(cellRef(_:Int)) => true`
+
+## K-0304 — reference-semantics/semantics/core.k:78
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `5a8e9cee84f2dbf8c0de9a66101d7f454ee0e4ef9387f90a1b3b96d108f076bb`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isCellRef(_:Val) => false [owise]`
+
+## K-0305 — reference-semantics/semantics/core.k:85-90
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `ccbcf54c09d432d185cd73f66e00b677291ba701494a1d9a9e7fa3b7eb7c5936`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> cellRef(H:Int) => V ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> <heap> ... H |-> cellV(V:Val) ... </heap> requires "$cells" in_keys(M) [priority(40)]`
+
+## K-0306 — reference-semantics/semantics/core.k:95
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `746e63785a2ae3973e73c46044dcbf4775ebee34152fc64892f4b2b789edd83f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= kwV(String, Val)`
+
+## K-0307 — reference-semantics/semantics/core.k:96
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `7135e0a28684c3f959f5c02eb7518d47f4673034587be13a48e55a135987f6e2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #kwTag(String)`
+
+## K-0308 — reference-semantics/semantics/core.k:97
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `28d46dc1bd55f13049d73cb2bf63a371dc732d4615cdd181645239d4cd5ad537`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>`
+
+## K-0309 — reference-semantics/semantics/core.k:98-99
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b16faf57f0a4ea99fe0c8f966f92696df0327f139ba5260288a67e046f99a2dc`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k> requires notBool isKwV(V)`
+
+## K-0310 — reference-semantics/semantics/core.k:100
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `50eabe9c99f38505cf15bf77c4bac9a1abf4f9b87d14b59bbda92ca979979de1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= isKwV(Val) [function, total]`
+
+## K-0311 — reference-semantics/semantics/core.k:101
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a1fa116710bde2dcf3a27bef6ca7c778952c610ebf3439a992d3b795fbb62980`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isKwV(kwV(_:String, _:Val)) => true`
+
+## K-0312 — reference-semantics/semantics/core.k:102
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `200aa58406d99e22d3b9ce9a9ef60d4663b4e18452d09f10c48e045bd68b7760`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isKwV(_:Val) => false [owise]`
+
+## K-0313 — reference-semantics/semantics/core.k:106
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `2285105441dce6794397ba48377014495fd03df64a341f3f38c98e1db8345f5a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= cellsMark(ParamNames)`
+
+## K-0314 — reference-semantics/semantics/core.k:107
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `ad2441054e7f455725e98d81f76b8fd041bc9ed222e5edb98a5c94ae3839523b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ParamNames ::= cellsOf(Val) [function]`
+
+## K-0315 — reference-semantics/semantics/core.k:108
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `dadd75df53218bc9b64ef8083a5cfdd2ce110ae737320172b4df3b74b49eca81`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule cellsOf(cellsMark(CVS:ParamNames)) => CVS`
+
+## K-0316 — reference-semantics/semantics/core.k:109
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `009b993788c253193b1ce0fa5b061697c6440e0788701a19869c9dab19663ff9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= pnMember(String, ParamNames) [function, total]`
+
+## K-0317 — reference-semantics/semantics/core.k:110
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `09cb69784187ad842a22036b322bfc6e6b6b0146b07291ed5538c1ed17fb12c8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule pnMember(_:String, .ParamNames) => false`
+
+## K-0318 — reference-semantics/semantics/core.k:111
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `40d3ebcbac2e7febec8650f7bec5a04bd4771fe1fb00b0029b055011e68b54d1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)`
+
+## K-0319 — reference-semantics/semantics/core.k:113
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `16af91ae25382cf323fddfcbec2b15113bb7f8e345fc838cffd3d1ea5c48402f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #cellW(Val, Val)`
+
+## K-0320 — reference-semantics/semantics/core.k:114-115
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8cd98c73610f48aa57c981cb37756c66c7690094d14b1d7dd6ecc280118e508b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k> <heap> ... H |-> cellV(_:Val => V) ... </heap>`
+
+## K-0321 — reference-semantics/semantics/core.k:117
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `584583182d331f98087811d087ed974611dcaaa6ed451b3fd1b5669db71ee113`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #alloc(Val)`
+
+## K-0322 — reference-semantics/semantics/core.k:118-121
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `73c5f2c1164c99bb4e431aa329b45e3df25a9a3916f4720ae94c4a1a3117a043`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #alloc(V:Val) => ref(N) ... </k> <heap> H:Map => (N |-> V) H </heap> <heapLoc> N:Int => N +Int 1 </heapLoc> requires notBool N in_keys(H)`
+
+## K-0323 — reference-semantics/semantics/core.k:124
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `40d32b5e1ad10747cb8671cd1e429ea97d3cec1b42c0c51a97d4025ea15ec9d2`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax KItem ::= #loadAll(Module)`
+
+## K-0324 — reference-semantics/semantics/core.k:125
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `831765b43e688fdf9dd2115a4b939d436706f8c21eec8d12ae58d63460ea64ff`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>`
+
+## K-0325 — reference-semantics/semantics/core.k:126
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `622f8afd49106ea25b456b94d71e2824694c02f0a7d79c85174ee0f6bbe5aeb2`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>`
+
+## K-0326 — reference-semantics/semantics/core.k:127
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `913b04bec3e9965c5fccda5c7468146ab7b9b60368e64ca29864c719e88dc4bd`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> .Stmts => .K ... </k>`
+
+## K-0327 — reference-semantics/semantics/core.k:130
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `68e17b99a979fdef8ca37621b96b2adca48d3919ab7f1ce5c01b65d55df1c936`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax KItem ::= #look(String, Int)`
+
+## K-0328 — reference-semantics/semantics/core.k:131
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4dffd7efda704b7e4db7e1c647183217805e651df4dafc5254bb00bf2fdc9cbe`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>`
+
+## K-0329 — reference-semantics/semantics/core.k:132-134
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b29eee0298a0fbd55b27ebbe8c80981c6b4319ab729ec6146f576f5933c18219`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k> <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes> requires X in_keys(M)`
+
+## K-0330 — reference-semantics/semantics/core.k:145-151
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `3b3293c9807352b0c0c99b7a9b8c613ec00733fdcbd3fde140e26742e2aaa9a2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #look(X:String, L:Int) => V ... </k> <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes> <heap> ... H |-> cellV(V:Val) ... </heap> requires X in_keys(M) andBool "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool {M[X]}:>Val ==K cellRef(H) [priority(40)]`
+
+## K-0331 — reference-semantics/semantics/core.k:152-154
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d805c991ad7d7a3556c12a68451a95bfc8986337fd4c5223a84c747f695d20bf`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> #look(X:String, L:Int) => #look(X, P) ... </k> <scopes> ... L |-> scope(M:Map, parent(P:Int)) ... </scopes> requires notBool (X in_keys(M))`
+
+## K-0332 — reference-semantics/semantics/core.k:157
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `9b3d6c932d97b99118d4972bbf495e2ee6ff961180c802cfc8002ac45499bc28`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Scope ::= "builtinsScope" [function, total]`
+
+## K-0333 — reference-semantics/semantics/core.k:158-181
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `6bb9401f2285601227a19ab2ad04f9d6d4535937705df26c54aa09559a71180b`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule builtinsScope => scope(.Map [ "len" <- builtinV("len") ] [ "set" <- builtinV("set") ] [ "sum" <- builtinV("sum") ] [ "abs" <- builtinV("abs") ] [ "min" <- builtinV("min") ] [ "max" <- builtinV("max") ] [ "ord" <- builtinV("ord") ] [ "chr" <- builtinV("chr") ] [ "range" <- builtinV("range") ] [ "all" <- builtinV("all") ] [ "any" <- builtinV("any") ] [ "zip" <- builtinV("zip") ] [ "isinstance" <- builtinV("isinstance") ] [ "sorted" <- builtinV("sorted") ] [ "list" <- builtinV("list") ] [ "round" <- builtinV("round") ] [ "bin" <- builtinV("bin") ] [ "enumerate" <- builtinV("enumerate") ] [ "map" <- builtinV("map") ] [ "eval" <- builtinV("eval") ] [ "int" <- typeV("int") ] [ "str" <- typeV("str") ] [ "float" <- typeV("float") ], root)`
+
+## K-0334 — reference-semantics/semantics/core.k:185
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `0cd464bb92d6fbd9eb61627b5a302e8d1419fb60845e61f594eea37e505361c0`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax ApplyK ::= toCall(Val)`
+
+## K-0335 — reference-semantics/semantics/core.k:186-188
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `4c486ed4a149e9e305a9176e39ac7f0ff75963f04d2b8be0defa6a4db356524d`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax KItem ::= #evalArgs(Exprs, Vals, ApplyK) | #evalArgCont(Exprs, Vals, ApplyK) | #applyK(ApplyK, Vals)`
+
+## K-0336 — reference-semantics/semantics/core.k:189
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e7135690e7262635dd0046776e8c65541a1b0e833e52085a497abbab22a24c0d`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>`
+
+## K-0337 — reference-semantics/semantics/core.k:190
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `aee090561fe2fc878e5922d8eeb9c6b759e0948f8c972db0ec10627a3d75e10a`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>`
+
+## K-0338 — reference-semantics/semantics/core.k:191
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `970d561c7f9c4b8f4a8b0291c59f5f473450c3c0c27124fa6efa204fbc998190`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>`
+
+## K-0339 — reference-semantics/semantics/core.k:194
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `49f810c47c2d98a8109f54c75a88554a078c9de7a27b1c9e98bab7c301f38e4c`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> Int(I:Int) => I ... </k>`
+
+## K-0340 — reference-semantics/semantics/core.k:195
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `28c8aac589ebebb882cb3f121a4017a8cda85f190a8992d2ffac23ca9f423675`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> Bool(B:Bool) => B ... </k>`
+
+## K-0341 — reference-semantics/semantics/core.k:196
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8f43f057222f9caa18b3df9c3fe8caf3eca8d3dd38d14d265a3a9f1ad1823ae0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> NoneVal => noneV ... </k>`
+
+## K-0342 — reference-semantics/semantics/core.k:199
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `c70b8b2eac36b927650e58afbb71b054cb3bbaaf272b95c269b562f4cca551bf`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Bool ::= truthy(Val) [function]`
+
+## K-0343 — reference-semantics/semantics/core.k:200
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `6a5f897dddf50fc1cc333177fd7d58fd05d5d2105120316f6e5a4151303bd335`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule truthy(B:Bool) => B`
+
+## K-0344 — reference-semantics/semantics/core.k:201
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ce79df9f62d4e794695fa9afbce647d0952b63e75c12138ff9c2bd78b074cd9d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule truthy(noneV) => false`
+
+## K-0345 — reference-semantics/semantics/core.k:202
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `028df8cf7244b1e37591ce4395e7e3b07a76ae5a4290f7d0cafdf039fca50fb8`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule truthy(I:Int) => I =/=Int 0`
+
+## K-0346 — reference-semantics/semantics/core.k:203
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `933b3fe9dcab3bdf20db8bf4c1a2b3cba08db2f51ccb124b6ba82c35a9515bc5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule truthy(str(S:IntSeq)) => notBool (S ==K .IntSeq)`
+
+## K-0347 — reference-semantics/semantics/core.k:204
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `75c0f2ab15c6fc94075bf8f9cef4918470585c955004634f0c982615be0ae0ae`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule truthy(list(V:ValSeq)) => notBool (V ==K .ValSeq)`
+
+## K-0348 — reference-semantics/semantics/core.k:205
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1660cb2026322597104cf4ec33c7388b5fe1da5ffc7ea6acbeb5c45fbab93d91`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)`
+
+## K-0349 — reference-semantics/semantics/core.k:208
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `01c72ea272fe77e59dfee2c706b635e11d09b2a04d1d76f98d60659c942fd492`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Val ::= applyUn(String, Val) [function]`
+
+## K-0350 — reference-semantics/semantics/core.k:209
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `182a981e83f00c3893b88729b6cf5be5479e21d6f42cdaf842eeeb76affaecf1`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Val ::= applyBin(String, Val, Val) [function]`
+
+## K-0351 — reference-semantics/semantics/core.k:210
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `da44e152afa873733ab2dc3148ce50d71b34ecc042e1cf1ccf8c1551df77c27d`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Bool ::= applyCmp(String, Val, Val) [function]`
+
+## K-0352 — reference-semantics/semantics/core.k:213
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `763cc5fd6e1abb711ac3c786c23d3e9954aa228ccb4012bbd586bfaa5ba4fadd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Vals ::= appendVal(Vals, Val) [function, total]`
+
+## K-0353 — reference-semantics/semantics/core.k:214
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `60caff7a9f1fbc6feaab41eb48b1217883a3d6ad60ae5ccc2081ffcaee8d5de9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule appendVal(.Vals, V:Val) => V , .Vals`
+
+## K-0354 — reference-semantics/semantics/core.k:215
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c67434450dfaea990d24b843f34d458858030555acd1f7050ad57b6ec05e65ed`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule appendVal((V0:Val, VS:Vals), V:Val) => V0 , appendVal(VS, V)`
+
+## K-0355 — reference-semantics/semantics/core.k:217
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `7a97605e841a91e05985c61a14143af9e0f2bfbec36c5c9bd36fc15daf540b31`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= vals2valSeq(Vals) [function, total]`
+
+## K-0356 — reference-semantics/semantics/core.k:218
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `702ecbf22fe6f1758f419f11f4435c2105c06424806029125446876b94c85500`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule vals2valSeq(.Vals) => .ValSeq`
+
+## K-0357 — reference-semantics/semantics/core.k:219
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e9fb82f13f27e02f1171f3ff6f4fd08b6f62b8db5925e26bba0d60c5e5856474`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))`
+
+## K-0358 — reference-semantics/semantics/core.k:223
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `dd74bc995871facfa87ea8ae2ecfdd41abc06296c877effa234a3e72b3d18dc0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= vsLen(ValSeq) [function, total]`
+
+## K-0359 — reference-semantics/semantics/core.k:224
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `04fc8b8adecfcc54620963a8180bac258c092189330857ed93cc23a9f5a19d1e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule vsLen(.ValSeq) => 0`
+
+## K-0360 — reference-semantics/semantics/core.k:225
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c1a7ece3322915ef794297b5c75a3938b56e9ca672ce0ac429021ecfc9588598`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)`
+
+## K-0361 — reference-semantics/semantics/core.k:227
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `cefb7744efac56151396c7b5c9ca84f75f0488d25c2614a59448994443d13dc2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= isLen(IntSeq) [function, total]`
+
+## K-0362 — reference-semantics/semantics/core.k:228
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e4e059101c40b9a841f0cba7da287bef20050de08ba733f65680a2ed0ad5317e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isLen(.IntSeq) => 0`
+
+## K-0363 — reference-semantics/semantics/core.k:229
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `71e04135edd8203bb98e5f9629d39d9e3de339d7420839fa40ad625658fdd31b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)`
+
+## K-0364 — reference-semantics/semantics/core.k:233
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `912ccb9ff6dc8632845252b58a055e68a16f0a9118db220d4bf8ee08fca756ff`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]`
+
+## K-0365 — reference-semantics/semantics/core.k:234
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1ac12e956540ee0b2650a26ed63e75a50691abe9faebecbb4344c6e34fc8f0e0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule setVSAt(.ValSeq, _:Int, _:Val) => .ValSeq`
+
+## K-0366 — reference-semantics/semantics/core.k:235
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `cf509c2667abf8c2a0a68464517f173c03affc282c5df4724ce0d522e8d2d856`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val) => vCons(V, S)`
+
+## K-0367 — reference-semantics/semantics/core.k:236-237
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `5624986ca9eb142798b212b86787df4faa532404a194a092d394737c4ad7aa9b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V)) requires I >Int 0`
+
+## K-0368 — reference-semantics/semantics/core.k:238-239
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `db586ecb1b4757198c769b8364d2b6845532095de51d5c937193c570eb0ca22a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule setVSAt(VS:ValSeq, I:Int, _:Val) => VS requires I <Int 0`
+
+## K-0369 — reference-semantics/semantics/dict.k:20
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `6df725675f7a3fe1fbef1dc1ce5a0adb42736c5da2f9d7288df57ffac9bd48ba`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= dictV(ValSeq, ValSeq)`
+
+## K-0370 — reference-semantics/semantics/dict.k:23-25
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `30be194e1c62b3ee9f22057d539d83463709e382c2349504428121466ed73e68`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #dictAcc(Entries, ValSeq, ValSeq) | #dictKey(Expr, Entries, ValSeq, ValSeq) | #dictVal(Val, Entries, ValSeq, ValSeq)`
+
+## K-0371 — reference-semantics/semantics/dict.k:26
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `338fc50af3ecaf41411e972eea5912fd2bee7938e1bff6720692e99e334f5fba`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> DictExpr(ES:Entries) => #dictAcc(ES, .ValSeq, .ValSeq) ... </k>`
+
+## K-0372 — reference-semantics/semantics/dict.k:27
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f86750e273ef1a0279ecf6f61df440040bd682375694808504d2126cfe14f07d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #dictAcc(.Entries, KS:ValSeq, VS:ValSeq) => dictV(KS, VS) ... </k>`
+
+## K-0373 — reference-semantics/semantics/dict.k:28-29
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d45ec799e4cd836f44f484fc1d3628968a5f297cc46f82a202ee6a1dcfdeb42d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #dictAcc((Entry(K:Expr, V:Expr), REST:Entries), KS:ValSeq, VS:ValSeq) => K ~> #dictKey(V, REST, KS, VS) ... </k>`
+
+## K-0374 — reference-semantics/semantics/dict.k:30-31
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b5cfd31650441a30d759997a210bc318f97835e93dfe744fb1e03d0bb48a798c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> KV:Val ~> #dictKey(V:Expr, REST:Entries, KS:ValSeq, VS:ValSeq) => V ~> #dictVal(KV, REST, KS, VS) ... </k>`
+
+## K-0375 — reference-semantics/semantics/dict.k:32-33
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a92b0519b082d218a559af7516cfef9d6dc2d8af618b2adcffa4662bcfbdd134`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> VV:Val ~> #dictVal(KV:Val, REST:Entries, KS:ValSeq, VS:ValSeq) => #dictAcc(REST, dPutK(KS, KV), dPutV(KS, VS, KV, VV)) ... </k>`
+
+## K-0376 — reference-semantics/semantics/dict.k:37
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `b1e4066d0d4acd3c64f38780d7aea22278b1bd58e3672a864ff09a7970008697`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= dHasKey(ValSeq, Val) [function, total]`
+
+## K-0377 — reference-semantics/semantics/dict.k:38
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a5aab27421b2f64c493da6ff97007f44f9d65c869d95728a3dc5e84548241b4b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dHasKey(.ValSeq, _:Val) => false`
+
+## K-0378 — reference-semantics/semantics/dict.k:39
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `140cbc9a1aeed8d176645ace38702c79dc42da15b6e5c8c122a7d6e466494f73`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dHasKey(vCons(A:Val, _:ValSeq), K:Val) => true requires A ==K K`
+
+## K-0379 — reference-semantics/semantics/dict.k:40
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d5e79e57f442c03ff8cc2c715636cf83f11e50ea637471eb603501956edb7c2e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dHasKey(vCons(A:Val, R:ValSeq), K:Val) => dHasKey(R, K) requires notBool (A ==K K)`
+
+## K-0380 — reference-semantics/semantics/dict.k:43
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `97a166c788d6c17c0b8006da462d27de937efebd9f79b1205190771acf087932`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= dPutK(ValSeq, Val) [function, total]`
+
+## K-0381 — reference-semantics/semantics/dict.k:44
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `5164f3d147fc1e922aee8ebd927f64a7b22663f1d6062620c758c1cc398edfd1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dPutK(KS:ValSeq, K:Val) => KS requires dHasKey(KS, K)`
+
+## K-0382 — reference-semantics/semantics/dict.k:45
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e529b1885d7972576cc7962fca56b22aba2ca21245710a47742ae59505440e2e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dPutK(KS:ValSeq, K:Val) => valSeqConcat(KS, vCons(K, .ValSeq)) requires notBool dHasKey(KS, K)`
+
+## K-0383 — reference-semantics/semantics/dict.k:49
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `a03444397cd8f766654c7e3d429905bf2ef672ac16a3d38004b0ccea0cdf26dc`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= dPutV(ValSeq, ValSeq, Val, Val) [function, total]`
+
+## K-0384 — reference-semantics/semantics/dict.k:50-51
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2527b32b669ff89090da46aa23c97bc365387cb62d3ceaf02672f50dcfdb6684`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dPutV(vCons(A:Val, _:ValSeq), vCons(_:Val, VR:ValSeq), K:Val, V:Val) => vCons(V, VR) requires A ==K K`
+
+## K-0385 — reference-semantics/semantics/dict.k:52-53
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8b0c3eb1a71ca341f00a31aa32ffbb44b4d4c75345582c55bf33700e53537330`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dPutV(vCons(A:Val, KR:ValSeq), vCons(B:Val, VR:ValSeq), K:Val, V:Val) => vCons(B, dPutV(KR, VR, K, V)) requires notBool (A ==K K)`
+
+## K-0386 — reference-semantics/semantics/dict.k:54
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `23c2d76a5bb2e7adf9b832aa4300f9d00a0352504136d72fd9e65ac1295d5b27`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dPutV(_KS:ValSeq, VS:ValSeq, _K:Val, V:Val) => valSeqConcat(VS, vCons(V, .ValSeq)) [owise]`
+
+## K-0387 — reference-semantics/semantics/dict.k:58-60
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `c613378f8346d41e1ff40b094b61688cbb09150d427d757ca7b8ad77ce23ff12`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(boundMethodV(dictV(KS:ValSeq, _:ValSeq), "keys")), .Vals) => #alloc(list(KS)) ... </k> [priority(40)]`
+
+## K-0388 — reference-semantics/semantics/dict.k:63
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2e626ca3a0e5e06a889a4d97406f45d3659087e9efdac24f9037c7b021b61d25`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyIndexD(dictV(KS:ValSeq, VS:ValSeq), K:Val) => dGet(KS, VS, K)`
+
+## K-0389 — reference-semantics/semantics/dict.k:64
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `391e4efc55553a5e694ebaf97dfe170a4a08c60841a9c39d8958cc9545fc76f2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= applyIndexD(Val, Val) [function]`
+
+## K-0390 — reference-semantics/semantics/dict.k:65-66
+
+- Kind: rule
+- Attributes: priority(45)
+- Normalized SHA-256: `189b2894f160ae325fca63d2978357c8101dc743249bca2587aeaa998bc574c0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Subscript(dictV(KS:ValSeq, VS:ValSeq), K:Val) => applyIndexD(dictV(KS, VS), K) ... </k> [priority(45)]`
+
+## K-0391 — reference-semantics/semantics/dict.k:70
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `31f3f6e36c107f354fb41ccfe3cf3cd21869f226637d592051299da74c7cdd2f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= dictSet(Val, Val, Val) [function]`
+
+## K-0392 — reference-semantics/semantics/dict.k:71
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `fe76006a41db9b04182eac0081d2b89f33d9f8612d4df5d59e159f152f21027a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dictSet(dictV(KS:ValSeq, VS:ValSeq), K:Val, V:Val) => dictV(dPutK(KS, K), dPutV(KS, VS, K, V))`
+
+## K-0393 — reference-semantics/semantics/dict.k:76
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `882d796d0a94e03af3316fa067c35a7bb135e1dabf98f9924be715aa1ac35f94`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #dsetK(String, Val)`
+
+## K-0394 — reference-semantics/semantics/dict.k:77
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4bbcefc7ea06cb0a74912a7e16f43ad37f5b0a3ee22b17219012676ff5ecc3ec`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Assign(Subscript(Name(X:String), K:Expr), VV:Val) => K ~> #dsetK(X, VV) ... </k>`
+
+## K-0395 — reference-semantics/semantics/dict.k:78-81
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `9d1ff995bd95ac2b3b5da7ff66b2cd5a4b8b73d9fbee973a032feeb27ca15697`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- dictSet({M[X]}:>Val, KV, VV) ], _) ... </scopes> requires X in_keys(M) andBool notBool isRefV({M[X]}:>Val)`
+
+## K-0396 — reference-semantics/semantics/dict.k:82-85
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `485423180beef1651c3f117d2f2892fd603734c3faf88d391b16407ff455af2f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => #dsetV({M[X]}:>Val, KV, VV) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires X in_keys(M) andBool isRefV({M[X]}:>Val)`
+
+## K-0397 — reference-semantics/semantics/dict.k:86
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `cfa9005e176ec5b6079b3150ca401aac1e59264561f6ebcd7e0052b2e1767255`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #dsetV(Val, Val, Val)`
+
+## K-0398 — reference-semantics/semantics/dict.k:87-88
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e130e7fd1d40210446c6488920686ffd088444c8696317ea2cc7d191ef53deed`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #dsetV(ref(H:Int), I:Int, VV:Val) => .K ... </k> <heap> ... H |-> list(VS:ValSeq => setVSAt(VS, normIdxD(I, vsLen(VS)), VV)) ... </heap>`
+
+## K-0399 — reference-semantics/semantics/dict.k:90
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `1c5323bfd95cd3cb664adcf89003e8bd1edfe2eefca936b6e63553bd03ca2a9b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= normIdxD(Int, Int) [function, total]`
+
+## K-0400 — reference-semantics/semantics/dict.k:91
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `458bf70556ac8c03ed6e21a622a978e5d34be85d627b6d4f58f5f060bc44fde4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule normIdxD(I:Int, LEN:Int) => I +Int LEN requires I <Int 0`
+
+## K-0401 — reference-semantics/semantics/dict.k:92
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ed050aba2a04ed87e8b60acbc92f27d9cc54295f869d22a4720aacd2622971b8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule normIdxD(I:Int, _:Int) => I requires I >=Int 0`
+
+## K-0402 — reference-semantics/semantics/dict.k:95-96
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1c9db57ab415b441ba412596dcf280fbe85d60afeea5ba85521b855309f1f5f6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("==", dictV(KS1:ValSeq, VS1:ValSeq), dictV(KS2:ValSeq, VS2:ValSeq)) => (vsLen(KS1) ==Int vsLen(KS2)) andBool dSubset(KS1, VS1, KS2, VS2)`
+
+## K-0403 — reference-semantics/semantics/dict.k:97
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `24fc648b5bc5f1b87c0b113593503702ac899646af3d254d731c3d4e5ffc61ae`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= dSubset(ValSeq, ValSeq, ValSeq, ValSeq) [function]`
+
+## K-0404 — reference-semantics/semantics/dict.k:98
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `38e9c64805ad38d661e4e7c2f33c2399b182a2711ca7bc122061e762bf8474ee`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dSubset(.ValSeq, .ValSeq, _:ValSeq, _:ValSeq) => true`
+
+## K-0405 — reference-semantics/semantics/dict.k:99-100
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `cdfafd7d57f16e3d35b9c54663a1ba9ff34141422b1f8e6d464f8019530df075`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dSubset(vCons(K:Val, KR:ValSeq), vCons(V:Val, VR:ValSeq), KS2:ValSeq, VS2:ValSeq) => dHasKey(KS2, K) andBool (dGet(KS2, VS2, K) ==K V) andBool dSubset(KR, VR, KS2, VS2)`
+
+## K-0406 — reference-semantics/semantics/dict.k:101
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `10fc860d42b91939926b7ddbf4700aa5545a6754489e58ab76b66d3af6d482a5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= dGet(ValSeq, ValSeq, Val) [function]`
+
+## K-0407 — reference-semantics/semantics/dict.k:102
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a145c44f31bfcd75ef044137ce8d42d976b8bb256225f16e85bbd2a2167205ee`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dGet(vCons(A:Val, _:ValSeq), vCons(B:Val, _:ValSeq), K:Val) => B requires A ==K K`
+
+## K-0408 — reference-semantics/semantics/dict.k:103
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `6971aef401036e46e2e9df3628917fcccf09751381df9430a38bd33284b82f27`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dGet(vCons(A:Val, KR:ValSeq), vCons(_:Val, VR:ValSeq), K:Val) => dGet(KR, VR, K) requires notBool (A ==K K)`
+
+## K-0409 — reference-semantics/semantics/float.k:20
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `f206c1a5ca92a9a762be3e97c9ab44ee4f72fa5d071bcb8ed4a0aa3b63cb0d34`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= Float`
+
+## K-0410 — reference-semantics/semantics/float.k:21
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `958c3574357c8428d95f6741b6d8187e5e3190138aa0b5187d0b4e1f2b25fc60`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Float(F:Float) => F ... </k>`
+
+## K-0411 — reference-semantics/semantics/float.k:24
+
+- Kind: syntax
+- Attributes: function, total, symbol(intFloatDiv), no-evaluators
+- Normalized SHA-256: `f4862b43f760e695beb6727198d6b0bd1486a20fc8ba5871213b46541b77f8dd`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Float ::= intFloatDiv(Int, Float) [function, total, symbol(intFloatDiv), no-evaluators]`
+
+## K-0412 — reference-semantics/semantics/float.k:25
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `be877732fabb34242222ef0e2c0fb64b761eece113ce9bbb8de0aeaf9ce64fca`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule intFloatDiv(I:Int, F:Float) => Int2Float(I, 53, 11) /Float F [concrete]`
+
+## K-0413 — reference-semantics/semantics/float.k:27
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ad4088a17a289dd488182432542dc1ee4ea6ff870718b65f444010830b897eba`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("/", I:Int, F:Float) => intFloatDiv(I, F)`
+
+## K-0414 — reference-semantics/semantics/float.k:30
+
+- Kind: syntax
+- Attributes: function, total, symbol(divII), no-evaluators
+- Normalized SHA-256: `3c7cef5fcc77371d3654505ea7b198e0da74e7585aa45aca562525a59a63923b`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Float ::= divII(Int, Int) [function, total, symbol(divII), no-evaluators]`
+
+## K-0415 — reference-semantics/semantics/float.k:31
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `111c0e226da2c6738b3f8b5cec611cb2e1bd07bb09ee056045a36d3d6475f6c7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule divII(I1:Int, I2:Int) => Int2Float(I1, 53, 11) /Float Int2Float(I2, 53, 11) [concrete]`
+
+## K-0416 — reference-semantics/semantics/float.k:32
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4f674380fdd433f56c21e087e38d181af6f79017577d29b997ec82124dc2fef6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("/", I1:Int, I2:Int) => divII(I1, I2)`
+
+## K-0417 — reference-semantics/semantics/float.k:37
+
+- Kind: syntax
+- Attributes: function, total, symbol(floatMod), no-evaluators
+- Normalized SHA-256: `26237ef2edca0917e0569815f93385224bbda0fd4d6cc2bc1419ffa94686c7ee`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Float ::= floatMod(Float, Float) [function, total, symbol(floatMod), no-evaluators]`
+
+## K-0418 — reference-semantics/semantics/float.k:38
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `f0f814d6f918a67f2d1dbe84073ffb15231fd42083b328d44910ae370821cf9c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule floatMod(F1:Float, F2:Float) => F1 -Float (floorFloat(F1 /Float F2) *Float F2) [concrete]`
+
+## K-0419 — reference-semantics/semantics/float.k:39
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b992bea3c102cf000d5ff100f2f229847d5ffd8a41282ce665ba69a939bc67a8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("%", F1:Float, F2:Float) => floatMod(F1, F2)`
+
+## K-0420 — reference-semantics/semantics/float.k:43
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ce568cc9c8ae662d6f5e89cde017ce3384e06a48825731fd774752aac5f9ec52`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2`
+
+## K-0421 — reference-semantics/semantics/float.k:44
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `08c0b0dbc97fb2a4d31d378a41c1526e36b68468ebdb67cfe00acebf3309215a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2)`
+
+## K-0422 — reference-semantics/semantics/float.k:50
+
+- Kind: syntax
+- Attributes: function, total, symbol(floatLt), no-evaluators
+- Normalized SHA-256: `9675cd9c7a220914d5e1ac6fd0cea726b7800b8a4e4cc8e3827dab3f1a64e40a`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Bool ::= floatLt(Float, Float) [function, total, symbol(floatLt), no-evaluators]`
+
+## K-0423 — reference-semantics/semantics/float.k:51
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `2a8121a4d91fa2828c6f00490d4170198174d13b61570468b22f0e42ac18f7ad`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule floatLt(F1:Float, F2:Float) => F1 <Float F2 [concrete]`
+
+## K-0424 — reference-semantics/semantics/float.k:52
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c073d8cee697c56f18c7591e4e094442f43e33bde7d1f323b558237de1ec7fb4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("<", F1:Float, F2:Float) => floatLt(F1, F2)`
+
+## K-0425 — reference-semantics/semantics/float.k:54
+
+- Kind: syntax
+- Attributes: function, total, symbol(absF), no-evaluators
+- Normalized SHA-256: `12a1faf44cdf66e02b407c54180b85b62a91e0e15d77be9b9e9206ab00a1f8b4`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Float ::= absF(Float) [function, total, symbol(absF), no-evaluators]`
+
+## K-0426 — reference-semantics/semantics/float.k:55
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `b00b8066b8e964faa56e75d261ba728c14a5849399b0c29bf1f32b48ec5eedec`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule absF(F:Float) => absFloat(F) [concrete]`
+
+## K-0427 — reference-semantics/semantics/float.k:56
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ea3ec435ee8ebe3c96a535cefcd8cb43119d8a7744c9f1b3c8d31f8601b48a5c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("abs", F:Float, .Vals) => absF(F)`
+
+## K-0428 — reference-semantics/semantics/float.k:61
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b7f366ac2fd217c1eba7cfbefec148a65f8af45d95eaed38990d34ee842a08dd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Import(_:String) => .K ... </k>`
+
+## K-0429 — reference-semantics/semantics/float.k:65
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `b46507b52502d69ecd0b28bf99b17d6364e01f0ddfcc14834ec07fcafceb1f78`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= "#mathCeil"`
+
+## K-0430 — reference-semantics/semantics/float.k:66
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `6731784767d29f257a6e457e28ea5da072a6cdb279502efc86711cf04b62290e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Call(Attribute(Name("math"), "ceil"), (E:Expr, .Exprs)) => E ~> #mathCeil ... </k> [priority(40)]`
+
+## K-0431 — reference-semantics/semantics/float.k:67
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `43dd41b1a295d443dd4cef3af27017a700cb2b3f65093044777707dcb1ee6d07`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> V:Val ~> #mathCeil => ceilF(V) ... </k>`
+
+## K-0432 — reference-semantics/semantics/float.k:70
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `7182dabba36769b189524af8593436518f2392b447983f4d2982643bf6ca9f6d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= "#mathFloor"`
+
+## K-0433 — reference-semantics/semantics/float.k:71
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `8c6ed970676f93aca0ee122cdf288baef386e0d235737cd00ef0972d35539986`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Call(Attribute(Name("math"), "floor"), (E:Expr, .Exprs)) => E ~> #mathFloor ... </k> [priority(40)]`
+
+## K-0434 — reference-semantics/semantics/float.k:72
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `65f0f3138bd4041429d19744d61cd2ab7ae411553229ea4ff3dbdd7b1684509a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> V:Val ~> #mathFloor => floorFI(V) ... </k>`
+
+## K-0435 — reference-semantics/semantics/float.k:73
+
+- Kind: syntax
+- Attributes: function, total, symbol(floorFI)
+- Normalized SHA-256: `bb414e98ce7ce75743ab373e70347f41d2f4ee07ff45aa6580a15966550ccb50`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]`
+
+## K-0436 — reference-semantics/semantics/float.k:74
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `6f2278b445a3354bce4acb84b19c8366d938c41f0320cc6150412091d50ce376`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule floorFI(I:Int) => I [concrete]`
+
+## K-0437 — reference-semantics/semantics/float.k:75
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `c5cd79cd77b2b27671c36827b4550154d02326cba2e26a9031b1a2a6fb1304c6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule floorFI(F:Float) => Float2Int(floorFloat(F)) [concrete]`
+
+## K-0438 — reference-semantics/semantics/float.k:78
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4f4ffc4a6628c5740fa8ade1d51ba965ebb75a520f0dee556a13f5d680058c82`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("floor", V:Val, .Vals) => floorFI(V)`
+
+## K-0439 — reference-semantics/semantics/float.k:79
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `840de0abaf7b9f0d0b48a1a022bba1b14ac40befb87c135d59dfe3f5dbd98e13`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("ceil", V:Val, .Vals) => ceilF(V)`
+
+## K-0440 — reference-semantics/semantics/float.k:82
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `533ce20926848a932096268dcc8d19a7affc311f363f07719348863d48fca5b4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #mathPow1(Expr) | #mathPow2(Val)`
+
+## K-0441 — reference-semantics/semantics/float.k:83
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `841a8e8cad165e0baad70da3e93cd4b35a8e56bf91952b8dd9176dfbcc1fd55a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Call(Attribute(Name("math"), "pow"), (E1:Expr, E2:Expr, .Exprs)) => E1 ~> #mathPow1(E2) ... </k> [priority(40)]`
+
+## K-0442 — reference-semantics/semantics/float.k:84
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `fbcd9d035631ab0d6584bf5ad7e731663ca5f847f66a3e2c17f88cc6b8b62f59`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> V1:Val ~> #mathPow1(E2:Expr) => E2 ~> #mathPow2(V1) ... </k>`
+
+## K-0443 — reference-semantics/semantics/float.k:85
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f6ee2424cb4d2471040a4178c7b5055007746c94dd088fd5fe295808e4d9ba56`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> V2:Val ~> #mathPow2(V1:Val) => powF(toF(V1), toF(V2)) ... </k>`
+
+## K-0444 — reference-semantics/semantics/float.k:86
+
+- Kind: syntax
+- Attributes: function, total, symbol(toF)
+- Normalized SHA-256: `5506be32391181835ed65a75fc4654d2c25ffe352ec3115b3d137d28f495bf73`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Float ::= toF(Val) [function, total, symbol(toF)]`
+
+## K-0445 — reference-semantics/semantics/float.k:87
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `ed62a3a7f661923ba2dc8a8100b240b37581acaf018e91c6d5f0e04b90f1b339`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule toF(F:Float) => F [concrete]`
+
+## K-0446 — reference-semantics/semantics/float.k:88
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `6280627d8549da3b1d2864295ac7eb9de21a7f9c44ea0d434f5386bf5c53c887`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule toF(I:Int) => intToF(I) [concrete]`
+
+## K-0447 — reference-semantics/semantics/float.k:93
+
+- Kind: syntax
+- Attributes: function, total, symbol(ceilF)
+- Normalized SHA-256: `52675460312419ec876e710ac18206472fab07ac74a094bd6caa45e1ec0027ed`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= ceilF(Val) [function, total, symbol(ceilF)]`
+
+## K-0448 — reference-semantics/semantics/float.k:94
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `c5ad02ae16417369c8125277af88c6486c901951961ba6b585a296287b4a5be8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule ceilF(I:Int) => I [concrete]`
+
+## K-0449 — reference-semantics/semantics/float.k:95
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `01d36090dbecf1863264f62b5f1c732952306657f4b1aa8a3111e2b5032da920`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule ceilF(F:Float) => Float2Int(ceilFloat(F)) [concrete]`
+
+## K-0450 — reference-semantics/semantics/float.k:99
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0360ea94a438461024afbf1fbc70e7f4c570550fa97c069197cbab9fb6f1fd9d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyUn("-", F:Float) => 0.0 -Float F`
+
+## K-0451 — reference-semantics/semantics/float.k:103
+
+- Kind: syntax
+- Attributes: function, total, symbol(subF), no-evaluators
+- Normalized SHA-256: `bd9289f118f1e03fa252abe44e6e1c934c9f1ae015ed8e3fbd4299e7f5c26494`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Float ::= subF(Float, Float) [function, total, symbol(subF), no-evaluators]`
+
+## K-0452 — reference-semantics/semantics/float.k:104
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `12f60d082454bd2b0805c3344bf9ab377c453dcd7d5e9c5b42bf333f5d57edb8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule subF(F1:Float, F2:Float) => F1 -Float F2 [concrete]`
+
+## K-0453 — reference-semantics/semantics/float.k:105
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `600f864e0d4d5f3dfe90085090dd70db36baef4d5567bb1aaeef349e99da06db`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("-", F1:Float, F2:Float) => subF(F1, F2)`
+
+## K-0454 — reference-semantics/semantics/float.k:107
+
+- Kind: syntax
+- Attributes: function, total, symbol(divF), no-evaluators
+- Normalized SHA-256: `91e03f2ac9cf90dce2b3ea5859601973196a3504474c25eb80ec2b21be7ffe57`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Float ::= divF(Float, Float) [function, total, symbol(divF), no-evaluators]`
+
+## K-0455 — reference-semantics/semantics/float.k:108
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `26654b7bcf191054c73e2246eb8532b4bd2b7243dfed90f8a8981b961ece60f8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule divF(F1:Float, F2:Float) => F1 /Float F2 [concrete]`
+
+## K-0456 — reference-semantics/semantics/float.k:109
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ef46ce780b55860627d49bf1404f7f29e15fe39b90cd069c1022d94b833e6290`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("/", F1:Float, F2:Float) => divF(F1, F2)`
+
+## K-0457 — reference-semantics/semantics/float.k:111
+
+- Kind: syntax
+- Attributes: function, total, symbol(addF), no-evaluators
+- Normalized SHA-256: `2398531263a97112a72ea01928b6cf992a9f2306201ba7f3170536661db96622`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Float ::= addF(Float, Float) [function, total, symbol(addF), no-evaluators]`
+
+## K-0458 — reference-semantics/semantics/float.k:112
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `3f45f37477446abb30b2cf45ac67d631b0bf8d597d6dfac37aebfb9494124574`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule addF(F1:Float, F2:Float) => F1 +Float F2 [concrete]`
+
+## K-0459 — reference-semantics/semantics/float.k:113
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `034cf2b7767250b7e2e63618d233e160da84cceb00705122dacb2b21d37f9641`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("+", F1:Float, F2:Float) => addF(F1, F2)`
+
+## K-0460 — reference-semantics/semantics/float.k:115
+
+- Kind: syntax
+- Attributes: function, total, symbol(mulF), no-evaluators
+- Normalized SHA-256: `4e0d8b299c8516d20b15b89833ed1e760641f6fa8ecc8d0069cf24fa804c9c98`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Float ::= mulF(Float, Float) [function, total, symbol(mulF), no-evaluators]`
+
+## K-0461 — reference-semantics/semantics/float.k:116
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `46a5b95d90aada84fb908fcccfac676a044aaa6b9f76e95e95f4c620acb0278b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule mulF(F1:Float, F2:Float) => F1 *Float F2 [concrete]`
+
+## K-0462 — reference-semantics/semantics/float.k:117
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7bc5c419eaac104d84561c37f738d88864aedb6a8f4fe53efafeaf9213747acd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("*", F1:Float, F2:Float) => mulF(F1, F2)`
+
+## K-0463 — reference-semantics/semantics/float.k:119
+
+- Kind: syntax
+- Attributes: function, total, symbol(powF), no-evaluators
+- Normalized SHA-256: `47a046af374b7333041c374f5e55c9c816bb128c6ec2b425f34da68716e8cea3`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Float ::= powF(Float, Float) [function, total, symbol(powF), no-evaluators]`
+
+## K-0464 — reference-semantics/semantics/float.k:120
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `88f0b7d20137e8c6cc512845c967e98e804b4966da1b2ef8eb07db88bae5b8fa`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule powF(F1:Float, F2:Float) => F1 ^Float F2 [concrete]`
+
+## K-0465 — reference-semantics/semantics/float.k:121
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `661e867f27fd29596ddc7c8c80254088d059d42967ef244acafd0959e43c965b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("**", F1:Float, F2:Float) => powF(F1, F2)`
+
+## K-0466 — reference-semantics/semantics/float.k:125
+
+- Kind: syntax
+- Attributes: function, total, symbol(gtF), no-evaluators
+- Normalized SHA-256: `9fdcc02ab4ee99148d3e6503c0421d6d40e4c43f206fecef2bf271337906a0c0`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Bool ::= gtF(Float, Float) [function, total, symbol(gtF), no-evaluators]`
+
+## K-0467 — reference-semantics/semantics/float.k:126
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `088703ce3653f7358ab35922090d8b0c6380e7bdabc390bab127a4fb756fe9f9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule gtF(F1:Float, F2:Float) => F1 >Float F2 [concrete]`
+
+## K-0468 — reference-semantics/semantics/float.k:127
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0288d338940c4dc8037d4e03ef5004dce662bd4311b988368300e3b9694a9088`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp(">", F1:Float, F2:Float) => gtF(F1, F2)`
+
+## K-0469 — reference-semantics/semantics/float.k:128
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `5eb9299eb06c3b1274bb92813d634fba7250df5e932e6fbd4f10219082b4e26d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp(">=", F1:Float, F2:Float) => notBool floatLt(F1, F2)`
+
+## K-0470 — reference-semantics/semantics/float.k:129
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `714c6765e58708cf37e023afc8269da1f32bd906e0c44f22c339889bb80bf14a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("<=", F1:Float, F2:Float) => notBool gtF(F1, F2)`
+
+## K-0471 — reference-semantics/semantics/float.k:132
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f16ef18fbd1d9024a5bbbb2180e97eb0b9b548b0a53165996dc52bd3db603161`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("**", I:Int, F:Float) => powF(intToF(I), F)`
+
+## K-0472 — reference-semantics/semantics/float.k:133
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `6353492521ad97f8b794ad6a43bd8fd197aa82dde113f341a78b56fbcebb6436`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("**", F:Float, I:Int) => powF(F, intToF(I))`
+
+## K-0473 — reference-semantics/semantics/float.k:134
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7b68c306973586de958d305580b9863c51bc797c0632e645a8be0e4e94ab5f88`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("-", I:Int, F:Float) => subF(intToF(I), F)`
+
+## K-0474 — reference-semantics/semantics/float.k:135
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1409954604e558d1e20ebb673b113bb4e753382700056a9bb050e2f5877f2435`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("-", F:Float, I:Int) => subF(F, intToF(I))`
+
+## K-0475 — reference-semantics/semantics/float.k:136
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `695a4d4bdd54bacc726be8bb1b947957b13ac3c1ea85079e6f37f176f5dd1e85`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("+", I:Int, F:Float) => addF(intToF(I), F)`
+
+## K-0476 — reference-semantics/semantics/float.k:137
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8105c256a812da5488c816ddc234cc23a361eaea37ba294397ab351db64ecbe8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("+", F:Float, I:Int) => addF(F, intToF(I))`
+
+## K-0477 — reference-semantics/semantics/float.k:138
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `74e2f8b58bc61612bd447aba290b62193b7b0a596847a535cef8ecf17013ed6d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("*", I:Int, F:Float) => mulF(intToF(I), F)`
+
+## K-0478 — reference-semantics/semantics/float.k:139
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `de611e1415d1413bffdbb0fc1e35fdc3143eee6a775b9cef2212242ec9d8114a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("*", F:Float, I:Int) => mulF(F, intToF(I))`
+
+## K-0479 — reference-semantics/semantics/float.k:142
+
+- Kind: syntax
+- Attributes: function, total, symbol(eqF), no-evaluators
+- Normalized SHA-256: `4d0d2ce425b47cbd6bee2f255bcf3d96198d491b336ae2a39b526ef63bea2402`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Bool ::= eqF(Float, Float) [function, total, symbol(eqF), no-evaluators]`
+
+## K-0480 — reference-semantics/semantics/float.k:143
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `9653dcd55b20d0e03ba4d3cbe0f0bc8f742986e54a1d18bce5cea115e0effbb2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule eqF(F1:Float, F2:Float) => F1 ==Float F2 [concrete]`
+
+## K-0481 — reference-semantics/semantics/float.k:144
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ac77f892cfc0b69b735ac2dedee89bcc32c18ec0b6242435d33e360dc3bdfebc`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("==", I:Int, F:Float) => eqF(intToF(I), F)`
+
+## K-0482 — reference-semantics/semantics/float.k:145
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `722beef5b388f74df4709c027e46917747d36d8c1d7c43bf20a191f26682e6a0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("==", F:Float, I:Int) => eqF(F, intToF(I))`
+
+## K-0483 — reference-semantics/semantics/float.k:146
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `15bc1d1e3d08b5b6493f5463f32de91bc41aedbc0531460205fa7b219d3a0b6e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("!=", I:Int, F:Float) => notBool eqF(intToF(I), F)`
+
+## K-0484 — reference-semantics/semantics/float.k:147
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `330ac8e38f2c5dc2e16493d9573956960ac5ac0f1aa2ec0b94a2bab7f4776709`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("!=", F:Float, I:Int) => notBool eqF(F, intToF(I))`
+
+## K-0485 — reference-semantics/semantics/float.k:148
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1714c1550770bc11884e259edb53966f4938fc04546dd96c773cabee38acab6c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("<", I:Int, F:Float) => floatLt(intToF(I), F)`
+
+## K-0486 — reference-semantics/semantics/float.k:149
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a3b308b7b2c2e9343ae069b0a7bbe47498537cca6859ee92873552c2df50f105`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("<", F:Float, I:Int) => floatLt(F, intToF(I))`
+
+## K-0487 — reference-semantics/semantics/float.k:150
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `fc6de3b7c2f96d950f9aaca9f5df3aed76102c3b005e86cef59e2d2bce19afcf`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp(">", I:Int, F:Float) => gtF(intToF(I), F)`
+
+## K-0488 — reference-semantics/semantics/float.k:151
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `18ff729bf687fd4bce566aec46540f7830a79e48525d2236d2247e5487e70ab2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp(">", F:Float, I:Int) => gtF(F, intToF(I))`
+
+## K-0489 — reference-semantics/semantics/float.k:154
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ed4df68a2d974fe706e71c86e88eb3e36801da78a3eaa8c2ecbaa51f6ced123c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("==", V:Val, noneV) => V ==K noneV`
+
+## K-0490 — reference-semantics/semantics/float.k:155
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2a477f6ab023d1a0b36361a5a4dccc657f6dac92a02e4e740d92abb1bee2887f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("!=", V:Val, noneV) => notBool (V ==K noneV)`
+
+## K-0491 — reference-semantics/semantics/float.k:160
+
+- Kind: syntax
+- Attributes: function, total, symbol(decStrToF), no-evaluators
+- Normalized SHA-256: `588f5768440e82dbce509dc1072150d464064371a95ab449d306de6c8a1ab71d`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Float ::= decStrToF(IntSeq) [function, total, symbol(decStrToF), no-evaluators]`
+
+## K-0492 — reference-semantics/semantics/float.k:161
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `32ad68f36a3579ddde24fed9991e513dbe124c01fa42f3cf8d325c00724072e5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule decStrToF(iCons(45, CS:IntSeq)) => 0.0 -Float decStrToF(CS) [concrete]`
+
+## K-0493 — reference-semantics/semantics/float.k:162-164
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `9f3e9336e6d4f17232515b23e758529e9713428bdc07275860865b9fabe9a17e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule decStrToF(CS:IntSeq) => intToF(intPart(CS)) +Float (intToF(fracPart(CS)) /Float intToF(fracScale(CS))) requires isLen(CS) >Int 0 andBool headIS(CS) =/=Int 45 [concrete]`
+
+## K-0494 — reference-semantics/semantics/float.k:165
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `7ccb5a6fa421529eb4d84258e8892a126f17837c883f5f769a46302b9f415a77`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= headIS(IntSeq) [function]`
+
+## K-0495 — reference-semantics/semantics/float.k:166
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `87f97131d232c3b3fe63af84c485392eb5fa213372961692ad8be1d4e829b6be`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule headIS(iCons(C:Int, _:IntSeq)) => C`
+
+## K-0496 — reference-semantics/semantics/float.k:167
+
+- Kind: syntax
+- Attributes: function, total, function, total
+- Normalized SHA-256: `81addd4f5596f2033c20428b0f7237369100bbb560bee73c96ad21a80d841b50`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= intPart(IntSeq) [function, total] | intPartAcc(IntSeq, Int) [function, total]`
+
+## K-0497 — reference-semantics/semantics/float.k:168
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8628f4bdac5b353e03c2bc742851a9bef5270e9f55485b2fd5106110b32c91eb`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule intPart(CS:IntSeq) => intPartAcc(CS, 0)`
+
+## K-0498 — reference-semantics/semantics/float.k:169
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b0b8a3b71d8b773e0ac54513c6fc1487bd635290f8b43e0cde2e727212088832`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule intPartAcc(.IntSeq, A:Int) => A`
+
+## K-0499 — reference-semantics/semantics/float.k:170
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `afe4cef68f539bdd51c1f0a5ae8df7775d90ea5f56b631736fca0c3045775347`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule intPartAcc(iCons(46, _:IntSeq), A:Int) => A`
+
+## K-0500 — reference-semantics/semantics/float.k:171-172
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `449dadad749f7ef91ef8e6743696425941aff55a9e7c5e9632f30e047051f33e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule intPartAcc(iCons(C:Int, R:IntSeq), A:Int) => intPartAcc(R, A *Int 10 +Int (C -Int 48)) requires C =/=Int 46`
+
+## K-0501 — reference-semantics/semantics/float.k:173
+
+- Kind: syntax
+- Attributes: function, total, function, total
+- Normalized SHA-256: `89e3dfc58231d5383b1e61b92e817335a29e719d804013b43b7c7441c61c2b6f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= fracPart(IntSeq) [function, total] | fracAcc(IntSeq, Int) [function, total]`
+
+## K-0502 — reference-semantics/semantics/float.k:174
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `63e7386de829e297aa3549501083463f674402c03453af6d2af82954ea3ca089`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule fracPart(.IntSeq) => 0`
+
+## K-0503 — reference-semantics/semantics/float.k:175
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `336f8c20b7a91aaa9ffeb7e78c4036dc329b5eb2285b828ebdf685de71756ca5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule fracPart(iCons(46, R:IntSeq)) => fracAcc(R, 0)`
+
+## K-0504 — reference-semantics/semantics/float.k:176
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `517a796c8a51a532d5deec287622e3fd5c53f114d3c2c4a90d81a38845e188eb`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule fracPart(iCons(C:Int, R:IntSeq)) => fracPart(R) requires C =/=Int 46`
+
+## K-0505 — reference-semantics/semantics/float.k:177
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `3a7473c8713b4543d57cb02410dccb5d38aec392bbef467c280296112e6e3f98`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule fracAcc(.IntSeq, A:Int) => A`
+
+## K-0506 — reference-semantics/semantics/float.k:178
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a87341fff5746e9d5194086ddc44c7ad77a84af986cfb236c0eb82e4803100b8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule fracAcc(iCons(C:Int, R:IntSeq), A:Int) => fracAcc(R, A *Int 10 +Int (C -Int 48))`
+
+## K-0507 — reference-semantics/semantics/float.k:179
+
+- Kind: syntax
+- Attributes: function, total, function, total
+- Normalized SHA-256: `dffc425acef907d2815f3c09cd0f551eb3c0d4d833f812e1fd91fd039a251917`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= fracScale(IntSeq) [function, total] | fscAcc(IntSeq, Int) [function, total]`
+
+## K-0508 — reference-semantics/semantics/float.k:180
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f006d2881246b7d3dcd8eaf9d4618941fa02e37bba781cc8bde1ca23cf00abeb`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule fracScale(.IntSeq) => 1`
+
+## K-0509 — reference-semantics/semantics/float.k:181
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `abcd00241d753458f9e3c9c9b4f190a16743b72541923fda31d832a76e6e8c0a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule fracScale(iCons(46, R:IntSeq)) => fscAcc(R, 1)`
+
+## K-0510 — reference-semantics/semantics/float.k:182
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `abd5cc4adcbe2ff17a9a65065bab11cb91f71486cec9b3aec6b916a2dadd508f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule fracScale(iCons(C:Int, R:IntSeq)) => fracScale(R) requires C =/=Int 46`
+
+## K-0511 — reference-semantics/semantics/float.k:183
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1e74ce0b2611ba03551065586840c66efcef50ec31c87931ea7e1fcdd0c038d5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule fscAcc(.IntSeq, A:Int) => A`
+
+## K-0512 — reference-semantics/semantics/float.k:184
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `21eab0b39d565a3e9d8d58a6a31ae9dc36d9912941fde9c3fde2ba3b0e13a8b1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule fscAcc(iCons(_:Int, R:IntSeq), A:Int) => fscAcc(R, A *Int 10)`
+
+## K-0513 — reference-semantics/semantics/float.k:185
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a528cb142102cbb205e5e2a04f502db9659e955dbeb0b957699af3bdbb7e1409`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("float", str(CS:IntSeq), .Vals) => decStrToF(CS)`
+
+## K-0514 — reference-semantics/semantics/float.k:186
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `df11945a1b8f0f7bb66b9095abcda69026b9ee39f08d7621f51584b5193711e3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("float", I:Int, .Vals) => intToF(I)`
+
+## K-0515 — reference-semantics/semantics/float.k:187
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e38c88c120d0a5969be48bfcba2276d40c987fdadf7624d349d13a7f3ce00c24`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("float", F:Float, .Vals) => F`
+
+## K-0516 — reference-semantics/semantics/float.k:190
+
+- Kind: syntax
+- Attributes: function, total, symbol(divFloatIntV), no-evaluators
+- Normalized SHA-256: `f49cc043a05b2accf64a4db2d7e01a1b3b2ad8d4c9aac725e410510fe5868681`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Float ::= divFloatIntV(Float, Int) [function, total, symbol(divFloatIntV), no-evaluators]`
+
+## K-0517 — reference-semantics/semantics/float.k:191
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `a71c4a7b3d8c96c0b1b11e6d910903e91cc245db5c6b79525d6f74e8d046211e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule divFloatIntV(F:Float, I:Int) => F /Float Int2Float(I, 53, 11) [concrete]`
+
+## K-0518 — reference-semantics/semantics/float.k:192
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a2200023b7cc0d4d18376d024441459c53d0edd27611e3800bf0ff4e84749073`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("/", F:Float, I:Int) => divFloatIntV(F, I)`
+
+## K-0519 — reference-semantics/semantics/float.k:195
+
+- Kind: syntax
+- Attributes: function, total, symbol(intToF), no-evaluators
+- Normalized SHA-256: `4f21c29912e1361d8706f1bf1cde8207bd9e40372f9128ae77571effd103a990`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Float ::= intToF(Int) [function, total, symbol(intToF), no-evaluators]`
+
+## K-0520 — reference-semantics/semantics/float.k:196
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `389178d3dfd7c359c14f9336e08d770f7068b029dbbe053760f92d9769d2781f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule intToF(I:Int) => Int2Float(I, 53, 11) [concrete]`
+
+## K-0521 — reference-semantics/semantics/float.k:197
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `695a4d4bdd54bacc726be8bb1b947957b13ac3c1ea85079e6f37f176f5dd1e85`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("+", I:Int, F:Float) => addF(intToF(I), F)`
+
+## K-0522 — reference-semantics/semantics/float.k:198
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8105c256a812da5488c816ddc234cc23a361eaea37ba294397ab351db64ecbe8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("+", F:Float, I:Int) => addF(F, intToF(I))`
+
+## K-0523 — reference-semantics/semantics/float.k:199
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7b68c306973586de958d305580b9863c51bc797c0632e645a8be0e4e94ab5f88`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("-", I:Int, F:Float) => subF(intToF(I), F)`
+
+## K-0524 — reference-semantics/semantics/float.k:200
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1409954604e558d1e20ebb673b113bb4e753382700056a9bb050e2f5877f2435`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("-", F:Float, I:Int) => subF(F, intToF(I))`
+
+## K-0525 — reference-semantics/semantics/float.k:201
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `74e2f8b58bc61612bd447aba290b62193b7b0a596847a535cef8ecf17013ed6d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("*", I:Int, F:Float) => mulF(intToF(I), F)`
+
+## K-0526 — reference-semantics/semantics/float.k:202
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `de611e1415d1413bffdbb0fc1e35fdc3143eee6a775b9cef2212242ec9d8114a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("*", F:Float, I:Int) => mulF(F, intToF(I))`
+
+## K-0527 — reference-semantics/semantics/float.k:203
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1714c1550770bc11884e259edb53966f4938fc04546dd96c773cabee38acab6c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("<", I:Int, F:Float) => floatLt(intToF(I), F)`
+
+## K-0528 — reference-semantics/semantics/float.k:204
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a3b308b7b2c2e9343ae069b0a7bbe47498537cca6859ee92873552c2df50f105`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("<", F:Float, I:Int) => floatLt(F, intToF(I))`
+
+## K-0529 — reference-semantics/semantics/float.k:205
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `fc6de3b7c2f96d950f9aaca9f5df3aed76102c3b005e86cef59e2d2bce19afcf`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp(">", I:Int, F:Float) => gtF(intToF(I), F)`
+
+## K-0530 — reference-semantics/semantics/float.k:206
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `18ff729bf687fd4bce566aec46540f7830a79e48525d2236d2247e5487e70ab2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp(">", F:Float, I:Int) => gtF(F, intToF(I))`
+
+## K-0531 — reference-semantics/semantics/float.k:209
+
+- Kind: syntax
+- Attributes: function, total, symbol(truncF), no-evaluators
+- Normalized SHA-256: `11c17aa2d43131ae18ec1be82f27b6922d13447bcdad8aea53515aaf4222e7a0`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Int ::= truncF(Float) [function, total, symbol(truncF), no-evaluators]`
+
+## K-0532 — reference-semantics/semantics/float.k:210
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `bee730d1e87168f9dad702b1113b5a919a7ee189741db231857746a167529d25`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule truncF(F:Float) => #if F >=Float 0.0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi [concrete]`
+
+## K-0533 — reference-semantics/semantics/float.k:211
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `651a7c3ee92f0a9635c032666a3452b3cfa8ca92836f167a48bc06274401d3e0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("int", F:Float, .Vals) => truncF(F)`
+
+## K-0534 — reference-semantics/semantics/float.k:213
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `df11945a1b8f0f7bb66b9095abcda69026b9ee39f08d7621f51584b5193711e3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("float", I:Int, .Vals) => intToF(I)`
+
+## K-0535 — reference-semantics/semantics/float.k:214
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e38c88c120d0a5969be48bfcba2276d40c987fdadf7624d349d13a7f3ce00c24`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("float", F:Float, .Vals) => F`
+
+## K-0536 — reference-semantics/semantics/float.k:217
+
+- Kind: syntax
+- Attributes: function, total, symbol(roundF), no-evaluators
+- Normalized SHA-256: `d0b7f75c69f6a7f52a6d150fa1f859c9c843ffefeea29b68a7ef6d619f7a89ba`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Int ::= roundF(Float) [function, total, symbol(roundF), no-evaluators]`
+
+## K-0537 — reference-semantics/semantics/float.k:218-222
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `eb02485bbe2629074d51e3cdcf92ebd4d3b9ea985bd5c69349a87b2bcf6107db`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule roundF(F:Float) => #if (F -Float floorFloat(F)) ==Float 0.5 #then (#if Float2Int(floorFloat(F)) %Int 2 ==Int 0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi) #else Float2Int(floorFloat(F +Float 0.5)) #fi [concrete]`
+
+## K-0538 — reference-semantics/semantics/float.k:223
+
+- Kind: syntax
+- Attributes: function, total, symbol(roundFN), no-evaluators
+- Normalized SHA-256: `73ff3255d50db9ef5ce4e5587a02f3727412ba9e564eb216091a4a44fea04c54`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Float ::= roundFN(Float, Int) [function, total, symbol(roundFN), no-evaluators]`
+
+## K-0539 — reference-semantics/semantics/float.k:224-226
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `2ae5db0795e6706028e1cee0c2674dd3a80f09d61603b97b4c52262edd039e9f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule roundFN(F:Float, N:Int) => Int2Float(roundF(F *Float Int2Float(10 ^Int N, 53, 11)), 53, 11) /Float Int2Float(10 ^Int N, 53, 11) [concrete]`
+
+## K-0540 — reference-semantics/semantics/float.k:227
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `196b869af0707a66536ccccb9f7ab759877beef029956d5731c92e1c0c669539`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("round", F:Float, .Vals) => roundF(F)`
+
+## K-0541 — reference-semantics/semantics/float.k:228
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `053cb084a5421b38959bd6e86a7f16795e1408d819c3053e85c24ab6c9bd01f4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBuiltin("round", F:Float, N:Int, .Vals) => roundFN(F, N)`
+
+## K-0542 — reference-semantics/semantics/float.k:230
+
+- Kind: syntax
+- Attributes: function, total, symbol(sqrtF), no-evaluators
+- Normalized SHA-256: `ccbc575470399e30c153b9c247d480371d972bf5c6a908dd1deba29b7a3fb92e`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax Float ::= sqrtF(Float) [function, total, symbol(sqrtF), no-evaluators]`
+
+## K-0543 — reference-semantics/semantics/float.k:231
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `6233ea5230d8583f4585636e51bd39d973ee97f98281d6711e369677f7fab7c2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule sqrtF(F:Float) => sqrtFloat(F) [concrete]`
+
+## K-0544 — reference-semantics/semantics/float.k:232
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `cf723364ca5d681bba80f43226edcd7e8beea1e13bea0f107f710ad340966933`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= "#mathSqrt"`
+
+## K-0545 — reference-semantics/semantics/float.k:233
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `9708f9876df9bd54f74a36d6f213af9a101a9064261c6b8717ef86a520e5f151`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Call(Attribute(Name("math"), "sqrt"), (E:Expr, .Exprs)) => E ~> #mathSqrt ... </k> [priority(40)]`
+
+## K-0546 — reference-semantics/semantics/float.k:234
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7e79b6dbd8c07376bb029b374572020a5420a378a9c49c65d56f1567c002a4c0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> F:Float ~> #mathSqrt => sqrtF(F) ... </k>`
+
+## K-0547 — reference-semantics/semantics/float.k:235
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c4013b0dca36c3805769558331af3325e7b71d939c9164b97826f635140691b2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> I:Int ~> #mathSqrt => sqrtF(intToF(I)) ... </k>`
+
+## K-0548 — reference-semantics/semantics/float.k:243
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `a63f310fdba5a6f45aa19461da4b980cdebc96e73ac1a35a94f6c219c4f4ac1f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #maxAccF(Iterable, Float) | #maxContF(Float)`
+
+## K-0549 — reference-semantics/semantics/float.k:244
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `838b90fdad470a0cb9ec017aca4445c39c79d1400f0c8199bc5e379d1394c6ac`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAccF(R, {V}:>Float) ... </k> requires isFloat(V)`
+
+## K-0550 — reference-semantics/semantics/float.k:245
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `dfa99d6b3002d3d181db1c1b740bbb0d365de00515a7b0da3d6ccd418d8ad5f0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #maxAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #maxContF(M) ... </k>`
+
+## K-0551 — reference-semantics/semantics/float.k:246
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `35a797d2ae5f80419d2f097787037eeac7ac26d46a573a396d00a2c237fe0902`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterDone ~> #maxContF(M:Float) => M ... </k>`
+
+## K-0552 — reference-semantics/semantics/float.k:247-248
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a1f41d00826cf56a35800be5d846bff2a033b3f6bcaf1397f1dcb67661b49162`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxContF(M:Float) => #maxAccF(R, maxFloat(M, {V}:>Float)) ... </k> requires isFloat(V)`
+
+## K-0553 — reference-semantics/semantics/float.k:250
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `cd35b1a809162624d97017592cb4c67cfabdc4236752758dfc73e9223f535029`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #minAccF(Iterable, Float) | #minContF(Float)`
+
+## K-0554 — reference-semantics/semantics/float.k:251
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `785007e31d6e0716e9e2c2607b7db6ddc091436f5499b86dd575c0fc5b1e1546`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAccF(R, {V}:>Float) ... </k> requires isFloat(V)`
+
+## K-0555 — reference-semantics/semantics/float.k:252
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `6b8405dae8d41cf373535771fde16f1e70f4e5c27e9318ec9f469b6c95df0487`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #minAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #minContF(M) ... </k>`
+
+## K-0556 — reference-semantics/semantics/float.k:253
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `700ae0c8579a15db7131fac162e19ae25bcac57d8cb38ce3275296d31d7d0441`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterDone ~> #minContF(M:Float) => M ... </k>`
+
+## K-0557 — reference-semantics/semantics/float.k:254-255
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `62d7ad6d3b7582fc853d1b4c3073d85cbf15b474b37c6f3f2cce997ed0c1cd2a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, R:Iterable) ~> #minContF(M:Float) => #minAccF(R, minFloat(M, {V}:>Float)) ... </k> requires isFloat(V)`
+
+## K-0558 — reference-semantics/semantics/float.k:261
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `0abd52ddf475c76be88e36b6ae667fa4b020f936fe9da72fa0159555df394556`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #sumAccF(Iterable, Float) | #sumContF(Float)`
+
+## K-0559 — reference-semantics/semantics/float.k:262-264
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2f1184f501b575d4a8952df05fc121110263a6f198ff344bf2726ed5cfb552cf`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int) => #sumAccF(R, addF(intToF(ACC), {V}:>Float)) ... </k> requires isFloat(V) andBool notBool (isInt(V) orBool isBool(V))`
+
+## K-0560 — reference-semantics/semantics/float.k:265
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `65c1e01d9cd3ba0608befb376b26333c0a382f6396af8fad36e39e1ea0018c6c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #sumAccF(IT:Iterable, ACC:Float) => #iterNext(IT) ~> #sumContF(ACC) ... </k>`
+
+## K-0561 — reference-semantics/semantics/float.k:266
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a39fca22a1537ecfaa404ec9fe4c163ac7600183a1ac70ec53c1f71b2c0cd536`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterDone ~> #sumContF(ACC:Float) => ACC ... </k>`
+
+## K-0562 — reference-semantics/semantics/float.k:267-269
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f1353b9a01f4ea8a63619a4f791a8a6904388bcec2de6fab1a0f4d467efdafc8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float) => #sumAccF(R, addF(ACC, {V}:>Float)) ... </k> requires isFloat(V)`
+
+## K-0563 — reference-semantics/semantics/float.k:270-272
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `dba3e0024842ced0d7c1cdf793479eaf00fa924fce0cd834d63a596490397345`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float) => #sumAccF(R, addF(ACC, intToF(intOf(V)))) ... </k> requires isInt(V) orBool isBool(V)`
+
+## K-0564 — reference-semantics/semantics/functions.k:8-11
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `b8132b42692298e0453e47fcb21d7ecbd51bcfcbaa9539de501a909a178576c3`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax KItem ::= frame(continuation: K, callerEnv: Int, savedLoc: Int) | #bindP(ParamNames, Vals) | "#pop" | "#endcall"`
+
+## K-0565 — reference-semantics/semantics/functions.k:14-16
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f981471f7fe1d37edc742ee83b218f62160ea0f267c0c7c8eaa419d7ff573576`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ F <- closureVal(PNS, BODY, L) ], _) ... </scopes>`
+
+## K-0566 — reference-semantics/semantics/functions.k:18
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `a6aeea98e7de047f34a60286bc922b09e47fb2b1ed36e387cb4dd043ab958d97`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Expr ::= closureExpr(ParamNames, Stmts)`
+
+## K-0567 — reference-semantics/semantics/functions.k:19-20
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b5697d5757d50f19924daf21c59148c4f0d18162d691743e5f7e25edb0e6542a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> closureExpr(PNS:ParamNames, BODY:Stmts) => closureVal(PNS, BODY, L) ... </k> <env> L:Int </env>`
+
+## K-0568 — reference-semantics/semantics/functions.k:27
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `f8d9de7aacedb88070deb48cf517ad49a811284a400c70ab4ee77abb02c7abad`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= closureValC(ParamNames, ParamNames, Stmts, Map)`
+
+## K-0569 — reference-semantics/semantics/functions.k:31-32
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `adf59ac49fac375fed8b82627c7f2e97361a74ce540c25191e7364c8443683c5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #mkClosure(String, ParamNames, ParamNames, ParamNames, Stmts, Map) | #mkLambda(ParamNames, ParamNames, ParamNames, Stmts, Map)`
+
+## K-0570 — reference-semantics/semantics/functions.k:33-35
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c7913840b3eb69329fe66da5d3c1f4f0a3abc6b814a059ba7855eecbeb837d90`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> FuncDef(F:String, Params(PNS:ParamNames), CellVars(CVS:ParamNames), FreeVars(FVS:ParamNames), BODY:Stmts) => #mkClosure(F, PNS, CVS, FVS, BODY, .Map) ... </k>`
+
+## K-0571 — reference-semantics/semantics/functions.k:36-41
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `9260d8509a74e5602f68966df89b4019a08f945c39f9d9563ecebdd490d0ded2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames, (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map) => #mkClosure(F, PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires FV in_keys(M)`
+
+## K-0572 — reference-semantics/semantics/functions.k:42-45
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `79ce8ed09e9100199940db64ea62f6dd5dc3d16997661c87fb4642a5bd2b4a4d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ F <- closureValC(PNS, CVS, BODY, CM) ], _) ... </scopes>`
+
+## K-0573 — reference-semantics/semantics/functions.k:47-49
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `deda77ab935136ffc525059ae6f3062f8de96e8d459d155d8ce231e281ab77cb`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Lambda(Params(PNS:ParamNames), E:Expr) => closureVal(PNS, Return(E) .Stmts, L) ... </k> <env> L:Int </env>`
+
+## K-0574 — reference-semantics/semantics/functions.k:50-52
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `37112d13ebff5c38dbbcc21f3de6bef754075cb2a431f4cbff297fb1d401c072`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Lambda(Params(PNS:ParamNames), CellVars(CVS:ParamNames), FreeVars(FVS:ParamNames), E:Expr) => #mkLambda(PNS, CVS, FVS, Return(E) .Stmts, .Map) ... </k>`
+
+## K-0575 — reference-semantics/semantics/functions.k:53-58
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ee95b3fb3c96473b23386b2b24d6b2b1414c69c651ebfb2e896cc40501679e7b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map) => #mkLambda(PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires FV in_keys(M)`
+
+## K-0576 — reference-semantics/semantics/functions.k:59-60
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `76bc83655d11809cd18c182f7e285fa4e0117b4df26508068efc390e89119507`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map) => closureValC(PNS, CVS, BODY, CM) ... </k>`
+
+## K-0577 — reference-semantics/semantics/functions.k:63
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e3671d9bac62395286261253cedc1db6b2cc0499988e29cfc0fef9ecb270a51f`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>`
+
+## K-0578 — reference-semantics/semantics/functions.k:64-66
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2fb6a38b2f4126f645402c9404a3922c27569eda002ac4571cf37bb101f95a5c`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ P <- V ], _) ... </scopes>`
+
+## K-0579 — reference-semantics/semantics/functions.k:68-75
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `47a760dbae6d703de7bf41b0ac21c3647ea2a6c810d7e328aa96a33ba082eacd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #cellW({M[P]}:>Val, V) ~> #bindP(PS, VS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(P, cellsOf({M["$cells"]}:>Val)) andBool P in_keys(M) andBool isCellRef({M[P]}:>Val) [priority(40)]`
+
+## K-0580 — reference-semantics/semantics/functions.k:78-79
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e32ef37e336c744611c4b34d811ac7ae4ebf8b5e2de407b6775937770d40a28c`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> Return(V:Val) ~> _ => #pop </k> <ret> noRet => retV(V) </ret>`
+
+## K-0581 — reference-semantics/semantics/functions.k:80-81
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e89e01d6c452e67496902442093c95fb823ab8363bd6e7702b25bfe5e000af58`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> #endcall => #pop ... </k> <ret> noRet => retV(noneV) </ret>`
+
+## K-0582 — reference-semantics/semantics/functions.k:85-90
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0976ba92bcac43fd697edbd1f7198b551a421c797750f89243f796c52dab75ab`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> #pop => V ~> CONT </k> <ret> retV(V) => noRet </ret> <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack> <env> L:Int => CALLERL </env> <scopes> SC:Map => SC [ L <- undef ] </scopes> <scopeLoc> _ => SAVEDL </scopeLoc>`
+
+## K-0583 — reference-semantics/semantics/int.k:7
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `bea824a9d0c76babe487fb83fc65f9325c396843c8776705ff5df097dcbe35ab`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule applyUn("-", I:Int) => 0 -Int I`
+
+## K-0584 — reference-semantics/semantics/int.k:9
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8c4c1e8eef6166845f5a3f36e2a5898d5f905bfe4c52b48b097c1647940b0309`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("+", I1:Int, I2:Int) => I1 +Int I2`
+
+## K-0585 — reference-semantics/semantics/int.k:11
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `515cc9110af914220fd043ddada48c7f17365a9bfa328efa8ae0919b5473859a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("+", I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi`
+
+## K-0586 — reference-semantics/semantics/int.k:12
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `335d0401d42936641828c8519f03000492eab5fdde729be9ad84a964c192e1ed`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("+", B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I`
+
+## K-0587 — reference-semantics/semantics/int.k:13
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `045a3b7ba0f87b98701c029636a3617c9a7131d9a4011152d4bcca47c54b5501`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule applyBin("-", I1:Int, I2:Int) => I1 -Int I2`
+
+## K-0588 — reference-semantics/semantics/int.k:14
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b25cf4d3a0b2c5705570985e016c6a573c9b1c47be3b9f677993f1c5a998c7a3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("*", I1:Int, I2:Int) => I1 *Int I2`
+
+## K-0589 — reference-semantics/semantics/int.k:15
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7cfc166283c78d7165e4b29b6a7a8af5e7cecf8afe34ef7d32f9fb2313a573f2`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule applyBin("%", I1:Int, I2:Int) => pyMod(I1, I2)`
+
+## K-0590 — reference-semantics/semantics/int.k:16
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `85afa4d25d1446e6442d53737a36d1cc763b73b3fc78e5ee581835eea8b7b0f2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2`
+
+## K-0591 — reference-semantics/semantics/int.k:17
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `614ae406522ba61d5dafd570459dee468b49b861442a3c456ef857b36c41e18a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0`
+
+## K-0592 — reference-semantics/semantics/int.k:19
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `c131b0a212330737a12ec60d92eb60b3277a638e494ba82dba54d486be7e0c1a`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Int ::= pyMod(Int, Int) [function]`
+
+## K-0593 — reference-semantics/semantics/int.k:20
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e3bb9293bfdee6b979c9f707348dfd94cb34c6ea9cc50901bfde37efe127d5f7`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2`
+
+## K-0594 — reference-semantics/semantics/int.k:22
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `10360ae8affd8bc7e27f8eb3e84b9a9da97af8c4b1970f529095f4e98af3c2f6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("<", I1:Int, I2:Int) => I1 <Int I2`
+
+## K-0595 — reference-semantics/semantics/int.k:23
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c213716c432e960423134537589932a4917bb15ada8af878e32b1f4a71d4cac9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("<=", I1:Int, I2:Int) => I1 <=Int I2`
+
+## K-0596 — reference-semantics/semantics/int.k:24
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `fefdcde2267af04c1bdeb0961cbc9cb977147b091ffaebf44a694173a23e1516`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp(">", I1:Int, I2:Int) => I1 >Int I2`
+
+## K-0597 — reference-semantics/semantics/int.k:25
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `463b1de8dd3e82b0fcd03ee7033dc057a279b2a2be351a7a8b3ce80a42c98227`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule applyCmp(">=", I1:Int, I2:Int) => I1 >=Int I2`
+
+## K-0598 — reference-semantics/semantics/int.k:26
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `533193ddf05e9682051473e0f142b3e9586ce8088bd6202dca16db0688e93fd1`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule applyCmp("==", I1:Int, I2:Int) => I1 ==Int I2`
+
+## K-0599 — reference-semantics/semantics/int.k:27
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `14ecc12ef5abadb7bac32c0bfe2efbd9eb2f38fd37dfa7a308cec90354697399`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("!=", I1:Int, I2:Int) => I1 =/=Int I2`
+
+## K-0600 — reference-semantics/semantics/iter.k:8
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `2fa814827c664147e6d7c96edd48c3a829a22cd77adc337afbe1fec74dba68ec`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #iterNext(Iterable) | "#iterDone" | #iterYield(Val, Iterable)`
+
+## K-0601 — reference-semantics/semantics/list.k:9
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `92f64fe670702341ba82d9aaa63eca3a1927b56437b86ed5d187461d3f017d83`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterNext(list(.ValSeq)) => #iterDone ... </k>`
+
+## K-0602 — reference-semantics/semantics/list.k:10
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b39b7937bce1e43be3d25c7e1a583b9d55a0397bad21c5120e7b47d7af9bf947`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterNext(list(vCons(V:Val, R:ValSeq))) => #iterYield(V, list(R)) ... </k>`
+
+## K-0603 — reference-semantics/semantics/list.k:13
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `3d024af826bb0836a06da6fe46f0ff98c9b78f2c58b136c80135b77c71073d7d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ApplyK ::= "toList"`
+
+## K-0604 — reference-semantics/semantics/list.k:14
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f3163ec1febd09901035e7b494bbfc753c89a46a9286d5ed34309f5bf3a03b91`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>`
+
+## K-0605 — reference-semantics/semantics/list.k:15
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `70e0fbd42323504f9643bc0dbe62e8e5fc4e39b2a9b46f9c34de07f8050d28a7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>`
+
+## K-0606 — reference-semantics/semantics/list.k:18
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `ac8c744da9bbc4a3bc2a3f5ce845163aab64e079291f25529f7fea3a7eb17b02`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]`
+
+## K-0607 — reference-semantics/semantics/list.k:19
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `68f539c882c79f5546657cc91f8fb71028a6aa18a578a462aa805712c1ca0b1a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule valSeqConcat(.ValSeq, T:ValSeq) => T`
+
+## K-0608 — reference-semantics/semantics/list.k:20
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `89ea4e872855ed5d4d0212b9806dbc55fb74d24e1a683dd46becb75f24f236d7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))`
+
+## K-0609 — reference-semantics/semantics/list.k:24-25
+
+- Kind: rule
+- Attributes: priority(45)
+- Normalized SHA-256: `e435eea17b21e910a9b3b2c2b60e93607bc638e239ecfa7cbcbb94a8bbb946c9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k> [priority(45)]`
+
+## K-0610 — reference-semantics/semantics/list.k:27
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `408c1dfb03ffb9842e1592e2fc229c8dc323c41b1a08feced658b6845110398c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B`
+
+## K-0611 — reference-semantics/semantics/list.k:28
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8b89879a64e7c08543e67d678d3371d1d46fcb31287619eaac42f552accd7c7d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B)`
+
+## K-0612 — reference-semantics/semantics/list.k:33
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `afe83d38567e7cd0f351930bbf72bf06852a8be4cd8aa7d3a8a0baedfe69508a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= hasRefVS(ValSeq) [function, total]`
+
+## K-0613 — reference-semantics/semantics/list.k:34
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `49b8d05956105413ccd74fc8e2dd526afaa36af0f622076cd093caa41bc828a3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule hasRefVS(.ValSeq) => false`
+
+## K-0614 — reference-semantics/semantics/list.k:35
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `3e47ea875f2d3db96838bc493159b5314396db5be11a6042c7f37ccc9135968e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule hasRefVS(vCons(V:Val, R:ValSeq)) => isRefV(V) orBool hasRefVS(R)`
+
+## K-0615 — reference-semantics/semantics/list.k:37-38
+
+- Kind: syntax
+- Attributes: function, function
+- Normalized SHA-256: `a77ca761dd61e4592a17190e4d17103c26d555a23af39433a11386cfb680647e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= deepEqVS(ValSeq, ValSeq, Map) [function] | deepEqV(Val, Val, Map) [function]`
+
+## K-0616 — reference-semantics/semantics/list.k:39
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d3fe72f99ea297b17954f4c0408df1a6c642e9b0d041adc503e6d2d57a098d62`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule deepEqVS(.ValSeq, .ValSeq, _:Map) => true`
+
+## K-0617 — reference-semantics/semantics/list.k:40
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c45656fdf64a83b0f5a7eef7ff708eaf6bd7c3cbbfcb2b5efb6904193eb0c3af`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule deepEqVS(.ValSeq, vCons(_:Val, _:ValSeq), _:Map) => false`
+
+## K-0618 — reference-semantics/semantics/list.k:41
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f8711893a8fa5703490159c88a3ba3325609e1a06a9560189416426704ec2cb0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule deepEqVS(vCons(_:Val, _:ValSeq), .ValSeq, _:Map) => false`
+
+## K-0619 — reference-semantics/semantics/list.k:42-43
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `75597ae93e20789e373193439cd70ef8d7e007de1415e3b9287933e852f53953`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule deepEqVS(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq), HP:Map) => deepEqV(A, B, HP) andBool deepEqVS(As, Bs, HP)`
+
+## K-0620 — reference-semantics/semantics/list.k:45-46
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c5c0bdde4aba1effd6f4522e38802d04386eea3f37f136b82351ab143641ff93`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule deepEqV(ref(H:Int), B:Val, HP:Map) => deepEqV({HP[H]}:>Val, B, HP) requires H in_keys(HP)`
+
+## K-0621 — reference-semantics/semantics/list.k:47-48
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4eab3bce7e801b1bf18fd4ce302aa8cfcc0ca93dbe8068801736b16a00c8d21b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule deepEqV(A:Val, ref(H:Int), HP:Map) => deepEqV(A, {HP[H]}:>Val, HP) requires notBool isRefV(A) andBool H in_keys(HP)`
+
+## K-0622 — reference-semantics/semantics/list.k:49
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `3863900e8a58f55b84dfb8e7bbb5d85873021d96c873b9f9d8df464649e1fe74`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule deepEqV(list(A:ValSeq), list(B:ValSeq), HP:Map) => deepEqVS(A, B, HP)`
+
+## K-0623 — reference-semantics/semantics/list.k:50
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `5d6c5490e16bfbd7d875aabe3fe5ac40601718a7b5fa92d3ed7f525a8998bc1b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule deepEqV(A:Val, B:Val, _:Map) => A ==K B [owise]`
+
+## K-0624 — reference-semantics/semantics/list.k:53-55
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `1a65389c755b4387c77820c38c0725d3bdcf2e864451622caf60b3631f7a5a72`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "append")), (V:Val, .Vals)) => noneV ... </k> <heap> ... H |-> list(VS:ValSeq => valSeqConcat(VS, vCons(V, .ValSeq))) ... </heap> [priority(40)]`
+
+## K-0625 — reference-semantics/semantics/list.k:58
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `e171041153df48d94a2b0f613d3cea691d9708f5a08bc58349b786188006ec0c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #memberAcc(Val, Iterable) | #memberCont(Val) | "#notB"`
+
+## K-0626 — reference-semantics/semantics/list.k:59
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `816d231c73c9744b6b61bb31856f3bff88956d64926b6a81416e9741e1af22b1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Compare(LV:Val, CmpOp("in", list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ... </k>`
+
+## K-0627 — reference-semantics/semantics/list.k:60
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `81419bc508aecac692f551f75d6b28b9e01b040d4bc0084db4de317160a54492`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Compare(LV:Val, CmpOp("not in", list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ~> #notB ... </k>`
+
+## K-0628 — reference-semantics/semantics/list.k:61
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e84f869d57a9b95738d25e2c08fe4c7a9fc5eee5cc83a72dce6b9b077d8e258a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #memberAcc(V:Val, IT:Iterable) => #iterNext(IT) ~> #memberCont(V) ... </k>`
+
+## K-0629 — reference-semantics/semantics/list.k:62
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d8442792286ce85192874167d4b911992fb7f792c374c8aa1981e75ee444d220`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterDone ~> #memberCont(_V:Val) => false ... </k>`
+
+## K-0630 — reference-semantics/semantics/list.k:63-64
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `65f8e4204476f1e8a7c3e32409d2953ab02328d8b68c6bb0b571ed40447f714e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(E:Val, _:Iterable) ~> #memberCont(V:Val) => true ... </k> requires E ==K V`
+
+## K-0631 — reference-semantics/semantics/list.k:65-66
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8b08b93c8199fd51dded1e0ee3fd0def15ccb7eed113350ed7ef8bc5e4e3db3a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterYield(E:Val, R:Iterable) ~> #memberCont(V:Val) => #memberAcc(V, R) ... </k> requires notBool (E ==K V)`
+
+## K-0632 — reference-semantics/semantics/list.k:67
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `5511f8c4ec4450e21911f2ff0f12e7e5b0efafc30602e42132f5d292d30a5d81`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> B:Bool ~> #notB => notBool B ... </k>`
+
+## K-0633 — reference-semantics/semantics/methods.k:10
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `bcd6321cf1a2aa2dd9eb69867c0344da1df7626efc9ca51b2e5f293ead7b59cd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= applyMethod(Val, String, Vals) [function]`
+
+## K-0634 — reference-semantics/semantics/methods.k:13
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `328b30a3774c14efcc41ec3ccafc8b66c15e41138c101b1814f95c16e7d3c3b5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)`
+
+## K-0635 — reference-semantics/semantics/methods.k:14
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a6ae81f68d63fdf6ebf7a83e4cebc6a8ea356b697bc7b9e100d0e313713cafea`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)`
+
+## K-0636 — reference-semantics/semantics/methods.k:15
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `eb11f68e60879a03923bdb729b6cb65379b96d936aca7636c174815b536d2af1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)`
+
+## K-0637 — reference-semantics/semantics/methods.k:16
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `03ce90d0bcd96a745a02728e93a57eb23bf2a117a421098cea7b75a8e2332e61`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS)`
+
+## K-0638 — reference-semantics/semantics/methods.k:19
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d65f50abf0475fc0549e8fb763ffdc7dff8cf9adbb8d3f0a80ada868ae266892`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(str(CS:IntSeq), "lower", .Vals) => str(mapLower(CS))`
+
+## K-0639 — reference-semantics/semantics/methods.k:20
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1adc9077ccda30c6f3fd532b50695c3029e0d9995b42c6db9a0841b79bdb3c4b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(str(CS:IntSeq), "upper", .Vals) => str(mapUpper(CS))`
+
+## K-0640 — reference-semantics/semantics/methods.k:21
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `30f5704dc33a3d8d524d7463827e058818062ab3fc23769570f8d6f317251315`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(str(CS:IntSeq), "swapcase", .Vals) => str(mapSwap(CS))`
+
+## K-0641 — reference-semantics/semantics/methods.k:26
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7c16ae8ffba754403e7d8d5b92438d28f400facc922dec2dcfd2f19b2638b867`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(str(SEP:IntSeq), "join", list(VS:ValSeq), .Vals) => str(joinCodes(SEP, VS))`
+
+## K-0642 — reference-semantics/semantics/methods.k:27
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `8449bace9b91c5f0d37c5971d3b28cd1cad5edfa8c5a4b09064e3d0368f9d4c4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]`
+
+## K-0643 — reference-semantics/semantics/methods.k:28
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `dcb47502ba7100828de3ffb17ec481bef2af40dba346ade5600c4ff154b7e376`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule joinCodes(_:IntSeq, .ValSeq) => .IntSeq`
+
+## K-0644 — reference-semantics/semantics/methods.k:29
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f2558775f8dab0e8cd93a50b44fe41f53fbfa634e3f8bb69170c8354661a39e0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule joinCodes(_:IntSeq, vCons(str(CS:IntSeq), .ValSeq)) => CS`
+
+## K-0645 — reference-semantics/semantics/methods.k:30-31
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0edaa0fbba44dc2bf322316303ce9f2a2bd2cfbbb56b0af3dab783b9a316babe`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule joinCodes(SEP:IntSeq, vCons(str(CS:IntSeq), vCons(V:Val, R:ValSeq))) => seqConcat(CS, seqConcat(SEP, joinCodes(SEP, vCons(V, R))))`
+
+## K-0646 — reference-semantics/semantics/methods.k:34
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `21c9fe9f742047bb32315eba84888c896b61193306c3c917ee7c909b4828e677`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)`
+
+## K-0647 — reference-semantics/semantics/methods.k:35
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `277077c74e8e5c1c9b55dccc915e494892ca2a34006043a7e2e1b08e7507c261`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= cntSub(IntSeq, IntSeq) [function]`
+
+## K-0648 — reference-semantics/semantics/methods.k:36
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f4dfc7d2f461d391d0196a077c5f476695803634821d0edeccc7045cb02eb5c8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule cntSub(.IntSeq, _:IntSeq) => 0`
+
+## K-0649 — reference-semantics/semantics/methods.k:37-38
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `17286b8b7ff9965b222eadb3e97b25dee5120c8d78a06b9f41176e56335d61e2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC) requires strPrefix(PC, iCons(C, R)) andBool isLen(PC) >Int 0`
+
+## K-0650 — reference-semantics/semantics/methods.k:39-40
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0bf718afc195d3938512aa55dbdd340f4b08702b50c544a52e4e5ac6428deba6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => cntSub(R, PC) requires notBool strPrefix(PC, iCons(C, R)) orBool isLen(PC) <=Int 0`
+
+## K-0651 — reference-semantics/semantics/methods.k:41
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `121d0c58dbca6c2852abf6c8fbc50c66fa47e0563465d6ee60f128d83e251aa4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= dropIS(IntSeq, Int) [function, total]`
+
+## K-0652 — reference-semantics/semantics/methods.k:42
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `036bd013d44b4c1edf7a703d1d6db67965c6fa20915eca3d3946a6022c1d2ea9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dropIS(S:IntSeq, N:Int) => S requires N <=Int 0`
+
+## K-0653 — reference-semantics/semantics/methods.k:43
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `f7a542230356ebad6029f1716109b7d96c72f11c2d5eeba3c1f490ad8595b4a1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dropIS(.IntSeq, _:Int) => .IntSeq [owise]`
+
+## K-0654 — reference-semantics/semantics/methods.k:44
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `5f16ac6adf6486e76a1ea4259a23542e58277a75f220157a3f9de4af1c0c79f0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dropIS(iCons(_:Int, R:IntSeq), N:Int) => dropIS(R, N -Int 1) requires N >Int 0`
+
+## K-0655 — reference-semantics/semantics/methods.k:47
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `fc495b2dc6ff9d31d6c463b238bc6f4493026df5e3b1bdb6a89f40b1df908ecc`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(str(CS:IntSeq), "strip", .Vals) => str(revIS(trimWS(revIS(trimWS(CS)))))`
+
+## K-0656 — reference-semantics/semantics/methods.k:48
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `4eeafed3826be8194a981bc1e80c6de26dba5f5a70b2bbac7793fa157606154c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= trimWS(IntSeq) [function, total]`
+
+## K-0657 — reference-semantics/semantics/methods.k:49
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4291267251cee7ecfdb91403f873109d0c5ef939a1f6251e0a4fedd1156ca37b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule trimWS(.IntSeq) => .IntSeq`
+
+## K-0658 — reference-semantics/semantics/methods.k:50
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `879a0736a8b490a2e2b40e4831c2e1462be6bf413bab581ea2fef7fef0e2f13a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule trimWS(iCons(C:Int, R:IntSeq)) => trimWS(R) requires isWSC(C)`
+
+## K-0659 — reference-semantics/semantics/methods.k:51
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `988ee980274cf866a4026887cbba6282e3f7c959e268cc0e188d304b386fe20f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule trimWS(iCons(C:Int, R:IntSeq)) => iCons(C, R) requires notBool isWSC(C)`
+
+## K-0660 — reference-semantics/semantics/methods.k:52
+
+- Kind: syntax
+- Attributes: function, total, function, total
+- Normalized SHA-256: `588afa88ddb7cf7ccee3e65194d4b948b7144aff2cb57bf1c63a5b88eea31739`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= revIS(IntSeq) [function, total] | revISAcc(IntSeq, IntSeq) [function, total]`
+
+## K-0661 — reference-semantics/semantics/methods.k:53
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f72cb5914e4ad9c0fb018b845bab1085013c5baa882264e635d565f1ec941aee`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule revIS(S:IntSeq) => revISAcc(S, .IntSeq)`
+
+## K-0662 — reference-semantics/semantics/methods.k:54
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `24b1a05b8e5db65b0005965f6a85b1d0b37681f9aea425a3fd11cfee46934c89`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule revISAcc(.IntSeq, A:IntSeq) => A`
+
+## K-0663 — reference-semantics/semantics/methods.k:55
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a743803ce5fedca42661b8bf5d8e2559facb8b30e8d8c91ab60250921afd9bbd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule revISAcc(iCons(C:Int, R:IntSeq), A:IntSeq) => revISAcc(R, iCons(C, A))`
+
+## K-0664 — reference-semantics/semantics/methods.k:58
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `46cee75aa03aa7bfbfa482bbb55d7485be47cef0f9f1ce5a58d11b1f58e1f88c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(str(CS:IntSeq), "encode", str(_:IntSeq), .Vals) => str(CS)`
+
+## K-0665 — reference-semantics/semantics/methods.k:61
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `905e9a90f21719054e0ef1f6e039b497253fce6d6b613dc4dbb8e92fd97ca399`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)`
+
+## K-0666 — reference-semantics/semantics/methods.k:64
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `bf346f893e63110f2247b4095f95a28b356af1cec402e140ea43d69c26c85380`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)`
+
+## K-0667 — reference-semantics/semantics/methods.k:65
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `b0bd756c21697bd2cd0656ba80c117936e75820eef660f3bd1ad62020d9d73f6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= cntOccVS(ValSeq, Val) [function, total]`
+
+## K-0668 — reference-semantics/semantics/methods.k:66
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `99f68ecf56cfdc12342971ad00b9ad222cce7f311f69a37259d0ee04e977c7dc`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule cntOccVS(.ValSeq, _:Val) => 0`
+
+## K-0669 — reference-semantics/semantics/methods.k:67
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `87d9bfa2c6dc520cacd075a24b600fd6e56f675d04b6531d733a9a0b13ef16fe`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V`
+
+## K-0670 — reference-semantics/semantics/methods.k:68
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8317513f33a69d73d30b15dc11457001ab58294a9734e5ee37c790ec7059d39f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => cntOccVS(R, V) requires notBool (A ==K V)`
+
+## K-0671 — reference-semantics/semantics/methods.k:72-74
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `3ffc01180f48516f665143fefab8bc2d10f3a90e4b440dbab43a546c5896b78c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals) => #alloc(list(splitWS(CS, .IntSeq, .ValSeq))) ... </k> [priority(40)]`
+
+## K-0672 — reference-semantics/semantics/methods.k:75
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `da1c8e2b2236c89788eb2a36f17c5548107c2817bfcdd82164d3300fc6a862ac`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= splitWS(IntSeq, IntSeq, ValSeq) [function]`
+
+## K-0673 — reference-semantics/semantics/methods.k:76
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e52130b97ceec63beef441b26323fc08c38cfe3a90e45c887dc3dc5e1a00b6d4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule splitWS(.IntSeq, CUR:IntSeq, ACC:ValSeq) => flushTok(ACC, CUR)`
+
+## K-0674 — reference-semantics/semantics/methods.k:77-78
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c4024da56e0b8a5d044270b87973bb28ef152b4fdf599c139531bfd764399696`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, .IntSeq, flushTok(ACC, CUR)) requires isWSC(C)`
+
+## K-0675 — reference-semantics/semantics/methods.k:79-80
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `895f4b195d1b9154c2893374db8f71a98140a50fac6898e14211180dd92dd705`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, seqConcat(CUR, iCons(C, .IntSeq)), ACC) requires notBool isWSC(C)`
+
+## K-0676 — reference-semantics/semantics/methods.k:82
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `002dffc41af21f640ec2d6c3961dac9a3d4c9f70cd750b85ea4637646913c277`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= flushTok(ValSeq, IntSeq) [function]`
+
+## K-0677 — reference-semantics/semantics/methods.k:83
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7b979b52a54648dbaaa049ad6a0a93c72745c0cbb0cdfdce36eb0894c104f7fa`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule flushTok(ACC:ValSeq, .IntSeq) => ACC`
+
+## K-0678 — reference-semantics/semantics/methods.k:84
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0c970d4acf65c9b6165ba1fe9178229acd7b60d37a1f841e0a59864678cb91d1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule flushTok(ACC:ValSeq, iCons(C:Int, T:IntSeq)) => valSeqConcat(ACC, vCons(str(iCons(C, T)), .ValSeq))`
+
+## K-0679 — reference-semantics/semantics/methods.k:85
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `37f133bfa155728fbce4d8d71377c834d069d72a03b76ab067d8d40e862021b7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= isWSC(Int) [function, total]`
+
+## K-0680 — reference-semantics/semantics/methods.k:86
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8175fabb10574b14be50a0ddde58085af67226b3e90a48e925876b328a736602`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isWSC(C:Int) => C ==Int 32 orBool C ==Int 9 orBool C ==Int 10 orBool C ==Int 13`
+
+## K-0681 — reference-semantics/semantics/methods.k:89-91
+
+- Kind: rule
+- Attributes: priority(39)
+- Normalized SHA-256: `3f433049a23ebd507ca05e236396f84b4e9c465e79b8ab085ba7cbe17577dc9f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (kwV("sep", str(S:IntSeq)), .Vals)) => #applyK(toCall(boundMethodV(str(CS), "split")), (str(S), .Vals)) ... </k> [priority(39)]`
+
+## K-0682 — reference-semantics/semantics/methods.k:94-96
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `01261c3f8fa4d7dfe9acaf5bf8dd34b42df1337d00fc410ea9a8ae86de65e656`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (str(iCons(SEP:Int, .IntSeq)), .Vals)) => #alloc(list(splitSep(CS, SEP, .IntSeq))) ... </k> [priority(40)]`
+
+## K-0683 — reference-semantics/semantics/methods.k:97
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `7fe4b6f9e7e87fa067caeef5d910c7d9277f58ac5883001af8013aca55e2fe8a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= splitSep(IntSeq, Int, IntSeq) [function]`
+
+## K-0684 — reference-semantics/semantics/methods.k:98
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2d26406190b8fe4d095469d908ccc588bb8789d747ed0ab811785f67fbd807ca`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule splitSep(.IntSeq, _SEP:Int, CUR:IntSeq) => vCons(str(CUR), .ValSeq)`
+
+## K-0685 — reference-semantics/semantics/methods.k:99-100
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `83564ea69e6a28d64aa789e33d2d724b287ed9ca68e59d12103f3dfd13562b53`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => vCons(str(CUR), splitSep(R, SEP, .IntSeq)) requires C ==Int SEP`
+
+## K-0686 — reference-semantics/semantics/methods.k:101-102
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `73831c9297876f11165c47b33c6f020e6223a81f97af0ba7bbd7f242faf5a821`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => splitSep(R, SEP, seqConcat(CUR, iCons(C, .IntSeq))) requires notBool (C ==Int SEP)`
+
+## K-0687 — reference-semantics/semantics/methods.k:104-105
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `83ed72ac9f08df5ffc184930b2a2d967a803bce5c85691948f11bf7475838b25`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(str(CS:IntSeq), "replace", str(iCons(A:Int, .IntSeq)), str(iCons(B:Int, .IntSeq)), .Vals) => str(replaceC(CS, A, B))`
+
+## K-0688 — reference-semantics/semantics/methods.k:106
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `6c0dfc288cc629a1d6c7002d834de9ab6467f109d87dbf2def009ecf65e4feab`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= replaceC(IntSeq, Int, Int) [function, total]`
+
+## K-0689 — reference-semantics/semantics/methods.k:107
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `31431694b27dd91eb6dbd75e188f48cfc5c5a66c6a6f1da80062279242313505`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule replaceC(.IntSeq, _:Int, _:Int) => .IntSeq`
+
+## K-0690 — reference-semantics/semantics/methods.k:108
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `439491c8316246eaa540a332a8b69e523cad49c2c7c4d2d0142a7365c4cf940a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(B, replaceC(R, A, B)) requires C ==Int A`
+
+## K-0691 — reference-semantics/semantics/methods.k:109
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `9e3d155b87f63ef2943ec52b7ec85fd475110f7612968f44a9ce4c57bf92cd86`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(C, replaceC(R, A, B)) requires notBool (C ==Int A)`
+
+## K-0692 — reference-semantics/semantics/methods.k:112
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `d60af3772ac0b1d7afb4df9a5320f88f50130c50810ac094f36f4dea6537df54`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= isUpperC(Int) [function, total]`
+
+## K-0693 — reference-semantics/semantics/methods.k:113
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `885fc4123b6066087a19a87a681f895f6a86f9bd1e02f3fb3fc7e1fabb14b2b9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90`
+
+## K-0694 — reference-semantics/semantics/methods.k:115
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `9dc54db4cfe6c121597250d661d41de3feca896e01340e6952fd90fcb31ce21d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= isLowerC(Int) [function, total]`
+
+## K-0695 — reference-semantics/semantics/methods.k:116
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `35a981d9ee7cc6a503019df0faf56e3a0884553ea859feb5618daf57b8c6bff0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122`
+
+## K-0696 — reference-semantics/semantics/methods.k:118
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `219ceeed6ce776a0cfbb90795c30070c969387af50acdaa041efb347388ebaad`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= isAlphaC(Int) [function, total]`
+
+## K-0697 — reference-semantics/semantics/methods.k:119
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `63bc2def4f489009546f9a91e24b3ffa9b670b80bb92ed494d9f785e22e6a388`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)`
+
+## K-0698 — reference-semantics/semantics/methods.k:121
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `86d0c30136f327303a3cc2a5006d27a5df63a97799f3af186fe9019679b73e77`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= isDigitC(Int) [function, total]`
+
+## K-0699 — reference-semantics/semantics/methods.k:122
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `12088c599f6ae2e51e489ac82576f0474dcf76486270f1ffaff23590a7bab546`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57`
+
+## K-0700 — reference-semantics/semantics/methods.k:124
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `79b65077c768714576df510d062c7f8faa40fe671016c74452cd3b326438bd4a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= hasUpper(IntSeq) [function, total]`
+
+## K-0701 — reference-semantics/semantics/methods.k:125
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f3875f726b38d830797bc05ebd9ea38aeceaa3ff362480e1ec324d01e25f4320`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule hasUpper(.IntSeq) => false`
+
+## K-0702 — reference-semantics/semantics/methods.k:126
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `bb1d921fad33840fa9314b732b8ed9dd765886085bed5d9b21fa20b789c14bf7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)`
+
+## K-0703 — reference-semantics/semantics/methods.k:128
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `6e2fe9388187f1af6d0cf6bdcea2ad9ae2e428d0d55469410899d36935ee8028`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= hasLower(IntSeq) [function, total]`
+
+## K-0704 — reference-semantics/semantics/methods.k:129
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `abfddcd09b065362b502cf7768f28f8ee5f6d898a45f56d45c8bfbc53a8ba812`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule hasLower(.IntSeq) => false`
+
+## K-0705 — reference-semantics/semantics/methods.k:130
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `92b0385b90924f1ce474b41530a85aa81e35ee0483da7c4a5c61c6d90fb8654b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)`
+
+## K-0706 — reference-semantics/semantics/methods.k:132
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `436a79dc0dbd23f2ea8e95271377a016097e63ec1ecb5b86f931f66254a7a8a2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= allAlpha(IntSeq) [function, total]`
+
+## K-0707 — reference-semantics/semantics/methods.k:133
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2c1e5b1f9b4f6cc557d89df272622562ec767c1ca8c2ec9d8fcf085fa517a4f0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule allAlpha(.IntSeq) => true`
+
+## K-0708 — reference-semantics/semantics/methods.k:134
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `5e18a35dd26e8c9cb3e89130f9750947ca76c88f34f983ab0751c48b4a5473f9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)`
+
+## K-0709 — reference-semantics/semantics/methods.k:136
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `1f98366143eb8709385692f7c489f3d72f2146ce57ccd75f9c27f47831343b0e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= allDigit(IntSeq) [function, total]`
+
+## K-0710 — reference-semantics/semantics/methods.k:137
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f2d51c623b4f2e0ea5399348883dbdc07255c9149ba598c76056243e453f9bd6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule allDigit(.IntSeq) => true`
+
+## K-0711 — reference-semantics/semantics/methods.k:138
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `5aeec07d2a569d8b38690fc423330e53e233eec18bbe87600b6fa028e54285ff`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)`
+
+## K-0712 — reference-semantics/semantics/methods.k:140
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `6bbb30e0ba93ff7cbd72b0ca2116bad44a072d06879d4c5892bd5800df4b53b2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= lowerC(Int) [function, total]`
+
+## K-0713 — reference-semantics/semantics/methods.k:142
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `16ec3ccc73d9d1c032b0b52705b63c081ad99d9d02564e45a35458fb98a66b24`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)`
+
+## K-0714 — reference-semantics/semantics/methods.k:143
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `90acf91ce79484f7d21db17b777db5b8e116cff0e1e2e3dccbeb234c9add0508`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule lowerC(C:Int) => C [owise]`
+
+## K-0715 — reference-semantics/semantics/methods.k:145
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `b6e1b4db46d46812d2d9e708dcbcc28ed0c9fa23966a9b5c1035a57b5ef6ca17`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= upperC(Int) [function, total]`
+
+## K-0716 — reference-semantics/semantics/methods.k:146
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `36f1da2397a7408e107373eaac1feb468111c8e72ed831db508700e91ed6ab22`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule upperC(C:Int) => C -Int 32 requires isLowerC(C)`
+
+## K-0717 — reference-semantics/semantics/methods.k:147
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `786ab98c703f00112b7a6a04ac841fbff13154c44dea0eb9f47aa6fec9988345`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule upperC(C:Int) => C [owise]`
+
+## K-0718 — reference-semantics/semantics/methods.k:149
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `3d8ce436184a4c4495b0b26833fb2a717cbd1270b0934f7734dbacb108d11a6a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= swapC(Int) [function, total]`
+
+## K-0719 — reference-semantics/semantics/methods.k:150
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ec05513118cd81cddd31f795a5d04a9f9b8a10f18de362f897479bb0cf8e312c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule swapC(C:Int) => C +Int 32 requires isUpperC(C)`
+
+## K-0720 — reference-semantics/semantics/methods.k:151
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `960de195b818c1402cb93fbbe2472de8a315493bc6e31dd6c2b7d78de68bf879`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule swapC(C:Int) => C -Int 32 requires isLowerC(C)`
+
+## K-0721 — reference-semantics/semantics/methods.k:152
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `88a95ca55d3e2dd34b64c5eca2f9079cee35b0d23e1a859d38d7c1881a5830eb`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule swapC(C:Int) => C [owise]`
+
+## K-0722 — reference-semantics/semantics/methods.k:154
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `0fb973df4891969082e7f1d3cf1e9f88b6a17a0c072021a4189f7793642d418b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= mapLower(IntSeq) [function, total]`
+
+## K-0723 — reference-semantics/semantics/methods.k:155
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `5cd9c020c2bdc744cad3eb03c33a9cb4f5218be4399bf62ab8f2ec83bcc8fd6c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule mapLower(.IntSeq) => .IntSeq`
+
+## K-0724 — reference-semantics/semantics/methods.k:156
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `da21f8430ee48bda4a7b47ed0a026e86f516a8e0b9ec9a783e3d195cfe6b1bfc`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule mapLower(iCons(C:Int, S:IntSeq)) => iCons(lowerC(C), mapLower(S))`
+
+## K-0725 — reference-semantics/semantics/methods.k:158
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `82523acd09b2270edd4b6be02553a0cbb2ba2c922402a18b1a9e0423720d0da7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= mapUpper(IntSeq) [function, total]`
+
+## K-0726 — reference-semantics/semantics/methods.k:159
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b31cc456b204df571c2fa73c6fcff30f4d4c7482f5dccce7ba3dda73b929a5f2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule mapUpper(.IntSeq) => .IntSeq`
+
+## K-0727 — reference-semantics/semantics/methods.k:160
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2c01ef3cfffe93f5acb69b81b093ff77bc4328522f80f09fbbfad0c7f482a87c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule mapUpper(iCons(C:Int, S:IntSeq)) => iCons(upperC(C), mapUpper(S))`
+
+## K-0728 — reference-semantics/semantics/methods.k:162
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `39e9100dbb4b6a5bd52d0d8d277ad0bb5d62b70091df8e253bd378d08a6799e1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= mapSwap(IntSeq) [function, total]`
+
+## K-0729 — reference-semantics/semantics/methods.k:163
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `6de81779e3a07c5a099b1102e3b61d790bbc2ca485d70dc6e23b26707eb7b546`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule mapSwap(.IntSeq) => .IntSeq`
+
+## K-0730 — reference-semantics/semantics/methods.k:164
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `039a7b17bd0223be5271105c7dfc0ca12d94b194b82a63cdafdbd3a81980c73d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule mapSwap(iCons(C:Int, S:IntSeq)) => iCons(swapC(C), mapSwap(S))`
+
+## K-0731 — reference-semantics/semantics/methods.k:166
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `6f6a4aa0687d9e9c143e72eb2b0b1f23855f06d49db9aa9ba2692155c087e32e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= startsWith(IntSeq, IntSeq) [function, total]`
+
+## K-0732 — reference-semantics/semantics/methods.k:167
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7e2343bdac73058ce3e7d7332d71fc6fa6353475fcfaefb08b7b378e68bfe493`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule startsWith(.IntSeq, _:IntSeq) => true`
+
+## K-0733 — reference-semantics/semantics/methods.k:168
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c22b5ffce270c2c5a950eb89cd6c83284507f173b95439017116cd2bba8a05a3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule startsWith(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+
+## K-0734 — reference-semantics/semantics/methods.k:169
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4e5497c6f435ecbdd36b9d4489a31b6d6ebcdc34f56c48531301b97a31b0ff0a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule startsWith(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool startsWith(As, Bs)`
+
+## K-0735 — reference-semantics/semantics/operators.k:10
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ec04b29e2d1b46254cb3f8a70fed7bc53b6920095b428522d967063442fc073b`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>`
+
+## K-0736 — reference-semantics/semantics/operators.k:12
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `df8d1cba28a9335e4a3d90133a44a2a4a208dc62b7f72991dc4316221969aa85`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>`
+
+## K-0737 — reference-semantics/semantics/operators.k:15
+
+- Kind: context
+- Attributes: none
+- Normalized SHA-256: `e4932b24484a885d34b3f53705eeeb1fed84fc516b3ed52d0654f78929b823f1`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `context Compare(HOLE, _)`
+
+## K-0738 — reference-semantics/semantics/operators.k:16
+
+- Kind: context
+- Attributes: none
+- Normalized SHA-256: `ca9e40a2c27b7a232b7510b580b93e5ae8114c5866de16dfeea069acb5d453d0`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `context Compare(_:Val, CmpOp(_, HOLE))`
+
+## K-0739 — reference-semantics/semantics/operators.k:17
+
+- Kind: rule
+- Attributes: owise
+- Normalized SHA-256: `262226c0a44f44c7a4f1da356324355babc5b5d4fb8f040deb3476d6fcd78288`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]`
+
+## K-0740 — reference-semantics/semantics/operators.k:19
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8ccf167a4ebcff08513286fa040a242f6d1106362b2089afb114a4f4098ad409`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("is", V:Val, noneV) => V ==K noneV`
+
+## K-0741 — reference-semantics/semantics/operators.k:20
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e6679786edcc1fc5dfb541f59fe30e7c327a5755ef33eace2cd8d769ca9e678e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)`
+
+## K-0742 — reference-semantics/semantics/operators.k:25-27
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `5a6092f742c5bd0605c3a52addd5182891cc94460efd44cdc226d58664d70230`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## K-0743 — reference-semantics/semantics/operators.k:28-31
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `20e54d3a51f2a4cc9e88f70e1a9b09109dcc430acdf4002f6497b5cfb068975e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(L) [priority(40)]`
+
+## K-0744 — reference-semantics/semantics/operators.k:34-37
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `d56481fd1327961bcc7dfabad56a78e9d80287e9bb4b71e8ed42450c3069408b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k> <heap> ... H |-> V:Val ... </heap> requires OP =/=String "in" andBool OP =/=String "not in" [priority(40)]`
+
+## K-0745 — reference-semantics/semantics/operators.k:38-42
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `575d5da0be9c5a705af46eb426acc0945a7e57c4f8dd33f85024a9f42c205773`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(L) orBool OP ==String "in" orBool OP ==String "not in" [priority(40)]`
+
+## K-0746 — reference-semantics/semantics/operators.k:44-46
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `0d606e97b2daea643faef6251047b6cd1f4acd6b86eb37b1102069ab9e66d79d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> UnaryOp(OP:String, ref(H:Int)) => UnaryOp(OP, V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## K-0747 — reference-semantics/semantics/range.k:9
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `dec39b9740c8dd9d0236a292381d109809f8767a4531aef24a40002ccc2123ea`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= inRange(Int, Int, Int) [function, total]`
+
+## K-0748 — reference-semantics/semantics/range.k:10
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f93b1245c72320e5aa7cbc51256b44d4efb5755c048893f6ba2f6d35d191c295`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule inRange(I:Int, HI:Int, ST:Int) => (ST >Int 0 andBool I <Int HI) orBool (ST <Int 0 andBool I >Int HI)`
+
+## K-0749 — reference-semantics/semantics/range.k:12
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `9f9f1aaeaee29256645f794ab24ac2a68d22b03a0716b38717979c26620d48f6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= rangeLen(Int, Int, Int) [function]`
+
+## K-0750 — reference-semantics/semantics/range.k:13-14
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `9af49b302485c841cd923ccba6b67e7d286f4b61b934bf2401585a37d520a5c7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule rangeLen(LO:Int, HI:Int, ST:Int) => (HI -Int LO +Int ST -Int 1) /Int ST requires ST >Int 0 andBool HI >Int LO`
+
+## K-0751 — reference-semantics/semantics/range.k:15-16
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d5350a65a2baba91f97b52d175ef4ca5dd5b2f8d7bf75a90ffec26e884280e69`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule rangeLen(LO:Int, HI:Int, ST:Int) => (LO -Int HI -Int ST -Int 1) /Int (0 -Int ST) requires ST <Int 0 andBool HI <Int LO`
+
+## K-0752 — reference-semantics/semantics/range.k:17-18
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `80ff51ad02417a4598d4431b9f0ddf671f442ade49c6a07519d95c3064f1f290`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule rangeLen(LO:Int, HI:Int, ST:Int) => 0 requires (ST >Int 0 andBool HI <=Int LO) orBool (ST <Int 0 andBool HI >=Int LO)`
+
+## K-0753 — reference-semantics/semantics/range.k:20-22
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `55e600477e369ffe6f7e93603b422c0207a0d4dbab23094a49d82b531277c8a4`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterYield(I, rangeObj(I +Int ST, HI, ST)) ... </k> requires inRange(I, HI, ST)`
+
+## K-0754 — reference-semantics/semantics/range.k:23-24
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c4b7668164923fa9a010dec9a8bb69d36f63e776e24deb0c489f3901f90b1f65`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterDone ... </k> requires notBool inRange(I, HI, ST)`
+
+## K-0755 — reference-semantics/semantics/set.k:8
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `ceff1f1bd25d9a267f856c441976bb7adac099e229836c7b32ec2f12aa014dcf`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= setV(IntSeq)`
+
+## K-0756 — reference-semantics/semantics/set.k:11
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `be0ae2291d5d6df7e27aeb082308a7eef47f89db683207f1bf0a156860e1c128`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= codeIn(Int, IntSeq) [function, total]`
+
+## K-0757 — reference-semantics/semantics/set.k:12
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f60a5083116078439f260e8947e8e121be108610461db1e62e5dde42edec6d9f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule codeIn(_:Int, .IntSeq) => false`
+
+## K-0758 — reference-semantics/semantics/set.k:13
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `df05d7c47e63fce0ac7da73741aab9e90b5ac7bc34226ef508129f43d45cc207`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule codeIn(C:Int, iCons(H:Int, T:IntSeq)) => C ==Int H orBool codeIn(C, T)`
+
+## K-0759 — reference-semantics/semantics/set.k:16-17
+
+- Kind: syntax
+- Attributes: function, total, function, total
+- Normalized SHA-256: `dae5291dcfaa5bfe81733d0e0c7161c7d4784f6ef84f0ae162e6ef6e915130ba`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= dedupCodes(IntSeq) [function, total] | dedupFrom(IntSeq, IntSeq) [function, total]`
+
+## K-0760 — reference-semantics/semantics/set.k:18
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d766b83ec2d86623c34078fd5baac96439ef9df58e2905582ef9572bf4141f92`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dedupCodes(CS:IntSeq) => dedupFrom(CS, .IntSeq)`
+
+## K-0761 — reference-semantics/semantics/set.k:19
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `43f63938c9877ea6964a01be9a0975520ad7bcd1547963caf64819fb8899825e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dedupFrom(.IntSeq, ACC:IntSeq) => ACC`
+
+## K-0762 — reference-semantics/semantics/set.k:20-21
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `045bd0dd1ac5c844b07bb281dcaf17d59728efd2d9558f6845debf02614419a9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, ACC) requires codeIn(C, ACC)`
+
+## K-0763 — reference-semantics/semantics/set.k:22-23
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `af80178bc6f52f381da6ad70967e436e533c9e0328e8253018f434fa2dbbc055`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, snocCode(ACC, C)) requires notBool codeIn(C, ACC)`
+
+## K-0764 — reference-semantics/semantics/set.k:25
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `c59b599a912dfbe757f346db515843be1349471c0c709ed66b796ec08ec1cdd1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= snocCode(IntSeq, Int) [function, total]`
+
+## K-0765 — reference-semantics/semantics/set.k:26
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c906946c4c7df0578465aadaa39fda1399e11d26a08b9c1d9157e1052febcf72`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule snocCode(.IntSeq, C:Int) => iCons(C, .IntSeq)`
+
+## K-0766 — reference-semantics/semantics/set.k:27
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0caac9972e0456dc13b96000d1e7220398d8ec94af95dfe37a67f527142e1aa3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule snocCode(iCons(H:Int, T:IntSeq), C:Int) => iCons(H, snocCode(T, C))`
+
+## K-0767 — reference-semantics/semantics/set.k:31
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `b1d04ee84fabe3f58ed28b05901d2634c5c530b5391f4673cdf9b2dedafdacc7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= subsetCodes(IntSeq, IntSeq) [function, total]`
+
+## K-0768 — reference-semantics/semantics/set.k:32
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `fb4a56d463fb7ae7e7343b070a815f4e3f405282ea8c247dd34df6c5ace2051a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule subsetCodes(.IntSeq, _:IntSeq) => true`
+
+## K-0769 — reference-semantics/semantics/set.k:33
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `850be538170a9edb22a44a4ce2568f35b29fa79f58888e09984a4033d6aebbaf`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule subsetCodes(iCons(C:Int, S:IntSeq), B:IntSeq) => codeIn(C, B) andBool subsetCodes(S, B)`
+
+## K-0770 — reference-semantics/semantics/set.k:35
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `6156266fe9d9b07a383778418b8a8a6b768dca1807dfad3ee0498cff0ecc75f7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= sameSet(IntSeq, IntSeq) [function, total]`
+
+## K-0771 — reference-semantics/semantics/set.k:36
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `973ec0dc7d1dd25b63211ec2796093a030819e8f10bf596c532e825544016a15`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule sameSet(A:IntSeq, B:IntSeq) => subsetCodes(A, B) andBool subsetCodes(B, A)`
+
+## K-0772 — reference-semantics/semantics/set.k:39
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7a5ed6b4e8d675889fbd0c888e0097b0f319b6b1c37872ccf6716c2f2afc0565`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("==", setV(A:IntSeq), setV(B:IntSeq)) => sameSet(A, B)`
+
+## K-0773 — reference-semantics/semantics/sort.k:18
+
+- Kind: syntax
+- Attributes: function, total, symbol(sortVS), no-evaluators
+- Normalized SHA-256: `c6d761b986e34bb35057126ad5885215fea615a238764749865f535e470fa43b`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax ValSeq ::= sortVS(ValSeq) [function, total, symbol(sortVS), no-evaluators]`
+
+## K-0774 — reference-semantics/semantics/sort.k:19
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `0a76cca66b26bec5620b0fa0900cfbae5de0d5c61ed2c375e74ec5aed8aacf19`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= insVS(Int, ValSeq) [function]`
+
+## K-0775 — reference-semantics/semantics/sort.k:20
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `6bd401e364fe74eb4cae6d3763a8f7e2d4d3982191aa427f54e6b11a4b4c2475`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule sortVS(.ValSeq) => .ValSeq [concrete]`
+
+## K-0776 — reference-semantics/semantics/sort.k:21
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `afe20c3cfa1af6db4fd20a8050faf019552807fa0b01572e504e92491be14b63`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule sortVS(vCons(X:Int, R:ValSeq)) => insVS(X, sortVS(R)) [concrete]`
+
+## K-0777 — reference-semantics/semantics/sort.k:22
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `0e61d8cbcf2421314bfb6e247679e9540c25158a77c3032126b86ab622ffe70c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule insVS(X:Int, .ValSeq) => vCons(X, .ValSeq) [concrete]`
+
+## K-0778 — reference-semantics/semantics/sort.k:23
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `e38dbfdea30a930ec41dc76e1fc86def100bfbfcfd88853d63d1fd9597a78ee5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]`
+
+## K-0779 — reference-semantics/semantics/sort.k:24
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `7c122d7cb92134d1be973e74dc0de1b66e2d62021f3701fb8f03feb67179ca1d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X >Int Y [concrete]`
+
+## K-0780 — reference-semantics/semantics/sort.k:26
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `f778a322aece37266d282b5757dcb47aa66fbd6bcd3cb99133579990e1ea7411`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]`
+
+## K-0781 — reference-semantics/semantics/sort.k:27
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `f56269f2805fdf6e8a4ee27fc629bc2b5ad70b59c74649375bb93f7ddd171898`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]`
+
+## K-0782 — reference-semantics/semantics/sort.k:28
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `1f2df95775eb233969123f430eb5df8ccfc8e3c063894b7b20733a158307ff84`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]`
+
+## K-0783 — reference-semantics/semantics/sort.k:29-30
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `302f445859987e6c1b7aeafc49449d0e468c659b7c6d3b14ba52a771f210f519`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(A), vCons(str(B), R)) requires strLt(A, B) orBool A ==K B [concrete]`
+
+## K-0784 — reference-semantics/semantics/sort.k:31-32
+
+- Kind: rule
+- Attributes: concrete
+- Normalized SHA-256: `8a5909d32106d68003f029eee09394c33085e7e2d1d359e31ed9b357636b5dec`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(B), insVSs(A, R)) requires notBool (strLt(A, B) orBool A ==K B) [concrete]`
+
+## K-0785 — reference-semantics/semantics/sort.k:36-37
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `85de54880bd40fd5e01185f6f1d442971b4569881794f1cb887ee53e60a272d9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), .Vals)) => #alloc(list(sortVS(VS))) ... </k>`
+
+## K-0786 — reference-semantics/semantics/sort.k:40-42
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `251a2da82e1ab24eef7671ee11ba4cebb379a1c22384e9f98cb370d1cad720ce`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "sort")), .Vals) => noneV ... </k> <heap> ... H |-> list(VS:ValSeq => sortVS(VS)) ... </heap> [priority(40)]`
+
+## K-0787 — reference-semantics/semantics/sort.k:49
+
+- Kind: syntax
+- Attributes: function, total, symbol(sortKeyVS), no-evaluators
+- Normalized SHA-256: `f2ac55ee34d899f8dea02d048fbe04c31e9380eb65b24fe7a665a4c459a47fce`
+- Disposition: FIXED_UNUSED_OPAQUE
+- Assessment: Not reachable from the submitted program term; cannot influence its result, state, control, or claims.
+- Sentence: `syntax ValSeq ::= sortKeyVS(ValSeq, Val) [function, total, symbol(sortKeyVS), no-evaluators]`
+
+## K-0788 — reference-semantics/semantics/sort.k:51-52
+
+- Kind: syntax
+- Attributes: function, total, function, total
+- Normalized SHA-256: `da8fbe9dd99b0d35fe225182a9017408c9cbe8a36110d0f6205ae6896c20bb27`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= revVS(ValSeq) [function, total] | revVSAcc(ValSeq, ValSeq) [function, total]`
+
+## K-0789 — reference-semantics/semantics/sort.k:53
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ce0aa18a536023617b5fa012c4896693902eb851d32017e9e0add330616fdfbd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule revVS(S:ValSeq) => revVSAcc(S, .ValSeq)`
+
+## K-0790 — reference-semantics/semantics/sort.k:54
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `726a2866a59e53374aab2b1bed31946a74b1866463d1adc19b016a7017ae08fd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule revVSAcc(.ValSeq, A:ValSeq) => A`
+
+## K-0791 — reference-semantics/semantics/sort.k:55
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `5fd679052347f58f5e3637566616cd1304da061a3232edc871028bc59707c5f3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule revVSAcc(vCons(V:Val, R:ValSeq), A:ValSeq) => revVSAcc(R, vCons(V, A))`
+
+## K-0792 — reference-semantics/semantics/sort.k:57
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `7e8ff8d017c7edb7bd2d8f72a2de7fb5fcf8c1afde10e1aa97a2656fb519c6d3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= condRev(ValSeq, Bool) [function, total]`
+
+## K-0793 — reference-semantics/semantics/sort.k:58
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a1e37b0851c34a5eb84ec7d35cfb0b013cf9a4c94a656167b6fbc8fbe0204cea`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule condRev(S:ValSeq, false) => S`
+
+## K-0794 — reference-semantics/semantics/sort.k:59
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b59c3f4a824c81f6f9f14886f3458aa04d45bfce3feccec9077e43f9707b9305`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule condRev(S:ValSeq, true) => revVS(S)`
+
+## K-0795 — reference-semantics/semantics/sort.k:61-62
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `72cacce57534e83f92e153d66b43090b202234e875e5d0f24f69fcc6d4b6709e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals)) => #alloc(list(sortKeyVS(VS, KV))) ... </k>`
+
+## K-0796 — reference-semantics/semantics/sort.k:63-64
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `9934b02daf557e7c112bf5a5b8e9e08b538570f16ce23b53fc1fb4df695dec9c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals)) => #alloc(list(condRev(sortKeyVS(VS, KV), RB))) ... </k>`
+
+## K-0797 — reference-semantics/semantics/sort.k:65-66
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `70d7393a6bf6ecc809590c2c8812a95458fabf855ba6b0dded04d01b5c572e0f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("reverse", RB:Bool), .Vals)) => #alloc(list(condRev(sortVS(VS), RB))) ... </k>`
+
+## K-0798 — reference-semantics/semantics/str.k:8
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c96529154572047b7a2cf28199875992fd3580e240d1dfcd1ce795c5d718fa31`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterNext(str(.IntSeq)) => #iterDone ... </k>`
+
+## K-0799 — reference-semantics/semantics/str.k:9-10
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `388678fa55bb1f8b9638c641a4c7aad1e1c080ba007768feb77b6e65564cce7b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterNext(str(iCons(C:Int, R:IntSeq))) => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>`
+
+## K-0800 — reference-semantics/semantics/str.k:13
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `4c7f66efcd88665dff4c35a17dc03b67c9783ab5b67b51e3f1f429be8c12c225`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= strToCodes(String) [function]`
+
+## K-0801 — reference-semantics/semantics/str.k:14
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `70d0a8a9935761aeff6d90853c1ce79fe6b2d3d84e32ade7a48810ae01e1c6bc`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Str(S:String) => str(strToCodes(S)) ... </k>`
+
+## K-0802 — reference-semantics/semantics/str.k:15
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c7b4b4fc80bd1dab004d1c0cff5999112395445d816bdc9b0edecc99a8798b39`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule strToCodes("") => .IntSeq`
+
+## K-0803 — reference-semantics/semantics/str.k:16-17
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `72f87a35b152a52689ee89f78f8ff922704af2d9e8a80bc99e0c9d00333c5e43`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S)))) requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128`
+
+## K-0804 — reference-semantics/semantics/str.k:20
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `4dcfe32d71db24ec5955e3d81daa08ca2c8c1c4249a4a4c3817f846f0b17c0f5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]`
+
+## K-0805 — reference-semantics/semantics/str.k:21
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1bc8690035f06e8c955b45eed00c60d116bdfdc1c944476306b32dc8e906e093`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule seqConcat(.IntSeq, T:IntSeq) => T`
+
+## K-0806 — reference-semantics/semantics/str.k:22
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b8aaa07a8414960ab2e09a7e8d287988619c5616b854d3a0fa67a9011c4c911d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))`
+
+## K-0807 — reference-semantics/semantics/str.k:24
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `6b69c6c1fd75e820f054be1bbfabbbb714742e62d4a49b6d3a9735edf52858e1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyBin("+", str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))`
+
+## K-0808 — reference-semantics/semantics/str.k:25
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8039b62069c1e72239f18ede04a673fdc8c5822d023118b6a05d14faaa5bd94e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B`
+
+## K-0809 — reference-semantics/semantics/str.k:26
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `efca9467c64ccf47dec48d4105bdbf713e56b92ef1d6e93ea96101096ab05b2d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)`
+
+## K-0810 — reference-semantics/semantics/str.k:29
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `44d8a30fde58d7208121984e832bbe657faef28a89c2af536a1a04cf95e95e56`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("in", str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)`
+
+## K-0811 — reference-semantics/semantics/str.k:30
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b646f3d3387b9d153ef8f01453f878e378af6f9923a2fa437887132d7ff05e8f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)`
+
+## K-0812 — reference-semantics/semantics/str.k:32
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `0c2a240d2f88394551e618a37947d5264f22335393502b4e0b535fe4ee17b42e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]`
+
+## K-0813 — reference-semantics/semantics/str.k:33
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `57c619a4cc231d9095f54d25d8702d98126dd6137c9ed395b54d94d7cf232e61`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule strPrefix(.IntSeq, _:IntSeq) => true`
+
+## K-0814 — reference-semantics/semantics/str.k:34
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0e758c7b129dc20e372ee10b7d456c59868ce228e665daed0b04bd14738c35df`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+
+## K-0815 — reference-semantics/semantics/str.k:35
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d6816398ab1624e9bdb2e81cae94e7049aa5a1faab17f799f6e2d0563a83f669`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)`
+
+## K-0816 — reference-semantics/semantics/str.k:37
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `e5d82a70ec2aaeff27e0dbaebe4f7c40ff0ac2535c50906ea65726e53c9f7851`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]`
+
+## K-0817 — reference-semantics/semantics/str.k:38
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `fe5302406eba932257f5c94d088471ffedb1134a437eb3b947f53f4da407978b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule strContains(P:IntSeq, X:IntSeq) => true requires strPrefix(P, X)`
+
+## K-0818 — reference-semantics/semantics/str.k:39
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `6c197a2767cc14fc11dc5cbc1358ddfd15d76a2b6ddf5eb092b8f67d513e10a2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule strContains(P:IntSeq, .IntSeq) => false requires notBool strPrefix(P, .IntSeq)`
+
+## K-0819 — reference-semantics/semantics/str.k:40-41
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `40835cd00b164d7799801762c5bc87fd05ea89fd9c1306154d74f48b7f0e6bd7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs) requires notBool strPrefix(P, iCons(C, Xs))`
+
+## K-0820 — reference-semantics/semantics/str.k:48
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `e6a79420c495be30ba61123f1b16b3235ce1737390d5e7d920ed4d34624726c2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]`
+
+## K-0821 — reference-semantics/semantics/str.k:49
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d9faa5615105aeee1bec17ec6cd1a3d566adb7b531d78fb3619243c63425f62a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule strLt(.IntSeq, .IntSeq) => false`
+
+## K-0822 — reference-semantics/semantics/str.k:50
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1d055a6c97d452ded1f5b8522897bd99bfa0dd9ba3d5bab09339e76d0f414fbc`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true`
+
+## K-0823 — reference-semantics/semantics/str.k:51
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d1e1c922c4b206ef8c71888f6f964968eb7bc34ab9c172778c6243675c445926`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+
+## K-0824 — reference-semantics/semantics/str.k:52
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a15116dcda039e8bc63b028465b2952534a8b734cb0a7557e99625bf38c45aae`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true requires A <Int B`
+
+## K-0825 — reference-semantics/semantics/str.k:53
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7c98b79b0e03f30301eaf288d846a7fc26ea5866562926bd94dd2e8c26a1ba26`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false requires A >Int B`
+
+## K-0826 — reference-semantics/semantics/str.k:54
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d72e4a9c68cd264b7906d638a49bcf274a4fae7e0c350f191081f81696042a79`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B`
+
+## K-0827 — reference-semantics/semantics/str.k:56
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `3f16844c8a96e226925c07325a24c28ae0dc01bd05d6b97ffc08534e62789bbd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("<", str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)`
+
+## K-0828 — reference-semantics/semantics/str.k:57
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d14e65d751c2eb72a84110b0da37606308ef5eaf2af2c9f0b4686be52ed69e3b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp(">", str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)`
+
+## K-0829 — reference-semantics/semantics/str.k:58
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `fd8254e2aad6ddc722ec79acfc57d3d9f56eeb5a7cedabedeb40aab07d805865`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)`
+
+## K-0830 — reference-semantics/semantics/str.k:59
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0bb37c9e5117e140f89907947627e32d6756cc5e18e9518e3823c2710a62fc6c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)`
+
+## K-0831 — reference-semantics/semantics/subscript.k:11
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `92dd5a3cbdae995653f421008f9fa2c2f911d143c899dee80374413a92482473`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= valSeqAt(ValSeq, Int) [function, total]`
+
+## K-0832 — reference-semantics/semantics/subscript.k:12
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `5efae5e636659046dd3ad38178f893753f16c5b26ea08cfe11b0f323d3990453`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule valSeqAt(vCons(V:Val, _:ValSeq), 0) => V`
+
+## K-0833 — reference-semantics/semantics/subscript.k:13-14
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `463bd5d63df534f3d4cc313ec80e81f0c7c645e266732d113ea8b10dbac478d1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule valSeqAt(vCons(_:Val, S:ValSeq), I:Int) => valSeqAt(S, I -Int 1) requires I >Int 0`
+
+## K-0834 — reference-semantics/semantics/subscript.k:16
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `d573fee41395263868cfcc4fbae6df6d4a3bcc1a7bca14e633a30ec4f77887a1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= intSeqAt(IntSeq, Int) [function]`
+
+## K-0835 — reference-semantics/semantics/subscript.k:17
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8eb9da7cc0451bafd5812077c689538105618e705c93eb17820917ff139bbc4c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule intSeqAt(iCons(C:Int, _:IntSeq), 0) => C`
+
+## K-0836 — reference-semantics/semantics/subscript.k:18-19
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a89deb267298a13e5d86fa826aa9f476cc9f836461b46ade60423a8f364bdd37`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule intSeqAt(iCons(_:Int, S:IntSeq), I:Int) => intSeqAt(S, I -Int 1) requires I >Int 0`
+
+## K-0837 — reference-semantics/semantics/subscript.k:21
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `8d0629ddf60abdd87d1319c61a91897635eaf44a195cae23c3e4a9059fb8d475`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= normIdx(Int, Int) [function, total]`
+
+## K-0838 — reference-semantics/semantics/subscript.k:22
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0398dfbaabb1dbe0748c4a93874c453d7143a94e0f0d3d18c8b11359439b2c9a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule normIdx(I:Int, LEN:Int) => I +Int LEN requires I <Int 0`
+
+## K-0839 — reference-semantics/semantics/subscript.k:23
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `7ba2c056b69d0deead32ca025bc6cddf3f281ed5b87a62dcb6d148a1afcf38fb`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule normIdx(I:Int, _:Int) => I requires I >=Int 0`
+
+## K-0840 — reference-semantics/semantics/subscript.k:27
+
+- Kind: context
+- Attributes: none
+- Normalized SHA-256: `e235a553cf7939b217e6aad3c563f19136b897acadf2bfa842db991933f28e85`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `context Subscript(HOLE, _)`
+
+## K-0841 — reference-semantics/semantics/subscript.k:28
+
+- Kind: context
+- Attributes: none
+- Normalized SHA-256: `0ea5351709e9231f1e957adc2a438215860b2e7e7ff51f177407dd170e6bf752`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `context Subscript(_:Val, HOLE:Expr)`
+
+## K-0842 — reference-semantics/semantics/subscript.k:31-33
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `ba2015156656f7c6f341b0f480baae5329d86ae155b09fbc73a635bdcd103d67`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Subscript(ref(H:Int), IX:Index) => Subscript(V, IX) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## K-0843 — reference-semantics/semantics/subscript.k:35
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `e2cbe99533f0bbd2f5a28abaaea776b05e2d8eb2f238a9406b0c9ab6b8287633`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Subscript(OBJ:Val, I:Int) => applyIndex(OBJ, I) ... </k>`
+
+## K-0844 — reference-semantics/semantics/subscript.k:37
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `83aa86951e423ee652f166e56f679403febdfb828febf5216d59b54bda2753a5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= applyIndex(Val, Int) [function]`
+
+## K-0845 — reference-semantics/semantics/subscript.k:38
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c494188c31ef997e96906aae550573a54345c081fe24563a1f05a92f0396ffed`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyIndex(list(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))`
+
+## K-0846 — reference-semantics/semantics/subscript.k:39
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `52ab84557b24a72bd0e049cec6cb67ec53e2d262f19c93e2abec650a0e856c1e`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyIndex(tuple(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))`
+
+## K-0847 — reference-semantics/semantics/subscript.k:40-41
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `bc2eddc3f7ce8f77c32fb18bbf36c1c7c538e0e664e441898ffa1d9683894006`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyIndex(str(IS:IntSeq), I:Int) => str(iCons(intSeqAt(IS, normIdx(I, isLen(IS))), .IntSeq))`
+
+## K-0848 — reference-semantics/semantics/subscript.k:44-47
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `3586c0bf2e67a9c1eb55c902a81beaed999d84bf8ceb386870415106ecc297be`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #evalB(Bound) | "#toSome" | #slLo(Val, Bound, Bound) | #slHi(Val, OptInt, Bound) | #slStep(Val, OptInt, OptInt)`
+
+## K-0849 — reference-semantics/semantics/subscript.k:49
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `560ebb71a2e12f9a78694f384d19cb1d73190b6c9e724c4bdc202b583f111b3f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax OptInt ::= "noB" | someB(Int)`
+
+## K-0850 — reference-semantics/semantics/subscript.k:50
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `260093ac1ada7ada03d8f9e469670753e5253e805768f1d008f660cfdbdc34ab`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #evalB(NoBound) => noB ... </k>`
+
+## K-0851 — reference-semantics/semantics/subscript.k:51
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c05e824ec7d02b0ff48467bfe475709470965fc34d4376b8c53afcd4dee95f9d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #evalB(E:Expr) => E ~> #toSome ... </k>`
+
+## K-0852 — reference-semantics/semantics/subscript.k:52
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `55c49487ba7821307656b279fb60c670618fe70606d57783c776ef4b2986550c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> I:Int ~> #toSome => someB(I) ... </k>`
+
+## K-0853 — reference-semantics/semantics/subscript.k:54
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b39cd50c6c413a35564da1aa0434956df105d8e124a63f8867bec71c7c410abd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Subscript(OBJ:Val, Slice(LO:Bound, HI:Bound, ST:Bound)) => #evalB(LO) ~> #slLo(OBJ, HI, ST) ... </k>`
+
+## K-0854 — reference-semantics/semantics/subscript.k:55
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ba8162a4d94407c48b3a07a2686d8691c56de9280ab431f061eb6defe0ddfd8c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> LO:OptInt ~> #slLo(OBJ:Val, HI:Bound, ST:Bound) => #evalB(HI) ~> #slHi(OBJ, LO, ST) ... </k>`
+
+## K-0855 — reference-semantics/semantics/subscript.k:56
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `9ab3eb142d12d98094d2c11403d8f5711ab2b79c337b17046d56f4a76948370c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> HI:OptInt ~> #slHi(OBJ:Val, LO:OptInt, ST:Bound) => #evalB(ST) ~> #slStep(OBJ, LO, HI) ... </k>`
+
+## K-0856 — reference-semantics/semantics/subscript.k:58-60
+
+- Kind: rule
+- Attributes: priority(45)
+- Normalized SHA-256: `8d45174aef8739b21b538bb13740c6b0c0c0936fed9723b9adf51b3f8297d642`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> ST:OptInt ~> #slStep(list(VS:ValSeq), LO:OptInt, HI:OptInt) => #alloc(doSlice(list(VS), LO, HI, ST)) ... </k> [priority(45)]`
+
+## K-0857 — reference-semantics/semantics/subscript.k:61
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4b6c937f1b27b309ca57781e12cde5632c9fe631b46769f8b5fb2ae27e5d3559`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> ST:OptInt ~> #slStep(OBJ:Val, LO:OptInt, HI:OptInt) => doSlice(OBJ, LO, HI, ST) ... </k>`
+
+## K-0858 — reference-semantics/semantics/subscript.k:63
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `35803b4f4140c58723c0e31492a1715f532186e38b4e9b68650e58ae677e48dd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Val ::= doSlice(Val, OptInt, OptInt, OptInt) [function]`
+
+## K-0859 — reference-semantics/semantics/subscript.k:64-65
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f98c4d73aaf2650365e7250aa3b8f9de0da52a8d7e678ad474769b372db234fd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule doSlice(list(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt) => list(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))`
+
+## K-0860 — reference-semantics/semantics/subscript.k:66-67
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `6e8f59ed2ecb112dbbdd350b1235fec686f6ea424b8654ce5e02cc6e21fa3fcc`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule doSlice(tuple(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt) => tuple(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))`
+
+## K-0861 — reference-semantics/semantics/subscript.k:68-69
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0b5e5f8da08f08d46a3f42f731b25aa5402c716061aa75d97008a2ace7a3bf56`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule doSlice(str(IS:IntSeq), LO:OptInt, HI:OptInt, ST:OptInt) => str(buildIS(IS, slStart(LO, ST, isLen(IS)), slStop(HI, ST, isLen(IS)), slStep(ST)))`
+
+## K-0862 — reference-semantics/semantics/subscript.k:72
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `3673727509ac1987488ad8a299c7a4a1ed9143e108520907ed8ae746269699c8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= slStep(OptInt) [function, total]`
+
+## K-0863 — reference-semantics/semantics/subscript.k:73
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `080183421a02aea58098f319cf047707ed71b0951438d28d977948f4e0d478a2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule slStep(noB) => 1`
+
+## K-0864 — reference-semantics/semantics/subscript.k:74
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `38520b2d08df510dd573e03a40c5d25b7f8b89388b18d9d7aec6e9196ba1f6a1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule slStep(someB(S:Int)) => S`
+
+## K-0865 — reference-semantics/semantics/subscript.k:76
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `12940b25c9d85c4c575623a2d2085f8f09acda4390e58e7e27114df698e02858`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= slStart(OptInt, OptInt, Int) [function]`
+
+## K-0866 — reference-semantics/semantics/subscript.k:77-78
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f071f630a8f9d29c647b36ce94d423b9fbf40e83a653df82f1c26b442e07bcf9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule slStart(noB, ST:OptInt, _LEN:Int) => 0 requires slStep(ST) >Int 0`
+
+## K-0867 — reference-semantics/semantics/subscript.k:79-80
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `9a3afd20003e73154e811d7548e5a7375c143659696969695a76a6249e1197e1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule slStart(noB, ST:OptInt, LEN:Int) => LEN -Int 1 requires slStep(ST) <Int 0`
+
+## K-0868 — reference-semantics/semantics/subscript.k:81
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2e19a63f1664fef54fab562622ede417ba53fd30ced6cdedcde492feccb68677`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule slStart(someB(I:Int), ST:OptInt, LEN:Int) => slAdjust(I, LEN, slStep(ST))`
+
+## K-0869 — reference-semantics/semantics/subscript.k:83
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `def902114717732bd04bddb5459b883a7e72943d9905a006fa2908eeda667d1b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= slStop(OptInt, OptInt, Int) [function]`
+
+## K-0870 — reference-semantics/semantics/subscript.k:84-85
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `f8868ca0ab86614540c4f1dd48f166d89ac29e79ec0ddfd95983531c1f8a92fa`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule slStop(noB, ST:OptInt, LEN:Int) => LEN requires slStep(ST) >Int 0`
+
+## K-0871 — reference-semantics/semantics/subscript.k:86-87
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `fde349e77a3a9bdf581389ada6da29e7655b032852946cc55dd6d0fe7e6ebd17`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule slStop(noB, ST:OptInt, _LEN:Int) => -1 requires slStep(ST) <Int 0`
+
+## K-0872 — reference-semantics/semantics/subscript.k:88
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `8422a8ba8f8d7ea7a1411c4e9c0a955a66108a5220822111d4bc6be937bd70b9`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule slStop(someB(I:Int), ST:OptInt, LEN:Int) => slAdjust(I, LEN, slStep(ST))`
+
+## K-0873 — reference-semantics/semantics/subscript.k:90
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `9ec1896aa81dbda8d1ea3e6687ee086beea967bc3822cd10a318a2f04b3aa7bd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= slAdjust(Int, Int, Int) [function, total]`
+
+## K-0874 — reference-semantics/semantics/subscript.k:91-92
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `58c9216d8b6d4a214dea9e45411319b249515ac57ddfabc8f134b0b9ee6a0273`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampLo(I +Int LEN, STEP) requires I <Int 0`
+
+## K-0875 — reference-semantics/semantics/subscript.k:93-94
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `1c4d6ca3d3534697cd74873e69461efdcea7866ec6b97a95f3557568bf626378`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampHi(I, LEN, STEP) requires I >=Int 0`
+
+## K-0876 — reference-semantics/semantics/subscript.k:96
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `74b1e671d5bc2675c57a6e37b0517ae907a75fd226523c01205ef0a8bd3ac2f3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= clampLo(Int, Int) [function, total]`
+
+## K-0877 — reference-semantics/semantics/subscript.k:97-98
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a2e92eace44c06709afc4171de72f4f7aa640e356954efd5daa3b03cda75b4c1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule clampLo(J:Int, _STEP:Int) => J requires J >=Int 0`
+
+## K-0878 — reference-semantics/semantics/subscript.k:99-100
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0a357da8ed32fb6e8c29409f20c6100498859b45a42da73570dd2d839e702e0f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule clampLo(J:Int, STEP:Int) => #if STEP <Int 0 #then -1 #else 0 #fi requires J <Int 0`
+
+## K-0879 — reference-semantics/semantics/subscript.k:102
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `cf49fd584aa0aaff635d15fbfb5b3e627a19462ba2e20a330262744fbc4167da`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= clampHi(Int, Int, Int) [function, total]`
+
+## K-0880 — reference-semantics/semantics/subscript.k:103-104
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `706a4096d6eca2beac22bf86a9339c5af4255e57fc45f3205b67b0348c58b94a`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule clampHi(I:Int, LEN:Int, _STEP:Int) => I requires I <Int LEN`
+
+## K-0881 — reference-semantics/semantics/subscript.k:105-106
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `23b66755d1bc5837766bf28000a8c6d63de91eba12e4b18b73682920d78c2419`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule clampHi(I:Int, LEN:Int, STEP:Int) => #if STEP <Int 0 #then LEN -Int 1 #else LEN #fi requires I >=Int LEN`
+
+## K-0882 — reference-semantics/semantics/subscript.k:109
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `328023ed05394848428d502f2282a83f2f6fce266a9ff7c7187134b098872146`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ValSeq ::= buildVS(ValSeq, Int, Int, Int) [function]`
+
+## K-0883 — reference-semantics/semantics/subscript.k:110-112
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d6ecccf0b62d26633cbbbc1872d4e8696544682181c2fc2edc10eaada63d4aaa`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule buildVS(VS:ValSeq, I:Int, STOP:Int, STEP:Int) => vCons(valSeqAt(VS, I), buildVS(VS, I +Int STEP, STOP, STEP)) requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)`
+
+## K-0884 — reference-semantics/semantics/subscript.k:113-114
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0150c19c37152837babd9486a766951b2129d60e7537092d2eaa38a9e16453e5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule buildVS(_:ValSeq, I:Int, STOP:Int, STEP:Int) => .ValSeq requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))`
+
+## K-0885 — reference-semantics/semantics/subscript.k:116
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `0a55bc39332ca672124112c173cf443fc87f1059e0eab1577ce827bbbc559228`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax IntSeq ::= buildIS(IntSeq, Int, Int, Int) [function]`
+
+## K-0886 — reference-semantics/semantics/subscript.k:117-119
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `723e67f7af3e57e507162191080547158653bebe4dbd6fdb322201406c8852e1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule buildIS(IS:IntSeq, I:Int, STOP:Int, STEP:Int) => iCons(intSeqAt(IS, I), buildIS(IS, I +Int STEP, STOP, STEP)) requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)`
+
+## K-0887 — reference-semantics/semantics/subscript.k:120-121
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `68b366dedd7d79096626e82fbaa88bc954129111f50f44fe8e7be568f11ea4a2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule buildIS(_:IntSeq, I:Int, STOP:Int, STEP:Int) => .IntSeq requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))`
+
+## K-0888 — reference-semantics/semantics/syntax.k:9-30
+
+- Kind: syntax
+- Attributes: strict(2), macro, macro, strict(1), strict(1)
+- Normalized SHA-256: `970a5d907eb7e8719c2231b6232969f2dc9f205fd1d7c210c1529f39ef36afe0`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Expr ::= "Int" "(" Int ")" | "Float" "(" Float ")" | "Bool" "(" Bool ")" | "Name" "(" String ")" | "Str" "(" String ")" | "UnaryOp" "(" String "," Expr ")" [strict(2)] | "BinOp" "(" String "," Expr "," Expr ")" [seqstrict(2, 3)] | "BoolOp" "(" String "," Exprs ")" | "ListExpr" "(" Exprs ")" | "DictExpr" "(" Entries ")" | "ListComp" "(" Expr "," CompFors ")" [macro] | "GenExp" "(" Expr "," CompFors ")" [macro] | "TupleExpr" "(" Exprs ")" | "Subscript" "(" Expr "," Index ")" | "IfExp" "(" Expr "," Expr "," Expr ")" [strict(1)] | "Lambda" "(" Params "," Expr ")" | "KwArg" "(" String "," Expr ")" | "Lambda" "(" Params "," CellVars "," FreeVars "," Expr ")" | "NoneVal" | "Call" "(" Expr "," Exprs ")" | "Attribute" "(" Expr "," String ")" [strict(1)] | "Compare" "(" Expr "," CmpOp ")"`
+
+## K-0889 — reference-semantics/semantics/syntax.k:32
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `31fa5777bd647a4f25c58d68c85eb6c09619c01637f6df1bab48dc8b483e1a58`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"`
+
+## K-0890 — reference-semantics/semantics/syntax.k:33
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `3bf94dbad23a84b43e9aa25c15c21623947d6e776c73abfcae7187615db19847`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Entry ::= "Entry" "(" Expr "," Expr ")"`
+
+## K-0891 — reference-semantics/semantics/syntax.k:34
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `0e6de400c48346b7d36a41e6bd8bf0980e98ec9480c37c9e1447cdd6f20eeee0`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Entries ::= List{Entry, ","}`
+
+## K-0892 — reference-semantics/semantics/syntax.k:35
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `5bb59c5f0dc165e1a3c95708cf38f932c8f75c3f79b40696254c91e9ce14d48c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"`
+
+## K-0893 — reference-semantics/semantics/syntax.k:36
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `76d2ff7278fb79223076a48063fb3990b4456a793dc2ebc0dae8979f1c8a8177`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax CompFors ::= List{CompFor, ""}`
+
+## K-0894 — reference-semantics/semantics/syntax.k:37
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `5d0831f6c932f17e2c6a98fb109159767a6973adcf6c887c24f437ca5bac1a8e`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Exprs ::= List{Expr, ","}`
+
+## K-0895 — reference-semantics/semantics/syntax.k:38
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `2d7648621bd02a753995ccf8dc080239ab17e1e24b7d352f86ca59e91a27e7c8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Index ::= Expr | "Slice" "(" Bound "," Bound "," Bound ")"`
+
+## K-0896 — reference-semantics/semantics/syntax.k:39
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `0a207e7f6805a1fa7e9f84cb33748203011d32695e6a85d35c0ad0a2dd9da87c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Bound ::= Expr | "NoBound"`
+
+## K-0897 — reference-semantics/semantics/syntax.k:41-54
+
+- Kind: syntax
+- Attributes: strict(2), strict(3), strict(2), strict(1), strict, strict, strict
+- Normalized SHA-256: `1fdf12132fa6e34f9320cff44f77ddd81272816de7922284fab69897bf43f4db`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Stmt ::= "Assign" "(" Expr "," Expr ")" [strict(2)] | "Import" "(" String ")" | "ImportFrom" "(" String "," ParamNames ")" | "AugAssign" "(" Expr "," String "," Expr ")" [strict(3)] | "For" "(" Expr "," Expr "," Stmts ")" [strict(2)] | "While" "(" Expr "," Stmts ")" | "Break" | "Continue" | "If" "(" Expr "," Stmts "," Stmts ")" [strict(1)] | "Return" "(" Expr ")" [strict] | "Assert" "(" Expr ")" [strict] | "Expr" "(" Expr ")" [strict] | "FuncDef" "(" String "," Params "," Stmts ")" | "FuncDef" "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"`
+
+## K-0898 — reference-semantics/semantics/syntax.k:56
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `a815785974c2b381c1312f576d97ec94ebca743960cc443c92b8f44c8a0d74fe`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Stmts ::= List{Stmt, ""}`
+
+## K-0899 — reference-semantics/semantics/syntax.k:57
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `f9fd64833dd16dab12d5564129d63d642aefec063a071b470a02478201643b04`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Params ::= "Params" "(" ParamNames ")"`
+
+## K-0900 — reference-semantics/semantics/syntax.k:58
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `19c7da008dd612726936901b0d383a1c69bae9bb11460463187ccbc85b485212`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax CellVars ::= "CellVars" "(" ParamNames ")"`
+
+## K-0901 — reference-semantics/semantics/syntax.k:59
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `ff2cf5e4bb8759039c00ed5554e68f13d9298d8895d0d4df552558eeac2195bf`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax FreeVars ::= "FreeVars" "(" ParamNames ")"`
+
+## K-0902 — reference-semantics/semantics/syntax.k:60
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `8788a8da7c08b959b55f76539af04c5a55abe26a1584ada00a2820ee79b3501e`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax ParamNames ::= List{String, ","}`
+
+## K-0903 — reference-semantics/semantics/syntax.k:61
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `8da28960d4db086d4929161f541cf022015dc577e72bf3fa9a3c5249ddb90cdb`
+- Disposition: FIXED_RELEVANT
+- Assessment: Accepted for this theorem after control/data-flow review against the executed Int/If/function-call fragment.
+- Sentence: `syntax Module ::= "Module" "(" Stmts ")"`
+
+## K-0904 — reference-semantics/semantics/tuple.k:10
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `6088fae06255bb7360c99a675f37b1b629f669561408698b684244d07f7f15cb`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterNext(tuple(.ValSeq)) => #iterDone ... </k>`
+
+## K-0905 — reference-semantics/semantics/tuple.k:11
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d8c8d186a0d0dea5a4e118c70b52af3609edfabd17970d55303510cfd041e188`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #iterNext(tuple(vCons(V:Val, R:ValSeq))) => #iterYield(V, tuple(R)) ... </k>`
+
+## K-0906 — reference-semantics/semantics/tuple.k:14
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `508a95f61aed6d1129b9e3f84b2cc6d4021eb25accb256e816573049feff554b`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax ApplyK ::= "toTuple"`
+
+## K-0907 — reference-semantics/semantics/tuple.k:15
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `ff193ea2849e97ee999677d4a6b7f490cbe8fd917a21c5b418eb6620def33124`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> TupleExpr(ES:Exprs) => #evalArgs(ES, .Vals, toTuple) ... </k>`
+
+## K-0908 — reference-semantics/semantics/tuple.k:16
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `b0d84d481730d06c5882783cccdcdbaf7a0b81c185e990531bf607fc1dc9b01d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #applyK(toTuple, ACC:Vals) => tuple(vals2valSeq(ACC)) ... </k>`
+
+## K-0909 — reference-semantics/semantics/tuple.k:18
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `25153c3caf4c231c39cf912a4a670df203f58cc9ac4e01dcb6383f28400a9ed6`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("==", tuple(A:ValSeq), tuple(B:ValSeq)) => A ==K B`
+
+## K-0910 — reference-semantics/semantics/tuple.k:20
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `4e02486b9482d2cace94eb83c1cb2c6dfa8fda78806420970245c05e9408c1cd`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Compare(LV:Val, CmpOp("in", tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ... </k>`
+
+## K-0911 — reference-semantics/semantics/tuple.k:21
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `49fb4172dbeb8e8b160b7081e58ae5f55fc5fe8e35bc64980d7e8badc0f8ec54`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Compare(LV:Val, CmpOp("not in", tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ~> #notB ... </k>`
+
+## K-0912 — reference-semantics/semantics/tuple.k:23
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `bd7254bbf1105af77c015d6c37e329774f93ff7da7628dac38536f793e7eaf75`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyMethod(tuple(VS:ValSeq), "index", V:Val, .Vals) => idxOfVS(VS, V, 0)`
+
+## K-0913 — reference-semantics/semantics/tuple.k:24
+
+- Kind: syntax
+- Attributes: function
+- Normalized SHA-256: `df13ef70912b4ded4f2c2f97e50011c9ef936dff982309cfb623b77d247755d2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax Int ::= idxOfVS(ValSeq, Val, Int) [function]`
+
+## K-0914 — reference-semantics/semantics/tuple.k:25
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `663f7ddf889dc5c9c1fd12455b160afe66ad15883ae2930da18fb89d423d57ce`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule idxOfVS(vCons(A:Val, _:ValSeq), V:Val, I:Int) => I requires A ==K V`
+
+## K-0915 — reference-semantics/semantics/tuple.k:26-27
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `11dc3e7b5407cf8290d6db0b5c907d3d24396c53d91de763f2e5262412fc95d2`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule idxOfVS(vCons(A:Val, R:ValSeq), V:Val, I:Int) => idxOfVS(R, V, I +Int 1) requires notBool (A ==K V)`
+
+## K-0916 — reference-semantics/semantics/tuple.k:28
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `aef9af9e20033b3370e23e53369cc2dcbde9d967ed9a0314e2cb2ef5e5c9a059`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule applyCmp("!=", tuple(A:ValSeq), tuple(B:ValSeq)) => notBool (A ==K B)`
+
+## K-0917 — reference-semantics/semantics/tuple.k:31
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `98b229b9b4321ace7e17cbcc2dc0408fe6d1dfad46dffa400d30f3c40ccaad7d`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #bindTgt(Expr, Val)`
+
+## K-0918 — reference-semantics/semantics/tuple.k:32-34
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c3fab775730b56fa281ed34cd936ba5a5b472887c8359d897366a7399e4ec366`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #bindTgt(Name(X:String), V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>`
+
+## K-0919 — reference-semantics/semantics/tuple.k:35-41
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `bc76f6241e7dc38c889bd7385b99c3b84b3c97ab0caccdc38cc73a989f9b5068`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #bindTgt(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool X in_keys(M) andBool isCellRef({M[X]}:>Val) [priority(40)]`
+
+## K-0920 — reference-semantics/semantics/tuple.k:42
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `0d5b4092fa171333cbf5df6b548b5769cbb17dc4e57757e026b955c62cd7a9f3`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #bindTgt(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+
+## K-0921 — reference-semantics/semantics/tuple.k:43
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `a816acd68173f30a351177661e1ba49e2973160662cab9411e1a005ba8fd01c5`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #bindTgt(TupleExpr(TS:Exprs), list(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+
+## K-0922 — reference-semantics/semantics/tuple.k:44-46
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `59e31bc4012c3b5ce874435d4ab90d2e927d6ef521ec6ed5da59856e7dddbfa8`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #bindTgt(TupleExpr(TS:Exprs), ref(H:Int)) => #bindTgt(TupleExpr(TS), V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## K-0923 — reference-semantics/semantics/tuple.k:49
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `7dbe45ad3aa2cd3bf8ecd6f3515826ea6cbe564d227a73d51ed9eb4c590411e1`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `syntax KItem ::= #unpackSeq(Exprs, ValSeq)`
+
+## K-0924 — reference-semantics/semantics/tuple.k:50
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `3187abeadb723949255c0b48fe693a94615b14483be47e07de1b13b7a83b4a5c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Assign(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+
+## K-0925 — reference-semantics/semantics/tuple.k:51
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `441a29fab67a3f419ca7d4e56794565181965d88658ae3d0aee1955872cc8c5c`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Assign(TupleExpr(TS:Exprs), list(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+
+## K-0926 — reference-semantics/semantics/tuple.k:52-54
+
+- Kind: rule
+- Attributes: priority(40)
+- Normalized SHA-256: `f7778b4441622195b3db508c4c0c2de69955765341598d49a4776dee3790868f`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> Assign(TupleExpr(TS:Exprs), ref(H:Int)) => Assign(TupleExpr(TS), V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## K-0927 — reference-semantics/semantics/tuple.k:55-56
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `d538f44e4a19103a092dbf9a77a9075f2ee785584b073b22709dbccb1d090415`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #unpackSeq((T:Expr, TS:Exprs), vCons(V:Val, VS:ValSeq)) => #bindTgt(T, V) ~> #unpackSeq(TS, VS) ... </k>`
+
+## K-0928 — reference-semantics/semantics/tuple.k:57
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `2377fb943da101e36f2c0d35e43554ee1815fe1b1fe043893a271defc9620fd7`
+- Disposition: FIXED_UNUSED
+- Assessment: Not reachable from the submitted program term; no task-answer rule or dependency from a target claim.
+- Sentence: `rule <k> #unpackSeq(.Exprs, .ValSeq) => .K ... </k>`
+
+## K-0929 — verification.k:8
+
+- Kind: syntax
+- Attributes: none
+- Normalized SHA-256: `41325f43c48cce914a5a637ba6bb2740da0cb5a2234fda35b8db391ef1f4268e`
+- Disposition: LOCAL_INVOCATION_SYNTAX
+- Assessment: Accepted: proof-only constructor with no equation except the exact expansion at line 19.
+- Sentence: `syntax KItem ::= "#chooseNum" "(" Int "," Int ")"`
+
+## K-0930 — verification.k:12
+
+- Kind: syntax
+- Attributes: function, total
+- Normalized SHA-256: `2ccf5b6f594ba0c19f59bc559dca440867360077d46d8a365428e7d842fffbf3`
+- Disposition: LOCAL_DEFINITIONAL_SUMMARY
+- Assessment: Accepted: total mathematical function; its single rule covers all Int pairs.
+- Sentence: `syntax Int ::= largestEvenInRange(Int, Int) [function, total]`
+
+## K-0931 — verification.k:13-17
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `c03e276aa838c9ccf89f1a02a5355f619fd9394ba2274696d4c6c3b5f6c8c047`
+- Disposition: LOCAL_DEFINITIONAL_SUMMARY
+- Assessment: Accepted: computes Y-pyMod(Y,2) and returns it iff it is >= X; no execution is replaced.
+- Sentence: `rule largestEvenInRange(X:Int, Y:Int) => #if X <=Int Y -Int pyMod(Y, 2) #then Y -Int pyMod(Y, 2) #else -1 #fi`
+
+## K-0932 — verification.k:19-40
+
+- Kind: rule
+- Attributes: none
+- Normalized SHA-256: `322c7434385e18d731b0a8f9faaae283673f25cd14302a2d02662c6bb69252e0`
+- Disposition: LOCAL_OPERATIONAL_BRIDGE
+- Assessment: Accepted subject to the separately recorded constructor/body, state-footprint, and sensitivity checks.
+- Sentence: `rule <k> #chooseNum(X:Int, Y:Int) => Call( closureVal( ("x", "y"), If( Compare(BinOp("%", Name("y"), Int(2)), CmpOp("==", Int(0))), If( Compare(Name("y"), CmpOp(">=", Name("x"))), Return(Name("y")), .Stmts) Return(UnaryOp("-", Int(1))), .Stmts) If( Compare( BinOp("-", Name("y"), Int(1)), CmpOp(">=", Name("x"))), Return(BinOp("-", Name("y"), Int(1))), .Stmts) Return(UnaryOp("-", Int(1))), 0), X, Y) ... </k>`
+
+## K-0933 — spec.k:11-25
+
+- Kind: claim
+- Attributes: none
+- Normalized SHA-256: `b4ccab0e09b18246d3056eeb93ab53dfcd1550c0334b4676a55dc1d1de1a8f80`
+- Disposition: TARGET_CLAIM
+- Assessment: Result-constraining reachability target; precondition satisfiability and closure checked separately.
+- Sentence: `claim [all-positive-inputs]: <k> #chooseNum(X:Int, Y:Int) => largestEvenInRange(X, Y) </k> <env> 0 </env> <scopes> 0 |-> scope(.Map, parent(-1)) -1 |-> builtinsScope </scopes> <scopeLoc> 1 </scopeLoc> <heap> .Map </heap> <heapLoc> 0 </heapLoc> <stack> .List </stack> <ret> noRet </ret> <exc> NoExc </exc> <exit-code> 0 </exit-code> requires X >Int 0 andBool Y >Int 0`
+
+## K-0934 — spec.k:27-43
+
+- Kind: claim
+- Attributes: none
+- Normalized SHA-256: `0a5b07ced44ea0080bbbefb93e91b25ab1651afd089ade05568ed076f835436e`
+- Disposition: TARGET_CLAIM
+- Assessment: Result-constraining reachability target; precondition satisfiability and closure checked separately.
+- Sentence: `claim [even-upper-in-range]: <k> #chooseNum(X:Int, Y:Int) => Y </k> <env> 0 </env> <scopes> 0 |-> scope(.Map, parent(-1)) -1 |-> builtinsScope </scopes> <scopeLoc> 1 </scopeLoc> <heap> .Map </heap> <heapLoc> 0 </heapLoc> <stack> .List </stack> <ret> noRet </ret> <exc> NoExc </exc> <exit-code> 0 </exit-code> requires X >Int 0 andBool Y >Int 0 andBool pyMod(Y, 2) ==Int 0 andBool X <=Int Y`
+
+## K-0935 — spec.k:45-61
+
+- Kind: claim
+- Attributes: none
+- Normalized SHA-256: `01cd88a1cd9e03aeaf23f603be82a8bb022809e3c820a3f8f3b198f3d73e5ac3`
+- Disposition: TARGET_CLAIM
+- Assessment: Result-constraining reachability target; precondition satisfiability and closure checked separately.
+- Sentence: `claim [even-upper-before-range]: <k> #chooseNum(X:Int, Y:Int) => -1 </k> <env> 0 </env> <scopes> 0 |-> scope(.Map, parent(-1)) -1 |-> builtinsScope </scopes> <scopeLoc> 1 </scopeLoc> <heap> .Map </heap> <heapLoc> 0 </heapLoc> <stack> .List </stack> <ret> noRet </ret> <exc> NoExc </exc> <exit-code> 0 </exit-code> requires X >Int 0 andBool Y >Int 0 andBool pyMod(Y, 2) ==Int 0 andBool X >Int Y`
+
+## K-0936 — spec.k:63-79
+
+- Kind: claim
+- Attributes: none
+- Normalized SHA-256: `000f52db0b00aa6c41a1229b13e27b121ef752d7ef2715bce749748e68fa529b`
+- Disposition: TARGET_CLAIM
+- Assessment: Result-constraining reachability target; precondition satisfiability and closure checked separately.
+- Sentence: `claim [odd-upper-predecessor-in-range]: <k> #chooseNum(X:Int, Y:Int) => Y -Int 1 </k> <env> 0 </env> <scopes> 0 |-> scope(.Map, parent(-1)) -1 |-> builtinsScope </scopes> <scopeLoc> 1 </scopeLoc> <heap> .Map </heap> <heapLoc> 0 </heapLoc> <stack> .List </stack> <ret> noRet </ret> <exc> NoExc </exc> <exit-code> 0 </exit-code> requires X >Int 0 andBool Y >Int 0 andBool pyMod(Y, 2) ==Int 1 andBool X <Int Y`
+
+## K-0937 — spec.k:81-97
+
+- Kind: claim
+- Attributes: none
+- Normalized SHA-256: `f7414723ae4c24b67e7ea160223bf17d4656c3f50e7cee5e1f03a06573aba76e`
+- Disposition: TARGET_CLAIM
+- Assessment: Result-constraining reachability target; precondition satisfiability and closure checked separately.
+- Sentence: `claim [odd-upper-no-even-in-range]: <k> #chooseNum(X:Int, Y:Int) => -1 </k> <env> 0 </env> <scopes> 0 |-> scope(.Map, parent(-1)) -1 |-> builtinsScope </scopes> <scopeLoc> 1 </scopeLoc> <heap> .Map </heap> <heapLoc> 0 </heapLoc> <stack> .List </stack> <ret> noRet </ret> <exc> NoExc </exc> <exit-code> 0 </exit-code> requires X >Int 0 andBool Y >Int 0 andBool pyMod(Y, 2) ==Int 1 andBool X >=Int Y`
+

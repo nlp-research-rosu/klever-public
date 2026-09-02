@@ -1,0 +1,131 @@
+Script started on 2026-07-27 23:37:05-05:00 [<not executed on terminal>]
+#!/usr/bin/env python3
+"""Deterministically export one frozen K proof workspace to a Lean project."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import shlex
+import stat
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
+
+
+REPO = Path(__file__).resolve().parent.parent
+KLEAN = REPO / "tools/klean.py"
+KOMPILE_TIMEOUT = 480
+KLEAN_TIMEOUT = 300
+BUILD_TIMEOUT = 600
+
+K_IDENTIFIER = r"[A-Za-z][A-Za-z0-9_'-]*"
+SYNTAX_BLOCK_RE = re.compile(
+    rf"(?ms)^[ \t]*syntax\s+(?P<ret>{K_IDENTIFIER})\s*::=\s*"
+    r"(?P<body>.*?)"
+    r"(?=^[ \t]*(?:syntax|rule|module|endmodule|imports)\b|\Z)"
+)
+FUNC_PRODUCTION_RE = re.compile(
+    r"(?:\A|^[ \t]*\|)\s*"
+    rf"(?P<name>{K_IDENTIFIER})\s*\((?P<args>[^)]*)\)\s*"
+    r"\[(?P<attrs>[^\]]*)\]",
+    re.M,
+)
+K_IDENTIFIER_END = r"(?![A-Za-z0-9_'-])"
+MODULE_RE = re.compile(
+    rf"(?m)^[ \t]*module\s+({K_IDENTIFIER}){K_IDENTIFIER_END}"
+)
+MODULE_BLOCK_RE = re.compile(
+    rf"(?ms)^[ \t]*module\s+(?P<name>{K_IDENTIFIER}){K_IDENTIFIER_END}"
+    r"(?P<body>.*?)\bendmodule\b"
+)
+IMPORT_RE = re.compile(
+    rf"(?m)^[ \t]*imports\s+({K_IDENTIFIER}){K_IDENTIFIER_END}"
+)
+REQUIRES_RE = re.compile(r'requires\s+"([^"]+)"')
+_TERM_HEAD_RE = re.compile(r"fail to show termination for\s*\n\s*(«[^»]+»|\S+)")
+_TERM_CALL_RE = re.compile(r"Call from («[^»]+»|\S+) to («[^»]+»|\S+)")
+_ELAB_LINE_RE = re.compile(
+    r"error:\s+\S*Func\.lean:(\d+):\d+:\s+"
+    r"(?:unknown identifier|Application type mismatch)"
+)
+_DEF_RE = re.compile(r"^(\s*)(?:noncomputable\s+)?def\s+(\S+)\b")
+_NONCOMPUTABLE_RE = re.compile(r"(?m)^\s*noncomputable\s+def\s+(\S+)")
+_LEAN_NAMESPACE_RE = re.compile(r"^\s*namespace\s+(\S+)\s*$")
+_LEAN_END_RE = re.compile(r"^\s*end(?:\s+(\S+))?\s*$")
+_LEAN_TRUST_DECL_RE = re.compile(
+    r"^\s*(axiom|opaque)\s+(\S+)\s+(.+?)\s*$"
+)
+
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from tools import k_rule_inventory, lemma_discovery_contract
+
+
+class KleanExportError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class Func:
+    name: str
+    ret: str
+    args: list[str]
+
+
+@dataclass(frozen=True)
+class DefinitionResolution:
+    verification_file: Path
+    verification_module: str
+    syntax_module: str
+    required_files: tuple[Path, ...]
+    entry_files: tuple[Path, ...]
+
+
+@dataclass(frozen=True)
+class KompileCommand:
+    source: Path
+    main_module: str | None
+    syntax_module: str | None
+    backend: str | None
+
+
+def _proof_kompile_commands(workspace: Path) -> tuple[KompileCommand, ...]:
+    prove = workspace / "prove.sh"
+    if not prove.is_file() or prove.is_symlink():
+        return ()
+    logical_lines = prove.read_text().replace("\\\n", " ").splitlines()
+    commands: list[KompileCommand] = []
+    for line in logical_lines:
+        try:
+            words = shlex.split(line, comments=True)
+        except ValueError:
+            continue
+        try:
+            index = words.index("kompile")
+        except ValueError:
+            continue
+        arguments = words[index + 1 :]
+        source_word = next(
+            (
+                word
+                for word in arguments
+                if not word.startswith("-") and word.endswith(".k")
+14:import subprocess
+23:KLEAN = REPO / "tools/klean.py"
+700:        result = subprocess.run(
+707:            stdout=subprocess.PIPE,
+708:            stderr=subprocess.STDOUT,
+711:    except subprocess.TimeoutExpired:
+1077:            command = [
+1099:            command = [
+
+Script done on 2026-07-27 23:37:05-05:00 [COMMAND_EXIT_CODE="0"]

@@ -1,0 +1,297 @@
+$ nl -ba /reference/k-proof/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module ENCODE-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Exact loop body emitted by solution.mpy, named once so both proof phases
+     7	  // are checked against the same AST.
+     8	  syntax Stmts ::= "encodeLoopBody" [macro]
+     9	  rule encodeLoopBody
+    10	    =>
+    11	      Assign(
+    12	        Name("char"),
+    13	        Call(Attribute(Name("char"), "swapcase"), .Exprs))
+    14	      Assign(
+    15	        Name("code"),
+    16	        Call(Name("ord"), (Name("char"), .Exprs)))
+    17	      If(
+    18	        BoolOp(
+    19	          "or",
+    20	          (Compare(Name("code"), CmpOp("==", Int(97))),
+    21	           Compare(Name("code"), CmpOp("==", Int(101))),
+    22	           Compare(Name("code"), CmpOp("==", Int(105))),
+    23	           Compare(Name("code"), CmpOp("==", Int(111))),
+    24	           Compare(Name("code"), CmpOp("==", Int(117))),
+    25	           Compare(Name("code"), CmpOp("==", Int(65))),
+    26	           Compare(Name("code"), CmpOp("==", Int(69))),
+    27	           Compare(Name("code"), CmpOp("==", Int(73))),
+    28	           Compare(Name("code"), CmpOp("==", Int(79))),
+    29	           Compare(Name("code"), CmpOp("==", Int(85))),
+    30	           .Exprs)),
+    31	        AugAssign(
+    32	          Name("result"),
+    33	          "+",
+    34	          Call(
+    35	            Name("chr"),
+    36	            (BinOp(
+    37	              "+",
+    38	              Name("code"),
+    39	              Int(2)),
+    40	             .Exprs))),
+    41	        AugAssign(
+    42	          Name("result"),
+    43	          "+",
+    44	          Name("char")))
+    45	      .Stmts
+    46	
+    47	  syntax Stmts ::= "encodeFunctionBody" [macro]
+    48	  rule encodeFunctionBody
+    49	    =>
+    50	      Assign(Name("result"), Str(""))
+    51	      Assign(Name("char"), Str(""))
+    52	      Assign(Name("code"), Int(0))
+    53	      For(Name("char"), Name("message"), encodeLoopBody)
+    54	      Return(Name("result"))
+    55	      .Stmts
+    56	
+    57	  // Mathematical contract: first swap each ASCII letter's case, then advance
+    58	  // every (now case-swapped) vowel by two code points.
+    59	  syntax Bool ::= isVowelCode(Int) [function, total]
+    60	  rule isVowelCode(C:Int)
+    61	    => C ==Int 65  orBool C ==Int 69  orBool C ==Int 73
+    62	       orBool C ==Int 79  orBool C ==Int 85
+    63	       orBool C ==Int 97  orBool C ==Int 101 orBool C ==Int 105
+    64	       orBool C ==Int 111 orBool C ==Int 117
+    65	
+    66	  syntax Int ::= encodeCode(Int) [function, total]
+    67	  rule encodeCode(C:Int) => swapC(C) +Int 2
+    68	    requires isVowelCode(swapC(C))
+    69	  rule encodeCode(C:Int) => swapC(C)
+    70	    requires notBool isVowelCode(swapC(C))
+    71	
+    72	  // Accumulator form mirrors the implementation's left-to-right loop.  It is
+    73	  // also the induction measure used by the loop claim in spec.k.
+    74	  syntax IntSeq ::= encodeAcc(IntSeq, IntSeq) [function, total]
+    75	  rule encodeAcc(.IntSeq, ACC:IntSeq) => ACC
+    76	  rule encodeAcc(iCons(C:Int, REST:IntSeq), ACC:IntSeq)
+    77	    => encodeAcc(
+    78	         REST,
+    79	         seqConcat(ACC, iCons(encodeCode(C), .IntSeq)))
+    80	
+    81	  syntax IntSeq ::= encodeCodes(IntSeq) [function, total]
+    82	  rule encodeCodes(INPUT:IntSeq) => encodeAcc(INPUT, .IntSeq)
+    83	endmodule
+$ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module ENCODE-SPEC
+     4	  imports ENCODE-VERIFICATION
+     5	
+     6	  // End-to-end contract.  During the joint proof this composes encode-init
+     7	  // with the independently inductive encode-loop claim below.
+     8	  claim [encode-total]:
+     9	    <k>
+    10	      Call(
+    11	        closureVal(
+    12	          ("message", .ParamNames),
+    13	          encodeFunctionBody,
+    14	          0),
+    15	        (str(INPUT:IntSeq), .Exprs))
+    16	      =>
+    17	      str(encodeCodes(INPUT))
+    18	    </k>
+    19	    <env> 0 </env>
+    20	    <scopes>
+    21	      0 |-> scope(.Map, parent(-1))
+    22	      -1 |-> builtinsScope
+    23	    </scopes>
+    24	    <scopeLoc> 1 </scopeLoc>
+    25	    <heap> .Map </heap>
+    26	    <heapLoc> 0 </heapLoc>
+    27	    <stack> .List </stack>
+    28	    <ret> noRet </ret>
+    29	    <exc> NoExc </exc>
+    30	    <exit-code> 0 </exit-code>
+    31	
+    32	  // Phase 1: normal function-call setup reaches the loop invariant with the
+    33	  // original message and an empty output accumulator.
+    34	  claim [encode-init]:
+    35	    <k>
+    36	      Call(
+    37	        closureVal(
+    38	          ("message", .ParamNames),
+    39	          encodeFunctionBody,
+    40	          0),
+    41	        (str(INPUT:IntSeq), .Exprs))
+    42	      =>
+    43	      #loop(str(INPUT), Name("char"), encodeLoopBody)
+    44	      ~> (Return(Name("result")) .Stmts)
+    45	      ~> #endcall
+    46	    </k>
+    47	    <env> 0 => 1 </env>
+    48	    <scopes>
+    49	      0 |-> scope(.Map, parent(-1))
+    50	      -1 |-> builtinsScope
+    51	      =>
+    52	      0 |-> scope(.Map, parent(-1))
+    53	      1 |-> scope(
+    54	             "message" |-> str(INPUT)
+    55	             "result"  |-> str(.IntSeq)
+    56	             "char"    |-> str(.IntSeq)
+    57	             "code"    |-> 0,
+    58	             parent(0))
+    59	      -1 |-> builtinsScope
+    60	    </scopes>
+    61	    <scopeLoc> 1 => 2 </scopeLoc>
+    62	    <heap> .Map </heap>
+    63	    <heapLoc> 0 </heapLoc>
+    64	    <stack> .List => ListItem(frame(.K, 0, 1)) </stack>
+    65	    <ret> noRet </ret>
+    66	    <exc> NoExc </exc>
+    67	    <exit-code> 0 </exit-code>
+    68	
+    69	  // Phase 2: K proves the loop invariant by circularity over INPUT.
+    70	  claim [encode-loop]:
+    71	    <k>
+    72	      #loop(str(INPUT:IntSeq), Name("char"), encodeLoopBody)
+    73	      ~> (Return(Name("result")) .Stmts)
+    74	      ~> #endcall
+    75	      =>
+    76	      str(encodeAcc(INPUT, ACC))
+    77	    </k>
+    78	    <env> 1 => 0 </env>
+    79	    <scopes>
+    80	      0 |-> scope(.Map, parent(-1))
+    81	      1 |-> scope(
+    82	             "message" |-> str(_MESSAGE:IntSeq)
+    83	             "result"  |-> str(ACC:IntSeq)
+    84	             "char"    |-> str(_OLDCHAR:IntSeq)
+    85	             "code"    |-> _OLDCODE:Int,
+    86	             parent(0))
+    87	      -1 |-> builtinsScope
+    88	      =>
+    89	      0 |-> scope(.Map, parent(-1))
+    90	      -1 |-> builtinsScope
+    91	    </scopes>
+    92	    <scopeLoc> 2 => 1 </scopeLoc>
+    93	    <heap> .Map </heap>
+    94	    <heapLoc> 0 </heapLoc>
+    95	    <stack> ListItem(frame(.K, 0, 1)) => .List </stack>
+    96	    <ret> noRet </ret>
+    97	    <exc> NoExc </exc>
+    98	    <exit-code> 0 </exit-code>
+    99	endmodule
+$ nl -ba /reference/k-proof/solution.py
+     1	def encode(message):
+     2	    result = ""
+     3	    char = ""
+     4	    code = 0
+     5	    for char in message:
+     6	        char = char.swapcase()
+     7	        code = ord(char)
+     8	        if code == 97 or code == 101 or code == 105 or code == 111 or code == 117 or code == 65 or code == 69 or code == 73 or code == 79 or code == 85:
+     9	            result += chr(code + 2)
+    10	        else:
+    11	            result += char
+    12	    return result
+$ nl -ba /reference/k-proof/solution.mpy
+     1	Module(
+     2	  FuncDef("encode", Params("message"),
+     3	    Assign(Name("result"), Str(""))
+     4	    Assign(Name("char"), Str(""))
+     5	    Assign(Name("code"), Int(0))
+     6	    For(Name("char"), Name("message"),
+     7	      Assign(Name("char"), Call(Attribute(Name("char"), "swapcase"), ))
+     8	      Assign(Name("code"), Call(Name("ord"), Name("char")))
+     9	      If(BoolOp(
+    10	        "or",
+    11	        Compare(Name("code"), CmpOp("==", Int(97))),
+    12	        Compare(Name("code"), CmpOp("==", Int(101))),
+    13	        Compare(Name("code"), CmpOp("==", Int(105))),
+    14	        Compare(Name("code"), CmpOp("==", Int(111))),
+    15	        Compare(Name("code"), CmpOp("==", Int(117))),
+    16	        Compare(Name("code"), CmpOp("==", Int(65))),
+    17	        Compare(Name("code"), CmpOp("==", Int(69))),
+    18	        Compare(Name("code"), CmpOp("==", Int(73))),
+    19	        Compare(Name("code"), CmpOp("==", Int(79))),
+    20	        Compare(Name("code"), CmpOp("==", Int(85)))),
+    21	        AugAssign(
+    22	          Name("result"),
+    23	          "+",
+    24	          Call(Name("chr"), BinOp("+", Name("code"), Int(2)))),
+    25	        AugAssign(Name("result"), "+", Name("char"))))
+    26	    Return(Name("result"))))
+$ nl -ba /reference/k-proof/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py concrete_tests.py > concrete_tests.mpy
+     6	
+     7	kompile reference-semantics/semantics.k \
+     8	  --backend llvm \
+     9	  --main-module MPY-KRUN \
+    10	  --syntax-module MPY-SYNTAX \
+    11	  --output-definition runtime-kompiled
+    12	
+    13	krun concrete_tests.mpy \
+    14	  --definition runtime-kompiled \
+    15	  --output pretty
+    16	
+    17	kompile verification.k \
+    18	  --backend haskell \
+    19	  --main-module ENCODE-VERIFICATION \
+    20	  --syntax-module MPY-SYNTAX \
+    21	  --output-definition verification-kompiled
+    22	
+    23	kprove spec.k \
+    24	  --definition verification-kompiled \
+    25	  --spec-module ENCODE-SPEC
+$ sed -n "1,360p" /reference/lemma-discovery.json
+{
+  "schema_version": 2,
+  "inventory_sha256": "e3cb1460d02952d9116b4f977842c33b5a5399e664b221ce7f280b6e21020025",
+  "rules": [
+    {
+      "source_rule_id": "rule-4f1c1b8a406c0f6cf8b5d127a3dc79e4ddbab158f74aa40cbbd60e54aa68f543",
+      "classification": "DEFINITION",
+      "rationale": "This macro equation expands the named encodeLoopBody proof term to the exact translated loop-body statement sequence."
+    },
+    {
+      "source_rule_id": "rule-fe7cc44ef102427686a96c04572b5ba2207f321d0a51c6a392c8df26f885f857",
+      "classification": "DEFINITION",
+      "rationale": "This macro equation expands encodeFunctionBody to the initialization, loop, and return statements used as the named function-body proof term."
+    },
+    {
+      "source_rule_id": "rule-c967809d7c1f7190c8ad73e7c196724ba72b22ff8161f4b280ffeb5eec91a81e",
+      "classification": "DEFINITION",
+      "rationale": "This equation defines the isVowelCode predicate as membership in the ten uppercase and lowercase ASCII vowel code points."
+    },
+    {
+      "source_rule_id": "rule-cff78f2fb920faa6ccb5cd7dc82e6fc6fef2f2b8add70a8501a76838d75b7bff",
+      "classification": "DEFINITION",
+      "rationale": "This is the vowel branch of the case definition for encodeCode, specifying case swap followed by a two-code-point advance."
+    },
+    {
+      "source_rule_id": "rule-e36d9423613e355c95d43fc7e640d283a0f29febbbaf355149ebefac14af8c37",
+      "classification": "DEFINITION",
+      "rationale": "This is the complementary non-vowel branch of the case definition for encodeCode, specifying only the case swap."
+    },
+    {
+      "source_rule_id": "rule-6f211f83fd1f1b067ef8044b1b3525bab51c6d295ab7ac66fe5024ea27fb9d59",
+      "classification": "DEFINITION",
+      "rationale": "This equation is the empty-input base case of the encodeAcc recurrence."
+    },
+    {
+      "source_rule_id": "rule-1a15858c13e575c194c98f523a18428daa99bf08a7d7f9756b8ffe6ea2e12371",
+      "classification": "DEFINITION",
+      "rationale": "This equation is the nonempty-input recursive case of encodeAcc, appending the encoded head code and recurring on the tail."
+    },
+    {
+      "source_rule_id": "rule-34c2691cb0a6fbd3e7ddcc90c14b933007085cabf3ad29d27766ad1f2943c4cf",
+      "classification": "DEFINITION",
+      "rationale": "This wrapper equation defines encodeCodes by invoking encodeAcc with an empty output accumulator."
+    }
+  ]
+}

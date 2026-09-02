@@ -1,0 +1,244 @@
+Script started on 2026-07-28 17:23:48-05:00 [<not executed on terminal>]
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module REMOVE-DUPLICATES-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // HumanEval's input type is List[int].  The predicate is carried as the
+     7	  // symbolic precondition, excluding the other Val constructors in MPY.
+     8	  syntax Bool ::= allInts(ValSeq) [function, total]
+     9	  rule allInts(.ValSeq) => true
+    10	  rule allInts(vCons(V:Val, REST:ValSeq))
+    11	    => isIntV(V) andBool allInts(REST)
+    12	
+    13	  // Mathematical specification in accumulator form.  The form mirrors the
+    14	  // program loop and therefore also serves as its induction invariant.
+    15	  syntax ValSeq ::= keepSinglesAcc(ValSeq, ValSeq, ValSeq) [function, total]
+    16	  rule keepSinglesAcc(ACC:ValSeq, .ValSeq, _ALL:ValSeq) => ACC
+    17	    [simplification]
+    18	  rule keepSinglesAcc(ACC:ValSeq,
+    19	                      vCons(V:Val, REST:ValSeq),
+    20	                      ALL:ValSeq)
+    21	    => keepSinglesAcc(
+    22	         valSeqConcat(ACC, vCons(V, .ValSeq)),
+    23	         REST,
+    24	         ALL)
+    25	    requires 1 ==Int cntOccVS(ALL, V)
+    26	    [simplification]
+    27	  rule keepSinglesAcc(ACC:ValSeq,
+    28	                      vCons(V:Val, REST:ValSeq),
+    29	                      ALL:ValSeq)
+    30	    => keepSinglesAcc(ACC, REST, ALL)
+    31	    requires notBool (1 ==Int cntOccVS(ALL, V))
+    32	    [simplification]
+    33	
+    34	  // The exact loop body emitted by py2mpy for solution.py.
+    35	  syntax Stmts ::= "#removeDuplicatesBody" [macro]
+    36	  rule #removeDuplicatesBody
+    37	    => If(
+    38	         Compare(
+    39	           Call(
+    40	             Attribute(Name("numbers"), "count"),
+    41	             Name("number"), .Exprs),
+    42	           CmpOp("==", Int(1))),
+    43	         Expr(
+    44	           Call(
+    45	             Attribute(Name("result"), "append"),
+    46	             Name("number"), .Exprs))
+    47	         .Stmts,
+    48	         .Stmts)
+    49	       .Stmts
+    50	
+    51	  // Exact translated function body used by the entry-point claims.
+    52	  syntax Val ::= "#removeDuplicatesClosure" [macro]
+    53	  rule #removeDuplicatesClosure
+    54	    => closureVal(
+    55	         "numbers",
+    56	         Assign(Name("result"), ListExpr(.Exprs))
+    57	         For(
+    58	           Name("number"),
+    59	           Name("numbers"),
+    60	           #removeDuplicatesBody)
+    61	         Return(Name("result"))
+    62	         .Stmts,
+    63	         0)
+    64	endmodule
+     1	requires "verification.k"
+     2	
+     3	module REMOVE-DUPLICATES-SPEC
+     4	  imports REMOVE-DUPLICATES-VERIFICATION
+     5	
+     6	  // Induction invariant for the loop.  The result list contains the existing
+     7	  // accumulator followed by precisely the singleton-occurrence elements in
+     8	  // REST, in their original order.
+     9	  claim [loop-invariant]:
+    10	    <k>
+    11	      #loop(list(REST), Name("number"), #removeDuplicatesBody)
+    12	      ~> CONT
+    13	      => CONT
+    14	    </k>
+    15	    <env> LOCAL </env>
+    16	    <scopes>
+    17	      SCOPES
+    18	      LOCAL |-> scope(
+    19	        ("number" |-> OLD)
+    20	        ("numbers" |-> list(ALL))
+    21	        ("result" |-> ref(RESULT)),
+    22	        PARENT)
+    23	      =>
+    24	      SCOPES
+    25	      LOCAL |-> scope(
+    26	        ("number" |-> ?LAST)
+    27	        ("numbers" |-> list(ALL))
+    28	        ("result" |-> ref(RESULT)),
+    29	        PARENT)
+    30	    </scopes>
+    31	    <heap>
+    32	      (RESULT |-> list(ACC))
+    33	      HEAP
+    34	      =>
+    35	      (RESULT |-> list(keepSinglesAcc(ACC, REST, ALL)))
+    36	      HEAP
+    37	    </heap>
+    38	    requires allInts(ALL)
+    39	     andBool allInts(REST)
+    40	
+    41	  // The following exhaustive entry cases establish the theorem for every
+    42	  // value satisfying the prompt's List[int] precondition.
+    43	  claim [entry-empty]:
+    44	    <k>
+    45	      Call(#removeDuplicatesClosure, list(.ValSeq), .Exprs)
+    46	      => ref(0)
+    47	    </k>
+    48	    <env> 0 </env>
+    49	    <scopes>
+    50	      0 |-> scope(.Map, parent(-1))
+    51	      -1 |-> builtinsScope
+    52	    </scopes>
+    53	    <scopeLoc> 1 </scopeLoc>
+    54	    <heap>
+    55	      .Map
+    56	      => 0 |-> list(.ValSeq)
+    57	    </heap>
+    58	    <heapLoc> 0 => 1 </heapLoc>
+    59	    <stack> .List </stack>
+    60	    <ret> noRet </ret>
+    61	    <exc> NoExc </exc>
+    62	    <exit-code> 0 </exit-code>
+    63	
+    64	  claim [entry-keep]:
+    65	    <k>
+    66	      Call(
+    67	        #removeDuplicatesClosure,
+    68	        list(vCons(V, REST)), .Exprs)
+    69	      => ref(0)
+    70	    </k>
+    71	    <env> 0 </env>
+    72	    <scopes>
+    73	      0 |-> scope(.Map, parent(-1))
+    74	      -1 |-> builtinsScope
+    75	    </scopes>
+    76	    <scopeLoc> 1 </scopeLoc>
+    77	    <heap>
+    78	      .Map
+    79	      => 0 |-> list(
+    80	           keepSinglesAcc(
+    81	             vCons(V, .ValSeq),
+    82	             REST,
+    83	             vCons(V, REST)))
+    84	    </heap>
+    85	    <heapLoc> 0 => 1 </heapLoc>
+    86	    <stack> .List </stack>
+    87	    <ret> noRet </ret>
+    88	    <exc> NoExc </exc>
+    89	    <exit-code> 0 </exit-code>
+    90	    requires allInts(vCons(V, REST))
+    91	     andBool 1 ==Int cntOccVS(vCons(V, REST), V)
+    92	
+    93	  claim [entry-drop]:
+    94	    <k>
+    95	      Call(
+    96	        #removeDuplicatesClosure,
+    97	        list(vCons(V, REST)), .Exprs)
+    98	      => ref(0)
+    99	    </k>
+   100	    <env> 0 </env>
+   101	    <scopes>
+   102	      0 |-> scope(.Map, parent(-1))
+   103	      -1 |-> builtinsScope
+   104	    </scopes>
+   105	    <scopeLoc> 1 </scopeLoc>
+   106	    <heap>
+   107	      .Map
+   108	      => 0 |-> list(
+   109	           keepSinglesAcc(
+   110	             .ValSeq,
+   111	             REST,
+   112	             vCons(V, REST)))
+   113	    </heap>
+   114	    <heapLoc> 0 => 1 </heapLoc>
+   115	    <stack> .List </stack>
+   116	    <ret> noRet </ret>
+   117	    <exc> NoExc </exc>
+   118	    <exit-code> 0 </exit-code>
+   119	    requires allInts(vCons(V, REST))
+   120	     andBool notBool (
+   121	       1 ==Int cntOccVS(vCons(V, REST), V))
+   122	endmodule
+     1	from typing import List
+     2	
+     3	
+     4	def remove_duplicates(numbers: List[int]) -> List[int]:
+     5	    result = []
+     6	    for number in numbers:
+     7	        if numbers.count(number) == 1:
+     8	            result.append(number)
+     9	    return result
+     1	Module(
+     2	  ImportFrom("typing", "List")
+     3	  FuncDef("remove_duplicates", Params("numbers"),
+     4	    Assign(Name("result"), ListExpr())
+     5	    For(Name("number"), Name("numbers"),
+     6	      If(Compare(
+     7	        Call(Attribute(Name("numbers"), "count"), Name("number")),
+     8	        CmpOp("==", Int(1))),
+     9	        Expr(Call(Attribute(Name("result"), "append"), Name("number"))),
+    10	        ))
+    11	    Return(Name("result"))))
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py concrete-tests.py > concrete-tests.mpy
+     6	
+     7	kompile reference-semantics/semantics.k \
+     8	  --backend llvm \
+     9	  --main-module MPY-KRUN \
+    10	  --syntax-module MPY-SYNTAX \
+    11	  --output-definition runtime-kompiled
+    12	
+    13	krun concrete-tests.mpy \
+    14	  --definition runtime-kompiled \
+    15	  --output none
+    16	
+    17	kompile verification.k \
+    18	  --backend haskell \
+    19	  --main-module REMOVE-DUPLICATES-VERIFICATION \
+    20	  --syntax-module MPY-SYNTAX \
+    21	  --output-definition verification-kompiled
+    22	
+    23	# First prove the reusable loop invariant by circularity.
+    24	kprove spec.k \
+    25	  --definition verification-kompiled \
+    26	  --spec-module REMOVE-DUPLICATES-SPEC \
+    27	  --claims REMOVE-DUPLICATES-SPEC.loop-invariant \
+    28	  --output pretty
+    29	
+    30	# Then use that already-proved invariant as a lemma for all entry cases.
+    31	kprove spec.k \
+    32	  --definition verification-kompiled \
+    33	  --spec-module REMOVE-DUPLICATES-SPEC \
+    34	  --trusted REMOVE-DUPLICATES-SPEC.loop-invariant \
+    35	  --output pretty
+
+Script done on 2026-07-28 17:23:48-05:00 [COMMAND_EXIT_CODE="0"]

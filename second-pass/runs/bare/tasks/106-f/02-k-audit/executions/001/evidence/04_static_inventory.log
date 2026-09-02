@@ -1,0 +1,336 @@
+COMMAND: line-numbered source inventory
+FILE: /tmp/audit-work/106-f/source/semantic.k
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports BOOL-SYNTAX
+     4	  imports STRING-SYNTAX
+     5	
+     6	  syntax Program ::= "Module" "(" Stmts ")"
+     7	
+     8	  syntax Stmts ::= List{Stmt, ""}
+     9	  syntax Strings ::= List{String, ","}
+    10	  syntax Exprs ::= List{Expr, ","}
+    11	
+    12	  syntax Params ::= "Params" "(" Strings ")"
+    13	
+    14	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    15	                | "Assign" "(" Expr "," Expr ")"
+    16	                | "While" "(" Expr "," Stmts ")"
+    17	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    18	                | "Return" "(" Expr ")"
+    19	
+    20	  syntax Expr ::= "Int" "(" Int ")"
+    21	                | "Name" "(" String ")"
+    22	                | "ListExpr" "(" Exprs ")"
+    23	                | "BinOp" "(" String "," Expr "," Expr ")"
+    24	                | "Compare" "(" Expr "," CmpOp ")"
+    25	
+    26	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    27	endmodule
+    28	
+    29	module SEMANTIC
+    30	  imports MPY-SYNTAX
+    31	  imports INT
+    32	  imports BOOL
+    33	  imports STRING
+    34	  imports MAP
+    35	  imports LIST
+    36	
+    37	  syntax Value ::= "intVal" "(" Int ")"
+    38	                 | "boolVal" "(" Bool ")"
+    39	                 | "listVal" "(" List ")"
+    40	
+    41	  syntax Result ::= "noResult" | "done" "(" Value ")"
+    42	
+    43	  configuration
+    44	    <py>
+    45	      <k> $PGM:Program </k>
+    46	      <input> $INPUT:Int </input>
+    47	      <env> .Map </env>
+    48	      <result> noResult </result>
+    49	    </py>
+    50	
+    51	  syntax KItem ::= "exec" "(" Stmts ")"
+    52	                 | "eval" "(" Expr ")"
+    53	                 | "store" "(" String ")"
+    54	                 | "singleton"
+    55	                 | "binLeft" "(" String "," Expr ")"
+    56	                 | "binRight" "(" String "," Value ")"
+    57	                 | "cmpLeft" "(" String "," Expr ")"
+    58	                 | "cmpRight" "(" String "," Value ")"
+    59	                 | "ifBranch" "(" Stmts "," Stmts ")"
+    60	                 | "whileBranch" "(" Expr "," Stmts ")"
+    61	                 | "doReturn"
+    62	
+    63	  rule <k> Module(FuncDef(_F, Params(P:String), BODY)) => exec(BODY) </k>
+    64	       <input> N </input>
+    65	       <env> .Map => P |-> intVal(N) </env>
+    66	
+    67	  rule exec(.Stmts) => .K
+    68	  rule exec(S:Stmt REST:Stmts) => S ~> exec(REST)
+    69	
+    70	  rule Assign(Name(X), E) => eval(E) ~> store(X)
+    71	  rule <k> V:Value ~> store(X) => .K ...</k>
+    72	       <env> ENV => ENV [ X <- V ] </env>
+    73	
+    74	  rule If(COND, THEN, ELSE) => eval(COND) ~> ifBranch(THEN, ELSE)
+    75	  rule boolVal(true) ~> ifBranch(THEN, _ELSE) => exec(THEN)
+    76	  rule boolVal(false) ~> ifBranch(_THEN, ELSE) => exec(ELSE)
+    77	
+    78	  rule While(COND, BODY) => eval(COND) ~> whileBranch(COND, BODY)
+    79	  rule boolVal(true) ~> whileBranch(COND, BODY)
+    80	    => exec(BODY) ~> While(COND, BODY)
+    81	  rule boolVal(false) ~> whileBranch(_COND, _BODY) => .K
+    82	
+    83	  rule Return(E) => eval(E) ~> doReturn
+    84	  rule <k> V:Value ~> doReturn ~> _REST:K => .K </k>
+    85	       <result> noResult => done(V) </result>
+    86	
+    87	  rule <k> eval(Int(I)) => intVal(I) ...</k>
+    88	  rule <k> eval(Name(X)) => V ...</k>
+    89	       <env>... X |-> V:Value ...</env>
+    90	
+    91	  rule eval(ListExpr(.Exprs)) => listVal(.List)
+    92	  rule eval(ListExpr(E)) => eval(E) ~> singleton
+    93	  rule intVal(I) ~> singleton => listVal(ListItem(I))
+    94	
+    95	  rule eval(BinOp(OP, LEFT, RIGHT)) => eval(LEFT) ~> binLeft(OP, RIGHT)
+    96	  rule V:Value ~> binLeft(OP, RIGHT) => eval(RIGHT) ~> binRight(OP, V)
+    97	  rule intVal(J) ~> binRight("+", intVal(I)) => intVal(I +Int J)
+    98	  rule intVal(J) ~> binRight("*", intVal(I)) => intVal(I *Int J)
+    99	  rule intVal(J) ~> binRight("%", intVal(I)) => intVal(I %Int J)
+   100	  rule listVal(L2) ~> binRight("+", listVal(L1)) => listVal(L1 L2)
+   101	
+   102	  rule eval(Compare(LEFT, CmpOp(OP, RIGHT)))
+   103	    => eval(LEFT) ~> cmpLeft(OP, RIGHT)
+   104	  rule V:Value ~> cmpLeft(OP, RIGHT) => eval(RIGHT) ~> cmpRight(OP, V)
+   105	  rule intVal(J) ~> cmpRight("<=", intVal(I)) => boolVal(I <=Int J)
+   106	  rule intVal(J) ~> cmpRight("==", intVal(I)) => boolVal(I ==Int J)
+   107	endmodule
+FILE: /tmp/audit-work/106-f/source/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  syntax Int ::= "mathFactorial" "(" Int ")" [function]
+     7	               | "mathTriangle" "(" Int ")" [function]
+     8	               | "expectedAt" "(" Int ")" [function]
+     9	  syntax List ::= "expected" "(" Int ")" [function]
+    10	                | "expectedCompletion" "(" Int "," Int "," Int "," Int "," List ")" [function]
+    11	
+    12	  rule mathFactorial(0) => 1
+    13	  rule mathFactorial(N) => mathFactorial(N -Int 1) *Int N
+    14	    requires N >Int 0
+    15	
+    16	  rule mathTriangle(0) => 0
+    17	  rule mathTriangle(N) => mathTriangle(N -Int 1) +Int N
+    18	    requires N >Int 0
+    19	
+    20	  rule expectedAt(N) => mathFactorial(N)
+    21	    requires N >Int 0 andBool N %Int 2 ==Int 0
+    22	  rule expectedAt(N) => mathTriangle(N)
+    23	    requires N >Int 0 andBool N %Int 2 =/=Int 0
+    24	
+    25	  // The next four equations are the contract.  F is the product of the
+    26	  // indices already visited and T is their sum.  Thus the value appended at
+    27	  // an even I is I!, while the value appended at an odd I is 1 + ... + I.
+    28	  rule expected(N) => expectedCompletion(1, N, 1, 0, .List)
+    29	    requires N >=Int 0
+    30	
+    31	  rule expectedCompletion(I, N, _F, _T, L) => L
+    32	    requires I >Int N
+    33	  rule expectedCompletion(I, N, F, T, L)
+    34	    => expectedCompletion(
+    35	         I +Int 1, N, F *Int I, T +Int I,
+    36	         L ListItem(F *Int I))
+    37	    requires I <=Int N andBool I %Int 2 ==Int 0
+    38	  rule expectedCompletion(I, N, F, T, L)
+    39	    => expectedCompletion(
+    40	         I +Int 1, N, F *Int I, T +Int I,
+    41	         L ListItem(T +Int I))
+    42	    requires I <=Int N andBool I %Int 2 =/=Int 0
+    43	
+    44	  syntax Program ::= "solution" [macro]
+    45	  syntax Stmt ::= "solutionLoop" [macro]
+    46	
+    47	  rule solutionLoop =>
+    48	    While(Compare(Name("i"), CmpOp("<=", Name("n"))),
+    49	      Assign(
+    50	        Name("factorial"),
+    51	        BinOp("*", Name("factorial"), Name("i")))
+    52	      Assign(Name("total"), BinOp("+", Name("total"), Name("i")))
+    53	      If(Compare(BinOp("%", Name("i"), Int(2)), CmpOp("==", Int(0))),
+    54	        Assign(
+    55	          Name("result"),
+    56	          BinOp("+", Name("result"), ListExpr(Name("factorial")))),
+    57	        Assign(
+    58	          Name("result"),
+    59	          BinOp("+", Name("result"), ListExpr(Name("total")))))
+    60	      Assign(Name("i"), BinOp("+", Name("i"), Int(1))))
+    61	
+    62	  rule solution =>
+    63	    Module(
+    64	      FuncDef("f", Params("n"),
+    65	        Assign(Name("result"), ListExpr(.Exprs))
+    66	        Assign(Name("factorial"), Int(1))
+    67	        Assign(Name("total"), Int(0))
+    68	        Assign(Name("i"), Int(1))
+    69	        solutionLoop
+    70	        Return(Name("result"))))
+    71	endmodule
+FILE: /tmp/audit-work/106-f/source/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [loop-invariant]:
+     7	    <k>
+     8	      solutionLoop ~> exec(Return(Name("result")) .Stmts)
+     9	      => .K
+    10	    </k>
+    11	    <input> N </input>
+    12	    <env>
+    13	      "factorial" |-> intVal(F:Int)
+    14	      "i"         |-> intVal(I)
+    15	      "n"         |-> intVal(N)
+    16	      "result"    |-> listVal(L:List)
+    17	      "total"     |-> intVal(T:Int)
+    18	      =>
+    19	      "factorial" |-> intVal(?_FOUT:Int)
+    20	      "i"         |-> intVal(?_IOUT:Int)
+    21	      "n"         |-> intVal(N)
+    22	      "result"    |-> listVal(expectedCompletion(I, N, F, T, L))
+    23	      "total"     |-> intVal(?_TOUT:Int)
+    24	    </env>
+    25	    <result> noResult => done(listVal(expectedCompletion(I, N, F, T, L))) </result>
+    26	    requires N >=Int 0 andBool I >=Int 1
+    27	
+    28	  claim [main-correct]:
+    29	    <k> solution => .K </k>
+    30	    <input> N </input>
+    31	    <env>
+    32	      .Map
+    33	      =>
+    34	      "factorial" |-> intVal(?_FOUT:Int)
+    35	      "i"         |-> intVal(?_IOUT:Int)
+    36	      "n"         |-> intVal(N)
+    37	      "result"    |-> listVal(expected(N))
+    38	      "total"     |-> intVal(?_TOUT:Int)
+    39	    </env>
+    40	    <result> noResult => done(listVal(expected(N))) </result>
+    41	    requires N >=Int 0
+    42	endmodule
+FILE: /tmp/audit-work/106-f/source/solution.mpy
+     1	Module(
+     2	  FuncDef("f", Params("n"),
+     3	    Assign(Name("result"), ListExpr())
+     4	    Assign(Name("factorial"), Int(1))
+     5	    Assign(Name("total"), Int(0))
+     6	    Assign(Name("i"), Int(1))
+     7	    While(Compare(Name("i"), CmpOp("<=", Name("n"))),
+     8	      Assign(
+     9	        Name("factorial"),
+    10	        BinOp("*", Name("factorial"), Name("i")))
+    11	      Assign(Name("total"), BinOp("+", Name("total"), Name("i")))
+    12	      If(Compare(BinOp("%", Name("i"), Int(2)), CmpOp("==", Int(0))),
+    13	        Assign(
+    14	          Name("result"),
+    15	          BinOp("+", Name("result"), ListExpr(Name("factorial")))),
+    16	        Assign(
+    17	          Name("result"),
+    18	          BinOp("+", Name("result"), ListExpr(Name("total")))))
+    19	      Assign(Name("i"), BinOp("+", Name("i"), Int(1))))
+    20	    Return(Name("result"))))
+FILE: /tmp/audit-work/106-f/source/solution.py
+     1	def f(n):
+     2	    result = []
+     3	    factorial = 1
+     4	    total = 0
+     5	    i = 1
+     6	    while i <= n:
+     7	        factorial = factorial * i
+     8	        total = total + i
+     9	        if i % 2 == 0:
+    10	            result = result + [factorial]
+    11	        else:
+    12	            result = result + [total]
+    13	        i = i + 1
+    14	    return result
+COMMAND: declaration/rule/claim inventory
+/tmp/audit-work/106-f/source/spec.k:6:  claim [loop-invariant]:
+/tmp/audit-work/106-f/source/spec.k:28:  claim [main-correct]:
+/tmp/audit-work/106-f/source/verification.k:6:  syntax Int ::= "mathFactorial" "(" Int ")" [function]
+/tmp/audit-work/106-f/source/verification.k:9:  syntax List ::= "expected" "(" Int ")" [function]
+/tmp/audit-work/106-f/source/verification.k:12:  rule mathFactorial(0) => 1
+/tmp/audit-work/106-f/source/verification.k:13:  rule mathFactorial(N) => mathFactorial(N -Int 1) *Int N
+/tmp/audit-work/106-f/source/verification.k:16:  rule mathTriangle(0) => 0
+/tmp/audit-work/106-f/source/verification.k:17:  rule mathTriangle(N) => mathTriangle(N -Int 1) +Int N
+/tmp/audit-work/106-f/source/verification.k:20:  rule expectedAt(N) => mathFactorial(N)
+/tmp/audit-work/106-f/source/verification.k:22:  rule expectedAt(N) => mathTriangle(N)
+/tmp/audit-work/106-f/source/verification.k:28:  rule expected(N) => expectedCompletion(1, N, 1, 0, .List)
+/tmp/audit-work/106-f/source/verification.k:31:  rule expectedCompletion(I, N, _F, _T, L) => L
+/tmp/audit-work/106-f/source/verification.k:33:  rule expectedCompletion(I, N, F, T, L)
+/tmp/audit-work/106-f/source/verification.k:38:  rule expectedCompletion(I, N, F, T, L)
+/tmp/audit-work/106-f/source/verification.k:44:  syntax Program ::= "solution" [macro]
+/tmp/audit-work/106-f/source/verification.k:45:  syntax Stmt ::= "solutionLoop" [macro]
+/tmp/audit-work/106-f/source/verification.k:47:  rule solutionLoop =>
+/tmp/audit-work/106-f/source/verification.k:62:  rule solution =>
+/tmp/audit-work/106-f/source/semantic.k:6:  syntax Program ::= "Module" "(" Stmts ")"
+/tmp/audit-work/106-f/source/semantic.k:8:  syntax Stmts ::= List{Stmt, ""}
+/tmp/audit-work/106-f/source/semantic.k:9:  syntax Strings ::= List{String, ","}
+/tmp/audit-work/106-f/source/semantic.k:10:  syntax Exprs ::= List{Expr, ","}
+/tmp/audit-work/106-f/source/semantic.k:12:  syntax Params ::= "Params" "(" Strings ")"
+/tmp/audit-work/106-f/source/semantic.k:14:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+/tmp/audit-work/106-f/source/semantic.k:20:  syntax Expr ::= "Int" "(" Int ")"
+/tmp/audit-work/106-f/source/semantic.k:26:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+/tmp/audit-work/106-f/source/semantic.k:37:  syntax Value ::= "intVal" "(" Int ")"
+/tmp/audit-work/106-f/source/semantic.k:41:  syntax Result ::= "noResult" | "done" "(" Value ")"
+/tmp/audit-work/106-f/source/semantic.k:43:  configuration
+/tmp/audit-work/106-f/source/semantic.k:51:  syntax KItem ::= "exec" "(" Stmts ")"
+/tmp/audit-work/106-f/source/semantic.k:63:  rule <k> Module(FuncDef(_F, Params(P:String), BODY)) => exec(BODY) </k>
+/tmp/audit-work/106-f/source/semantic.k:67:  rule exec(.Stmts) => .K
+/tmp/audit-work/106-f/source/semantic.k:68:  rule exec(S:Stmt REST:Stmts) => S ~> exec(REST)
+/tmp/audit-work/106-f/source/semantic.k:70:  rule Assign(Name(X), E) => eval(E) ~> store(X)
+/tmp/audit-work/106-f/source/semantic.k:71:  rule <k> V:Value ~> store(X) => .K ...</k>
+/tmp/audit-work/106-f/source/semantic.k:74:  rule If(COND, THEN, ELSE) => eval(COND) ~> ifBranch(THEN, ELSE)
+/tmp/audit-work/106-f/source/semantic.k:75:  rule boolVal(true) ~> ifBranch(THEN, _ELSE) => exec(THEN)
+/tmp/audit-work/106-f/source/semantic.k:76:  rule boolVal(false) ~> ifBranch(_THEN, ELSE) => exec(ELSE)
+/tmp/audit-work/106-f/source/semantic.k:78:  rule While(COND, BODY) => eval(COND) ~> whileBranch(COND, BODY)
+/tmp/audit-work/106-f/source/semantic.k:79:  rule boolVal(true) ~> whileBranch(COND, BODY)
+/tmp/audit-work/106-f/source/semantic.k:81:  rule boolVal(false) ~> whileBranch(_COND, _BODY) => .K
+/tmp/audit-work/106-f/source/semantic.k:83:  rule Return(E) => eval(E) ~> doReturn
+/tmp/audit-work/106-f/source/semantic.k:84:  rule <k> V:Value ~> doReturn ~> _REST:K => .K </k>
+/tmp/audit-work/106-f/source/semantic.k:87:  rule <k> eval(Int(I)) => intVal(I) ...</k>
+/tmp/audit-work/106-f/source/semantic.k:88:  rule <k> eval(Name(X)) => V ...</k>
+/tmp/audit-work/106-f/source/semantic.k:91:  rule eval(ListExpr(.Exprs)) => listVal(.List)
+/tmp/audit-work/106-f/source/semantic.k:92:  rule eval(ListExpr(E)) => eval(E) ~> singleton
+/tmp/audit-work/106-f/source/semantic.k:93:  rule intVal(I) ~> singleton => listVal(ListItem(I))
+/tmp/audit-work/106-f/source/semantic.k:95:  rule eval(BinOp(OP, LEFT, RIGHT)) => eval(LEFT) ~> binLeft(OP, RIGHT)
+/tmp/audit-work/106-f/source/semantic.k:96:  rule V:Value ~> binLeft(OP, RIGHT) => eval(RIGHT) ~> binRight(OP, V)
+/tmp/audit-work/106-f/source/semantic.k:97:  rule intVal(J) ~> binRight("+", intVal(I)) => intVal(I +Int J)
+/tmp/audit-work/106-f/source/semantic.k:98:  rule intVal(J) ~> binRight("*", intVal(I)) => intVal(I *Int J)
+/tmp/audit-work/106-f/source/semantic.k:99:  rule intVal(J) ~> binRight("%", intVal(I)) => intVal(I %Int J)
+/tmp/audit-work/106-f/source/semantic.k:100:  rule listVal(L2) ~> binRight("+", listVal(L1)) => listVal(L1 L2)
+/tmp/audit-work/106-f/source/semantic.k:102:  rule eval(Compare(LEFT, CmpOp(OP, RIGHT)))
+/tmp/audit-work/106-f/source/semantic.k:104:  rule V:Value ~> cmpLeft(OP, RIGHT) => eval(RIGHT) ~> cmpRight(OP, V)
+/tmp/audit-work/106-f/source/semantic.k:105:  rule intVal(J) ~> cmpRight("<=", intVal(I)) => boolVal(I <=Int J)
+/tmp/audit-work/106-f/source/semantic.k:106:  rule intVal(J) ~> cmpRight("==", intVal(I)) => boolVal(I ==Int J)
+EXIT_STATUS: 0
+COMMAND: special-attribute inventory
+/tmp/audit-work/106-f/source/verification.k:6:  syntax Int ::= "mathFactorial" "(" Int ")" [function]
+/tmp/audit-work/106-f/source/verification.k:7:               | "mathTriangle" "(" Int ")" [function]
+/tmp/audit-work/106-f/source/verification.k:8:               | "expectedAt" "(" Int ")" [function]
+/tmp/audit-work/106-f/source/verification.k:9:  syntax List ::= "expected" "(" Int ")" [function]
+/tmp/audit-work/106-f/source/verification.k:10:                | "expectedCompletion" "(" Int "," Int "," Int "," Int "," List ")" [function]
+/tmp/audit-work/106-f/source/verification.k:44:  syntax Program ::= "solution" [macro]
+/tmp/audit-work/106-f/source/verification.k:45:  syntax Stmt ::= "solutionLoop" [macro]
+RG_EXIT_STATUS: 0 (0 means matches found; 1 would mean none)
+COMMAND: opaque-token inventory
+RG_EXIT_STATUS: 1 (1 means none found)
+COMMAND: source rule and claim counts
+semantic_rules=28
+verification_rules=12
+spec_claims=2
+SCRIPT_EXIT_STATUS: 0

@@ -1,0 +1,385 @@
+33f7a1a2e375f2542e5e93ddf622e92e278b4065299cbb16d2c220976c5f8ff4  /reference/k-proof/prove.sh
+af94daa02344c3ff3f969f6c07319f4cafd121d6659a29d46c8941cd862e0bbd  /reference/k-proof/connection-spec.k
+fa3001c180029239136ae9aafaedd968714f421f155e1235f34d39ccba70777e  /reference/k-proof/outer-connection-spec.k
+e2821c67ffbf39df1cb26a51c2bdcb2312cb17764d982d526a3aa9018d1c5852  /reference/k-proof/spec.k
+e25051c63817f08f95a6406410d7170f656e3824eff0a5a97bb484f5f69e71bf  /reference/k-proof/solution.py
+ffb7cb135b2b77d39e8c5199f3b3e551e61ac7e0f36ccbc84a72185b33f580c5  /reference/k-proof/solution.mpy
+#!/usr/bin/env bash
+set -eu
+
+expect_failure() {
+  probe_name=$1
+  shift
+  if "$@"; then
+    echo "UNEXPECTED SUCCESS: ${probe_name}" >&2
+    exit 1
+  else
+    probe_status=$?
+    echo "EXPECTED FAILURE: ${probe_name} (exit ${probe_status})"
+  fi
+}
+
+python3 py2mpy.py solution.py > solution.mpy
+python3 py2mpy.py concrete_tests.py > concrete_tests.mpy
+python3 differential_test.py
+
+kompile reference-semantics/semantics.k \
+  --backend llvm \
+  --main-module MPY-KRUN \
+  --syntax-module MPY-SYNTAX \
+  --output-definition runtime-kompiled
+krun concrete_tests.mpy --definition runtime-kompiled
+
+# Bridge-free projection, yield, and inner-loop connection proofs.
+kompile --backend haskell verification.k \
+  --main-module VERIFICATION-BASE \
+  --syntax-module MPY-SYNTAX \
+  --output-definition connection-kompiled
+kprove connection-spec.k \
+  --definition connection-kompiled \
+  --spec-module CONNECTION-SPEC
+
+# Outer-loop connection proof, using only the already-connected inner bridge.
+kompile --backend haskell verification.k \
+  --main-module VERIFICATION \
+  --syntax-module MPY-SYNTAX \
+  --output-definition outer-connection-kompiled
+kprove outer-connection-spec.k \
+  --definition outer-connection-kompiled \
+  --spec-module OUTER-CONNECTION-SPEC
+
+# Full target proof: both unbounded loop claims and both whole-program entries.
+kompile --backend haskell verification.k \
+  --main-module TARGET-VERIFICATION \
+  --syntax-module MPY-SYNTAX \
+  --output-definition verification-kompiled
+kprove spec.k \
+  --definition verification-kompiled \
+  --spec-module SPEC
+
+# Gate A negative probes.
+expect_failure false-result \
+  kprove spec-vacuity.k \
+    --definition verification-kompiled \
+    --spec-module SPEC-VACUITY
+
+expect_failure inner-wrong-value \
+  kprove bridge-mutation-spec.k \
+    --definition connection-kompiled \
+    --spec-module BRIDGE-MUTATION-SPEC \
+    --claims BRIDGE-MUTATION-SPEC.inner-wrong-value
+
+expect_failure yield-wrong-value \
+  kprove bridge-mutation-spec.k \
+    --definition connection-kompiled \
+    --spec-module BRIDGE-MUTATION-SPEC \
+    --claims BRIDGE-MUTATION-SPEC.yield-wrong-value
+
+kompile --backend haskell mutation-verification.k \
+  --main-module MUTATION-VERIFICATION \
+  --syntax-module MPY-SYNTAX \
+  --output-definition mutation-kompiled
+expect_failure changed-body \
+  kprove mutation-spec.k \
+    --definition mutation-kompiled \
+    --spec-module MUTATION-SPEC
+requires "verification.k"
+
+module CONNECTION-SPEC
+  imports VERIFICATION-BASE
+
+  // Datatype value-fidelity theorem for the guarded total projection.
+  claim [projection-identity]:
+    <k> V:Val => projectStrTotal(V) </k>
+    requires isStringVal(V)
+
+  // Universal fixed-semantics connection for the static-sort yield twin.
+  claim [yield-connection]:
+    <k>
+      #iterYield(V:Val, list(VS))
+      ~> #loopStep(Name("extension"), OUTER-BODY)
+      => #bindTgt(Name("extension"), projectStrTotal(V))
+         ~> OUTER-BODY
+         ~> #loopLbl(
+              #loop(
+                list(VS),
+                Name("extension"),
+                OUTER-BODY
+              )
+            )
+      ...
+    </k>
+    requires isStringVal(V)
+
+  // Universal fixed-semantics connection for the complete inner-loop bridge.
+  claim [inner-loop]:
+    <k>
+      #loop(STRING:Str, Name("character"), INNER-BODY)
+      => .K
+      ...
+    </k>
+    <env> L </env>
+    <scopes>
+      ...
+      L |-> scope(
+        "class_name" |-> str(CLASS)
+        "extensions" |-> list(ALLEXTS)
+        "strongest" |-> str(BEST)
+        "best_strength" |-> BESTVAL:Val
+        "extension" |-> str(EXT)
+        "strength" |-> (
+          S:Int => S +Int extensionStrength(codesOf(STRING))
+        )
+        "character" |-> (
+          str(OLDCHAR)
+          => str(lastCharacter(codesOf(STRING), OLDCHAR))
+        ),
+        parent(0)
+      )
+      ...
+    </scopes>
+endmodule
+requires "verification.k"
+
+module OUTER-CONNECTION-SPEC
+  imports VERIFICATION
+
+  // Universal connection theorem for the final outer-loop bridge.
+  claim [outer-loop]:
+    <k>
+      #loop(list(VS), Name("extension"), OUTER-BODY)
+      => .K
+      ...
+    </k>
+    <env> L </env>
+    <scopes>
+      ...
+      L |-> scope(
+        "class_name" |-> str(CLASS)
+        "extensions" |-> list(ALLEXTS)
+        "strongest" |-> (
+          str(BEST) => str(bestCodes(VS, BEST, BESTSCORE))
+        )
+        "best_strength" |-> (
+          BESTSCORE:Int => bestScore(VS, BESTSCORE)
+        )
+        "extension" |-> (
+          str(OLDEXT) => str(lastExtension(VS, OLDEXT))
+        )
+        "character" |-> (
+          str(OLDCHAR)
+          => str(lastCharacterAcross(VS, OLDCHAR))
+        )
+        "strength" |-> (
+          OLDSTRENGTH:Int => lastStrength(VS, OLDSTRENGTH)
+        ),
+        parent(0)
+      )
+      ...
+    </scopes>
+    requires allStrings(VS)
+endmodule
+requires "verification.k"
+
+module SPEC
+  imports TARGET-VERIFICATION
+
+  // Inner structural induction: every finite code sequence is scanned.
+  claim [inner-loop]:
+    <k>
+      #loop(STRING:Str, Name("character"), INNER-BODY)
+      => .K
+      ...
+    </k>
+    <env> L </env>
+    <scopes>
+      ...
+      L |-> scope(
+        "class_name" |-> str(CLASS)
+        "extensions" |-> list(ALLEXTS)
+        "strongest" |-> str(BEST)
+        "best_strength" |-> BESTVAL:Val
+        "extension" |-> str(EXT)
+        "strength" |-> (
+          S:Int => S +Int extensionStrength(codesOf(STRING))
+        )
+        "character" |-> (
+          str(OLDCHAR)
+          => str(lastCharacter(codesOf(STRING), OLDCHAR))
+        ),
+        parent(0)
+      )
+      ...
+    </scopes>
+
+  // Outer structural induction after a best score has been established.
+  claim [outer-loop]:
+    <k>
+      #loop(list(VS), Name("extension"), OUTER-BODY)
+      => .K
+      ...
+    </k>
+    <env> L </env>
+    <scopes>
+      ...
+      L |-> scope(
+        "class_name" |-> str(CLASS)
+        "extensions" |-> list(ALLEXTS)
+        "strongest" |-> (
+          str(BEST) => str(bestCodes(VS, BEST, BESTSCORE))
+        )
+        "best_strength" |-> (
+          BESTSCORE:Int => bestScore(VS, BESTSCORE)
+        )
+        "extension" |-> (
+          str(OLDEXT) => str(lastExtension(VS, OLDEXT))
+        )
+        "character" |-> (
+          str(OLDCHAR)
+          => str(lastCharacterAcross(VS, OLDCHAR))
+        )
+        "strength" |-> (
+          OLDSTRENGTH:Int => lastStrength(VS, OLDSTRENGTH)
+        ),
+        parent(0)
+      )
+      ...
+    </scopes>
+    requires allStrings(VS)
+
+  // Full entry theorem for an empty extension list.
+  claim [entry-empty]:
+    <k>
+      #loadAll(
+        Module(
+          FuncDef(
+            "Strongest_Extension",
+            Params("class_name", "extensions"),
+            STRONGEST-BODY
+          )
+          .Stmts
+        )
+      )
+      ~> Call(
+           Name("Strongest_Extension"),
+           str(CLASS),
+           list(.ValSeq),
+           .Exprs
+         )
+      => expectedResult(CLASS, .ValSeq)
+    </k>
+    <env> 0 </env>
+    <scopes>
+      0 |-> scope(
+        .Map
+        => "Strongest_Extension" |->
+             closureVal(
+               "class_name", "extensions", .ParamNames,
+               STRONGEST-BODY,
+               0
+             ),
+        parent(-1)
+      )
+      -1 |-> builtinsScope
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+
+  // Full entry theorem for every nonempty finite list of finite strings.
+  claim [entry-nonempty]:
+    <k>
+      #loadAll(
+        Module(
+          FuncDef(
+            "Strongest_Extension",
+            Params("class_name", "extensions"),
+            STRONGEST-BODY
+          )
+          .Stmts
+        )
+      )
+      ~> Call(
+           Name("Strongest_Extension"),
+           str(CLASS),
+           list(vCons(str(FIRST), RESTEXTS)),
+           .Exprs
+         )
+      => expectedResult(
+           CLASS,
+           vCons(str(FIRST), RESTEXTS)
+         )
+    </k>
+    <env> 0 </env>
+    <scopes>
+      0 |-> scope(
+        .Map
+        => "Strongest_Extension" |->
+             closureVal(
+               "class_name", "extensions", .ParamNames,
+               STRONGEST-BODY,
+               0
+             ),
+        parent(-1)
+      )
+      -1 |-> builtinsScope
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    requires allStrings(RESTEXTS)
+endmodule
+def Strongest_Extension(class_name, extensions):
+    strongest = ""
+    best_strength = None
+    extension = ""
+    character = ""
+
+    for extension in extensions:
+        strength = 0
+
+        for character in extension:
+            if character.isupper():
+                strength += 1
+            elif character.islower():
+                strength -= 1
+
+        if best_strength is None or strength > best_strength:
+            strongest = extension
+            best_strength = strength
+
+    return class_name + "." + strongest
+Module(
+  FuncDef("Strongest_Extension", Params("class_name", "extensions"),
+    Assign(Name("strongest"), Str(""))
+    Assign(Name("best_strength"), NoneVal)
+    Assign(Name("extension"), Str(""))
+    Assign(Name("character"), Str(""))
+    For(Name("extension"), Name("extensions"),
+      Assign(Name("strength"), Int(0))
+      For(Name("character"), Name("extension"),
+        If(Call(Attribute(Name("character"), "isupper"), ),
+          AugAssign(Name("strength"), "+", Int(1)),
+          If(Call(Attribute(Name("character"), "islower"), ),
+            AugAssign(Name("strength"), "-", Int(1)),
+            )))
+      If(BoolOp(
+        "or",
+        Compare(Name("best_strength"), CmpOp("is", NoneVal)),
+        Compare(Name("strength"), CmpOp(">", Name("best_strength")))),
+        Assign(Name("strongest"), Name("extension"))
+        Assign(Name("best_strength"), Name("strength")),
+        ))
+    Return(
+      BinOp(
+        "+",
+        BinOp("+", Name("class_name"), Str(".")),
+        Name("strongest")))))

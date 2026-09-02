@@ -1,0 +1,260 @@
+#!/usr/bin/env bash
+# Run one independent Codex audit session. The supervisor profile and spool
+# stay outside the workspace-write roots passed to Codex, so model-generated
+# commands cannot write those supervisor paths. The reviewer still controls the
+# semantic content it emits to its own outputs.
+set -uo pipefail
+
+MODEL="gpt-5.6-sol"
+EFFORT="xhigh"
+TIMEOUT_S="3600"
+HARNESS_ERROR_RC=70
+FROZEN_TOOLCHAIN_CHECK="${FROZEN_TOOLCHAIN_CHECK:-/usr/local/bin/assert-frozen-toolchain}"
+"$FROZEN_TOOLCHAIN_CHECK" agent || exit "$HARNESS_ERROR_RC"
+
+AUTH_FILE="${AUDIT_AUTH_FILE:-/auth/auth.json}"
+KIT_SKILLS_DIR="${AUDIT_KIT_SKILLS_DIR:-/kit-skills}"
+PROMPT_FILE="${AUDIT_PROMPT_FILE:-/audit-prompt.md}"
+OUTPUT_DIR="${AUDIT_OUTPUT_DIR:-/audit-output}"
+WORK_DIR="${AUDIT_WORK_DIR:-/tmp/audit-work}"
+SUPERVISOR_PARENT="${AUDIT_SUPERVISOR_PARENT:-$HOME}"
+CGROUP_ROOT="${AUDIT_CGROUP_ROOT:-/sys/fs/cgroup}"
+
+SUPERVISOR_DIR=""
+MODEL_PGID=""
+HARNESS_EXIT_CODE=0
+
+error() {
+  printf 'audit harness error: %s\n' "$*" >&2
+}
+
+is_real_regular_file() {
+  [[ -f "$1" && ! -L "$1" ]]
+}
+
+is_real_directory() {
+  [[ -d "$1" && ! -L "$1" ]]
+}
+
+terminate_model_group() {
+  local pgid="$1"
+  if [[ "$pgid" =~ ^[0-9]+$ ]] && kill -0 -- "-$pgid" 2>/dev/null; then
+    kill -TERM -- "-$pgid" 2>/dev/null || true
+    kill -KILL -- "-$pgid" 2>/dev/null || true
+  fi
+}
+
+cleanup() {
+  if [[ -n "$MODEL_PGID" ]]; then
+    terminate_model_group "$MODEL_PGID"
+    MODEL_PGID=""
+  fi
+  if [[
+    -n "$SUPERVISOR_DIR"
+    && "$SUPERVISOR_DIR" == "$SUPERVISOR_PARENT"/.audit-supervisor.*
+    && -d "$SUPERVISOR_DIR"
+    && ! -L "$SUPERVISOR_DIR"
+  ]]; then
+    rm -rf -- "$SUPERVISOR_DIR"
+  fi
+}
+
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+setup_error() {
+  error "$*"
+  exit "$HARNESS_ERROR_RC"
+}
+
+mark_harness_error() {
+  error "$*"
+  HARNESS_EXIT_CODE="$HARNESS_ERROR_RC"
+}
+
+prepare_destination() {
+  local destination="$1" label="$2"
+  if [[ -L "$destination" || -f "$destination" ]]; then
+    if ! rm -f -- "$destination"; then
+      error "cannot remove existing $label destination: $destination"
+      return 1
+    fi
+  elif [[ -e "$destination" ]]; then
+    error "$label destination is a directory or unsupported node: $destination"
+    return 1
+  fi
+}
+
+publish_regular_file() {
+  local source="$1" destination="$2" label="$3"
+  local temporary=""
+  if ! is_real_regular_file "$source"; then
+    error "$label source is missing, linked, or not a regular file: $source"
+    return 1
+  fi
+  if ! temporary="$(mktemp "$OUTPUT_DIR/.${destination##*/}.XXXXXX")"; then
+    error "cannot stage $label in $OUTPUT_DIR"
+    return 1
+  fi
+  if ! cp -- "$source" "$temporary"; then
+    error "cannot copy $label into its publication stage"
+    rm -f -- "$temporary"
+    return 1
+  fi
+  if ! is_real_regular_file "$temporary"; then
+    error "$label publication stage is not a real regular file"
+    rm -f -- "$temporary"
+    return 1
+  fi
+  if ! prepare_destination "$destination" "$label"; then
+    rm -f -- "$temporary"
+    return 1
+  fi
+  if ! mv -fT -- "$temporary" "$destination"; then
+    error "cannot atomically publish $label to $destination"
+    rm -f -- "$temporary"
+    return 1
+  fi
+}
+
+validate_trace_tree() {
+  local source="$1"
+  if ! is_real_directory "$source"; then
+    error "Codex trace source is missing, linked, or not a directory: $source"
+    return 1
+  fi
+  python3 - "$source" <<'PY'
+import os
+import stat
+import sys
+
+root = os.fsencode(sys.argv[1])
+pending = [root]
+while pending:
+    directory = pending.pop()
+    try:
+        entries = list(os.scandir(directory))
+    except OSError as error:
+        print(f"cannot scan Codex trace tree: {error}", file=sys.stderr)
+        raise SystemExit(1)
+    for entry in entries:
+        try:
+            mode = entry.stat(follow_symlinks=False).st_mode
+        except OSError as error:
+            print(f"cannot stat Codex trace entry: {error}", file=sys.stderr)
+            raise SystemExit(1)
+        if stat.S_ISDIR(mode):
+            pending.append(entry.path)
+        elif not stat.S_ISREG(mode):
+            print(
+                f"Codex trace contains a linked or unsupported entry: "
+                f"{os.fsdecode(entry.path)}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+PY
+}
+
+publish_trace_tree() {
+  local source="$1" destination="$2"
+  local temporary=""
+  if ! validate_trace_tree "$source"; then
+    return 1
+  fi
+  if ! temporary="$(mktemp -d "$OUTPUT_DIR/.codex-trace.XXXXXX")"; then
+    error "cannot stage Codex trace in $OUTPUT_DIR"
+    return 1
+  fi
+  if ! cp -R -- "$source/." "$temporary/"; then
+    error "cannot copy Codex trace into its publication stage"
+    rm -rf -- "$temporary"
+    return 1
+  fi
+  if ! validate_trace_tree "$temporary"; then
+    error "staged Codex trace failed regular-file validation"
+    rm -rf -- "$temporary"
+    return 1
+  fi
+  if ! prepare_destination "$destination" "Codex trace"; then
+    rm -rf -- "$temporary"
+    return 1
+  fi
+  if ! mv -fT -- "$temporary" "$destination"; then
+    error "cannot atomically publish Codex trace to $destination"
+    rm -rf -- "$temporary"
+    return 1
+  fi
+}
+
+: "${AUDIT_PROBLEM_ID:?AUDIT_PROBLEM_ID is required}"
+: "${AUDIT_CONDITION:?AUDIT_CONDITION is required}"
+: "${AUDIT_SEMANTICS_MODE:?AUDIT_SEMANTICS_MODE is required}"
+
+is_real_regular_file "$AUTH_FILE" \
+  || setup_error "auth source is missing, linked, or not a regular file: $AUTH_FILE"
+is_real_regular_file "$PROMPT_FILE" \
+  || setup_error "prompt source is missing, linked, or not a regular file: $PROMPT_FILE"
+is_real_directory "$KIT_SKILLS_DIR" \
+  || setup_error "Kit source is missing, linked, or not a directory: $KIT_SKILLS_DIR"
+is_real_directory "$OUTPUT_DIR" \
+  || setup_error "audit output is missing, linked, or not a directory: $OUTPUT_DIR"
+[[ -w "$OUTPUT_DIR" && -x "$OUTPUT_DIR" ]] \
+  || setup_error "audit output is not writable: $OUTPUT_DIR"
+is_real_directory "$SUPERVISOR_PARENT" \
+  || setup_error "supervisor parent is missing, linked, or not a directory: $SUPERVISOR_PARENT"
+
+if [[ "${AUDIT_PROBE_ONLY:-0}" == 1 ]]; then
+  python3 - <<'PY'
+import json
+from importlib.metadata import version
+from pathlib import Path
+import subprocess
+
+audit_input = json.loads(Path("/audit-input.json").read_text(encoding="utf-8"))
+layout = audit_input["record_layout"]
+
+print("OBSERVED AUDIT TOOLCHAIN")
+for command in ("codex", "kompile", "kprove", "krun"):
+    result = subprocess.run(
+        [command, "--version"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    print(f"{command}: {result.stdout.strip()}")
+print(f"K source: {Path('/opt/runtimeverification-k/.source-commit').read_text().strip()}")
+print(f"pyk/Klean: {version('kframework')}")
+result = subprocess.run(
+    ["lean", "--version"],
+    check=True,
+    capture_output=True,
+    text=True,
+)
+print(f"Lean: {result.stdout.strip()}")
+
+required_files = [
+    "/audit-input.json",
+    "/audit-campaign-lock.json",
+    "/audit-prompt.md",
+    "/audit-entrypoint.sh",
+    "/auth/auth.json",
+    "/reference/canonical.py",
+    "/reference/prompt.py",
+    "/reference/py2mpy.py",
+    "/generation-evidence/invocation.json",
+    "/generation-evidence/metrics.json",
+    "/generation-evidence/codex-output.log",
+    "/generation-evidence/codex-last.txt",
+    "/generation-evidence/prompt.txt",
+    "/run.json",
+    "/task.json",
+    "/generation-result.json",
+]
+if layout == "pipeline-v3":
+    required_files.extend(
+        (
+            "/generation-evidence/runtime-metrics.json",
+            "/generation-evidence/usage.json",
+        )

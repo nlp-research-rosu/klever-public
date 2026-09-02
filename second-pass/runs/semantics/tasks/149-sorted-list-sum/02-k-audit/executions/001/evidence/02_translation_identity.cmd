@@ -1,0 +1,2 @@
+cwd=/audit-output
+command=bash -c python3\ /reference/py2mpy.py\ /tmp/audit-work/reconstruction/solution.py\ \>\ /tmp/audit-work/reconstruction/solution.regenerated.mpy\ \&\&\ cmp\ -s\ /tmp/audit-work/reconstruction/solution.regenerated.mpy\ /tmp/audit-work/reconstruction/solution.mpy\ \&\&\ sha256sum\ /tmp/audit-work/reconstruction/solution.py\ /tmp/audit-work/reconstruction/solution.mpy\ /tmp/audit-work/reconstruction/solution.regenerated.mpy 

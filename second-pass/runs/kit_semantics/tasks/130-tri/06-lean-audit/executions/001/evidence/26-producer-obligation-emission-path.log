@@ -1,0 +1,186 @@
+Script started on 2026-07-31 08:14:59-05:00 [<not executed on terminal>]
+                used_symbols |= required_symbols
+                hypotheses.append(
+                    f"(h : {requires_proposition})"
+                )
+        if ensures is not None:
+            collect_variables(ensures, rhs_variables)
+            ensured_symbols = collect_symbols(ensures)
+            rule_symbols |= ensured_symbols
+            used_symbols |= ensured_symbols
+        ml_bound_variables: set[str] = set()
+        collect_ml_bound(normalized_rhs, ml_bound_variables)
+        existential_variables = {
+            name: sort
+            for name, sort in rhs_variables.items()
+            if name not in universal_variables
+            and name not in ml_bound_variables
+        }
+        proposition = conclusion(
+            normalized_lhs, normalized_rhs, rule.sort.name
+        )
+        if ensures is not None:
+            ensures_term = lean_pattern(ensures)
+            if ensures_term not in ("true", "(true)"):
+                proposition = f"({proposition}) ∧ ({ensures_term} = true)"
+        proposition = lean_quantified_obligation(
+            proposition,
+            universal_binders=tuple(
+                f"({_quoted_identifier(_var_ident(name))} : {sort})"
+                for name, sort in universal_variables.items()
+            ),
+            existential_binders=tuple(
+                f"({_quoted_identifier(_var_ident(name))} : {sort})"
+                for name, sort in existential_variables.items()
+            ),
+            hypotheses=tuple(hypotheses),
+        )
+        proposition = quote_reserved_lean_identifiers(
+            proposition, reserved_identifiers
+        )
+        propositions.append(
+            (start_line, proposition, source_rule, rule_symbols)
+        )
+
+    propositions.sort(key=lambda item: item[0])
+    seen_ids = [
+        str(source_rule["source_rule_id"])
+        for _line, _proposition, source_rule, _symbols in propositions
+    ]
+    expected_ids = [str(item["source_rule_id"]) for item in source_rules]
+    if seen_ids != expected_ids:
+        raise RuntimeError(
+            "source trust rules and generated Lean obligations are not bijective"
+        )
+
+    parameters: list[dict[str, str]] = []
+    polymorphic_definitions: dict[str, str] = {}
+    for symbol in sorted(used_symbols):
+        if symbol == "inj" or symbol not in full_definition.symbols:
+            continue
+        declaration = full_definition.symbols[symbol]
+        if "function" not in declaration.attrs_by_key:
+            continue
+        # Sort-polymorphic hooks (for example K ``ite``) cannot carry a
+        # monomorphic opaque binding; model them with an honest total Lean
+        # definition instead and skip the opaque parameter.
+        definition_line = _polymorphic_lemma_hook_definition(
+            declaration, symbol, _symbol_ident, SortApp
+        )
+        if definition_line is not None:
+            polymorphic_definitions[_symbol_ident(symbol)] = definition_line
+            continue
+        parameter_sorts = list(_param_sorts(declaration))
+        lean_type = (
+            " → ".join(parameter_sorts + [declaration.sort.name])
+            if parameter_sorts
+            else declaration.sort.name
+        )
+        lean_type = quote_reserved_lean_identifiers(
+            lean_type, reserved_identifiers
+        )
+        name = _quoted_identifier(_symbol_ident(symbol))
+        binding = {
+            "kore_symbol": symbol,
+            "name": name,
+            "type": lean_type,
+            "source_rule_ids": [
+                str(source_rule["source_rule_id"])
+                for _line, _proposition, source_rule, symbols in propositions
+                if symbol in symbols
+            ],
+        }
+        binding["binding_sha256"] = hashlib.sha256(
+            json.dumps(
+                binding, sort_keys=True, separators=(",", ":")
+            ).encode()
+        ).hexdigest()
+        parameters.append(binding)
+
+    namespace = f"{library_name}.Lemmas"
+    lines = [
+        f"import {library_name}.Inj",
+        *(
+            [f"import {library_name}.Rewrite"]
+            if any(
+                "Rewrites " in proposition
+                for _line, proposition, _source_rule, _symbols
+                in propositions
+            )
+            else []
+        ),
+        "",
+        "/- K trust-boundary goals. The second-pass agent must replace every",
+        "   writable opaque stub with an honest definition and prove this",
+        "   immutable proposition in the separate Proof.lean workspace. -/",
+        "",
+        f"namespace {namespace}",
+        "",
+    ]
+    if propositions and polymorphic_definitions:
+        # Honest total models for sort-polymorphic hooks the propositions apply
+        # (for example K ``ite`` rendered as ``kite``); emitted ahead of the
+        # obligation so targetStatement resolves them in-namespace.
+        for _ident, definition_line in sorted(polymorphic_definitions.items()):
+            lines.append(definition_line)
+        lines.append("")
+    if propositions:
+        lines.append("def targetStatement")
+        for parameter in parameters:
+            lines.append(
+                f"    ({parameter['name']} : {parameter['type']})"
+            )
+        lines.extend(
+            (
+                "    : Prop :=",
+                "    "
+                + "\n    ∧ ".join(
+                    f"({proposition})"
+                    for _line, proposition, _source_rule, _symbols in propositions
+                ),
+                "",
+            )
+        )
+    lines.append(f"end {namespace}")
+    lemma_file = package_directory / library_name / "Lemmas.lean"
+    lemma_file.write_text("\n".join(lines) + "\n")
+    root = package_directory / f"{library_name}.lean"
+    root_text = root.read_text()
+    if f"{library_name}.Lemmas" not in root_text:
+        root.write_text(root_text + f"import {library_name}.Lemmas\n")
+    mappings = []
+    for _line, proposition, source_rule, _symbols in propositions:
+        mappings.append(
+            {
+                "source_rule_id": source_rule["source_rule_id"],
+                "source_span": {
+                    "start_line": source_rule["start_line"],
+                    "end_line": source_rule["end_line"],
+                },
+                "lean_conjunct": proposition,
+                "lean_conjunct_sha256": hashlib.sha256(
+                    proposition.encode()
+                ).hexdigest(),
+            }
+        )
+    (package_directory / "obligation-map.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_rules": source_rules,
+                "obligations": mappings,
+                "trust_parameters": parameters,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    return len(propositions)
+
+
+def _patch_prelude(package_directory: Path, library_name: str) -> None:
+    prelude = package_directory / library_name / "Prelude.lean"
+    text = prelude.read_text()
+
+Script done on 2026-07-31 08:14:59-05:00 [COMMAND_EXIT_CODE="0"]

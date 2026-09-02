@@ -1,0 +1,813 @@
+Script started on 2026-07-31 00:44:09-05:00 [<not executed on terminal>]
+FLOAT_K
+     1	// reference/src/semantics/float.k — MPY-FLOAT
+     2	//
+     3	// Minimal, TRUSTED float support. K/Haskell (kprove) has no usable symbolic IEEE-754 theory and
+     4	// no Int2Float hook, so a float value stays an OPAQUE proof-domain primitive: `intFloatDiv(I, F)`
+     5	// (the Python true division I / F) is `[no-evaluators]` for kprove — it never reduces on symbolic
+     6	// input, and the proof verifies only the STRUCTURE (the result is the exact term the program
+     7	// builds). The `[concrete]` rule evaluates it for krun (llvm HAS the Int2Float / /Float hooks), so
+     8	// smoke tests run the real float value.
+     9	//
+    10	// Only the pieces needed so far: Float as a Val, the float literal, and Int / float true division
+    11	// (the `a * h / 2.0` idiom). More float ops (float +/-/*, comparison) are added as float problems
+    12	// need them — kept minimal + sound.
+    13	
+    14	module MPY-FLOAT
+    15	  imports MPY-OPERATORS
+    16	  imports MPY-BUILTINS
+    17	  imports FLOAT
+    18	
+    19	  // Float is a value; the float literal evaluates to the K Float.
+    20	  syntax Val ::= Float
+    21	  rule <k> Float(F:Float) => F ... </k>
+    22	
+    23	  // Int / float true division. OPAQUE for kprove (no-evaluators); concrete for krun.
+    24	  syntax Float ::= intFloatDiv(Int, Float) [function, total, symbol(intFloatDiv), no-evaluators]
+    25	  rule intFloatDiv(I:Int, F:Float) => Int2Float(I, 53, 11) /Float F [concrete]
+    26	
+    27	  rule applyBin("/", I:Int, F:Float) => intFloatDiv(I, F)
+    28	
+    29	  // Int / Int true division (Python: always a float). OPAQUE for kprove; concrete for krun.
+    30	  syntax Float ::= divII(Int, Int) [function, total, symbol(divII), no-evaluators]
+    31	  rule divII(I1:Int, I2:Int) => Int2Float(I1, 53, 11) /Float Int2Float(I2, 53, 11) [concrete]
+    32	  rule applyBin("/", I1:Int, I2:Int) => divII(I1, I2)
+    33	
+    34	  // float % float (e.g. `number % 1.0` = the fractional part). OPAQUE for kprove, concrete for
+    35	  // krun. Python's float `%` is floor-based: a % b = a - floor(a/b)*b (K's %Float is IEEE
+    36	  // remainder, which differs — 3.5 %Float 1.0 = -0.5 vs Python 0.5 — so it is NOT used).
+    37	  syntax Float ::= floatMod(Float, Float) [function, total, symbol(floatMod), no-evaluators]
+    38	  rule floatMod(F1:Float, F2:Float) => F1 -Float (floorFloat(F1 /Float F2) *Float F2) [concrete]
+    39	  rule applyBin("%", F1:Float, F2:Float) => floatMod(F1, F2)
+    40	
+    41	  // float equality — for concrete krun asserts (e.g. `area == 7.5`); the FLOAT.eq hook is fine on
+    42	  // concrete floats. kprove proofs return floats structurally and do not compare them.
+    43	  rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2
+    44	  rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2)
+    45	
+    46	  // float `<` and abs — OPAQUE for kprove ([no-evaluators], so a SYMBOLIC float compare stays an
+    47	  // uninterpreted Bool a proof case-splits on — a SINGLE compare per branch, not a nonlinear cascade),
+    48	  // [concrete] for krun. Additive, sort-disjoint from the Int rules. (has_close_elements: the pairwise
+    49	  // `abs(a-b) < t` proximity test.)
+    50	  syntax Bool ::= floatLt(Float, Float) [function, total, symbol(floatLt), no-evaluators]
+    51	  rule floatLt(F1:Float, F2:Float) => F1 <Float F2 [concrete]
+    52	  rule applyCmp("<", F1:Float, F2:Float) => floatLt(F1, F2)
+    53	
+    54	  syntax Float ::= absF(Float) [function, total, symbol(absF), no-evaluators]
+    55	  rule absF(F:Float) => absFloat(F) [concrete]
+    56	  rule applyBuiltin("abs", F:Float, .Vals) => absF(F)
+    57	
+    58	  // ==== math.ceil ===========================================================
+    59	  // `import X` is a no-op (we intercept the specific math functions syntactically; `math` itself is
+    60	  // never bound as a value).
+    61	  rule <k> Import(_:String) => .K ... </k>
+    62	
+    63	  // math.ceil(x): ceiling to an int. Intercepted at the Call BEFORE `math` is looked up (higher
+    64	  // priority than the generic Attribute/method dispatch in call.k).
+    65	  syntax KItem ::= "#mathCeil"
+    66	  rule <k> Call(Attribute(Name("math"), "ceil"), (E:Expr, .Exprs)) => E ~> #mathCeil ... </k> [priority(40)]
+    67	  rule <k> V:Val ~> #mathCeil => ceilF(V) ... </k>
+    68	
+    69	  // math.floor(x) — same interception shape as math.ceil
+    70	  syntax KItem ::= "#mathFloor"
+    71	  rule <k> Call(Attribute(Name("math"), "floor"), (E:Expr, .Exprs)) => E ~> #mathFloor ... </k> [priority(40)]
+    72	  rule <k> V:Val ~> #mathFloor => floorFI(V) ... </k>
+    73	  syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]
+    74	  rule floorFI(I:Int)   => I                        [concrete]
+    75	  rule floorFI(F:Float) => Float2Int(floorFloat(F)) [concrete]
+    76	
+    77	  // bare floor/ceil (bound by `from math import floor, ceil`)
+    78	  rule applyBuiltin("floor", V:Val, .Vals) => floorFI(V)
+    79	  rule applyBuiltin("ceil",  V:Val, .Vals) => ceilF(V)
+    80	
+    81	  // math.pow(x, y) — a two-arg interception onto powF (ints promote)
+    82	  syntax KItem ::= #mathPow1(Expr) | #mathPow2(Val)
+    83	  rule <k> Call(Attribute(Name("math"), "pow"), (E1:Expr, E2:Expr, .Exprs)) => E1 ~> #mathPow1(E2) ... </k> [priority(40)]
+    84	  rule <k> V1:Val ~> #mathPow1(E2:Expr) => E2 ~> #mathPow2(V1) ... </k>
+    85	  rule <k> V2:Val ~> #mathPow2(V1:Val) => powF(toF(V1), toF(V2)) ... </k>
+    86	  syntax Float ::= toF(Val) [function, total, symbol(toF)]
+    87	  rule toF(F:Float) => F        [concrete]
+    88	  rule toF(I:Int)   => intToF(I) [concrete]
+    89	
+    90	  // ceilF: math.ceil as an Int. TOTAL (K trusts it; a symbolic list element stays opaque for
+    91	  // kprove — structural). [concrete] so the Int2Float/ceilFloat hooks only run for krun (llvm).
+    92	  // Matches Python incl. negatives: ceil(-2.4) = -2 = Float2Int(ceilFloat(-2.4)).
+    93	  syntax Int ::= ceilF(Val) [function, total, symbol(ceilF)]
+    94	  rule ceilF(I:Int)   => I                       [concrete]
+    95	  rule ceilF(F:Float) => Float2Int(ceilFloat(F)) [concrete]
+    96	
+    97	  // unary minus on a float (e.g. the literal -2.4 = UnaryOp("-", Float(2.4))). Concrete for krun;
+    98	  // proofs use symbolic elements, never a float literal.
+    99	  rule applyUn("-", F:Float) => 0.0 -Float F
+   100	
+   101	  // ---- float - / / / + (OPAQUE for kprove [no-evaluators], concrete for krun) — for float-list
+   102	  // element maps (x - lo) / (hi - lo). Mirror intFloatDiv: additive, sort-disjoint from the Int rules.
+   103	  syntax Float ::= subF(Float, Float) [function, total, symbol(subF), no-evaluators]
+   104	  rule subF(F1:Float, F2:Float) => F1 -Float F2 [concrete]
+   105	  rule applyBin("-", F1:Float, F2:Float) => subF(F1, F2)
+   106	
+   107	  syntax Float ::= divF(Float, Float) [function, total, symbol(divF), no-evaluators]
+   108	  rule divF(F1:Float, F2:Float) => F1 /Float F2 [concrete]
+   109	  rule applyBin("/", F1:Float, F2:Float) => divF(F1, F2)
+   110	
+   111	  syntax Float ::= addF(Float, Float) [function, total, symbol(addF), no-evaluators]
+   112	  rule addF(F1:Float, F2:Float) => F1 +Float F2 [concrete]
+   113	  rule applyBin("+", F1:Float, F2:Float) => addF(F1, F2)
+   114	
+   115	  syntax Float ::= mulF(Float, Float) [function, total, symbol(mulF), no-evaluators]
+   116	  rule mulF(F1:Float, F2:Float) => F1 *Float F2 [concrete]
+   117	  rule applyBin("*", F1:Float, F2:Float) => mulF(F1, F2)
+   118	
+   119	  syntax Float ::= powF(Float, Float) [function, total, symbol(powF), no-evaluators]
+   120	  rule powF(F1:Float, F2:Float) => F1 ^Float F2 [concrete]
+   121	  rule applyBin("**", F1:Float, F2:Float) => powF(F1, F2)
+   122	
+   123	  // ---- the remaining comparisons (gtF promoted from find_zero — its summaries
+   124	  //      case-split on the atom; >= / <= derive from the two opaque compares) ----
+   125	  syntax Bool ::= gtF(Float, Float) [function, total, symbol(gtF), no-evaluators]
+   126	  rule gtF(F1:Float, F2:Float) => F1 >Float F2 [concrete]
+   127	  rule applyCmp(">",  F1:Float, F2:Float) => gtF(F1, F2)
+   128	  rule applyCmp(">=", F1:Float, F2:Float) => notBool floatLt(F1, F2)
+   129	  rule applyCmp("<=", F1:Float, F2:Float) => notBool gtF(F1, F2)
+   130	
+   131	  // ---- mixed Int/Float operators promote the Int side (n ** 0.5 etc.) ----
+   132	  rule applyBin("**", I:Int, F:Float) => powF(intToF(I), F)
+   133	  rule applyBin("**", F:Float, I:Int) => powF(F, intToF(I))
+   134	  rule applyBin("-",  I:Int, F:Float) => subF(intToF(I), F)
+   135	  rule applyBin("-",  F:Float, I:Int) => subF(F, intToF(I))
+   136	  rule applyBin("+",  I:Int, F:Float) => addF(intToF(I), F)
+   137	  rule applyBin("+",  F:Float, I:Int) => addF(F, intToF(I))
+   138	  rule applyBin("*",  I:Int, F:Float) => mulF(intToF(I), F)
+   139	  rule applyBin("*",  F:Float, I:Int) => mulF(F, intToF(I))
+   140	
+   141	  // ---- exact mixed Int/Float comparison ------------------------------------
+   142	  // The old rules compared via intToF(I), which ROUNDS ints >= 2^53 to a nearby
+   143	  // double (so e.g. 9007199254740993 > 9007199254740992.0 came out false). Compare
+   144	  // the REAL values instead: for a finite float F and an integer I,
+   145	  //     F <  I   <=>   floor(F) <  I
+   146	  //     F >  I   <=>   ceil(F)  >  I
+   147	  //     F == I   <=>   F is integral  AND  floor(F) == I
+   148	  // floorFloat/ceilFloat are exact and Float2Int yields the EXACT integer of an
+   149	  // integral float (no rounding), so this is exact for every finite F. Non-finite
+   150	  // F keeps the old intToF path (rounding is irrelevant to +/-inf and NaN, and
+   151	  // inf/NaN have no integer floor). Opaque for kprove, [concrete] for krun.
+   152	  syntax Bool ::= eqF(Float, Float) [function, total, symbol(eqF), no-evaluators]
+   153	  rule eqF(F1:Float, F2:Float) => F1 ==Float F2 [concrete]
+   154	
+   155	  syntax Bool ::= floatFinite(Float) [function, total, symbol(floatFinite), no-evaluators]
+   156	  rule floatFinite(F:Float) => notBool isNaN(F) andBool notBool isInfinite(F) [concrete]
+   157	
+   158	  syntax Bool ::= ltFI(Float, Int) [function, total, symbol(ltFI), no-evaluators]   // F <  I
+   159	                | ltIF(Int, Float) [function, total, symbol(ltIF), no-evaluators]   // I <  F
+   160	                | eqIF(Int, Float) [function, total, symbol(eqIF), no-evaluators]   // I == F
+   161	  rule ltFI(F:Float, I:Int) => Float2Int(floorFloat(F)) <Int I  requires floatFinite(F)          [concrete]
+   162	  rule ltFI(F:Float, I:Int) => floatLt(F, intToF(I))            requires notBool floatFinite(F)   [concrete]
+   163	  rule ltIF(I:Int, F:Float) => Float2Int(ceilFloat(F))  >Int I  requires floatFinite(F)          [concrete]
+   164	  rule ltIF(I:Int, F:Float) => floatLt(intToF(I), F)            requires notBool floatFinite(F)   [concrete]
+   165	  rule eqIF(I:Int, F:Float)
+   166	    => (floorFloat(F) ==Float ceilFloat(F)) andBool (Float2Int(floorFloat(F)) ==Int I)
+   167	       requires floatFinite(F) [concrete]
+   168	  rule eqIF(I:Int, F:Float) => eqF(intToF(I), F) requires notBool floatFinite(F) [concrete]
+   169	
+   170	  rule applyCmp("==", I:Int, F:Float) => eqIF(I, F)
+   171	  rule applyCmp("==", F:Float, I:Int) => eqIF(I, F)
+   172	  rule applyCmp("!=", I:Int, F:Float) => notBool eqIF(I, F)
+   173	  rule applyCmp("!=", F:Float, I:Int) => notBool eqIF(I, F)
+   174	  rule applyCmp("<",  I:Int, F:Float) => ltIF(I, F)
+   175	  rule applyCmp("<",  F:Float, I:Int) => ltFI(F, I)
+   176	  rule applyCmp(">",  I:Int, F:Float) => ltFI(F, I)          // I >  F  <=>  F <  I
+   177	  rule applyCmp(">",  F:Float, I:Int) => ltIF(I, F)          // F >  I  <=>  I <  F
+   178	  rule applyCmp("<=", I:Int, F:Float) => notBool ltFI(F, I)  // I <= F  <=>  not (F < I)
+   179	  rule applyCmp("<=", F:Float, I:Int) => notBool ltIF(I, F)  // F <= I  <=>  not (I < F)
+   180	  rule applyCmp(">=", I:Int, F:Float) => notBool ltIF(I, F)  // I >= F  <=>  not (I < F)
+   181	  rule applyCmp(">=", F:Float, I:Int) => notBool ltFI(F, I)  // F >= I  <=>  not (F < I)
+   182	
+   183	  // ---- bool is a subtype of int: a Bool operand with a Float promotes to 0/1 --
+   184	  rule applyBin(OP:String, B:Bool, F:Float) => applyBin(OP, boolAsInt(B), F) requires isArithOp(OP)
+   185	  rule applyBin(OP:String, F:Float, B:Bool) => applyBin(OP, F, boolAsInt(B)) requires isArithOp(OP)
+   186	  rule applyCmp(OP:String, B:Bool, F:Float) => applyCmp(OP, boolAsInt(B), F) requires isEqOrdOp(OP)
+   187	  rule applyCmp(OP:String, F:Float, B:Bool) => applyCmp(OP, F, boolAsInt(B)) requires isEqOrdOp(OP)
+   188	
+   189	  // ---- x == None (promoted from 137; `is` cases live in operators.k) ----
+   190	  rule applyCmp("==", V:Val, noneV) => V ==K noneV
+   191	  rule applyCmp("!=", V:Val, noneV) => notBool (V ==K noneV)
+   192	
+   193	  // ---- float(str): decimal parse (promoted from 137's defined chain) ----
+   194	  // digits '.' digits, optional leading '-'; concrete evaluation only (the
+   195	  // symbolic side stays an opaque decStrToF term a proof case-splits on).
+   196	  syntax Float ::= decStrToF(IntSeq) [function, total, symbol(decStrToF), no-evaluators]
+   197	  rule decStrToF(iCons(45, CS:IntSeq)) => 0.0 -Float decStrToF(CS) [concrete]
+   198	  rule decStrToF(CS:IntSeq)
+   199	    => intToF(intPart(CS)) +Float (intToF(fracPart(CS)) /Float intToF(fracScale(CS)))
+   200	       requires isLen(CS) >Int 0 andBool headIS(CS) =/=Int 45 [concrete]
+   201	  syntax Int ::= headIS(IntSeq) [function]
+   202	  rule headIS(iCons(C:Int, _:IntSeq)) => C
+   203	  syntax Int ::= intPart(IntSeq) [function, total] | intPartAcc(IntSeq, Int) [function, total]
+   204	  rule intPart(CS:IntSeq) => intPartAcc(CS, 0)
+   205	  rule intPartAcc(.IntSeq, A:Int) => A
+   206	  rule intPartAcc(iCons(46, _:IntSeq), A:Int) => A
+   207	  rule intPartAcc(iCons(C:Int, R:IntSeq), A:Int) => intPartAcc(R, A *Int 10 +Int (C -Int 48))
+   208	       requires C =/=Int 46
+   209	  syntax Int ::= fracPart(IntSeq) [function, total] | fracAcc(IntSeq, Int) [function, total]
+   210	  rule fracPart(.IntSeq) => 0
+   211	  rule fracPart(iCons(46, R:IntSeq)) => fracAcc(R, 0)
+   212	  rule fracPart(iCons(C:Int, R:IntSeq)) => fracPart(R) requires C =/=Int 46
+   213	  rule fracAcc(.IntSeq, A:Int) => A
+   214	  rule fracAcc(iCons(C:Int, R:IntSeq), A:Int) => fracAcc(R, A *Int 10 +Int (C -Int 48))
+   215	  syntax Int ::= fracScale(IntSeq) [function, total] | fscAcc(IntSeq, Int) [function, total]
+   216	  rule fracScale(.IntSeq) => 1
+   217	  rule fracScale(iCons(46, R:IntSeq)) => fscAcc(R, 1)
+   218	  rule fracScale(iCons(C:Int, R:IntSeq)) => fracScale(R) requires C =/=Int 46
+   219	  rule fscAcc(.IntSeq, A:Int) => A
+   220	  rule fscAcc(iCons(_:Int, R:IntSeq), A:Int) => fscAcc(R, A *Int 10)
+   221	  rule applyBuiltin("float", str(CS:IntSeq), .Vals) => decStrToF(CS)
+   222	  rule applyBuiltin("float", I:Int, .Vals)          => intToF(I)
+   223	  rule applyBuiltin("float", F:Float, .Vals)        => F
+   224	
+   225	  // ---- float / int division (promoted from mean_absolute_deviation) ----
+   226	  syntax Float ::= divFloatIntV(Float, Int) [function, total, symbol(divFloatIntV), no-evaluators]
+   227	  rule divFloatIntV(F:Float, I:Int) => F /Float Int2Float(I, 53, 11) [concrete]
+   228	  rule applyBin("/", F:Float, I:Int) => divFloatIntV(F, I)
+   229	
+   230	  // ---- int -> float promotion for the remaining mixed arithmetic/compares ----
+   231	  syntax Float ::= intToF(Int) [function, total, symbol(intToF), no-evaluators]
+   232	  rule intToF(I:Int) => Int2Float(I, 53, 11) [concrete]
+   233	  rule applyBin("+", I:Int, F:Float) => addF(intToF(I), F)
+   234	  rule applyBin("+", F:Float, I:Int) => addF(F, intToF(I))
+   235	  rule applyBin("-", I:Int, F:Float) => subF(intToF(I), F)
+   236	  rule applyBin("-", F:Float, I:Int) => subF(F, intToF(I))
+   237	  rule applyBin("*", I:Int, F:Float) => mulF(intToF(I), F)
+   238	  rule applyBin("*", F:Float, I:Int) => mulF(F, intToF(I))
+   239	  // (mixed Int/Float comparison is defined exactly above via ltIF/ltFI/eqIF;
+   240	  //  the former floatLt(intToF(...)) duplicates were removed for exactness.)
+   241	
+   242	  // ---- conversions: int(float) truncates toward zero; float(int); round; math.sqrt ----
+   243	  syntax Int ::= truncF(Float) [function, total, symbol(truncF), no-evaluators]
+   244	  rule truncF(F:Float) => #if F >=Float 0.0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi [concrete]
+   245	  rule applyBuiltin("int", F:Float, .Vals) => truncF(F)
+   246	
+   247	  rule applyBuiltin("float", I:Int, .Vals)   => intToF(I)
+   248	  rule applyBuiltin("float", F:Float, .Vals) => F
+   249	
+   250	  // round: Python half-even (banker's); round(F, N) scales by 10^N
+   251	  syntax Int ::= roundF(Float) [function, total, symbol(roundF), no-evaluators]
+   252	  rule roundF(F:Float)
+   253	    => #if (F -Float floorFloat(F)) ==Float 0.5
+   254	       #then (#if Float2Int(floorFloat(F)) %Int 2 ==Int 0
+   255	              #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi)
+   256	       #else Float2Int(floorFloat(F +Float 0.5)) #fi [concrete]
+   257	  // round(F, N): CPython rounds the EXACT binary value of F at the Nth decimal
+   258	  // place, half-to-even, then converts to the nearest double. The old code did
+   259	  // Int2Float(roundF(F *Float 10^N)) / 10^N — the float multiply F *Float 10^N
+   260	  // misrounds the half-way decision (witness: a Heron triangle area that must
+   261	  // round to 2.69 came out 2.68). Exact version, via arbitrary-precision integers:
+   262	  //     F = numer / 2^k      numer = Float2Int(F * 2^(52-e)),  k = 52 - exponentFloat(F)
+   263	  //     q = round-half-even( numer * 10^N , 2^k )        (exact big-integer round)
+   264	  //     result = nearest double to q / 10^N
+   265	  //   IEEE division is correctly rounded, so (double)q /Float (double)10^N equals
+   266	  //   the nearest double to q/10^N whenever q and 10^N are exactly representable.
+   267	  // Guarded to finite F with |F| < 1e12 and |F|*10^N < 2^52 (keeps numer and q
+   268	  // exactly representable) and a non-subnormal exponent (avoids 2^k overflowing a
+   269	  // double); the exotic tail keeps the old path, so nothing regresses.
+   270	  // Opaque for kprove, [concrete] for krun.
+   271	  syntax Float ::= roundFN(Float, Int) [function, total, symbol(roundFN), no-evaluators]
+   272	  rule roundFN(F:Float, N:Int) => roundExactFN(F, N)
+   273	       requires notBool isNaN(F) andBool notBool isInfinite(F) andBool N >=Int 0
+   274	        andBool absFloat(F) <Float 1000000000000.0
+   275	        andBool (absFloat(F) *Float Int2Float(10 ^Int N, 53, 11)) <Float 4500000000000000.0
+   276	        andBool exponentFloat(F) >Int -900 [concrete]
+   277	  rule roundFN(F:Float, N:Int)
+   278	    => Int2Float(roundF(F *Float Int2Float(10 ^Int N, 53, 11)), 53, 11)
+   279	       /Float Int2Float(10 ^Int N, 53, 11) [owise, concrete]
+   280	
+   281	  syntax Float ::= roundExactFN(Float, Int) [function]
+   282	  rule roundExactFN(F:Float, N:Int)
+   283	    => rheToFloat(rndHalfEven(rExNumer(F) *Int (10 ^Int N), rExDenom(F)), 10 ^Int N, F) [concrete]
+   284	
+   285	  // exact fraction of a finite in-range float:  F = rExNumer(F) / rExDenom(F),
+   286	  // rExDenom(F) = 2^k, k = 52 - exponentFloat(F) >= 0 within the guard above.
+   287	  syntax Int ::= rExK(Float) [function]
+   288	  rule rExK(F:Float) => 52 -Int exponentFloat(F) [concrete]
+   289	  syntax Int ::= rExNumer(Float) [function]
+   290	  rule rExNumer(F:Float) => Float2Int(F *Float Int2Float(2 ^Int rExK(F), 53, 11)) [concrete]
+   291	  syntax Int ::= rExDenom(Float) [function]
+   292	  rule rExDenom(F:Float) => 2 ^Int rExK(F) [concrete]
+   293	
+   294	  // round-half-even of A/B (B > 0), to the nearest integer, ties to even.
+   295	  // divInt/modInt are Euclidean (B>0 => remainder in [0,B)) — i.e. floored here.
+   296	  syntax Int ::= rndHalfEven(Int, Int) [function]
+   297	  rule rndHalfEven(A:Int, B:Int) => rndHE(A divInt B, A modInt B, B) [concrete]
+   298	  syntax Int ::= rndHE(Int, Int, Int) [function]
+   299	  rule rndHE(Q:Int, R:Int, B:Int) => Q        requires 2 *Int R <Int B [concrete]
+   300	  rule rndHE(Q:Int, R:Int, B:Int) => Q +Int 1 requires 2 *Int R >Int B [concrete]
+   301	  rule rndHE(Q:Int, R:Int, B:Int) => Q        requires 2 *Int R ==Int B andBool Q modInt 2 ==Int 0 [concrete]
+   302	  rule rndHE(Q:Int, R:Int, B:Int) => Q +Int 1 requires 2 *Int R ==Int B andBool Q modInt 2 =/=Int 0 [concrete]
+   303	
+   304	  // q / 10^N as the nearest double; preserve Python's signed zero when q == 0.
+   305	  syntax Float ::= rheToFloat(Int, Int, Float) [function]
+   306	  rule rheToFloat(0, _:Int, F:Float) => #if signFloat(F) #then --Float 0.0 #else 0.0 #fi [concrete]
+   307	  rule rheToFloat(Q:Int, SCALE:Int, _:Float)
+   308	    => Int2Float(Q, 53, 11) /Float Int2Float(SCALE, 53, 11) requires Q =/=Int 0 [concrete]
+   309	
+   310	  rule applyBuiltin("round", F:Float, .Vals)        => roundF(F)
+   311	  rule applyBuiltin("round", F:Float, N:Int, .Vals) => roundFN(F, N)
+   312	
+   313	  syntax Float ::= sqrtF(Float) [function, total, symbol(sqrtF), no-evaluators]
+   314	  rule sqrtF(F:Float) => sqrtFloat(F) [concrete]
+   315	  syntax KItem ::= "#mathSqrt"
+   316	  rule <k> Call(Attribute(Name("math"), "sqrt"), (E:Expr, .Exprs)) => E ~> #mathSqrt ... </k> [priority(40)]
+   317	  rule <k> F:Float ~> #mathSqrt => sqrtF(F) ... </k>
+   318	  rule <k> I:Int ~> #mathSqrt => sqrtF(intToF(I)) ... </k>
+   319	
+   320	  // ---- min / max over a FLOAT list — FLOAT branch of the shared #minCont0/#maxCont0 folds (which
+   321	  // seed/step with `requires isInt(V)`, so they are STUCK on floats). These add the `requires
+   322	  // isFloat(V)` seed + a Float-accumulator fold via K's minFloat/maxFloat — concrete for krun. A proof
+   323	  // over a SYMBOLIC float list intercepts min/max problem-locally to an opaque minVF/maxVF (at
+   324	  // #applyK, priority 40, in its verification.k) BEFORE #minAcc0, so this fold is krun-only. Additive:
+   325	  // the isFloat guard is disjoint from the existing isInt one.
+   326	  syntax KItem ::= #maxAccF(Iterable, Float) | #maxContF(Float)
+   327	  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAccF(R, {V}:>Float) ... </k> requires isFloat(V)
+   328	  rule <k> #maxAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #maxContF(M) ... </k>
+   329	  rule <k> #iterDone ~> #maxContF(M:Float) => M ... </k>
+   330	  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxContF(M:Float) => #maxAccF(R, maxFloat(M, {V}:>Float)) ... </k>
+   331	       requires isFloat(V)
+   332	
+   333	  syntax KItem ::= #minAccF(Iterable, Float) | #minContF(Float)
+   334	  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAccF(R, {V}:>Float) ... </k> requires isFloat(V)
+   335	  rule <k> #minAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #minContF(M) ... </k>
+   336	  rule <k> #iterDone ~> #minContF(M:Float) => M ... </k>
+   337	  rule <k> #iterYield(V:Val, R:Iterable) ~> #minContF(M:Float) => #minAccF(R, minFloat(M, {V}:>Float)) ... </k>
+   338	       requires isFloat(V)
+   339	
+   340	  // cross-sort steps (v3): an Int/Bool yield hands the Float-seeded fold to the
+   341	  // general Val fold (builtins.k), which compares through the same applyCmp
+   342	  // dispatch (the exact ltIF/ltFI bridges + the bool promotion above) — mixed
+   343	  // lists like [2.5, 1]. Guards are disjoint from the isFloat steps above.
+   344	  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxContF(M:Float)
+   345	        => #iterYield(V, R) ~> #maxContV(M) ... </k>
+   346	       requires isInt(V) orBool isBool(V)
+   347	  rule <k> #iterYield(V:Val, R:Iterable) ~> #minContF(M:Float)
+   348	        => #iterYield(V, R) ~> #minContV(M) ... </k>
+   349	       requires isInt(V) orBool isBool(V)
+   350	
+   351	  // ---- sum over a float list (krun; mirrors the min/max float paths). The Int-only shared
+   352	  // #sumCont sticks on a Float yield; switch to a Float-headed fold via addF (concrete twin).
+   353	  // The switch guard carries the SYNTACTIC negation of the Int rule's guard so a symbolic proof
+   354	  // with isInt(V) in its path condition refutes this branch without sort reasoning.
+   355	  syntax KItem ::= #sumAccF(Iterable, Float) | #sumContF(Float)
+   356	  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int)
+   357	        => #sumAccF(R, addF(intToF(ACC), {V}:>Float)) ... </k>
+   358	       requires isFloat(V) andBool notBool (isInt(V) orBool isBool(V))
+   359	  rule <k> #sumAccF(IT:Iterable, ACC:Float) => #iterNext(IT) ~> #sumContF(ACC) ... </k>
+   360	  rule <k> #iterDone ~> #sumContF(ACC:Float) => ACC ... </k>
+   361	  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float)
+   362	        => #sumAccF(R, addF(ACC, {V}:>Float)) ... </k>
+   363	       requires isFloat(V)
+   364	  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float)
+   365	        => #sumAccF(R, addF(ACC, intToF(intOf(V)))) ... </k>
+   366	       requires isInt(V) orBool isBool(V)
+   367	endmodule
+CONCRETE_RELEVANT
+     1	// reference/src/semantics/concrete.k — MPY-CONCRETE
+     2	// Concrete-execution-only rules, visible ONLY to the llvm build (run.sh kompiles
+     3	// MPY-CONCRETE; verification builds import MPY and never see these). Rationale:
+     4	// a k-cell rule matching value constructors NARROWS abstract Vals in the haskell
+     5	// backend ([concrete] is not respected on rewrite rules) — probed on
+     6	// 26-remove-duplicates, where element compares branched into deepEqVS.
+     7	
+     8	module MPY-CONCRETE
+     9	  imports MPY
+    10	
+    11	  // deep equality for list compares whose elements are heap objects
+    12	  // (list-of-lists): Python == is structural at every depth.
+    13	  rule <k> Compare(list(A:ValSeq), CmpOp("==", list(B:ValSeq))) => deepEqVS(A, B, HP) ... </k>
+    14	       <heap> HP:Map </heap>
+    15	       requires hasRefVS(A) orBool hasRefVS(B)
+    16	  rule <k> Compare(list(A:ValSeq), CmpOp("!=", list(B:ValSeq))) => notBool deepEqVS(A, B, HP) ... </k>
+    17	       <heap> HP:Map </heap>
+    18	       requires hasRefVS(A) orBool hasRefVS(B)
+    19	
+    20	  // ==== keyed sort, concrete leg ============================================
+    21	  // Computes each key by a REAL call through the uniform #callee machinery
+    22	  // (closures, len, type objects all work), stable-inserts on the key, and
+    23	  // allocates the result. priority(40) beats sort.k's opaque rules, so krun
+    24	  // runs this and proofs (which never see MPY-CONCRETE) keep sortKeyVS.
+    25	  syntax Val ::= kvP(Val, Val)
+    26	  syntax KItem ::= #ksort(ValSeq, Val, ValSeq, Bool)
+    27	                 | #ksIns(Val, ValSeq, Val, ValSeq, Bool)
+    28	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals))
+    29	        => #ksort(VS, KV, .ValSeq, false) ... </k>
+    30	       [priority(40)]
+    31	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals))
+    32	        => #ksort(VS, KV, .ValSeq, RB) ... </k>
+    33	       [priority(40)]
+    34	  rule <k> #ksort(.ValSeq, _:Val, ACC:ValSeq, RB:Bool)
+    35	        => #alloc(list(condRev(unpairVS(ACC), RB))) ... </k>
+    36	  rule <k> #ksort(vCons(V:Val, R:ValSeq), KV:Val, ACC:ValSeq, RB:Bool)
+    37	        => KV ~> #callee((V, .Exprs)) ~> #ksIns(V, R, KV, ACC, RB) ... </k>
+    38	  rule <k> K:Val ~> #ksIns(V:Val, R:ValSeq, KV:Val, ACC:ValSeq, RB:Bool)
+    39	        => #ksort(R, KV, insPair(ACC, K, V), RB) ... </k>
+    40	       requires notBool isKwV(K)
+    41	
+    42	  syntax ValSeq ::= insPair(ValSeq, Val, Val) [function]
+    43	  rule insPair(.ValSeq, K:Val, V:Val) => vCons(kvP(K, V), .ValSeq)
+    44	  rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val)
+    45	    => vCons(kvP(K, V), vCons(kvP(K2, V2), R))
+    46	       requires kLt(K, K2)
+    47	  rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val)
+    48	    => vCons(kvP(K2, V2), insPair(R, K, V))
+    49	       requires notBool kLt(K, K2)
+    50	
+    51	  syntax Bool ::= kLt(Val, Val) [function]
+    52	  rule kLt(I1:Int, I2:Int)             => I1 <Int I2
+    53	  rule kLt(F1:Float, F2:Float)         => F1 <Float F2
+    54	  rule kLt(str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+    55	  // v3: mixed Int/Float keys via the exact v2 bridges (float.k), bool keys by
+    56	  // the bool->int promotion (True==1, False==0). Unordered pairs (int vs str)
+    57	  // stay without a leg — stuck, like CPython's TypeError.
+    58	  rule kLt(I:Int, F:Float)   => ltIF(I, F)
+    59	  rule kLt(F:Float, I:Int)   => ltFI(F, I)
+    60	  rule kLt(B:Bool, V:Val)    => kLt(boolAsInt(B), V) requires isInt(V) orBool isFloat(V)
+    61	  rule kLt(V:Val, B:Bool)    => kLt(V, boolAsInt(B)) requires isInt(V) orBool isFloat(V)
+    62	  rule kLt(B1:Bool, B2:Bool) => boolAsInt(B1) <Int boolAsInt(B2)
+    63	
+    64	  syntax ValSeq ::= unpairVS(ValSeq) [function, total]
+    65	  rule unpairVS(.ValSeq) => .ValSeq
+    66	  rule unpairVS(vCons(kvP(_:Val, V:Val), R:ValSeq)) => vCons(V, unpairVS(R))
+    67	  rule unpairVS(vCons(V:Val, R:ValSeq)) => vCons(V, unpairVS(R)) [owise]
+    68	
+    69	  // ==== non-keyed reverse sorted(), concrete leg (v3) =======================
+    70	  // sort.k's condRev(sortVS(VS), true) reverses equal-key runs — invisible on
+    71	  // the all-Int / all-str lists sortVS used to accept, visible once sortVS
+    72	  // orders mixed numerics (CPython keeps FIRST-seen order among equal keys
+    73	  // under reverse=True). rev-in/rev-out over the same stable ascending sortVS
+    74	  // is exactly CPython's stable descending sort, and is output-identical on the
+    75	  // old homogeneous domains. krun-only (priority 40; proofs keep sort.k's
+    76	  // condRev(sortVS(VS), RB) term unchanged).
+    77	  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("reverse", true), .Vals))
+    78	        => #alloc(list(revVS(sortVS(revVS(VS))))) ... </k>
+    79	       [priority(40)]
+    80	
+    81	  // ==== numeric cross-type membership (Python: 1 == True == 1.0) =============
+    82	  // `x in list` / `x not in list` compare elements with ==K in list.k, which does
+    83	  // NOT collapse across the numeric types (true =/=K 1, 1 =/=K 1.0). Under krun,
+    84	  // override the membership fold with a numeric-aware equality so `in` and
+    85	  // unique()-style dedup behave like CPython for mixed int/bool/float elements.
+    86	  // (set.k needs no change: setV holds int char codes, compared with ==Int, so a
+    87	  // cross-type ==K collapse never arises there.)
+    88	  // krun-only (priority 40 beats list.k's default rules); kprove uses the
+    89	  // structural ==K rules in list.k unchanged.
+    90	  syntax Bool ::= numOrKEq(Val, Val) [function]
+    91	  rule numOrKEq(A:Val, B:Val) => applyCmp("==", A, B)
+    92	       requires (isInt(A) orBool isBool(A) orBool isFloat(A))
+    93	        andBool (isInt(B) orBool isBool(B) orBool isFloat(B))
+    94	  rule numOrKEq(A:Val, B:Val) => A ==K B [owise]
+    95	
+    96	  rule <k> #iterYield(E:Val, _:Iterable) ~> #memberCont(V:Val) => true ... </k>
+    97	       requires numOrKEq(E, V) [priority(40)]
+    98	  rule <k> #iterYield(E:Val, R:Iterable) ~> #memberCont(V:Val) => #memberAcc(V, R) ... </k>
+    99	       requires notBool numOrKEq(E, V) [priority(40)]
+   100	endmodule
+BUILTINS_ROUND_SQRT
+/reference/k-proof/reference-semantics/semantics/float.k
+30-  syntax Float ::= divII(Int, Int) [function, total, symbol(divII), no-evaluators]
+31-  rule divII(I1:Int, I2:Int) => Int2Float(I1, 53, 11) /Float Int2Float(I2, 53, 11) [concrete]
+32-  rule applyBin("/", I1:Int, I2:Int) => divII(I1, I2)
+33-
+34-  // float % float (e.g. `number % 1.0` = the fractional part). OPAQUE for kprove, concrete for
+35-  // krun. Python's float `%` is floor-based: a % b = a - floor(a/b)*b (K's %Float is IEEE
+36-  // remainder, which differs — 3.5 %Float 1.0 = -0.5 vs Python 0.5 — so it is NOT used).
+37-  syntax Float ::= floatMod(Float, Float) [function, total, symbol(floatMod), no-evaluators]
+38:  rule floatMod(F1:Float, F2:Float) => F1 -Float (floorFloat(F1 /Float F2) *Float F2) [concrete]
+39-  rule applyBin("%", F1:Float, F2:Float) => floatMod(F1, F2)
+40-
+41-  // float equality — for concrete krun asserts (e.g. `area == 7.5`); the FLOAT.eq hook is fine on
+42-  // concrete floats. kprove proofs return floats structurally and do not compare them.
+43-  rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2
+44-  rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2)
+45-
+46-  // float `<` and abs — OPAQUE for kprove ([no-evaluators], so a SYMBOLIC float compare stays an
+--
+64-  // priority than the generic Attribute/method dispatch in call.k).
+65-  syntax KItem ::= "#mathCeil"
+66-  rule <k> Call(Attribute(Name("math"), "ceil"), (E:Expr, .Exprs)) => E ~> #mathCeil ... </k> [priority(40)]
+67-  rule <k> V:Val ~> #mathCeil => ceilF(V) ... </k>
+68-
+69-  // math.floor(x) — same interception shape as math.ceil
+70-  syntax KItem ::= "#mathFloor"
+71-  rule <k> Call(Attribute(Name("math"), "floor"), (E:Expr, .Exprs)) => E ~> #mathFloor ... </k> [priority(40)]
+72:  rule <k> V:Val ~> #mathFloor => floorFI(V) ... </k>
+73:  syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]
+74:  rule floorFI(I:Int)   => I                        [concrete]
+75:  rule floorFI(F:Float) => Float2Int(floorFloat(F)) [concrete]
+76-
+77-  // bare floor/ceil (bound by `from math import floor, ceil`)
+78:  rule applyBuiltin("floor", V:Val, .Vals) => floorFI(V)
+79-  rule applyBuiltin("ceil",  V:Val, .Vals) => ceilF(V)
+80-
+81-  // math.pow(x, y) — a two-arg interception onto powF (ints promote)
+82-  syntax KItem ::= #mathPow1(Expr) | #mathPow2(Val)
+83-  rule <k> Call(Attribute(Name("math"), "pow"), (E1:Expr, E2:Expr, .Exprs)) => E1 ~> #mathPow1(E2) ... </k> [priority(40)]
+84-  rule <k> V1:Val ~> #mathPow1(E2:Expr) => E2 ~> #mathPow2(V1) ... </k>
+85-  rule <k> V2:Val ~> #mathPow2(V1:Val) => powF(toF(V1), toF(V2)) ... </k>
+86-  syntax Float ::= toF(Val) [function, total, symbol(toF)]
+87-  rule toF(F:Float) => F        [concrete]
+88:  rule toF(I:Int)   => intToF(I) [concrete]
+89-
+90-  // ceilF: math.ceil as an Int. TOTAL (K trusts it; a symbolic list element stays opaque for
+91-  // kprove — structural). [concrete] so the Int2Float/ceilFloat hooks only run for krun (llvm).
+92-  // Matches Python incl. negatives: ceil(-2.4) = -2 = Float2Int(ceilFloat(-2.4)).
+93-  syntax Int ::= ceilF(Val) [function, total, symbol(ceilF)]
+94-  rule ceilF(I:Int)   => I                       [concrete]
+95-  rule ceilF(F:Float) => Float2Int(ceilFloat(F)) [concrete]
+96-
+--
+124-  //      case-split on the atom; >= / <= derive from the two opaque compares) ----
+125-  syntax Bool ::= gtF(Float, Float) [function, total, symbol(gtF), no-evaluators]
+126-  rule gtF(F1:Float, F2:Float) => F1 >Float F2 [concrete]
+127-  rule applyCmp(">",  F1:Float, F2:Float) => gtF(F1, F2)
+128-  rule applyCmp(">=", F1:Float, F2:Float) => notBool floatLt(F1, F2)
+129-  rule applyCmp("<=", F1:Float, F2:Float) => notBool gtF(F1, F2)
+130-
+131-  // ---- mixed Int/Float operators promote the Int side (n ** 0.5 etc.) ----
+132:  rule applyBin("**", I:Int, F:Float) => powF(intToF(I), F)
+133:  rule applyBin("**", F:Float, I:Int) => powF(F, intToF(I))
+134:  rule applyBin("-",  I:Int, F:Float) => subF(intToF(I), F)
+135:  rule applyBin("-",  F:Float, I:Int) => subF(F, intToF(I))
+136:  rule applyBin("+",  I:Int, F:Float) => addF(intToF(I), F)
+137:  rule applyBin("+",  F:Float, I:Int) => addF(F, intToF(I))
+138:  rule applyBin("*",  I:Int, F:Float) => mulF(intToF(I), F)
+139:  rule applyBin("*",  F:Float, I:Int) => mulF(F, intToF(I))
+140-
+141-  // ---- exact mixed Int/Float comparison ------------------------------------
+142:  // The old rules compared via intToF(I), which ROUNDS ints >= 2^53 to a nearby
+143-  // double (so e.g. 9007199254740993 > 9007199254740992.0 came out false). Compare
+144-  // the REAL values instead: for a finite float F and an integer I,
+145-  //     F <  I   <=>   floor(F) <  I
+146-  //     F >  I   <=>   ceil(F)  >  I
+147-  //     F == I   <=>   F is integral  AND  floor(F) == I
+148:  // floorFloat/ceilFloat are exact and Float2Int yields the EXACT integer of an
+149-  // integral float (no rounding), so this is exact for every finite F. Non-finite
+150:  // F keeps the old intToF path (rounding is irrelevant to +/-inf and NaN, and
+151-  // inf/NaN have no integer floor). Opaque for kprove, [concrete] for krun.
+152-  syntax Bool ::= eqF(Float, Float) [function, total, symbol(eqF), no-evaluators]
+153-  rule eqF(F1:Float, F2:Float) => F1 ==Float F2 [concrete]
+154-
+155:  syntax Bool ::= floatFinite(Float) [function, total, symbol(floatFinite), no-evaluators]
+156:  rule floatFinite(F:Float) => notBool isNaN(F) andBool notBool isInfinite(F) [concrete]
+157-
+158-  syntax Bool ::= ltFI(Float, Int) [function, total, symbol(ltFI), no-evaluators]   // F <  I
+159-                | ltIF(Int, Float) [function, total, symbol(ltIF), no-evaluators]   // I <  F
+160-                | eqIF(Int, Float) [function, total, symbol(eqIF), no-evaluators]   // I == F
+161:  rule ltFI(F:Float, I:Int) => Float2Int(floorFloat(F)) <Int I  requires floatFinite(F)          [concrete]
+162:  rule ltFI(F:Float, I:Int) => floatLt(F, intToF(I))            requires notBool floatFinite(F)   [concrete]
+163:  rule ltIF(I:Int, F:Float) => Float2Int(ceilFloat(F))  >Int I  requires floatFinite(F)          [concrete]
+164:  rule ltIF(I:Int, F:Float) => floatLt(intToF(I), F)            requires notBool floatFinite(F)   [concrete]
+165-  rule eqIF(I:Int, F:Float)
+166:    => (floorFloat(F) ==Float ceilFloat(F)) andBool (Float2Int(floorFloat(F)) ==Int I)
+167:       requires floatFinite(F) [concrete]
+168:  rule eqIF(I:Int, F:Float) => eqF(intToF(I), F) requires notBool floatFinite(F) [concrete]
+169-
+170-  rule applyCmp("==", I:Int, F:Float) => eqIF(I, F)
+171-  rule applyCmp("==", F:Float, I:Int) => eqIF(I, F)
+172-  rule applyCmp("!=", I:Int, F:Float) => notBool eqIF(I, F)
+173-  rule applyCmp("!=", F:Float, I:Int) => notBool eqIF(I, F)
+174-  rule applyCmp("<",  I:Int, F:Float) => ltIF(I, F)
+175-  rule applyCmp("<",  F:Float, I:Int) => ltFI(F, I)
+176-  rule applyCmp(">",  I:Int, F:Float) => ltFI(F, I)          // I >  F  <=>  F <  I
+--
+191-  rule applyCmp("!=", V:Val, noneV) => notBool (V ==K noneV)
+192-
+193-  // ---- float(str): decimal parse (promoted from 137's defined chain) ----
+194-  // digits '.' digits, optional leading '-'; concrete evaluation only (the
+195-  // symbolic side stays an opaque decStrToF term a proof case-splits on).
+196-  syntax Float ::= decStrToF(IntSeq) [function, total, symbol(decStrToF), no-evaluators]
+197-  rule decStrToF(iCons(45, CS:IntSeq)) => 0.0 -Float decStrToF(CS) [concrete]
+198-  rule decStrToF(CS:IntSeq)
+199:    => intToF(intPart(CS)) +Float (intToF(fracPart(CS)) /Float intToF(fracScale(CS)))
+200-       requires isLen(CS) >Int 0 andBool headIS(CS) =/=Int 45 [concrete]
+201-  syntax Int ::= headIS(IntSeq) [function]
+202-  rule headIS(iCons(C:Int, _:IntSeq)) => C
+203-  syntax Int ::= intPart(IntSeq) [function, total] | intPartAcc(IntSeq, Int) [function, total]
+204-  rule intPart(CS:IntSeq) => intPartAcc(CS, 0)
+205-  rule intPartAcc(.IntSeq, A:Int) => A
+206-  rule intPartAcc(iCons(46, _:IntSeq), A:Int) => A
+207-  rule intPartAcc(iCons(C:Int, R:IntSeq), A:Int) => intPartAcc(R, A *Int 10 +Int (C -Int 48))
+--
+214-  rule fracAcc(iCons(C:Int, R:IntSeq), A:Int) => fracAcc(R, A *Int 10 +Int (C -Int 48))
+215-  syntax Int ::= fracScale(IntSeq) [function, total] | fscAcc(IntSeq, Int) [function, total]
+216-  rule fracScale(.IntSeq) => 1
+217-  rule fracScale(iCons(46, R:IntSeq)) => fscAcc(R, 1)
+218-  rule fracScale(iCons(C:Int, R:IntSeq)) => fracScale(R) requires C =/=Int 46
+219-  rule fscAcc(.IntSeq, A:Int) => A
+220-  rule fscAcc(iCons(_:Int, R:IntSeq), A:Int) => fscAcc(R, A *Int 10)
+221-  rule applyBuiltin("float", str(CS:IntSeq), .Vals) => decStrToF(CS)
+222:  rule applyBuiltin("float", I:Int, .Vals)          => intToF(I)
+223-  rule applyBuiltin("float", F:Float, .Vals)        => F
+224-
+225-  // ---- float / int division (promoted from mean_absolute_deviation) ----
+226-  syntax Float ::= divFloatIntV(Float, Int) [function, total, symbol(divFloatIntV), no-evaluators]
+227-  rule divFloatIntV(F:Float, I:Int) => F /Float Int2Float(I, 53, 11) [concrete]
+228-  rule applyBin("/", F:Float, I:Int) => divFloatIntV(F, I)
+229-
+230-  // ---- int -> float promotion for the remaining mixed arithmetic/compares ----
+231:  syntax Float ::= intToF(Int) [function, total, symbol(intToF), no-evaluators]
+232:  rule intToF(I:Int) => Int2Float(I, 53, 11) [concrete]
+233:  rule applyBin("+", I:Int, F:Float) => addF(intToF(I), F)
+234:  rule applyBin("+", F:Float, I:Int) => addF(F, intToF(I))
+235:  rule applyBin("-", I:Int, F:Float) => subF(intToF(I), F)
+236:  rule applyBin("-", F:Float, I:Int) => subF(F, intToF(I))
+237:  rule applyBin("*", I:Int, F:Float) => mulF(intToF(I), F)
+238:  rule applyBin("*", F:Float, I:Int) => mulF(F, intToF(I))
+239-  // (mixed Int/Float comparison is defined exactly above via ltIF/ltFI/eqIF;
+240:  //  the former floatLt(intToF(...)) duplicates were removed for exactness.)
+241-
+242:  // ---- conversions: int(float) truncates toward zero; float(int); round; math.sqrt ----
+243-  syntax Int ::= truncF(Float) [function, total, symbol(truncF), no-evaluators]
+244:  rule truncF(F:Float) => #if F >=Float 0.0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi [concrete]
+245-  rule applyBuiltin("int", F:Float, .Vals) => truncF(F)
+246-
+247:  rule applyBuiltin("float", I:Int, .Vals)   => intToF(I)
+248-  rule applyBuiltin("float", F:Float, .Vals) => F
+249-
+250-  // round: Python half-even (banker's); round(F, N) scales by 10^N
+251:  syntax Int ::= roundF(Float) [function, total, symbol(roundF), no-evaluators]
+252:  rule roundF(F:Float)
+253:    => #if (F -Float floorFloat(F)) ==Float 0.5
+254:       #then (#if Float2Int(floorFloat(F)) %Int 2 ==Int 0
+255:              #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi)
+256:       #else Float2Int(floorFloat(F +Float 0.5)) #fi [concrete]
+257-  // round(F, N): CPython rounds the EXACT binary value of F at the Nth decimal
+258-  // place, half-to-even, then converts to the nearest double. The old code did
+259:  // Int2Float(roundF(F *Float 10^N)) / 10^N — the float multiply F *Float 10^N
+260-  // misrounds the half-way decision (witness: a Heron triangle area that must
+261-  // round to 2.69 came out 2.68). Exact version, via arbitrary-precision integers:
+262-  //     F = numer / 2^k      numer = Float2Int(F * 2^(52-e)),  k = 52 - exponentFloat(F)
+263-  //     q = round-half-even( numer * 10^N , 2^k )        (exact big-integer round)
+264-  //     result = nearest double to q / 10^N
+265-  //   IEEE division is correctly rounded, so (double)q /Float (double)10^N equals
+266-  //   the nearest double to q/10^N whenever q and 10^N are exactly representable.
+267-  // Guarded to finite F with |F| < 1e12 and |F|*10^N < 2^52 (keeps numer and q
+268-  // exactly representable) and a non-subnormal exponent (avoids 2^k overflowing a
+269-  // double); the exotic tail keeps the old path, so nothing regresses.
+270-  // Opaque for kprove, [concrete] for krun.
+271:  syntax Float ::= roundFN(Float, Int) [function, total, symbol(roundFN), no-evaluators]
+272:  rule roundFN(F:Float, N:Int) => roundExactFN(F, N)
+273-       requires notBool isNaN(F) andBool notBool isInfinite(F) andBool N >=Int 0
+274-        andBool absFloat(F) <Float 1000000000000.0
+275-        andBool (absFloat(F) *Float Int2Float(10 ^Int N, 53, 11)) <Float 4500000000000000.0
+276-        andBool exponentFloat(F) >Int -900 [concrete]
+277:  rule roundFN(F:Float, N:Int)
+278:    => Int2Float(roundF(F *Float Int2Float(10 ^Int N, 53, 11)), 53, 11)
+279-       /Float Int2Float(10 ^Int N, 53, 11) [owise, concrete]
+280-
+281-  syntax Float ::= roundExactFN(Float, Int) [function]
+282-  rule roundExactFN(F:Float, N:Int)
+283-    => rheToFloat(rndHalfEven(rExNumer(F) *Int (10 ^Int N), rExDenom(F)), 10 ^Int N, F) [concrete]
+284-
+285-  // exact fraction of a finite in-range float:  F = rExNumer(F) / rExDenom(F),
+286-  // rExDenom(F) = 2^k, k = 52 - exponentFloat(F) >= 0 within the guard above.
+--
+302-  rule rndHE(Q:Int, R:Int, B:Int) => Q +Int 1 requires 2 *Int R ==Int B andBool Q modInt 2 =/=Int 0 [concrete]
+303-
+304-  // q / 10^N as the nearest double; preserve Python's signed zero when q == 0.
+305-  syntax Float ::= rheToFloat(Int, Int, Float) [function]
+306-  rule rheToFloat(0, _:Int, F:Float) => #if signFloat(F) #then --Float 0.0 #else 0.0 #fi [concrete]
+307-  rule rheToFloat(Q:Int, SCALE:Int, _:Float)
+308-    => Int2Float(Q, 53, 11) /Float Int2Float(SCALE, 53, 11) requires Q =/=Int 0 [concrete]
+309-
+310:  rule applyBuiltin("round", F:Float, .Vals)        => roundF(F)
+311:  rule applyBuiltin("round", F:Float, N:Int, .Vals) => roundFN(F, N)
+312-
+313:  syntax Float ::= sqrtF(Float) [function, total, symbol(sqrtF), no-evaluators]
+314:  rule sqrtF(F:Float) => sqrtFloat(F) [concrete]
+315-  syntax KItem ::= "#mathSqrt"
+316:  rule <k> Call(Attribute(Name("math"), "sqrt"), (E:Expr, .Exprs)) => E ~> #mathSqrt ... </k> [priority(40)]
+317:  rule <k> F:Float ~> #mathSqrt => sqrtF(F) ... </k>
+318:  rule <k> I:Int ~> #mathSqrt => sqrtF(intToF(I)) ... </k>
+319-
+320-  // ---- min / max over a FLOAT list — FLOAT branch of the shared #minCont0/#maxCont0 folds (which
+321-  // seed/step with `requires isInt(V)`, so they are STUCK on floats). These add the `requires
+322-  // isFloat(V)` seed + a Float-accumulator fold via K's minFloat/maxFloat — concrete for krun. A proof
+323-  // over a SYMBOLIC float list intercepts min/max problem-locally to an opaque minVF/maxVF (at
+324-  // #applyK, priority 40, in its verification.k) BEFORE #minAcc0, so this fold is krun-only. Additive:
+325-  // the isFloat guard is disjoint from the existing isInt one.
+326-  syntax KItem ::= #maxAccF(Iterable, Float) | #maxContF(Float)
+--
+349-       requires isInt(V) orBool isBool(V)
+350-
+351-  // ---- sum over a float list (krun; mirrors the min/max float paths). The Int-only shared
+352-  // #sumCont sticks on a Float yield; switch to a Float-headed fold via addF (concrete twin).
+353-  // The switch guard carries the SYNTACTIC negation of the Int rule's guard so a symbolic proof
+354-  // with isInt(V) in its path condition refutes this branch without sort reasoning.
+355-  syntax KItem ::= #sumAccF(Iterable, Float) | #sumContF(Float)
+356-  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int)
+357:        => #sumAccF(R, addF(intToF(ACC), {V}:>Float)) ... </k>
+358-       requires isFloat(V) andBool notBool (isInt(V) orBool isBool(V))
+359-  rule <k> #sumAccF(IT:Iterable, ACC:Float) => #iterNext(IT) ~> #sumContF(ACC) ... </k>
+360-  rule <k> #iterDone ~> #sumContF(ACC:Float) => ACC ... </k>
+361-  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float)
+362-        => #sumAccF(R, addF(ACC, {V}:>Float)) ... </k>
+363-       requires isFloat(V)
+364-  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float)
+365:        => #sumAccF(R, addF(ACC, intToF(intOf(V)))) ... </k>
+366-       requires isInt(V) orBool isBool(V)
+367-endmodule
+PROOF_MD_TRUST
+/reference/k-proof/PROOF.md
+13-- `-1` when `(a + b <= c) or (a + c <= b) or (b + c <= a)`;
+14-- otherwise, `round(sqrt(s * (s-a) * (s-b) * (s-c)), 2)`, where
+15-  `s = (a + b + c) / 2`.
+16-
+17-This is a partial-correctness result under the fixed semantics and the named
+18:float-primitive trust boundary below. It is not a separate liveness theorem.
+19-
+20-# Formal claim
+21-
+22-`spec.k` contains one entry claim for each member of
+23-`{Int, Float, Bool}^3`. Each starts from the exact initial MPY configuration,
+--
+34-There are no loops and therefore no loop circularities or bounded unrollings.
+35-Every claim ranges over the complete unbounded K sort named in that claim.
+36-
+37-# Proof-extension inventory
+38-
+39:## `proofIntToF` and `intToF(I) => proofIntToF(I)`
+40-
+41:- **Class:** trusted primitive reification.
+42-- **Semantic role:** replaces only the proof representation of the supplied
+43:  `intToF` primitive; it does not replace Python code or control flow.
+44-- **Domain:** every `I:Int`, with no additional guard.
+45:- **Matched context:** any pure `intToF(I)` subterm during simplification.
+46-  Continuation, bindings, stack, and state cells are not matched or changed.
+47-- **Justification scope and containment:** MPY-FLOAT already declares
+48:  `intToF(Int)` total, opaque to proofs, and gives its concrete LLVM equation.
+49-  The reification has exactly that `Int` domain and retains `I` as an argument.
+50-- **State footprint:** none.
+51-- **Value influence:** mixed arithmetic, some validity branches, and the final
+52-  Heron value.
+53:- **Value justification:** conditional trust assumption T1: for every integer
+54:  `I`, `proofIntToF(I)` denotes the same binary float as MPY's `intToF(I)`.
+55-  The theorem remains parametric in this term and asserts no independent
+56-  bit-level fact about it.
+57-- **Dependents:** all valid-area claims containing an `Int` or `Bool`; pure
+58-  invalid integer paths may return before using it.
+59-- **Control validation:** not applicable to the pure primitive itself. The
+--
+221-- **A3:** the proof starts at module load, so normal MPY name lookup selects the
+222-  just-created closure. Argument order, short-circuit evaluation, returns, and
+223-  frame cleanup execute under fixed rules.
+224-- **A4:** the definitional summaries are exhaustive, nonoverlapping, and
+225-  terminating. The sole external-value reification is explicitly conditional
+226:  on T1 and has the exact supplied primitive domain.
+227-- **A5:** `(1, 2, 10)` is a realizable witness. Both the false result and the
+228-  mutated body produce clean stuck claims and nonzero exits.
+229-
+230-## Gate B — PASS
+231-
+--
+251-untouched MPY LLVM execution returns `-1`. The theorem covers the MPY NaN value;
+252-the discrepancy is an explicit fixed-semantics adequacy boundary.
+253-
+254-## Gate C — PASS
+255-
+256:Every proof-local equation and every supplied opaque value primitive affecting
+257-the result is inventoried here. Commands, test programs, positive output,
+258-negative residuals, and the concrete model-boundary witness exist in the
+259-workspace. Formal results, conditional primitive assumptions, finite evidence,
+260-and excluded behavior are separated.
+261-
+262-# Trust boundary
+263-
+264-| Assumption/component | Outside theorem because | Influence | Dependents | Evidence |
+265-|---|---|---|---|---|
+266:| T1: `proofIntToF(I)` denotes MPY/Python integer-to-binary-float conversion | Haskell has no `FLOAT.int2float` evaluator; MPY itself marks the proof-side operation opaque | Values in mixed arithmetic, branches, and final area; no state/control effects | Claims whose path uses an integer or bool conversion | MPY-FLOAT's concrete equation; mixed LLVM smoke cases; input `I` remains explicit |
+267:| Supplied `divII`, `divFloatIntV`, `addF`, `subF`, `mulF`, `gtF`, `ltIF`, `ltFI`, `sqrtF`, and `roundFN` contracts | They are fixed MPY proof-domain primitives intentionally opaque to symbolic IEEE evaluation | Validity branches and returned value; no state effects | Claims using the corresponding numeric sort combinations | Untouched LLVM smoke execution and the contracts in `reference-semantics/semantics/float.k` |
+268-| Partial-correctness interpretation | The Kit reachability workflow does not separately prove liveness | Termination only | All claims | Program is straight-line; concrete runs terminate, but this remains finite evidence |
+269-
+270:No user-defined helper or body fragment is trusted.
+271-
+272-# Empirically supported facts
+273-
+274-- `test_solution.py` checks six CPython cases: both prompt examples, a
+275-  nonintegral rounded area, a mixed numeric case, a degenerate triangle, and a
+--
+282-  with `triangleProgram()`.
+283-- `model-boundary.py` and `model-boundary.mpy` reproducibly expose the NaN
+284-  difference described under Gate B.
+285-
+286-These are finite evidence only. Universal coverage comes from the 27 symbolic
+287:claims, conditional on the trust boundary.
+288-
+289-# Excluded behavior
+290-
+291-- Values outside MPY's represented ordered numeric classes.
+292-- Fidelity to CPython on NaN and any other float edge where the supplied model
+293-  differs; the concrete NaN divergence is explicit above.
+294:- Numerical interpretation of opaque float primitives beyond their named MPY
+295:  contracts and T1.
+296-- The final persistent module-scope map, which is internal loader state and not
+297-  an observable of the HumanEval result.
+298-- A separate total-termination theorem.
+
+Script done on 2026-07-31 00:44:10-05:00 [COMMAND_EXIT_CODE="0"]

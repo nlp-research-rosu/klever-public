@@ -1,0 +1,16 @@
+requires "verification.k"
+
+module AUDIT-PINNING
+  imports VERIFICATION
+
+  // Generated mechanically from the submitted solution.mpy FuncDef.
+  claim [submitted-constructor-equality]:
+    <k>
+      circularShiftClosure
+      => closureVal(
+           ("x", "shift", .ParamNames),
+           Assign(Name("s"), Call(Name("str"), Name("x"))) Return( IfExp( Compare(Name("shift"), CmpOp(">", Call(Name("len"), Name("s")))), Subscript( Name("s"), Slice(NoBound, NoBound, UnaryOp("-", Int(1)))), IfExp( Compare(Name("shift"), CmpOp("<", Int(0))), Name("s"), Subscript( BinOp("+", Name("s"), Name("s")), Slice( BinOp("-", Call(Name("len"), Name("s")), Name("shift")), BinOp( "-", BinOp("*", Int(2), Call(Name("len"), Name("s"))), Name("shift")), NoBound)))))
+           .Stmts,
+           0)
+    </k>
+endmodule

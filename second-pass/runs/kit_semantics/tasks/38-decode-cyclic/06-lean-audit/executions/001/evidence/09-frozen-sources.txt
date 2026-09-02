@@ -1,0 +1,225 @@
+--- verification.k ---
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Exact source fragments, used only as parse-time abbreviations in claims.
+     7	  syntax Stmts ::= "decodeLoopBody" [macro]
+     8	  rule decodeLoopBody
+     9	    => Assign(Name("group"), BinOp("+", Name("group"), Name("char")))
+    10	       If(
+    11	         Compare(Call(Name("len"), Name("group")), CmpOp("==", Int(3))),
+    12	         Assign(
+    13	           Name("result"),
+    14	           BinOp(
+    15	             "+",
+    16	             Name("result"),
+    17	             BinOp(
+    18	               "+",
+    19	               Subscript(Name("group"), Int(2)),
+    20	               Subscript(
+    21	                 Name("group"),
+    22	                 Slice(NoBound, Int(2), NoBound)))))
+    23	         Assign(Name("group"), Str("")),
+    24	         .Stmts)
+    25	
+    26	  syntax Stmts ::= "decodeFunctionBody" [macro]
+    27	  rule decodeFunctionBody
+    28	    => Expr(
+    29	         Str(
+    30	           "\n    Takes a string encoded by rotating each complete three-character group\n    left once, and restores the original string.\n    "))
+    31	       Assign(Name("result"), Str(""))
+    32	       Assign(Name("group"), Str(""))
+    33	       Assign(Name("char"), Str(""))
+    34	       For(Name("char"), Name("s"), decodeLoopBody)
+    35	       Return(BinOp("+", Name("result"), Name("group")))
+    36	
+    37	  // Exact accumulator after processing every complete three-character group.
+    38	  syntax IntSeq ::= decodedResult(IntSeq, IntSeq) [function, total]
+    39	  rule decodedResult(ACC:IntSeq, .IntSeq) => ACC
+    40	  rule decodedResult(ACC:IntSeq, iCons(_:Int, .IntSeq)) => ACC
+    41	  rule decodedResult(
+    42	         ACC:IntSeq,
+    43	         iCons(_:Int, iCons(_:Int, .IntSeq)))
+    44	    => ACC
+    45	  rule decodedResult(
+    46	         ACC:IntSeq,
+    47	         iCons(A:Int, iCons(B:Int, iCons(C:Int, R:IntSeq))))
+    48	    => decodedResult(
+    49	         seqConcat(
+    50	           ACC,
+    51	           iCons(C, iCons(A, iCons(B, .IntSeq)))),
+    52	         R)
+    53	
+    54	  // The final incomplete group, which the source leaves unchanged.
+    55	  syntax IntSeq ::= decodedTail(IntSeq) [function, total]
+    56	  rule decodedTail(.IntSeq) => .IntSeq
+    57	  rule decodedTail(iCons(A:Int, .IntSeq)) => iCons(A, .IntSeq)
+    58	  rule decodedTail(iCons(A:Int, iCons(B:Int, .IntSeq)))
+    59	    => iCons(A, iCons(B, .IntSeq))
+    60	  rule decodedTail(iCons(_:Int, iCons(_:Int, iCons(_:Int, R:IntSeq))))
+    61	    => decodedTail(R)
+    62	
+    63	  syntax IntSeq ::= decodeCodes(IntSeq) [function, total]
+    64	  rule decodeCodes(IS:IntSeq)
+    65	    => seqConcat(decodedResult(.IntSeq, IS), decodedTail(IS))
+    66	
+    67	  // Exact final value of the loop target. It preserves the old value for an
+    68	  // empty iterator and otherwise records the last one-character string.
+    69	  syntax Val ::= finalLoopChar(IntSeq, Val) [function, total]
+    70	  rule finalLoopChar(.IntSeq, OLD:Val) => OLD
+    71	  rule finalLoopChar(iCons(C:Int, R:IntSeq), _:Val)
+    72	    => finalLoopChar(R, str(iCons(C, .IntSeq)))
+    73	
+    74	endmodule
+--- spec.k ---
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Phase 0: no buffered characters.
+     7	  claim [loop-empty]:
+     8	    <k> #loop(str(IS:IntSeq), Name("char"), decodeLoopBody) => .K ... </k>
+     9	    <env> L:Int </env>
+    10	    <scopes>
+    11	      -1 |-> builtinsScope
+    12	      0 |-> scope("decode_cyclic" |-> FUN:Val, parent(-1))
+    13	      L |-> scope(
+    14	        "s"      |-> str(SOURCE:IntSeq)
+    15	        "result" |-> (str(ACC:IntSeq)
+    16	                      => str(decodedResult(ACC, IS)))
+    17	        "group"  |-> (str(.IntSeq) => str(decodedTail(IS)))
+    18	        "char"   |-> (OLDCHAR:Val => finalLoopChar(IS, OLDCHAR)),
+    19	        parent(0))
+    20	    </scopes>
+    21	    <scopeLoc> NEXTLOC:Int </scopeLoc>
+    22	    <heap> HEAP:Map </heap>
+    23	    <heapLoc> NEXTHEAP:Int </heapLoc>
+    24	    <stack> STACK:List </stack>
+    25	    <ret> noRet </ret>
+    26	    <exc> NoExc </exc>
+    27	    <exit-code> EXIT:Int </exit-code>
+    28	    requires L >=Int 1
+    29	
+    30	  // Phase 1: one buffered character.
+    31	  claim [loop-one]:
+    32	    <k> #loop(str(IS:IntSeq), Name("char"), decodeLoopBody) => .K ... </k>
+    33	    <env> L:Int </env>
+    34	    <scopes>
+    35	      -1 |-> builtinsScope
+    36	      0 |-> scope("decode_cyclic" |-> FUN:Val, parent(-1))
+    37	      L |-> scope(
+    38	        "s"      |-> str(SOURCE:IntSeq)
+    39	        "result" |-> (str(ACC:IntSeq)
+    40	                      => str(decodedResult(
+    41	                           ACC,
+    42	                           iCons(A:Int, IS))))
+    43	        "group"  |-> (str(iCons(A, .IntSeq))
+    44	                      => str(decodedTail(iCons(A, IS))))
+    45	        "char"   |-> (OLDCHAR:Val => finalLoopChar(IS, OLDCHAR)),
+    46	        parent(0))
+    47	    </scopes>
+    48	    <scopeLoc> NEXTLOC:Int </scopeLoc>
+    49	    <heap> HEAP:Map </heap>
+    50	    <heapLoc> NEXTHEAP:Int </heapLoc>
+    51	    <stack> STACK:List </stack>
+    52	    <ret> noRet </ret>
+    53	    <exc> NoExc </exc>
+    54	    <exit-code> EXIT:Int </exit-code>
+    55	    requires L >=Int 1
+    56	
+    57	  // Phase 2: two buffered characters.
+    58	  claim [loop-two]:
+    59	    <k> #loop(str(IS:IntSeq), Name("char"), decodeLoopBody) => .K ... </k>
+    60	    <env> L:Int </env>
+    61	    <scopes>
+    62	      -1 |-> builtinsScope
+    63	      0 |-> scope("decode_cyclic" |-> FUN:Val, parent(-1))
+    64	      L |-> scope(
+    65	        "s"      |-> str(SOURCE:IntSeq)
+    66	        "result" |-> (str(ACC:IntSeq)
+    67	                      => str(decodedResult(
+    68	                           ACC,
+    69	                           iCons(A:Int, iCons(B:Int, IS)))))
+    70	        "group"  |-> (str(iCons(A, iCons(B, .IntSeq)))
+    71	                      => str(decodedTail(
+    72	                           iCons(A, iCons(B, IS)))))
+    73	        "char"   |-> (OLDCHAR:Val => finalLoopChar(IS, OLDCHAR)),
+    74	        parent(0))
+    75	    </scopes>
+    76	    <scopeLoc> NEXTLOC:Int </scopeLoc>
+    77	    <heap> HEAP:Map </heap>
+    78	    <heapLoc> NEXTHEAP:Int </heapLoc>
+    79	    <stack> STACK:List </stack>
+    80	    <ret> noRet </ret>
+    81	    <exc> NoExc </exc>
+    82	    <exit-code> EXIT:Int </exit-code>
+    83	    requires L >=Int 1
+    84	
+    85	  // Whole-program entry: load the exact definition, resolve its binding, and
+    86	  // execute its body under the supplied semantics.
+    87	  claim [decode-entry]:
+    88	    <k>
+    89	      #loadAll(
+    90	        Module(
+    91	          FuncDef(
+    92	            "decode_cyclic",
+    93	            Params("s"),
+    94	            decodeFunctionBody)))
+    95	      ~> Call(Name("decode_cyclic"), str(INPUT:IntSeq))
+    96	      => str(decodeCodes(INPUT))
+    97	    </k>
+    98	    <env> 0 </env>
+    99	    <scopes>
+   100	      0  |-> scope(.Map => "decode_cyclic" |-> ?FUN:Val, parent(-1))
+   101	      -1 |-> builtinsScope
+   102	    </scopes>
+   103	    <scopeLoc> 1 </scopeLoc>
+   104	    <heap> .Map </heap>
+   105	    <heapLoc> 0 </heapLoc>
+   106	    <stack> .List </stack>
+   107	    <ret> noRet </ret>
+   108	    <exc> NoExc </exc>
+   109	    <exit-code> 0 </exit-code>
+   110	endmodule
+--- solution.mpy ---
+     1	Module(
+     2	  FuncDef("decode_cyclic", Params("s"),
+     3	    Expr(
+     4	      Str(
+     5	        "\n    Takes a string encoded by rotating each complete three-character group\n    left once, and restores the original string.\n    "))
+     6	    Assign(Name("result"), Str(""))
+     7	    Assign(Name("group"), Str(""))
+     8	    Assign(Name("char"), Str(""))
+     9	    For(Name("char"), Name("s"),
+    10	      Assign(Name("group"), BinOp("+", Name("group"), Name("char")))
+    11	      If(Compare(Call(Name("len"), Name("group")), CmpOp("==", Int(3))),
+    12	        Assign(
+    13	          Name("result"),
+    14	          BinOp(
+    15	            "+",
+    16	            Name("result"),
+    17	            BinOp(
+    18	              "+",
+    19	              Subscript(Name("group"), Int(2)),
+    20	              Subscript(Name("group"), Slice(NoBound, Int(2), NoBound)))))
+    21	        Assign(Name("group"), Str("")),
+    22	        ))
+    23	    Return(BinOp("+", Name("result"), Name("group")))))
+--- solution.py ---
+     1	def decode_cyclic(s: str):
+     2	    """
+     3	    Takes a string encoded by rotating each complete three-character group
+     4	    left once, and restores the original string.
+     5	    """
+     6	    result = ""
+     7	    group = ""
+     8	    char = ""
+     9	    for char in s:
+    10	        group = group + char
+    11	        if len(group) == 3:
+    12	            result = result + (group[2] + group[:2])
+    13	            group = ""
+    14	    return result + group

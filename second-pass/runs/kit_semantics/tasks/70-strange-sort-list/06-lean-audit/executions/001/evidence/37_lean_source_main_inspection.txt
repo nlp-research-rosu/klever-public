@@ -1,0 +1,368 @@
++ nl -ba /opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/Lean.lean
++ sed -n 1,220p
+     1	/-
+     2	Copyright (c) 2020 Microsoft Corporation. All rights reserved.
+     3	Released under Apache 2.0 license as described in the file LICENSE.
+     4	Authors: Leonardo de Moura
+     5	-/
+     6	import Lean.Data
+     7	import Lean.Compiler
+     8	import Lean.Environment
+     9	import Lean.Modifiers
+    10	import Lean.ProjFns
+    11	import Lean.Runtime
+    12	import Lean.ResolveName
+    13	import Lean.Attributes
+    14	import Lean.Parser
+    15	import Lean.ReducibilityAttrs
+    16	import Lean.Elab
+    17	import Lean.Class
+    18	import Lean.LocalContext
+    19	import Lean.MetavarContext
+    20	import Lean.AuxRecursor
+    21	import Lean.Meta
+    22	import Lean.Util
+    23	import Lean.Structure
+    24	import Lean.PrettyPrinter
+    25	import Lean.CoreM
+    26	import Lean.ReservedNameAction
+    27	import Lean.InternalExceptionId
+    28	import Lean.Server
+    29	import Lean.ScopedEnvExtension
+    30	import Lean.DocString
+    31	import Lean.DeclarationRange
+    32	import Lean.LoadDynlib
+    33	import Lean.Widget
+    34	import Lean.Log
+    35	import Lean.Linter
+    36	import Lean.SubExpr
+    37	import Lean.LabelAttribute
+    38	import Lean.AddDecl
+    39	import Lean.Replay
+    40	import Lean.PrivateName
+    41	import Lean.PremiseSelection
+    42	import Lean.Namespace
+    43	import Lean.EnvExtension
+    44	import Lean.ErrorExplanation
+    45	import Lean.ErrorExplanations
+    46	import Lean.DefEqAttrib
+    47	import Lean.Shell
++ nl -ba /opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/Lean/Shell.lean
++ tail -n 220
+    22	This is used instead of the standard `String` functions because Lean is expected to not immediately
+    23	abort on files with invalid UTF-8.
+    24	-/
+    25	@[extern "lean_decode_lossy_utf8"]
+    26	private opaque decodeLossyUTF8 (a : @& ByteArray) : String
+    27	
+    28	/- Runs the `main` function of the module with `args` using the Lean interpreter. -/
+    29	@[extern "lean_run_main"]
+    30	private opaque runMain (env : @& Environment) (opts : @& Options) (args : @& List String) : BaseIO UInt32
+    31	
+    32	/--
+    33	Initializes the LLVM subsystem.
+    34	If Lean lacks LLVM support, this function will fail with an assertion violation.
+    35	-/
+    36	@[extern "lean_init_llvm"]
+    37	private opaque initLLVM : IO Unit
+    38	
+    39	/--
+    40	Emits LLVM bitcode for the module.
+    41	Before calling this function, the LLVM subsystem must first be successfully initialized.
+    42	-/
+    43	@[extern "lean_emit_llvm"]
+    44	private opaque emitLLVM (env : Environment) (modName : Name) (filepath : FilePath) : IO Unit
+    45	
+    46	/-- Print all profiling times (if any) to standard error. -/
+    47	@[extern "lean_display_cumulative_profiling_times"]
+    48	private opaque displayCumulativeProfilingTimes : BaseIO Unit
+    49	
+    50	/-- Whether Lean was built with an address sanitizer enabled. -/
+    51	@[extern "lean_internal_has_address_sanitizer"]
+    52	private opaque Internal.hasAddressSanitizer (_ : Unit) : Bool
+    53	
+    54	/-- Whether Lean was built with multithread support. -/
+    55	@[extern "lean_internal_is_multi_thread"]
+    56	private opaque Internal.isMultiThread (_ : Unit) : Bool
+    57	
+    58	/-- Whether Lean was built in debug mode. -/
+    59	@[extern "lean_internal_is_debug"]
+    60	private opaque Internal.isDebug (_ : Unit) : Bool
+    61	
+    62	/-- The mode Lean was built in. -/
+    63	@[extern "lean_internal_get_build_type"]
+    64	private opaque Internal.getBuildType (_ : Unit) : String
+    65	
+    66	/-- Lean equivalent of `LEAN_VERSION_STRING` / `g_short_version_string` -/
+    67	private def shortVersionString : String :=
+    68	  if version.specialDesc ≠ "" then
+    69	    s!"{versionStringCore}-{version.specialDesc}"
+    70	  else if !version.isRelease then
+    71	    s!"{versionStringCore}-pre"
+    72	  else
+    73	    versionStringCore
+    74	
+    75	/-- The full Lean version header (i.e, what is printed by `lean --version`). -/
+    76	private def versionHeader : String := Id.run do
+    77	  let mut ver := shortVersionString
+    78	  if Platform.target ≠ "" then
+    79	    ver := s!"{ver}, {Platform.target}"
+    80	  if githash ≠ "" then
+    81	    ver := s!"{ver}, commit {githash}"
+    82	  s!"Lean (version {ver}, {Internal.getBuildType ()})"
+    83	
+    84	/-- Print the Lean version header. -/
+    85	@[export lean_display_header]
+    86	private def displayHeader : IO Unit := do
+    87	  IO.println versionHeader
+    88	
+    89	/-- Print the Lean CLI help message. -/
+    90	@[export lean_display_help]
+    91	private def displayHelp (useStderr : Bool) : IO Unit := do
+    92	  let out ← if useStderr then IO.getStderr else IO.getStdout
+    93	  out.putStrLn    versionHeader
+    94	  out.putStrLn    "Miscellaneous"
+    95	  out.putStrLn    "  -h, --help             display this message"
+    96	  out.putStrLn    "      --features         display features compiler provides (eg. LLVM support)"
+    97	  out.putStrLn    "  -v, --version          display version information"
+    98	  out.putStrLn    "  -V, --short-version    display short version number"
+    99	  out.putStrLn    "  -g, --githash          display the git commit hash number used to build this binary"
+   100	  out.putStrLn    "      --run <file>       call the 'main' definition in the given file with the remaining arguments"
+   101	  out.putStrLn    "  -o, --o=oname          create olean file"
+   102	  out.putStrLn    "  -i, --i=iname          create ilean file"
+   103	  out.putStrLn    "  -c, --c=fname          name of the C output file"
+   104	  out.putStrLn    "  -b, --bc=fname         name of the LLVM bitcode file"
+   105	  out.putStrLn    "      --stdin            take input from stdin"
+   106	  out.putStrLn    "      --root=dir         set package root directory from which the module name\n"
+   107	  out.putStrLn    "                         of the input file is calculated\n"
+   108	  out.putStrLn    "                         (default: current working directory)\n";
+   109	  out.putStrLn    "  -t, --trust=num        trust level (default: max) 0 means do not trust any macro,\n"
+   110	  out.putStrLn    "                         and type check all imported modules\n";
+   111	  out.putStrLn    "  -q, --quiet            do not print verbose messages"
+   112	  out.putStrLn    "  -M, --memory=num       maximum amount of memory that should be used by Lean"
+   113	  out.putStrLn    "                         (in megabytes)"
+   114	  out.putStrLn    "  -T, --timeout=num      maximum number of memory allocations per task"
+   115	  out.putStrLn    "                         this is a deterministic way of interrupting long running tasks"
+   116	  if Internal.isMultiThread () then
+   117	    out.putStrLn  "  -j, --threads=num      number of threads used to process lean files"
+   118	    out.putStrLn  "  -s, --tstack=num       thread stack size in Kb"
+   119	    out.putStrLn  "      --server           start lean in server mode"
+   120	    out.putStrLn  "      --worker           start lean in server-worker mode"
+   121	  out.putStrLn    "      --plugin=file      load and initialize Lean shared library for registering linters etc."
+   122	  out.putStrLn    "      --load-dynlib=file load shared library to make its symbols available to the interpreter"
+   123	  out.putStrLn    "      --setup=file       JSON file with module setup data (supersedes the file's header)"
+   124	  out.putStrLn    "      --json             report Lean output (e.g., messages) as JSON (one per line)"
+   125	  out.putStrLn    "  -E  --error=kind       report Lean messages of kind as errors"
+   126	  out.putStrLn    "      --deps             just print dependencies of a Lean input"
+   127	  out.putStrLn    "      --src-deps         just print dependency sources of a Lean input"
+   128	  out.putStrLn    "      --print-prefix     print the installation prefix for Lean and exit"
+   129	  out.putStrLn    "      --print-libdir     print the installation directory for Lean's built-in libraries and exit"
+   130	  out.putStrLn    "      --profile          display elaboration/type checking time for each definition/theorem"
+   131	  out.putStrLn    "      --stats            display environment statistics"
+   132	  if Internal.isDebug () then
+   133	    out.putStrLn  "      --debug=tag        enable assertions with the given tag"
+   134	  out.putStrLn    "      -D name=value      set a configuration option (see set_option command)"
+   135	
+   136	@[export lean_shell_main]
+   137	private def shellMain
+   138	    (args : List String)
+   139	    (useStdin : Bool := false)
+   140	    (onlyDeps : Bool := false)
+   141	    (onlySrcDeps : Bool := false)
+   142	    (depsJson : Bool := false)
+   143	    (opts : Options := {})
+   144	    (trustLevel : UInt32 := 0)
+   145	    (rootDir? : Option System.FilePath := none)
+   146	    (setupFileName? : Option System.FilePath := none)
+   147	    (oleanFileName? : Option System.FilePath := none)
+   148	    (ileanFileName? : Option System.FilePath := none)
+   149	    (cFileName? : Option System.FilePath := none)
+   150	    (bcFileName? : Option System.FilePath := none)
+   151	    (jsonOutput : Bool := false)
+   152	    (errorOnKinds : Array Name := #[])
+   153	    (printStats : Bool := false)
+   154	    (run : Bool := false)
+   155	    : IO UInt32 := do
+   156	  if onlyDeps && depsJson then
+   157	    let fns ←
+   158	      if useStdin then
+   159	        (← IO.getStdin).lines
+   160	      else
+   161	        pure args.toArray
+   162	    printImportsJson fns
+   163	    return 0
+   164	  let (fileName?, args) :=
+   165	    match args with
+   166	    | fileName :: args => (some fileName, args)
+   167	    | [] => (none, args)
+   168	  if !run && !args.isEmpty then
+   169	    IO.eprintln "Expected exactly one file name"
+   170	    displayHelp (useStderr := true)
+   171	    return 1
+   172	  let fileName ←
+   173	    if let some fileName := fileName? then
+   174	      pure fileName
+   175	    else if useStdin then
+   176	      pure "<stdin>"
+   177	    else
+   178	      IO.eprintln "Expected exactly one file name"
+   179	      displayHelp (useStderr := true)
+   180	      return 1
+   181	  let contents ← decodeLossyUTF8 <$> do
+   182	    if useStdin then
+   183	      (← IO.getStdin).readBinToEnd
+   184	    else
+   185	      IO.FS.readBinFile fileName
+   186	  if onlyDeps then
+   187	    Elab.printImports contents fileName
+   188	    return 0
+   189	  if onlySrcDeps then
+   190	    Elab.printImportSrcs contents fileName
+   191	    return 0
+   192	  -- Quick and dirty `#lang` support
+   193	  ---TODO: make it extensible, and add `lean4md`
+   194	  let contents ←
+   195	    if contents.startsWith "#lang" then
+   196	      let endLinePos := contents.posOf '\n'
+   197	      let langId := contents.extract ⟨6⟩ endLinePos |>.trim
+   198	      if langId == "lean4" then
+   199	        pure () -- do nothing for now
+   200	      else
+   201	        IO.eprintln s!"unknown language '{langId}'\n";
+   202	        return 1
+   203	      -- Remove up to `\n`
+   204	      pure <| contents.extract endLinePos contents.endPos
+   205	    else
+   206	      pure contents
+   207	  let setup? ← setupFileName?.mapM ModuleSetup.load
+   208	  let mainModuleName ←
+   209	    if let some setup := setup? then
+   210	      pure setup.name
+   211	    else if let some fileName := fileName? then
+   212	      try moduleNameOfFileName fileName rootDir? catch e =>
+   213	        if oleanFileName?.isNone && ileanFileName?.isNone then
+   214	          pure `_stdin
+   215	        else
+   216	          throw e
+   217	    else
+   218	      pure `_stdin
+   219	  let env? ← Elab.runFrontend contents opts fileName mainModuleName trustLevel
+   220	      oleanFileName? ileanFileName? jsonOutput errorOnKinds #[] printStats setup?
+   221	  if let some env := env? then
+   222	    if run then
+   223	      return ← runMain env opts args
+   224	    if let some c := cFileName? then
+   225	      let .ok out ← IO.FS.Handle.mk c .write |>.toBaseIO
+   226	        | IO.eprintln s!"failed to create '{c}'"
+   227	          return 1
+   228	      profileitIO "C code generation" opts do
+   229	        let data ← IO.ofExcept <| IR.emitC env mainModuleName
+   230	        out.write data.toUTF8
+   231	    if let some bc := bcFileName? then
+   232	      initLLVM
+   233	      profileitIO "LLVM code generation" opts do
+   234	        emitLLVM env mainModuleName bc
+   235	  displayCumulativeProfilingTimes
+   236	  if Internal.hasAddressSanitizer () then
+   237	    return if env?.isSome then 0 else 1
+   238	  else
+   239	    -- When not using the address/leak sanitizer, we interrupt execution without garbage collecting.
+   240	    -- This is useful when profiling improvements to Lean startup time.
+   241	    IO.Process.exit <| if env?.isSome then 0 else 1
++ nl -ba /opt/elan/toolchains/leanprover--lean4---v4.22.0/src/lean/Leanc.lean
++ tail -n 160
+     1	/-
+     2	Copyright (c) 2022 Sebastian Ullrich. All rights reserved.
+     3	Released under Apache 2.0 license as described in the file LICENSE.
+     4	Authors: Sebastian Ullrich
+     5	-/
+     6	import Lean.Compiler.FFI
+     7	
+     8	open Lean.Compiler.FFI
+     9	
+    10	def main (args : List String) : IO UInt32 := do
+    11	  let root ← match (← IO.getEnv "LEAN_SYSROOT") with
+    12	    | some root => pure <| System.FilePath.mk root
+    13	    | none      => pure <| (← IO.appDir).parent.get!
+    14	  let mut cc := "@LEANC_CC@".replace "ROOT" root.toString
+    15	
+    16	  if args.isEmpty then
+    17	    IO.println s!"Lean C compiler
+    18	
+    19	A simple wrapper around a C compiler. Defaults to `{cc}`,
+    20	which can be overridden with the environment variable `LEAN_CC`. All parameters are passed
+    21	as-is to the wrapped compiler.
+    22	
+    23	Interesting options:
+    24	* `--print-cflags`: print C compiler flags necessary for building against the Lean runtime and exit
+    25	* `--print-ldflags`: print C compiler flags necessary for statically linking against the Lean library and exit"
+    26	    return 1
+    27	
+    28	  -- It is difficult to identify the correct minor version here, leading to linking warnings like:
+    29	  -- `ld64.lld: warning: /usr/lib/system/libsystem_kernel.dylib has version 13.5.0, which is newer than target minimum of 13.0.0`
+    30	  -- In order to suppress these we set the MACOSX_DEPLOYMENT_TARGET variable into the far future.
+    31	  let env := match (← IO.getEnv "MACOSX_DEPLOYMENT_TARGET") with
+    32	    | some _ => #[]
+    33	    | none   => #[("MACOSX_DEPLOYMENT_TARGET", "99.0")]
+    34	
+    35	  -- let compileOnly := args.contains "-c"
+    36	  let linkStatic := !(args.contains "-shared" || args.contains "-leanshared")
+    37	  let args := args.erase "-leanshared"
+    38	
+    39	  -- We assume that the CMake variables do not contain escaped spaces
+    40	  let cflags := getCFlags root
+    41	  let mut cflagsInternal := getInternalCFlags root
+    42	  let mut ldflagsInternal := getInternalLinkerFlags root
+    43	  let ldflags := getLinkerFlags root linkStatic
+    44	
+    45	  for arg in args do
+    46	    match arg with
+    47	    | "--print-cflags" =>
+    48	      IO.println <| " ".intercalate cflags.toList
+    49	      return 0
+    50	    | "--print-ldflags" =>
+    51	      IO.println <| " ".intercalate (cflags ++ ldflags).toList
+    52	      return 0
+    53	    | _ => pure ()
+    54	
+    55	  if let some cc' ← IO.getEnv "LEAN_CC" then
+    56	    cc := cc'
+    57	    -- these are intended for the bundled compiler only
+    58	    cflagsInternal := #[]
+    59	    ldflagsInternal := #[]
+    60	  let args := cflags ++ cflagsInternal ++ args ++ ldflagsInternal ++ ldflags ++ ["-Wno-unused-command-line-argument"]
+    61	  let args := args.filter (!·.isEmpty)
+    62	  if args.contains "-v" then
+    63	    IO.eprintln s!"{cc} {" ".intercalate args.toList}"
+    64	  let child ← IO.Process.spawn { cmd := cc, args, env }
+    65	  child.wait
++ nm /opt/elan/toolchains/leanprover--lean4---v4.22.0/lib/lean/libLeanc.a
++ rg '_lean_main|l_main|Leanc_main'
++ head -n 100
+0000000000001380 T _lean_main
+00000000000000b0 B l_main___boxed__const__1
+0000000000000038 b l_main___closed__0
+0000000000000040 b l_main___closed__1
+0000000000000080 b l_main___closed__10
+0000000000000088 b l_main___closed__11
+00000000000000d0 b l_main___closed__12
+00000000000000d8 b l_main___closed__13
+00000000000000e0 b l_main___closed__14
+00000000000000e8 b l_main___closed__15
+0000000000000090 b l_main___closed__16
+0000000000000098 b l_main___closed__17
+00000000000000a0 b l_main___closed__18
+00000000000000a8 b l_main___closed__19
+00000000000000c8 b l_main___closed__2
+0000000000000028 b l_main___closed__20
+00000000000000f0 b l_main___closed__21
+00000000000000f8 b l_main___closed__22
+0000000000000100 b l_main___closed__23
+0000000000000030 b l_main___closed__24
+0000000000000048 b l_main___closed__3
+0000000000000050 b l_main___closed__4
+0000000000000058 b l_main___closed__5
+0000000000000060 b l_main___closed__6
+0000000000000068 b l_main___closed__7
+0000000000000070 b l_main___closed__8
+0000000000000078 b l_main___closed__9

@@ -1,0 +1,383 @@
+Script started on 2026-07-31 04:59:50-05:00 [<not executed on terminal>]
+verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // A guarded total twin of the partial Val-to-Str subsort projection.
+     7	  syntax Bool ::= definedProjectStr(Val) [function, total]
+     8	  rule definedProjectStr(V:Val) => isStr(V)
+     9	
+    10	  syntax Str ::= projectStrTotal(Val)
+    11	    [function, total, symbol(projectStrTotal), no-evaluators]
+    12	
+    13	  rule #Ceil({@V:Val}:>Str)
+    14	    => ({ definedProjectStr(@V) #Equals true } #And #Ceil(@V))
+    15	    [simplification]
+    16	
+    17	  rule projectStrTotal(V:Val) => {V}:>Str
+    18	    requires definedProjectStr(V)
+    19	    [concrete, simplification(10), preserves-definedness]
+    20	  rule {V:Val}:>Str => projectStrTotal(V)
+    21	    requires definedProjectStr(V)
+    22	    [symbolic(V), simplification, preserves-definedness]
+    23	  rule projectStrTotal(S:Str) => S [simplification]
+    24	  rule projectStrTotal(projectStrTotal(V)) => projectStrTotal(V) [simplification]
+    25	
+    26	  syntax IntSeq ::= codesOf(Str) [function, total]
+    27	  rule codesOf(str(CS)) => CS
+    28	
+    29	  // The complete dynamic input-domain predicate.
+    30	  syntax Bool ::= allStrings(ValSeq) [function, total]
+    31	  rule allStrings(.ValSeq) => true
+    32	  rule allStrings(vCons(V, REST))
+    33	    => definedProjectStr(V) andBool notBool isRefV(V) andBool allStrings(REST)
+    34	
+    35	  // Guarded dispatch twins of the fixed set(str) and str < str equations.
+    36	  rule applyBuiltin("set", V:Val, .Vals)
+    37	    => setV(dedupCodes(codesOf(projectStrTotal(V))))
+    38	    requires definedProjectStr(V)
+    39	    [simplification]
+    40	
+    41	  rule applyCmp("<", A:Val, B:Val)
+    42	    => strLt(codesOf(projectStrTotal(A)), codesOf(projectStrTotal(B)))
+    43	    requires definedProjectStr(A) andBool definedProjectStr(B)
+    44	    [simplification]
+    45	
+    46	  // The score used by the HumanEval contract.
+    47	  syntax Int ::= uniqueCount(Val) [function, total]
+    48	  rule uniqueCount(V)
+    49	    => isLen(dedupCodes(codesOf(projectStrTotal(V))))
+    50	
+    51	  // A candidate wins on score, then on lexicographically smaller spelling.
+    52	  syntax Bool ::= candidateWins(Val, Val, Int) [function, total]
+    53	  rule candidateWins(V, BEST, SCORE)
+    54	    => uniqueCount(V) >Int SCORE
+    55	       orBool (uniqueCount(V) ==Int SCORE
+    56	               andBool strLt(
+    57	                 codesOf(projectStrTotal(V)),
+    58	                 codesOf(projectStrTotal(BEST))))
+    59	
+    60	  // Exact mathematical fold computed by the outer loop.
+    61	  syntax Val ::= bestWord(ValSeq, Val, Int) [function, total]
+    62	  rule bestWord(.ValSeq, BEST, _SCORE) => BEST
+    63	  rule bestWord(vCons(V, REST), BEST, SCORE)
+    64	    => #if candidateWins(V, BEST, SCORE)
+    65	       #then bestWord(REST, V, uniqueCount(V))
+    66	       #else bestWord(REST, BEST, SCORE)
+    67	       #fi
+    68	
+    69	  syntax Int ::= bestScore(ValSeq, Val, Int) [function, total]
+    70	  rule bestScore(.ValSeq, _BEST, SCORE) => SCORE
+    71	  rule bestScore(vCons(V, REST), BEST, SCORE)
+    72	    => #if candidateWins(V, BEST, SCORE)
+    73	       #then bestScore(REST, V, uniqueCount(V))
+    74	       #else bestScore(REST, BEST, SCORE)
+    75	       #fi
+    76	
+    77	  // Exact final values of the loop target and its per-element score temporary.
+    78	  syntax Val ::= lastWord(ValSeq, Val) [function, total]
+    79	  rule lastWord(.ValSeq, WORD)         => WORD
+    80	  rule lastWord(vCons(V, REST), _WORD) => lastWord(REST, V)
+    81	
+    82	  syntax Int ::= lastScore(ValSeq, Int) [function, total]
+    83	  rule lastScore(.ValSeq, SCORE)         => SCORE
+    84	  rule lastScore(vCons(V, REST), _SCORE) => lastScore(REST, uniqueCount(V))
+    85	endmodule
+
+solution.py
+     1	def find_max(words):
+     2	    result = ""
+     3	    max_unique = -1
+     4	    word = ""
+     5	    unique = -1
+     6	    for word in words:
+     7	        unique = len(set(word))
+     8	        if unique > max_unique or unique == max_unique and word < result:
+     9	            result = word
+    10	            max_unique = unique
+    11	    return result
+
+solution.mpy
+     1	Module(
+     2	  FuncDef("find_max", Params("words"),
+     3	    Assign(Name("result"), Str(""))
+     4	    Assign(Name("max_unique"), UnaryOp("-", Int(1)))
+     5	    Assign(Name("word"), Str(""))
+     6	    Assign(Name("unique"), UnaryOp("-", Int(1)))
+     7	    For(Name("word"), Name("words"),
+     8	      Assign(
+     9	        Name("unique"),
+    10	        Call(Name("len"), Call(Name("set"), Name("word"))))
+    11	      If(BoolOp(
+    12	        "or",
+    13	        Compare(Name("unique"), CmpOp(">", Name("max_unique"))),
+    14	        BoolOp(
+    15	          "and",
+    16	          Compare(Name("unique"), CmpOp("==", Name("max_unique"))),
+    17	          Compare(Name("word"), CmpOp("<", Name("result"))))),
+    18	        Assign(Name("result"), Name("word"))
+    19	        Assign(Name("max_unique"), Name("unique")),
+    20	        ))
+    21	    Return(Name("result"))))
+
+spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [loop-inv]:
+     7	    <k>
+     8	      #loop(
+     9	        list(WORDS),
+    10	        Name("word"),
+    11	        Assign(
+    12	          Name("unique"),
+    13	          Call(Name("len"), Call(Name("set"), Name("word"), .Exprs), .Exprs))
+    14	        If(
+    15	          BoolOp(
+    16	            "or",
+    17	            Compare(Name("unique"), CmpOp(">", Name("max_unique"))),
+    18	            BoolOp(
+    19	              "and",
+    20	              Compare(Name("unique"), CmpOp("==", Name("max_unique"))),
+    21	              Compare(Name("word"), CmpOp("<", Name("result"))),
+    22	              .Exprs),
+    23	            .Exprs),
+    24	          Assign(Name("result"), Name("word"))
+    25	          Assign(Name("max_unique"), Name("unique"))
+    26	          .Stmts,
+    27	          .Stmts)
+    28	        .Stmts)
+    29	      => .K
+    30	      ...
+    31	    </k>
+    32	    <env> 1 </env>
+    33	    <scopes>
+    34	      0 |-> scope(
+    35	        "find_max" |-> closureVal(
+    36	          "words" , .ParamNames,
+    37	          Assign(Name("result"), Str(""))
+    38	          Assign(Name("max_unique"), UnaryOp("-", Int(1)))
+    39	          Assign(Name("word"), Str(""))
+    40	          Assign(Name("unique"), UnaryOp("-", Int(1)))
+    41	          For(
+    42	            Name("word"),
+    43	            Name("words"),
+    44	            Assign(
+    45	              Name("unique"),
+    46	              Call(Name("len"), Call(Name("set"), Name("word"), .Exprs), .Exprs))
+    47	            If(
+    48	              BoolOp(
+    49	                "or",
+    50	                Compare(Name("unique"), CmpOp(">", Name("max_unique"))),
+    51	                BoolOp(
+    52	                  "and",
+    53	                  Compare(Name("unique"), CmpOp("==", Name("max_unique"))),
+    54	                  Compare(Name("word"), CmpOp("<", Name("result"))),
+    55	                  .Exprs),
+    56	                .Exprs),
+    57	              Assign(Name("result"), Name("word"))
+    58	              Assign(Name("max_unique"), Name("unique"))
+    59	              .Stmts,
+    60	              .Stmts)
+    61	            .Stmts)
+    62	          Return(Name("result"))
+    63	          .Stmts,
+    64	          0),
+    65	        parent(-1))
+    66	      -1 |-> builtinsScope
+    67	      1 |-> scope(
+    68	        "words"      |-> list(ORIGINAL)
+    69	        "result"     |-> (BEST:Val => bestWord(WORDS, BEST, SCORE))
+    70	        "max_unique" |-> (SCORE => bestScore(WORDS, BEST, SCORE))
+    71	        "word"       |-> (CURRENT:Val => lastWord(WORDS, CURRENT))
+    72	        "unique"     |-> (CURRENT_SCORE => lastScore(WORDS, CURRENT_SCORE)),
+    73	        parent(0))
+    74	    </scopes>
+    75	    <scopeLoc> 2 </scopeLoc>
+    76	    <heap> .Map </heap>
+    77	    <stack> STACK </stack>
+    78	    <ret> noRet </ret>
+    79	    <exc> NoExc </exc>
+    80	    <exit-code> 0 </exit-code>
+    81	    requires allStrings(WORDS)
+    82	         andBool definedProjectStr(BEST)
+    83	         andBool notBool isRefV(BEST)
+    84	
+    85	  claim [find-max]:
+    86	    <k>
+    87	      #loadAll(
+    88	        Module(
+    89	          FuncDef(
+    90	            "find_max",
+    91	            Params("words"),
+    92	            Assign(Name("result"), Str(""))
+    93	            Assign(Name("max_unique"), UnaryOp("-", Int(1)))
+    94	            Assign(Name("word"), Str(""))
+    95	            Assign(Name("unique"), UnaryOp("-", Int(1)))
+    96	            For(
+    97	              Name("word"),
+    98	              Name("words"),
+    99	              Assign(
+   100	                Name("unique"),
+   101	                Call(Name("len"), Call(Name("set"), Name("word"), .Exprs), .Exprs))
+   102	              If(
+   103	                BoolOp(
+   104	                  "or",
+   105	                  Compare(Name("unique"), CmpOp(">", Name("max_unique"))),
+   106	                  BoolOp(
+   107	                    "and",
+   108	                    Compare(Name("unique"), CmpOp("==", Name("max_unique"))),
+   109	                    Compare(Name("word"), CmpOp("<", Name("result"))),
+   110	                    .Exprs),
+   111	                  .Exprs),
+   112	                Assign(Name("result"), Name("word"))
+   113	                Assign(Name("max_unique"), Name("unique"))
+   114	                .Stmts,
+   115	                .Stmts)
+   116	              .Stmts)
+   117	            Return(Name("result"))
+   118	            .Stmts)))
+   119	      ~> Call(Name("find_max"), list(WORDS), .Exprs)
+   120	      => bestWord(WORDS, str(.IntSeq), 0 -Int 1)
+   121	    </k>
+   122	    <env> 0 </env>
+   123	    <scopes>
+   124	      0 |-> scope(
+   125	        (.Map
+   126	          => "find_max" |-> closureVal(
+   127	            "words" , .ParamNames,
+   128	            Assign(Name("result"), Str(""))
+   129	            Assign(Name("max_unique"), UnaryOp("-", Int(1)))
+   130	            Assign(Name("word"), Str(""))
+   131	            Assign(Name("unique"), UnaryOp("-", Int(1)))
+   132	            For(
+   133	              Name("word"),
+   134	              Name("words"),
+   135	              Assign(
+   136	                Name("unique"),
+   137	                Call(Name("len"), Call(Name("set"), Name("word"), .Exprs), .Exprs))
+   138	              If(
+   139	                BoolOp(
+   140	                  "or",
+   141	                  Compare(Name("unique"), CmpOp(">", Name("max_unique"))),
+   142	                  BoolOp(
+   143	                    "and",
+   144	                    Compare(Name("unique"), CmpOp("==", Name("max_unique"))),
+   145	                    Compare(Name("word"), CmpOp("<", Name("result"))),
+   146	                    .Exprs),
+   147	                  .Exprs),
+   148	                Assign(Name("result"), Name("word"))
+   149	                Assign(Name("max_unique"), Name("unique"))
+   150	                .Stmts,
+   151	                .Stmts)
+   152	              .Stmts)
+   153	            Return(Name("result"))
+   154	            .Stmts,
+   155	            0)),
+   156	        parent(-1))
+   157	      -1 |-> builtinsScope
+   158	    </scopes>
+   159	    <scopeLoc> 1 </scopeLoc>
+   160	    <heap> .Map </heap>
+   161	    <stack> .List </stack>
+   162	    <ret> noRet </ret>
+   163	    <exc> NoExc </exc>
+   164	    <exit-code> 0 </exit-code>
+   165	    requires allStrings(WORDS)
+   166	endmodule
+
+prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py concrete_tests.py > concrete_tests.mpy
+     6	python3 py2mpy.py body_mutation.py > body_mutation.mpy
+     7	
+     8	kompile --backend llvm reference-semantics/semantics.k \
+     9	  --main-module MPY-KRUN \
+    10	  --syntax-module MPY-SYNTAX \
+    11	  --output-definition runtime-kompiled
+    12	
+    13	krun concrete_tests.mpy --definition runtime-kompiled
+    14	
+    15	kompile --backend haskell verification.k \
+    16	  --main-module VERIFICATION \
+    17	  --syntax-module MPY-SYNTAX \
+    18	  --output-definition verification-kompiled
+    19	
+    20	# Supporting isolated invariant proof.
+    21	kprove spec.k \
+    22	  --definition verification-kompiled \
+    23	  --spec-module SPEC \
+    24	  --claims SPEC.loop-inv
+    25	
+    26	# Required positive target proof: both the invariant and whole entry claim.
+    27	kprove spec.k \
+    28	  --definition verification-kompiled \
+    29	  --spec-module SPEC
+    30	
+    31	kompile --backend haskell connection.k \
+    32	  --main-module CONNECTION \
+    33	  --syntax-module MPY-SYNTAX \
+    34	  --output-definition connection-kompiled
+    35	
+    36	# Bridge-free universal fixed-semantics equations used to justify the guarded
+    37	# dynamic dispatch twins.
+    38	kprove connection-spec.k \
+    39	  --definition connection-kompiled \
+    40	  --spec-module CONNECTION-SPEC
+    41	
+    42	if kprove spec-vacuity.k \
+    43	     --definition verification-kompiled \
+    44	     --spec-module SPEC-VACUITY; then
+    45	  echo "UNEXPECTED: false-result mutation proved"
+    46	  exit 1
+    47	else
+    48	  echo "EXPECTED FAILURE: false-result mutation was rejected"
+    49	fi
+    50	
+    51	if krun body_mutation.mpy --definition runtime-kompiled; then
+    52	  echo "UNEXPECTED: material body mutant passed"
+    53	  exit 1
+    54	else
+    55	  echo "EXPECTED FAILURE: material body mutant changed the result"
+    56	fi
+    57	
+    58	python3 differential_test.py
+
+connection.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	// Deliberately imports only the fixed supplied semantics.  In particular, it
+     4	// does not import VERIFICATION or either guarded dispatch twin.
+     5	module CONNECTION
+     6	  imports MPY
+     7	endmodule
+
+connection-spec.k
+     1	requires "connection.k"
+     2	
+     3	module CONNECTION-SPEC
+     4	  imports CONNECTION
+     5	
+     6	  // These universal constructor-domain claims are the fixed equations that
+     7	  // the guarded dynamic dispatch twins restate through the total projection.
+     8	  claim [set-str-connection]:
+     9	    <k>
+    10	      applyBuiltin("set", str(CS), .Vals)
+    11	      => setV(dedupCodes(CS))
+    12	    </k>
+    13	
+    14	  claim [str-lt-connection]:
+    15	    <k>
+    16	      applyCmp("<", str(A), str(B))
+    17	      => strLt(A, B)
+    18	    </k>
+    19	endmodule
+
+Script done on 2026-07-31 04:59:50-05:00 [COMMAND_EXIT_CODE="0"]

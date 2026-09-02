@@ -1,0 +1,690 @@
+COMMAND: bash -lc for\ f\ in\ /reference/prompt.py\ /reference/canonical.py\ /reference/py2mpy.py\ /candidate/solution.py\ /candidate/solution.mpy\ /candidate/semantic.k\ /candidate/verification.k\ /candidate/spec.k\ /candidate/mutation-spec.k\ /candidate/prove.sh\;\ do\ printf\ \"FILE\ %s\\n\"\ \"\$f\"\;\ nl\ -ba\ \"\$f\"\;\ done
+FILE /reference/prompt.py
+     1	
+     2	
+     3	def common(l1: list, l2: list):
+     4	    """Return sorted unique common elements for two lists.
+     5	    >>> common([1, 4, 3, 34, 653, 2, 5], [5, 7, 1, 5, 9, 653, 121])
+     6	    [1, 5, 653]
+     7	    >>> common([5, 3, 2, 8], [3, 2])
+     8	    [2, 3]
+     9	
+    10	    """
+FILE /reference/canonical.py
+     1	# canonical.py — the UNMODIFIED HumanEval/58 reference solution (from the dataset).
+     2	# Co-located with solution.py (the proof rewrite) to make the original<->rewrite link
+     3	# explicit & auditable.  entry point: common
+     4	
+     5	
+     6	
+     7	def common(l1: list, l2: list):
+     8	    """Return sorted unique common elements for two lists.
+     9	    >>> common([1, 4, 3, 34, 653, 2, 5], [5, 7, 1, 5, 9, 653, 121])
+    10	    [1, 5, 653]
+    11	    >>> common([5, 3, 2, 8], [3, 2])
+    12	    [2, 3]
+    13	
+    14	    """
+    15	    ret = set()
+    16	    for e1 in l1:
+    17	        for e2 in l2:
+    18	            if e1 == e2:
+    19	                ret.add(e1)
+    20	    return sorted(list(ret))
+FILE /reference/py2mpy.py
+     1	#!/usr/bin/env python3
+     2	"""py2mpy — a *pure* CPython-AST -> K-constructor transliterator.
+     3	
+     4	Reads a .py file and prints the matching `.mpy` term: a Lisp-indented tree of K
+     5	constructors that a (future) K semantics will parse. The design rule is strict:
+     6	
+     7	    PURE TRANSLITERATION. Every Python AST node maps to exactly one K
+     8	    constructor with the same structure. The front-end makes NO semantic
+     9	    decisions — it does not desugar, simplify, normalize, or "interpret"
+    10	    anything. All meaning lives in the K semantics that consumes the term.
+    11	
+    12	Consequences of that rule (vs. a "helpful" front-end):
+    13	
+    14	  * `is` / `is not` transliterate to `CmpOp("is", ...)` / `CmpOp("is not", ...)`
+    15	    — NOT to `==` / `!=`. K decides what identity means.
+    16	  * a chained comparison `a < b < c` stays a single `Compare` carrying the
+    17	    chain (`Compare(a, CmpOp("<", b), CmpOp("<", c))`) — it is NOT pre-expanded
+    18	    into `a < b and b < c`.
+    19	  * a method call `x.append(v)` stays `Call(Attribute(Name("x"), "append"), v)`
+    20	    — there is no special `MethodCall` constructor folding the receiver in.
+    21	  * `a[i] = v` stays `Assign(Subscript(Name("a"), Name("i")), v)` — the target
+    22	    is just an expression in store position; no special `SubscriptAssign`.
+    23	
+    24	The only choices the transliterator makes are unavoidably *syntactic* — e.g. a
+    25	`bool` literal becomes `Bool(...)` not `Int(...)`, because that is the literal's
+    26	actual Python type as read off the AST, not a semantic judgement.
+    27	
+    28	Anything outside the covered subset raises `Unsupported`, naming the node, so
+    29	coverage gaps fail loudly instead of being silently dropped.
+    30	
+    31	Usage:
+    32	    python scripts/py2mpy.py FILE.py          # print the .mpy term (default)
+    33	    python scripts/py2mpy.py FILE.py --ast    # print the Python AST (ast.dump)
+    34	"""
+    35	from __future__ import annotations
+    36	
+    37	import argparse
+    38	import symtable
+    39	import ast
+    40	import json
+    41	import sys
+    42	
+    43	
+    44	class Unsupported(Exception):
+    45	    """Raised for any AST node the transliterator does not cover."""
+    46	
+    47	
+    48	# ---------------------------------------------------------------------------
+    49	# Term model: a .mpy term is a tree of these three node kinds.
+    50	#   Ctor(name, *args)  -> `name(arg, arg, ...)`  (comma-separated args)
+    51	#   Seq([item, ...])   -> a statement list: juxtaposed, no parens, no commas
+    52	#   str                -> a leaf token already in K surface form
+    53	#                         (a quoted string `"op"`, a number `0`, `true`, `Break`)
+    54	# ---------------------------------------------------------------------------
+    55	class Ctor:
+    56	    __slots__ = ("name", "args")
+    57	
+    58	    def __init__(self, name: str, *args):
+    59	        self.name = name
+    60	        self.args = list(args)
+    61	
+    62	
+    63	class Seq:
+    64	    __slots__ = ("items",)
+    65	
+    66	    def __init__(self, items):
+    67	        self.items = list(items)
+    68	
+    69	
+    70	def q(s: str) -> str:
+    71	    """A Python string as a K String token (double-quoted, escaped)."""
+    72	    return json.dumps(s)
+    73	
+    74	
+    75	# --- Operator spellings (string tokens carried inside constructors) ----------
+    76	# These are transliterations of the operator *symbol*, not its meaning.
+    77	_BINOP = {
+    78	    ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
+    79	    ast.FloorDiv: "//", ast.Mod: "%", ast.Pow: "**",
+    80	    ast.BitOr: "|", ast.BitAnd: "&", ast.BitXor: "^",
+    81	    ast.LShift: "<<", ast.RShift: ">>", ast.MatMult: "@",
+    82	}
+    83	_UNARY = {ast.USub: "-", ast.UAdd: "+", ast.Not: "not", ast.Invert: "~"}
+    84	_BOOLOP = {ast.And: "and", ast.Or: "or"}
+    85	_CMPOP = {
+    86	    ast.Eq: "==", ast.NotEq: "!=", ast.Lt: "<", ast.LtE: "<=",
+    87	    ast.Gt: ">", ast.GtE: ">=", ast.Is: "is", ast.IsNot: "is not",
+    88	    ast.In: "in", ast.NotIn: "not in",
+    89	}
+    90	
+    91	
+    92	# ---------------------------------------------------------------------------
+    93	# Closure scopes (Python's own symtable, faithfully exposed)
+    94	# ---------------------------------------------------------------------------
+    95	# (name, lineno) -> (cellvars, freevars, nested). A def/lambda gets the
+    96	# ANNOTATED node form iff it is nested inside a function or has cells/frees;
+    97	# module-level capture-free defs keep the old shape (zero churn).
+    98	SCOPES: dict = {}
+    99	
+   100	
+   101	def _frees(table):
+   102	    return set(table.get_frees()) if isinstance(table, symtable.Function) else set()
+   103	
+   104	
+   105	def _deep_frees(table):
+   106	    out = _frees(table)
+   107	    for g in table.get_children():
+   108	        out |= _deep_frees(g) - set(table.get_locals())
+   109	    return out
+   110	
+   111	
+   112	def _walk_symtable(table, depth=0):
+   113	    for child in table.get_children():
+   114	        if child.get_type() in ("function", "lambda"):
+   115	            frees = sorted(_frees(child))
+   116	            cells = sorted(
+   117	                s for s in child.get_locals()
+   118	                if any(s in _deep_frees(g) for g in child.get_children())
+   119	            )
+   120	            SCOPES[(child.get_name(), child.get_lineno())] = (
+   121	                cells, frees, depth > 0 or table.get_type() != "module")
+   122	        _walk_symtable(child, depth + (1 if child.get_type() in ("function", "lambda") else 0))
+   123	
+   124	
+   125	def scope_info(name, lineno):
+   126	    return SCOPES.get((name, lineno))
+   127	
+   128	
+   129	# ---------------------------------------------------------------------------
+   130	# Expressions
+   131	# ---------------------------------------------------------------------------
+   132	def emit_expr(node: ast.expr):
+   133	    if isinstance(node, ast.Constant):
+   134	        v = node.value
+   135	        if v is None:
+   136	            return "NoneVal"
+   137	        if isinstance(v, bool):                 # MUST precede int (bool ⊂ int)
+   138	            return Ctor("Bool", "true" if v else "false")
+   139	        if isinstance(v, int):
+   140	            return Ctor("Int", str(v))
+   141	        if isinstance(v, float):
+   142	            return Ctor("Float", repr(v))
+   143	        if isinstance(v, str):
+   144	            return Ctor("Str", q(v))
+   145	        raise Unsupported(f"Constant {type(v).__name__}")
+   146	
+   147	    if isinstance(node, ast.Name):
+   148	        return Ctor("Name", q(node.id))
+   149	
+   150	    if isinstance(node, ast.Lambda):
+   151	        a = node.args
+   152	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   153	            raise Unsupported("complex lambda signature")
+   154	        names = [p.arg for p in (a.posonlyargs + a.args)]
+   155	        params = Ctor("Params", *(q(n) for n in names))
+   156	        info = scope_info("lambda", node.lineno)
+   157	        if info and (info[0] or info[1] or info[2]):
+   158	            cells, frees, _ = info
+   159	            return Ctor("Lambda", params,
+   160	                        Ctor("CellVars", *(q(n) for n in cells)),
+   161	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   162	                        emit_expr(node.body))
+   163	        return Ctor("Lambda", params, emit_expr(node.body))
+   164	
+   165	    if isinstance(node, ast.BinOp):
+   166	        op = _BINOP.get(type(node.op))
+   167	        if op is None:
+   168	            raise Unsupported(f"BinOp {type(node.op).__name__}")
+   169	        return Ctor("BinOp", q(op), emit_expr(node.left), emit_expr(node.right))
+   170	
+   171	    if isinstance(node, ast.UnaryOp):
+   172	        op = _UNARY.get(type(node.op))
+   173	        if op is None:
+   174	            raise Unsupported(f"UnaryOp {type(node.op).__name__}")
+   175	        return Ctor("UnaryOp", q(op), emit_expr(node.operand))
+   176	
+   177	    if isinstance(node, ast.BoolOp):
+   178	        op = _BOOLOP[type(node.op)]
+   179	        return Ctor("BoolOp", q(op), *(emit_expr(v) for v in node.values))
+   180	
+   181	    if isinstance(node, ast.Compare):
+   182	        # Faithful, non-desugared: left operand + a chain of (op, comparator).
+   183	        # Single comparison => one CmpOp; `a < b < c` => two CmpOps.
+   184	        chain = [
+   185	            Ctor("CmpOp", q(_op_or_raise(_CMPOP, op, "Compare")), emit_expr(c))
+   186	            for op, c in zip(node.ops, node.comparators)
+   187	        ]
+   188	        return Ctor("Compare", emit_expr(node.left), *chain)
+   189	
+   190	    if isinstance(node, ast.List):
+   191	        return Ctor("ListExpr", *(emit_expr(e) for e in node.elts))
+   192	
+   193	    if isinstance(node, ast.Tuple):
+   194	        return Ctor("TupleExpr", *(emit_expr(e) for e in node.elts))
+   195	
+   196	    if isinstance(node, ast.Set):
+   197	        return Ctor("SetExpr", *(emit_expr(e) for e in node.elts))
+   198	
+   199	    if isinstance(node, ast.Dict):
+   200	        entries = []
+   201	        for k, v in zip(node.keys, node.values):
+   202	            if k is None:
+   203	                raise Unsupported("dict unpacking {**x}")
+   204	            entries.append(Ctor("Entry", emit_expr(k), emit_expr(v)))
+   205	        return Ctor("DictExpr", *entries)
+   206	
+   207	    if isinstance(node, ast.Subscript):
+   208	        return Ctor("Subscript", emit_expr(node.value), emit_index(node.slice))
+   209	
+   210	    if isinstance(node, ast.Attribute):
+   211	        return Ctor("Attribute", emit_expr(node.value), q(node.attr))
+   212	
+   213	    if isinstance(node, ast.Call):
+   214	        if any(isinstance(a, ast.Starred) for a in node.args):
+   215	            raise Unsupported("*args unpacking")
+   216	        if any(kw.arg is None for kw in node.keywords):
+   217	            raise Unsupported("**kwargs unpacking")
+   218	        # Call grammar is `Call(Expr, Exprs)` — the comma is mandatory, so a zero-arg
+   219	        # call must render as `Call(f, )` (empty Exprs), NOT `Call(f)` (which won't parse).
+   220	        args = [emit_expr(a) for a in node.args]
+   221	        args += [Ctor("KwArg", q(kw.arg), emit_expr(kw.value)) for kw in node.keywords]
+   222	        args = args or [""]
+   223	        return Ctor("Call", emit_expr(node.func), *args)
+   224	
+   225	    if isinstance(node, ast.IfExp):
+   226	        # AST field order: test, body, orelse — kept verbatim.
+   227	        return Ctor("IfExp", emit_expr(node.test),
+   228	                    emit_expr(node.body), emit_expr(node.orelse))
+   229	
+   230	    if isinstance(node, ast.ListComp):
+   231	        return Ctor("ListComp", emit_expr(node.elt), _gens(node.generators))
+   232	    if isinstance(node, ast.SetComp):
+   233	        return Ctor("SetComp", emit_expr(node.elt), _gens(node.generators))
+   234	    if isinstance(node, ast.GeneratorExp):
+   235	        return Ctor("GenExp", emit_expr(node.elt), _gens(node.generators))
+   236	    if isinstance(node, ast.DictComp):
+   237	        return Ctor("DictComp", emit_expr(node.key), emit_expr(node.value),
+   238	                    _gens(node.generators))
+   239	
+   240	    raise Unsupported(f"Expr {type(node).__name__}")
+   241	
+   242	
+   243	def _op_or_raise(table, op, label):
+   244	    spelled = table.get(type(op))
+   245	    if spelled is None:
+   246	        raise Unsupported(f"{label} {type(op).__name__}")
+   247	    return spelled
+   248	
+   249	
+   250	def _compfor(g):
+   251	    """A single generator -> CompFor(target, iter, <ifs as Exprs; .Exprs if none>)."""
+   252	    if getattr(g, "is_async", 0):
+   253	        raise Unsupported("async comprehension")
+   254	    ifs = [emit_expr(c) for c in g.ifs] or [Ctor("Bool", "true")]
+   255	    return Ctor("CompFor", emit_expr(g.target), emit_expr(g.iter), *ifs)
+   256	
+   257	
+   258	def _gens(generators):
+   259	    """The generator list -> a juxtaposed CompFors (a Seq of CompFor)."""
+   260	    return Seq([_compfor(g) for g in generators])
+   261	
+   262	
+   263	def emit_index(node: ast.expr):
+   264	    """Subscript index position: an `ast.Slice` -> `Slice(...)`, else the expr."""
+   265	    # Python <3.9 wrapped the index in ast.Index; unwrap if present.
+   266	    inner = getattr(ast, "Index", None)
+   267	    if inner is not None and isinstance(node, inner):
+   268	        node = node.value
+   269	    if isinstance(node, ast.Slice):
+   270	        def bound(b):
+   271	            # omitted bound (absent field) OR an explicit None constant -> NoBound.
+   272	            # Python treats `a[None:5]` exactly like `a[:5]`; only a *value* None
+   273	            # (Constant(None) outside a slice) becomes NoneVal. Keeping the two
+   274	            # distinct lets NoneVal be a real value without perturbing slices.
+   275	            if b is None or (isinstance(b, ast.Constant) and b.value is None):
+   276	                return "NoBound"
+   277	            return emit_expr(b)
+   278	        return Ctor("Slice", bound(node.lower), bound(node.upper), bound(node.step))
+   279	    return emit_expr(node)
+   280	
+   281	
+   282	# ---------------------------------------------------------------------------
+   283	# Statements
+   284	# ---------------------------------------------------------------------------
+   285	def emit_stmt(node: ast.stmt):
+   286	    if isinstance(node, ast.FunctionDef):
+   287	        a = node.args
+   288	        if a.vararg or a.kwarg or a.kwonlyargs or a.defaults or a.kw_defaults:
+   289	            raise Unsupported("complex function signature (defaults/varargs/kwonly)")
+   290	        if node.decorator_list:
+   291	            raise Unsupported("decorators")
+   292	        names = [p.arg for p in (a.posonlyargs + a.args)]  # type annotations ignored
+   293	        params = Ctor("Params", *(q(n) for n in names))
+   294	        info = scope_info(node.name, node.lineno)
+   295	        if info and (info[0] or info[1] or info[2]):
+   296	            cells, frees, _ = info
+   297	            return Ctor("FuncDef", q(node.name), params,
+   298	                        Ctor("CellVars", *(q(n) for n in cells)),
+   299	                        Ctor("FreeVars", *(q(n) for n in frees)),
+   300	                        emit_stmts(node.body))
+   301	        return Ctor("FuncDef", q(node.name), params, emit_stmts(node.body))
+   302	
+   303	    if isinstance(node, ast.Return):
+   304	        if node.value is None:
+   305	            return Ctor("Return")
+   306	        return Ctor("Return", emit_expr(node.value))
+   307	
+   308	    if isinstance(node, ast.Assign):
+   309	        if len(node.targets) != 1:
+   310	            raise Unsupported("chained assignment (a = b = ...)")
+   311	        # Target is just an expression in store position (Name / Tuple / Subscript / Attribute).
+   312	        return Ctor("Assign", emit_expr(node.targets[0]), emit_expr(node.value))
+   313	
+   314	    if isinstance(node, ast.AugAssign):
+   315	        op = _BINOP.get(type(node.op))
+   316	        if op is None:
+   317	            raise Unsupported(f"AugAssign {type(node.op).__name__}")
+   318	        return Ctor("AugAssign", emit_expr(node.target), q(op), emit_expr(node.value))
+   319	
+   320	    if isinstance(node, ast.If):
+   321	        return Ctor("If", emit_expr(node.test),
+   322	                    emit_stmts(node.body), emit_stmts(node.orelse))
+   323	
+   324	    if isinstance(node, ast.For):
+   325	        if node.orelse:
+   326	            raise Unsupported("for-else")
+   327	        return Ctor("For", emit_expr(node.target), emit_expr(node.iter),
+   328	                    emit_stmts(node.body))
+   329	
+   330	    if isinstance(node, ast.While):
+   331	        if node.orelse:
+   332	            raise Unsupported("while-else")
+   333	        return Ctor("While", emit_expr(node.test), emit_stmts(node.body))
+   334	
+   335	    if isinstance(node, ast.Break):
+   336	        return "Break"
+   337	    if isinstance(node, ast.Continue):
+   338	        return "Continue"
+   339	    if isinstance(node, ast.Pass):
+   340	        return "Pass"
+   341	
+   342	    if isinstance(node, ast.Assert):
+   343	        if node.msg is not None:
+   344	            return Ctor("Assert", emit_expr(node.test), emit_expr(node.msg))
+   345	        return Ctor("Assert", emit_expr(node.test))
+   346	
+   347	    if isinstance(node, ast.Expr):
+   348	        return Ctor("Expr", emit_expr(node.value))
+   349	
+   350	    if isinstance(node, ast.Import):
+   351	        return Ctor("Import", *(q(n.name) for n in node.names))
+   352	    if isinstance(node, ast.ImportFrom):
+   353	        mod = node.module if node.module is not None else ""
+   354	        return Ctor("ImportFrom", q(mod), *(q(n.name) for n in node.names))
+   355	
+   356	    raise Unsupported(f"Stmt {type(node).__name__}")
+   357	
+   358	
+   359	def emit_stmts(stmts) -> Seq:
+   360	    return Seq([emit_stmt(s) for s in stmts])
+   361	
+   362	
+   363	def emit_module(tree: ast.Module) -> Ctor:
+   364	    return Ctor("Module", emit_stmts(tree.body))
+   365	
+   366	
+   367	# ---------------------------------------------------------------------------
+   368	# Lisp-style pretty printer
+   369	# ---------------------------------------------------------------------------
+   370	WIDTH = 72  # an expression constructor wider than this breaks onto its own lines
+   371	
+   372	
+   373	def render(node, ind: int = 0) -> str:
+   374	    if isinstance(node, str):
+   375	        return node
+   376	
+   377	    if isinstance(node, Seq):
+   378	        if not node.items:
+   379	            return ""
+   380	        pad = "  " * ind
+   381	        return ("\n" + pad).join(render(it, ind) for it in node.items)
+   382	
+   383	    # Ctor
+   384	    cind = ind + 1
+   385	    cpad = "  " * cind
+   386	    has_block = any(isinstance(a, Seq) for a in node.args)
+   387	
+   388	    if not has_block:
+   389	        inline = node.name + "(" + ", ".join(render(a, ind) for a in node.args) + ")"
+   390	        if "\n" not in inline and len("  " * ind) + len(inline) <= WIDTH:
+   391	            return inline
+   392	        parts = [render(a, cind) for a in node.args]
+   393	        return node.name + "(\n" + cpad + (",\n" + cpad).join(parts) + ")"
+   394	
+   395	    # Has a statement block: inline the args before the first block, then put
+   396	    # each remaining arg (blocks included) on its own indented line.
+   397	    first = next(i for i, a in enumerate(node.args) if isinstance(a, Seq))
+   398	    head = node.args[:first]
+   399	    rest = node.args[first:]
+   400	    open_line = node.name + "(" + ", ".join(render(a, ind) for a in head) + ("," if head else "")
+   401	    lines = []
+   402	    for k, a in enumerate(rest):
+   403	        comma = "," if k < len(rest) - 1 else ""
+   404	        lines.append(cpad + render(a, cind) + comma)
+   405	    return open_line + "\n" + "\n".join(lines) + ")"
+   406	
+   407	
+   408	# ---------------------------------------------------------------------------
+   409	# CLI
+   410	# ---------------------------------------------------------------------------
+   411	def main(argv=None) -> int:
+   412	    ap = argparse.ArgumentParser(
+   413	        prog="py2mpy",
+   414	        description="Pure CPython-AST -> K-constructor transliterator.",
+   415	    )
+   416	    ap.add_argument("file", help="Python source file")
+   417	    ap.add_argument("--ast", action="store_true",
+   418	                    help="print the Python AST (ast.dump) instead of the .mpy term")
+   419	    args = ap.parse_args(argv)
+   420	
+   421	    with open(args.file, "r", encoding="utf-8") as fh:
+   422	        src = fh.read()
+   423	    tree = ast.parse(src, filename=args.file)
+   424	    _walk_symtable(symtable.symtable(src, args.file, "exec"))
+   425	
+   426	    if args.ast:
+   427	        print(ast.dump(tree, indent=2))
+   428	    else:
+   429	        print(render(emit_module(tree)))
+   430	    return 0
+   431	
+   432	
+   433	if __name__ == "__main__":
+   434	    sys.exit(main())
+FILE /candidate/solution.py
+     1	def common(l1: list, l2: list):
+     2	    return sorted(set(l1) & set(l2))
+FILE /candidate/solution.mpy
+     1	Module(
+     2	  FuncDef("common", Params("l1", "l2"),
+     3	    Return(
+     4	      Call(
+     5	        Name("sorted"),
+     6	        BinOp(
+     7	          "&",
+     8	          Call(Name("set"), Name("l1")),
+     9	          Call(Name("set"), Name("l2")))))))
+FILE /candidate/semantic.k
+     1	module SEMANTIC-SYNTAX
+     2	  imports INT
+     3	  imports STRING
+     4	
+     5	  // The concrete syntax emitted by py2mpy.py for solution.py.
+     6	  syntax PyModule ::= "Module" "(" PyStmt ")"
+     7	  syntax PyStmt   ::= "FuncDef" "(" String "," Params "," PyStmt ")"
+     8	                    | "Return" "(" PyExpr ")"
+     9	  syntax Params   ::= "Params" "(" String "," String ")"
+    10	  syntax PyExpr   ::= "Name" "(" String ")"
+    11	                    | "Call" "(" PyExpr "," PyExpr ")"
+    12	                    | "BinOp" "(" String "," PyExpr "," PyExpr ")"
+    13	
+    14	  // Values are deliberately restricted to the integer-list fragment needed
+    15	  // by this HumanEval problem.
+    16	  syntax Ints ::= List{Int, ","}
+    17	  syntax PyValue ::= "list" "(" Ints ")"
+    18	                   | "set" "(" Ints ")"
+    19	endmodule
+    20	
+    21	module SEMANTIC
+    22	  imports SEMANTIC-SYNTAX
+    23	  imports BOOL
+    24	
+    25	  configuration
+    26	    <py>
+    27	      <k> $PGM:PyModule </k>
+    28	      <l1> $L1:PyValue </l1>
+    29	      <l2> $L2:PyValue </l2>
+    30	    </py>
+    31	
+    32	  // Integer-list operations used to model Python set conversion,
+    33	  // intersection, and sorted.  A set is represented by a duplicate-free
+    34	  // Ints sequence; its incidental order is unobservable after sorted.
+    35	  syntax Bool ::= "containsInt" "(" Int ";" Ints ")" [function]
+    36	  rule containsInt(_ ; .Ints) => false
+    37	  rule containsInt(I ; J, IS) => (I ==Int J) orBool containsInt(I ; IS)
+    38	
+    39	  syntax Ints ::= "uniqueInts" "(" Ints ")" [function]
+    40	  rule uniqueInts(.Ints) => .Ints
+    41	  rule uniqueInts(I, IS) => uniqueInts(IS)
+    42	    requires containsInt(I ; IS)
+    43	  rule uniqueInts(I, IS) => I, uniqueInts(IS)
+    44	    requires notBool containsInt(I ; IS)
+    45	
+    46	  syntax Ints ::= "intersectInts" "(" Ints ";" Ints ")" [function]
+    47	  rule intersectInts(.Ints ; _) => .Ints
+    48	  rule intersectInts(I, IS ; JS) => I, intersectInts(IS ; JS)
+    49	    requires containsInt(I ; JS)
+    50	  rule intersectInts(I, IS ; JS) => intersectInts(IS ; JS)
+    51	    requires notBool containsInt(I ; JS)
+    52	
+    53	  syntax Ints ::= "insertInt" "(" Int ";" Ints ")" [function]
+    54	  rule insertInt(I ; .Ints) => I, .Ints
+    55	  rule insertInt(I ; J, IS) => I, J, IS
+    56	    requires I <=Int J
+    57	  rule insertInt(I ; J, IS) => J, insertInt(I ; IS)
+    58	    requires I >Int J
+    59	
+    60	  syntax Ints ::= "sortInts" "(" Ints ")" [function]
+    61	  rule sortInts(.Ints) => .Ints
+    62	  rule sortInts(I, IS) => insertInt(I ; sortInts(IS))
+    63	
+    64	  syntax PyValue ::= "makeSet" "(" PyValue ")" [function]
+    65	                   | "setAnd" "(" PyValue ";" PyValue ")" [function]
+    66	                   | "sortedValue" "(" PyValue ")" [function]
+    67	  rule makeSet(list(IS)) => set(uniqueInts(IS))
+    68	  rule setAnd(set(IS) ; set(JS)) => set(intersectInts(IS ; JS))
+    69	  rule sortedValue(set(IS)) => list(sortInts(IS))
+    70	  rule sortedValue(list(IS)) => list(sortInts(IS))
+    71	
+    72	  // Compositional expression evaluation.  Parameter names are carried by
+    73	  // the evaluator, so Name has ordinary lexical lookup for this two-argument
+    74	  // function fragment.
+    75	  syntax PyValue ::= "eval" "(" PyExpr ";" String ";" PyValue ";"
+    76	                              String ";" PyValue ")" [function]
+    77	  rule eval(Name(X) ; X ; V1 ; _ ; _) => V1
+    78	  rule eval(Name(Y) ; X ; _ ; Y ; V2) => V2
+    79	    requires X =/=String Y
+    80	  rule eval(Call(Name("set"), E) ; X ; V1 ; Y ; V2)
+    81	    => makeSet(eval(E ; X ; V1 ; Y ; V2))
+    82	  rule eval(Call(Name("sorted"), E) ; X ; V1 ; Y ; V2)
+    83	    => sortedValue(eval(E ; X ; V1 ; Y ; V2))
+    84	  rule eval(BinOp("&", E1, E2) ; X ; V1 ; Y ; V2)
+    85	    => setAnd(eval(E1 ; X ; V1 ; Y ; V2) ;
+    86	              eval(E2 ; X ; V1 ; Y ; V2))
+    87	
+    88	  syntax KItem ::= "execute" "(" PyStmt ";" String ";" PyValue ";"
+    89	                               String ";" PyValue ")"
+    90	
+    91	  // Loading the translated module binds its two parameters to the two input
+    92	  // cells and executes its body.  Return replaces the control term by the
+    93	  // expression's value.
+    94	  rule <k> Module(FuncDef("common", Params(X, Y), BODY))
+    95	        => execute(BODY ; X ; V1 ; Y ; V2) ... </k>
+    96	       <l1> V1 </l1>
+    97	       <l2> V2 </l2>
+    98	  rule <k> execute(Return(E) ; X ; V1 ; Y ; V2)
+    99	        => eval(E ; X ; V1 ; Y ; V2) ... </k>
+   100	endmodule
+FILE /candidate/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // Mathematical contract: convert each input to a finite integer set,
+     7	  // intersect the sets, then put the elements in ascending order.
+     8	  syntax Ints ::= "commonSpec" "(" Ints ";" Ints ")" [function]
+     9	  rule commonSpec(IS ; JS)
+    10	    => sortInts(intersectInts(uniqueInts(IS) ; uniqueInts(JS)))
+    11	endmodule
+FILE /candidate/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Functional correctness for arbitrary finite integer lists.  The left
+     7	  // side is exactly the constructor tree emitted in solution.mpy; the right
+     8	  // side is the independently named contract operation from verification.k.
+     9	  claim
+    10	    <py>
+    11	      <k>
+    12	        Module(
+    13	          FuncDef("common", Params("l1", "l2"),
+    14	            Return(
+    15	              Call(
+    16	                Name("sorted"),
+    17	                BinOp(
+    18	                  "&",
+    19	                  Call(Name("set"), Name("l1")),
+    20	                  Call(Name("set"), Name("l2")))))))
+    21	        => list(commonSpec(IS1 ; IS2))
+    22	      </k>
+    23	      <l1> list(IS1) </l1>
+    24	      <l2> list(IS2) </l2>
+    25	    </py>
+    26	endmodule
+FILE /candidate/mutation-spec.k
+     1	requires "verification.k"
+     2	
+     3	module MUTATION-SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Negative validation probe: this mutant uses l1 for both set operands.
+     7	  // Its alleged correctness claim must not prove for arbitrary IS1 and IS2.
+     8	  claim
+     9	    <py>
+    10	      <k>
+    11	        Module(
+    12	          FuncDef("common", Params("l1", "l2"),
+    13	            Return(
+    14	              Call(
+    15	                Name("sorted"),
+    16	                BinOp(
+    17	                  "&",
+    18	                  Call(Name("set"), Name("l1")),
+    19	                  Call(Name("set"), Name("l1")))))))
+    20	        => list(commonSpec(IS1 ; IS2))
+    21	      </k>
+    22	      <l1> list(IS1) </l1>
+    23	      <l2> list(IS2) </l2>
+    24	    </py>
+    25	endmodule
+FILE /candidate/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	cd -- "$(dirname -- "$0")"
+     5	
+     6	# Recreate the checked constructor program from the submitted Python source.
+     7	python3 py2mpy.py solution.py > solution.mpy
+     8	
+     9	# The verification definition imports the executable semantics and adds only
+    10	# the mathematical commonSpec operation.
+    11	kompile verification.k \
+    12	  --main-module VERIFICATION \
+    13	  --syntax-module SEMANTIC-SYNTAX \
+    14	  --backend haskell
+    15	
+    16	# Exercise both prompt examples plus duplicate/negative and empty-list cases.
+    17	krun solution.mpy --definition verification-kompiled \
+    18	  -cL1='list(1,4,3,34,653,2,5)' \
+    19	  -cL2='list(5,7,1,5,9,653,121)'
+    20	krun solution.mpy --definition verification-kompiled \
+    21	  -cL1='list(5,3,2,8)' \
+    22	  -cL2='list(3,2)'
+    23	krun solution.mpy --definition verification-kompiled \
+    24	  -cL1='list(3,3,-1,2)' \
+    25	  -cL2='list(3,-1,-1)'
+    26	krun solution.mpy --definition verification-kompiled \
+    27	  -cL1='list()' \
+    28	  -cL2='list(1,1)'
+    29	
+    30	# Positive target proof: this must print #Top and exit zero.
+    31	kprove spec.k --definition verification-kompiled --spec-module SPEC
+    32	
+    33	# Expected-failure mutation probe.  If this proves, the validation is unsound.
+    34	if kprove mutation-spec.k \
+    35	    --definition verification-kompiled \
+    36	    --spec-module MUTATION-SPEC; then
+    37	  echo 'ERROR: the deliberately incorrect mutation unexpectedly proved' >&2
+    38	  exit 1
+    39	else
+    40	  echo 'Expected failure: the l1/l1 intersection mutation was rejected.'
+    41	fi
+EXIT_STATUS: 0

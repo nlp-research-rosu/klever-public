@@ -1,0 +1,14312 @@
+# Exhaustive K source inventory
+
+- Files: 26
+- Sentences: 1110
+- Keyword counts: `{'claim': 2, 'configuration': 1, 'context': 5, 'endmodule': 27, 'imports': 88, 'module': 27, 'requires': 25, 'rule': 702, 'syntax': 233}`
+- Category counts: `{'concrete-rule': 35, 'configuration': 1, 'equational-or-macro-rule': 429, 'evaluation-context': 5, 'file-requirement': 25, 'function-declaration': 129, 'macro-declaration': 4, 'module-boundary': 54, 'module-import': 88, 'opaque-symbol-declaration': 22, 'operational-rule': 238, 'reachability-claim': 2, 'syntax-declaration': 78}`
+- Disposition counts: `{'ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF': 24, 'ACCEPTED_PROGRAM_CONSTRUCTOR_NORMALIZATION': 10, 'ACCEPTED_PROOF_LOCAL_MATHEMATICS': 3, 'ACCEPTED_PROOF_MODULE_SCAFFOLDING': 4, 'ACCEPTED_SPEC_SCAFFOLDING': 4, 'ACCEPTED_SUPPLIED_SEMANTICS': 1041, 'DECLARED_UNUSED_TRUST_BOUNDARY': 22, 'TARGET_OR_AUXILIARY_CLAIM': 2}`
+
+## reference-semantics/semantics.k:34-34:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `bd63dc2187bec52366768ae5e226469b8a2ad2c4c545712a0aa741516c9edc32`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/syntax.k"
+```
+
+## reference-semantics/semantics.k:35-35:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `8224539e3a3db217e66bd2a98ec63461834dc106ed2a29c0444f710fefda65f8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/core.k"
+```
+
+## reference-semantics/semantics.k:36-36:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `1e5b8702816aaf910a96fba0d81db1abbb6b851cb951d2599f700d2bc99dc68d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/iter.k"
+```
+
+## reference-semantics/semantics.k:37-37:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `aa5f663a5d1a12851ffd9c30d8f2ea8d3a5f525e2d67b7d0d58f7a8872201e30`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/range.k"
+```
+
+## reference-semantics/semantics.k:38-38:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `b194c4171e7ae0db64f5e70592f533a037cd2209b2efbffdbdce3f961c1ba8a3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/operators.k"
+```
+
+## reference-semantics/semantics.k:39-39:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `821ae9d706d11a65db65080f76bf3791956656836d0cd541a1ce2c7a7c0fc866`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/int.k"
+```
+
+## reference-semantics/semantics.k:40-40:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `4486f908787bb0107a24b945f3cc04fd35649f6fc896ddfb8287e00541fb24d2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/bool.k"
+```
+
+## reference-semantics/semantics.k:41-41:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `c686ca866c6c4244284f9c6fee5b4d3f0651dfee6f3b7caffa7acd081eedbf37`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/float.k"
+```
+
+## reference-semantics/semantics.k:42-42:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `3e6d049d0d07149d9b7da70a46f30478e3abc80a22c29d1bae5e92eb299269e5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/str.k"
+```
+
+## reference-semantics/semantics.k:43-43:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `28167624a9874cf0814cc078c343db574329406ffd94ef33c6a15b3199409955`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/set.k"
+```
+
+## reference-semantics/semantics.k:44-44:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `a95bd351b20c771469491020adb0ced7ccb5e0d0925e1a2a2afec379202c449d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/list.k"
+```
+
+## reference-semantics/semantics.k:45-45:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `4a702fffa1e16b4e2b9fe67d153dfac3c7e911bfa63b671a3bf13dcb280561fe`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/tuple.k"
+```
+
+## reference-semantics/semantics.k:46-46:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `f795613d9cb17629ce078e63a8a9c678058dd096cbc71b8d317b8f6dd90a9d92`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/subscript.k"
+```
+
+## reference-semantics/semantics.k:47-47:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `927b4eb4e3dce857ba8c6b0c9efa4dcea0bb75262d64b9d8c7acea80340f11d3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/comprehension.k"
+```
+
+## reference-semantics/semantics.k:48-48:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `3708c0fc4fe99cb67a5e6687f95ab01b6b5c12ce14e46e42eab67de05e8a5d10`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/methods.k"
+```
+
+## reference-semantics/semantics.k:49-49:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `498f2b091406cd4a46c7abb4ef9bd80af213323fa3c73451330610c725364577`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/controls.k"
+```
+
+## reference-semantics/semantics.k:50-50:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `bf13fda77786233dc0dc9153ae8cbafc7f9314e3888571436ecbcf652ed84416`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/functions.k"
+```
+
+## reference-semantics/semantics.k:51-51:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `9dc1130a72c535f9390df5fdbf23b65d5eb8642149d9228616e15de0b282c1b6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/builtins.k"
+```
+
+## reference-semantics/semantics.k:52-52:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `666c60af66b9a9a5e57ee0f3fc2f6b80fa7c40c65237af98051a82e0ae1568e3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/call.k"
+```
+
+## reference-semantics/semantics.k:53-53:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `9879ce98eb6621931b97c6d9e8a5fb58ff797bc17ca199f746974bae0dcfbbbf`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/sort.k"
+```
+
+## reference-semantics/semantics.k:54-54:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `d0eef04114b1f5a8e340ed83c998f08e618cdd739a8137db71723d6eafb0d8e3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/assert.k"
+```
+
+## reference-semantics/semantics.k:55-55:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `dff85649217fc5c356552912f0333bbf2a1eb50bc7d60382df3ce84a5585d73d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/dict.k"
+```
+
+## reference-semantics/semantics.k:56-57:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `f5f94e239ba7397d1ac63fc775155ba549bf099b6f8a4a6036ab6fb3bdecfcb4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+requires "semantics/concrete.k"
+```
+
+## reference-semantics/semantics.k:58-58:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `340f552bdab12916ad400c9c2beec5903f96decc9f651bec2c79ee27125aa80e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY
+```
+
+## reference-semantics/semantics.k:59-59:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics.k:60-60:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `8ad41781e06e91093b117ccd78f6f10180a840cf3b4adaa62547edd340b26acc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-ITER
+```
+
+## reference-semantics/semantics.k:61-61:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `548212ddc441d76983863c9d3376f95c8022ee76d1dcf98dbe9e839a912f1323`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-RANGE
+```
+
+## reference-semantics/semantics.k:62-62:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `ee018db6efb00ffdd01d59dac03e43be2192505ed7049d1c693197e018cbc088`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-OPERATORS
+```
+
+## reference-semantics/semantics.k:63-63:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `6a7df951c212c93cd44f9522a2128bbac2f97c6212765bb6d61d30326317e744`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-INT
+```
+
+## reference-semantics/semantics.k:64-64:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `bdd3eb0c1e7cd57b39439fe4b6b566cfaa33b796f674c16ff6f57b752736478b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-BOOL
+```
+
+## reference-semantics/semantics.k:65-65:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `b6b71fc553a1963619cbab2a492279a95ca1f81cca764d12f5721cea2ce77cfc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-FLOAT
+```
+
+## reference-semantics/semantics.k:66-66:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `1c022ad4e0c945f696aa1f9d78eb4c3caf78ef9d9b46ae55d6fd081ff4264877`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-STR
+```
+
+## reference-semantics/semantics.k:67-67:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `783147658ae89d8dfd5db1f7498e1994e2d82a87dc70c399891ee2e62d7aa7b6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-SET
+```
+
+## reference-semantics/semantics.k:68-68:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `511c798e04e96a7ad3e9efe5e06eb4804d66d38f1294d62d46068dc7eafb0373`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-LIST
+```
+
+## reference-semantics/semantics.k:69-69:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `b1d1ddeb005d397d01d2501033a979d991b52ce94dc5c6fcb2c801237e698309`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-TUPLE
+```
+
+## reference-semantics/semantics.k:70-70:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `e90331404c5d72894851d971bc8a38fd62bc826e9a92c5ef502548eaf8bcfade`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-SUBSCRIPT
+```
+
+## reference-semantics/semantics.k:71-71:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `18c619c21645e05e9351296d878b165945130c0d89c08db4c496990eb4ff7b23`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-COMPREHENSION
+```
+
+## reference-semantics/semantics.k:72-72:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `09fe9e0706aef859710b0c5447f1427e859a1a9e9660b612e310bb91d51ec923`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-METHODS
+```
+
+## reference-semantics/semantics.k:73-73:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `47dfd92e317bb7c0d2b37ea8704d1ebdf3daf5f2ca37f0555105ffde812c5061`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CONTROLS
+```
+
+## reference-semantics/semantics.k:74-74:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `62b2a9826516b040855a34fff2e8ca376316ea03367b0f585eae03c0e4e3403c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-FUNCTIONS
+```
+
+## reference-semantics/semantics.k:75-75:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `513b07985ad1b60ab1fc94f4a08021dd25a5b0aa218c3a975ce281a00395ddfa`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-BUILTINS
+```
+
+## reference-semantics/semantics.k:76-76:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `0c52765c886770ff4ce0300efb451d4b6ed20eb8ff585ae7e98d2be02377229e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CALL
+```
+
+## reference-semantics/semantics.k:77-77:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `051aad84a25d7e3211653f3f83ada310438179bd83d7fa1228a62de6fb19b10b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-SORT
+```
+
+## reference-semantics/semantics.k:78-78:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4f603401acfe25a81aba55de3528db3e1e8e6328b907ba1d69b5ece08a4ffd89`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-ASSERT
+```
+
+## reference-semantics/semantics.k:79-79:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4ff989d72f496502ff3ea8f84d27b5be72c05433d0f010e8e836c027a180b83d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-DICT
+```
+
+## reference-semantics/semantics.k:80-86:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `85f16bdbb9c7ab1c097cd62346e09ded9525cd40d9b7a43fec3879ef92ea2353`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+
+// The krun (llvm) main module: MPY plus the concrete-only legs (keyed sort's
+// real key calls, deep list equality). Verification builds import MPY and
+// never see MPY-CONCRETE. The llvm kompile MUST use --main-module MPY-KRUN —
+// with plain MPY the concrete legs are silently absent (this was live for a
+// while: sorted-key stuck and comprehension asserted wrong under krun).
+```
+
+## reference-semantics/semantics.k:87-87:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `3c507e22c3e1c073f40583d7461bc43221d4c807fb1114f39c77aace50585bc9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-KRUN
+```
+
+## reference-semantics/semantics.k:88-88:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `6ae4e1db797b2c5a9b115b591095b3516869431c6682a05468cf9bfec87aac66`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY
+```
+
+## reference-semantics/semantics.k:89-89:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `ed62b27710dfe37a3cb8fc6a56c6f1bce2c878a39d15675f250c57927c4a2018`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CONCRETE
+```
+
+## reference-semantics/semantics.k:90-90:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/assert.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `c9be78fdc587dd075a47c08e505694a8890633ae600b52f886a4ff33046c24b6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-ASSERT
+```
+
+## reference-semantics/semantics/assert.k:4-5:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics/assert.k:6-7:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `90fd8cb48806b565c7efda64556bc1f3741e4c215670728e20119ee4302ac5f5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Assert(V:Val) => .K ... </k>
+       requires truthy(V)
+```
+
+## reference-semantics/semantics/assert.k:8-12:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `dfe24d6909cafaa624ffd02ce638b5285dda809ae92d1bf8f64b9ef11388019b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Assert(V:Val) ~> _ => .K </k>
+       <exc> NoExc => AssertionError </exc>
+       <exit-code> _ => 1 </exit-code>
+       requires notBool truthy(V)
+```
+
+## reference-semantics/semantics/assert.k:13-15:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `94ec1f9b321539df9f19af2581391cdb32c7dc4d56895d3d9732706d61c6e039`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Assert(ref(H:Int)) => Assert(V) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/assert.k:16-16:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/bool.k:5-5:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `d0f4ccd7f134c7e028e54d830d022d5ca267e8266c1692006db410b48d14f7c1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-BOOL
+```
+
+## reference-semantics/semantics/bool.k:6-7:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics/bool.k:8-9:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f6a9f817afd56c9168797a3f098cd08c12966f18447d1e0f9d1a05f16ae677c4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyUn("not", V:Val) => notBool truthy(V)
+```
+
+## reference-semantics/semantics/bool.k:10-10:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `27c7ab07384784839a8a863b3f9933be214b73575a7e3e811e125c3d99a0370a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("==", B1:Bool, B2:Bool) => B1 ==Bool B2
+```
+
+## reference-semantics/semantics/bool.k:11-15:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `331c5ccbdb8e5528462b302241832a6ab6363790b3c67a9cd9e900fa43787d7f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("!=", B1:Bool, B2:Bool) => B1 =/=Bool B2
+
+  // ==== BoolOp: short-circuit, value-returning and / or =====================
+  // the node is its own accumulator: heat the HEAD element only, then either return it
+  // (short-circuit) or drop it and continue
+```
+
+## reference-semantics/semantics/bool.k:16-16:context
+
+- Category: `evaluation-context`
+- Attributes: `[]`
+- SHA-256: `4bad2e2ff81c39e87091eef691d33bff23a6d7adf29b55aafe2a261e9e7aa33a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  context BoolOp(_, (HOLE:Expr, _:Exprs))
+```
+
+## reference-semantics/semantics/bool.k:17-17:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `dd652a87b5666794e2e19a88c80917f8819ce783aae50f826a5d468e4a188544`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> BoolOp(_:String, (V:Val, .Exprs)) => V ... </k>
+```
+
+## reference-semantics/semantics/bool.k:18-19:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `c903d941fb7314ce9a808ef44e64dbb8c65585c74cc3935c843f59b30f0db2cb`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> BoolOp("and", (V:Val, A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>
+       requires truthy(V)
+```
+
+## reference-semantics/semantics/bool.k:20-21:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `609b42dde8cecff47044578c95dfa8dfa3b51a7bc1edc878294ab4d92055e5d3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> BoolOp("and", (V:Val, _:Expr, _:Exprs)) => V ... </k>
+       requires notBool truthy(V)
+```
+
+## reference-semantics/semantics/bool.k:22-23:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `66ef890f68fe08fb9cafa68cd0f292cad9db3d564aa5d15542c90c9baecd8c27`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> BoolOp("or",  (V:Val, _:Expr, _:Exprs)) => V ... </k>
+       requires truthy(V)
+```
+
+## reference-semantics/semantics/bool.k:24-28:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `a1e1d5c0c320489628410545eeba67dfb65e90c6799530ecbfb4a82719f91192`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> BoolOp("or",  (V:Val, A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>
+       requires notBool truthy(V)
+
+  // ==== heap-object head: decide truthiness THROUGH the heap, never rewrite the
+  // operand — and/or return the OBJECT itself (Python identity), not its structure
+```
+
+## reference-semantics/semantics/bool.k:29-30:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `570c438ed2f88db94f853171689a61a4a3efbf6632bd00359e59635b287cdd42`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> BoolOp(_:String, (ref(H:Int), .Exprs)) => ref(H) ... </k>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/bool.k:31-34:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `b20811d55420feb532235075af2164c6b7e8f9483e24f63346f384cc07354bdb`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> BoolOp("and", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires truthy(V)
+       [priority(40)]
+```
+
+## reference-semantics/semantics/bool.k:35-38:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `1da617ae289768882fb6780ddef9c967f8b30389f7e29694fbe4143e85146236`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> BoolOp("and", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool truthy(V)
+       [priority(40)]
+```
+
+## reference-semantics/semantics/bool.k:39-42:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `2eb620e8bf34c458becc919febceee04cab4f37e1a1ed7956f119a8b1265009e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> BoolOp("or", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires truthy(V)
+       [priority(40)]
+```
+
+## reference-semantics/semantics/bool.k:43-46:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `86c2967b9fc68899e77c31f07a35e2359123a4ec12bb59c71db0aed88426d464`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> BoolOp("or", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool truthy(V)
+       [priority(40)]
+```
+
+## reference-semantics/semantics/bool.k:47-47:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/builtins.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `714fcf7fc40ffcebec2a866bfc219f118a9bee4b47e2010874ca09a12c64884b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-BUILTINS
+```
+
+## reference-semantics/semantics/builtins.k:4-4:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics/builtins.k:5-5:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `1c022ad4e0c945f696aa1f9d78eb4c3caf78ef9d9b46ae55d6fd081ff4264877`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-STR
+```
+
+## reference-semantics/semantics/builtins.k:6-6:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `783147658ae89d8dfd5db1f7498e1994e2d82a87dc70c399891ee2e62d7aa7b6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-SET
+```
+
+## reference-semantics/semantics/builtins.k:7-7:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `8ad41781e06e91093b117ccd78f6f10180a840cf3b4adaa62547edd340b26acc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-ITER
+```
+
+## reference-semantics/semantics/builtins.k:8-8:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `548212ddc441d76983863c9d3376f95c8022ee76d1dcf98dbe9e839a912f1323`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-RANGE
+```
+
+## reference-semantics/semantics/builtins.k:9-9:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `6a7df951c212c93cd44f9522a2128bbac2f97c6212765bb6d61d30326317e744`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-INT
+```
+
+## reference-semantics/semantics/builtins.k:10-16:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `481e0c655538c59ac02d6b5e90bbda8fafe123ef32ea6cc0f4c654f9ca22e0df`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-METHODS
+
+  // the builtins REGISTRY is core.k's builtinsScope (the -1 frame); names resolve by lookup
+
+  // Call routing + argument evaluation live in call.k, which also routes the fold
+  // builtins (sum/all/any/max/min) to the #_Acc folds below and everything else to
+  // applyBuiltin. This module owns applyBuiltin + the fold implementations.
+```
+
+## reference-semantics/semantics/builtins.k:17-19:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `73578867deee2dfcdb98120487124565c315d958566aba476748783911768d8e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= applyBuiltin(String, Vals) [function]
+
+  // ==== len(obj) — O(1) per kind ============================================
+```
+
+## reference-semantics/semantics/builtins.k:20-20:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `f6cf3d1713c13dac8d22e5399684f39be014bb52fc407729a141920e9ac6961a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= seqLen(Val) [function]
+```
+
+## reference-semantics/semantics/builtins.k:21-21:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `4c33466e09a76b7760813815674e6ffbb94166ddb7069d042ef42b3ce95e3265`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("len", OBJ:Val, .Vals) => seqLen(OBJ)
+```
+
+## reference-semantics/semantics/builtins.k:22-22:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `0aaba3d3b63a12047950734de1d7f6d68d726a77712db94d2c7f79f9ee9d9546`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule seqLen(list(VS:ValSeq))                  => vsLen(VS)
+```
+
+## reference-semantics/semantics/builtins.k:23-23:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f5cd3a9a635bc85b291d7c33464d791ed4d02eeec6bc95e77180d1ef1e153748`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule seqLen(tuple(VS:ValSeq))                 => vsLen(VS)
+```
+
+## reference-semantics/semantics/builtins.k:24-24:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d643ec5ddd399eb71ffb1b400c91340247b2e06423439b55fc984555dfe96583`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule seqLen(str(IS:IntSeq))                   => isLen(IS)
+```
+
+## reference-semantics/semantics/builtins.k:25-25:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `fe3adc7a7e150cfcc668226bda4a9a9ff6fc4b01786d0c6f9d7a62c2dfda0bc1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule seqLen(setV(DS:IntSeq))                  => isLen(DS)
+```
+
+## reference-semantics/semantics/builtins.k:26-31:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `66ce929da75b936769c8642e6a1881ab89952847146a3e59bdcd235431f19d90`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule seqLen(rangeObj(LO:Int, HI:Int, ST:Int)) => rangeLen(LO, HI, ST)
+
+  // ==== list(seq) — materialize a list/tuple into a list (e.g. list(d.keys())) ==
+  // Minimal: the "copy a sequence" case (list of a list is itself; list of a tuple keeps order).
+  // list() of other iterables (str/range/set/zip) is added via the iterator fold when needed.
+  // (k-cell — list() constructs a NEW object)
+```
+
+## reference-semantics/semantics/builtins.k:32-32:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `200f6d489286304114b4e127922e5d267a6472b44933e2526b01f03abf54d849`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("list")), (list(VS:ValSeq),  .Vals)) => #alloc(list(VS)) ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:33-33:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `d4c8072f0224b4363a94ae3ac318b3b18ad05c41f2b433fe526f8d020ae141b5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("list")), (tuple(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:34-34:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `0b80f78f2b97822d5ac436de4244defd9d61c478add9ea00843e45329c8953de`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("list")), .Vals)                     => #alloc(list(.ValSeq)) ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:35-35:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `8b7fa386647f39a38debea703feca31b12a6d50ea85d8dc708c95c98f1d29cf8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("list")), (str(CS:IntSeq), .Vals))   => #alloc(list(charsOf(CS))) ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:36-36:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `01aff6eecdd49ca279cb4378e0ba39cf9a5e1da377c6bda52586943e73543839`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= charsOf(IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:37-37:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b46c475391e590ad418923d8208c753f459b5f2ab076283ed1a0377e31df6588`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule charsOf(.IntSeq)                => .ValSeq
+```
+
+## reference-semantics/semantics/builtins.k:38-40:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `5e4a1af2608ee0d41e92cb766af70cd79b78207ac88652a4c1eb65199edc07b6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule charsOf(iCons(C:Int, R:IntSeq)) => vCons(str(iCons(C, .IntSeq)), charsOf(R))
+
+  // ==== set(str) — distinct character codes =================================
+```
+
+## reference-semantics/semantics/builtins.k:41-43:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `4a4f32b7892007e61b26053d7bc7a349c1fe8aee355d0aaefc4852a3c9d99e8c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("set", str(CS:IntSeq), .Vals) => setV(dedupCodes(CS))
+
+  // ==== abs(int) ============================================================
+```
+
+## reference-semantics/semantics/builtins.k:44-46:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `db3d75b51d53b74c515d9cd60792c23b42f3418ae874263c7925d801326b7695`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("abs", I:Int, .Vals) => absInt(I)
+
+  // ==== sum(iterable) — one #iterNext fold; intOf = int value of an int/bool ==
+```
+
+## reference-semantics/semantics/builtins.k:47-47:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `8faa5250ed2b829b2c57a81708a1e0b4c8fc5683bff408e6fae108fe3ec4e60f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #sumAcc(Iterable, Int) | #sumCont(Int)
+```
+
+## reference-semantics/semantics/builtins.k:48-48:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `cd531bdb9afa464c73c67f8946bbe64957682a3d5dd078d0bf22a556ccc572e6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #sumAcc(IT:Iterable, ACC:Int) => #iterNext(IT) ~> #sumCont(ACC) ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:49-49:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `74ff8e8be84218b889ef85b902de5efaea860b572c8a5da8306df05a1b3c4947`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterDone ~> #sumCont(ACC:Int) => ACC ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:50-53:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `1ea66d1c87c6d6c2367b5978e8c39eabd2c37f53f7517b4ff6a7dd95934f21a0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int)
+        => #sumAcc(R, ACC +Int intOf(V)) ... </k>
+       requires isInt(V) orBool isBool(V)
+```
+
+## reference-semantics/semantics/builtins.k:54-54:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `0355f95a50a6608682b1c8b9e304799a37a3ed6f4f6f81f8cc0d968f5ff678a4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= intOf(Val) [function]
+```
+
+## reference-semantics/semantics/builtins.k:55-55:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `619051750e3b8e9f67feace8a633ecf86a9daf0eac32615563f871a0069e9e1c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule intOf(I:Int)  => I
+```
+
+## reference-semantics/semantics/builtins.k:56-58:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `4ab92a36ddc90a69c42fa4f200d975591e697d4b9245712fe827d75e4367ba4d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule intOf(B:Bool) => #if B #then 1 #else 0 #fi
+
+  // ==== all / any (short-circuiting #iterNext folds) ========================
+```
+
+## reference-semantics/semantics/builtins.k:59-59:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `ed695fa0c4dbae8a1436b754495b020fb468e206c2b6448c21a61316bf0da571`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #allAcc(Iterable) | "#allCont"
+```
+
+## reference-semantics/semantics/builtins.k:60-60:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `e7fc3b9b3a8439566a4974be9e36608e65f380fca9cc34bcc9c6b41e522e9c16`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #allAcc(IT:Iterable) => #iterNext(IT) ~> #allCont ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:61-61:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `b74e515d3e67d8a52e1d0a061bb0432a2bf1de1b43995cc280a0ee2003d49c36`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterDone ~> #allCont => true ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:62-63:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `beb3eb90ee0ff2e9d13f424eb92b4dc8263fba7700c6690beba2d2aafb4299ad`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #allCont => #allAcc(R) ... </k>
+       requires truthy(V)
+```
+
+## reference-semantics/semantics/builtins.k:64-66:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `942b3c5ca9399a49d2fbd6ab4fa1a405dd4a7cf4516ff56af02970e4f30aa9a1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, _:Iterable) ~> #allCont => false ... </k>
+       requires notBool truthy(V)
+```
+
+## reference-semantics/semantics/builtins.k:67-67:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `fbd45cd7894ab0316f890fc61b1b5354b41eabbba062394cbcbf820f53d00eb0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #anyAcc(Iterable) | "#anyCont"
+```
+
+## reference-semantics/semantics/builtins.k:68-68:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `ca3f3bc3212a4bde9db710ca67b9ff4f7372092a568008c9e263f36654c478be`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #anyAcc(IT:Iterable) => #iterNext(IT) ~> #anyCont ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:69-69:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `c0ee3d29de0f584789682596e1516d301ee7f3cd73ca05694f3f10b3a978063a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterDone ~> #anyCont => false ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:70-71:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `6d518d4a9ce768d209c77a938fe801e5d4cb6a5bf65b95ed6c13bd7ec71209b5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, _:Iterable) ~> #anyCont => true ... </k>
+       requires truthy(V)
+```
+
+## reference-semantics/semantics/builtins.k:72-75:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `164008b49bd9b7dc3661592aeaabd5fcfef9f1e2581b0ef1e18a4f471adf13e8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #anyCont => #anyAcc(R) ... </k>
+       requires notBool truthy(V)
+
+  // ==== max / min over an iterable (#iterNext folds; first element seeds) ====
+```
+
+## reference-semantics/semantics/builtins.k:76-76:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `e3461106d962a1af387b25dc9d0efaf45f25429c84e747320080d55a256fe3c6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #maxAcc0(Iterable) | "#maxCont0" | #maxAcc(Iterable, Int) | #maxCont(Int)
+```
+
+## reference-semantics/semantics/builtins.k:77-77:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `59848da8989bf29361886195ec4d734aee2bb375e15be945b163e8bebe9dc86b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #maxAcc0(IT:Iterable) => #iterNext(IT) ~> #maxCont0 ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:78-79:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `ea3939e11faecfbdaf2e2a14e81ed6135343d312f3de159e633f02b0fad02cd1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAcc(R, {V}:>Int) ... </k>
+       requires isInt(V)
+```
+
+## reference-semantics/semantics/builtins.k:80-80:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `66b9fabf71fa1c3cb5935e7c758b7835d42c078229bef95a9d00258c2be25942`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #maxAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #maxCont(M) ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:81-81:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `45675f8137ef759c03793ddbc5f29ba0c26e9b63dbb20548eff076acbe7f1e57`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterDone ~> #maxCont(M:Int) => M ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:82-85:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `fee6fab3ed0c3bb5c60e6322b9837a3f13ea7f3cf846ea670e1197e10b84ddf1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont(M:Int)
+        => #maxAcc(R, maxInt(M, {V}:>Int)) ... </k>
+       requires isInt(V)
+```
+
+## reference-semantics/semantics/builtins.k:86-86:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `612c7bdfd2d38320c9120a5ad0911e5880488eb2a92ab68e87ac7a0a9bdcc60d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #minAcc0(Iterable) | "#minCont0" | #minAcc(Iterable, Int) | #minCont(Int)
+```
+
+## reference-semantics/semantics/builtins.k:87-87:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `eb6389d2a176f8e9c2eb65f49175e5c400253651be9a571add590da6ce3ba770`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #minAcc0(IT:Iterable) => #iterNext(IT) ~> #minCont0 ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:88-89:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `626486127c454c5cc6f3c1fdbae17950f6a96239e28e9d72fdd6322a77112532`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAcc(R, {V}:>Int) ... </k>
+       requires isInt(V)
+```
+
+## reference-semantics/semantics/builtins.k:90-90:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `20c0d7b936a1ae717e1b498c544d3e56d529de8b54a671c87468ea52c0180f02`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #minAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #minCont(M) ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:91-91:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `3f472924a83dcd925a34d32704d5cb43591b3115643998243b00b590ffd0789e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterDone ~> #minCont(M:Int) => M ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:92-96:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `a9b5772d35f73a01689b10b279ce8d3882e8605d38e7ea60527da50c60cdf367`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont(M:Int)
+        => #minAcc(R, minInt(M, {V}:>Int)) ... </k>
+       requires isInt(V)
+
+  // ==== variadic max / min (a Vals fold) ====================================
+```
+
+## reference-semantics/semantics/builtins.k:97-97:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `4282c4747876bd11b0e0b06b2e4a8b6d9a709d9fb7d61a124e4e6e221a9cf49a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= maxVals(Int, Vals) [function]
+```
+
+## reference-semantics/semantics/builtins.k:98-98:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `16f482b70cca4e393239fcfc21ef383ea47184220924e70160efcc4f10351c27`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("max", I:Int, REST:Vals) => maxVals(I, REST)
+```
+
+## reference-semantics/semantics/builtins.k:99-99:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d3dcf3e3dfc110b7a7e46a508da6b501013718660c4909102ecb99372daeeb5e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule maxVals(M:Int, .Vals)           => M
+```
+
+## reference-semantics/semantics/builtins.k:100-101:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f1bf63869c2f8c3b4f48e5d002007a959d31bd3f9c39589cedd372e8e8c2c1fd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule maxVals(M:Int, (I:Int, R:Vals)) => maxVals(maxInt(M, I), R)
+```
+
+## reference-semantics/semantics/builtins.k:102-102:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `8b1e9d6e3b83d5fbb06102823efcc1bd5eceebe50248a0519155605df3d8928e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= minVals(Int, Vals) [function]
+```
+
+## reference-semantics/semantics/builtins.k:103-103:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `92b52ecacf4f7bcc94c1774bbf2f8c46491933333083bff18d1fba94099a53f7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("min", I:Int, REST:Vals) => minVals(I, REST)
+```
+
+## reference-semantics/semantics/builtins.k:104-104:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a772c1fa6c19d7e20de4bfb312290a4fec8361e25da92cf256eec367e779d438`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule minVals(M:Int, .Vals)           => M
+```
+
+## reference-semantics/semantics/builtins.k:105-107:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `52f70ac7a1b581eb62493a23d2c267864f1307d124a0d6469886b189a3c8b64c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule minVals(M:Int, (I:Int, R:Vals)) => minVals(minInt(M, I), R)
+
+  // ==== bin(n) — "0b" + binary digit codes (promoted from 103's defined fold) ==
+```
+
+## reference-semantics/semantics/builtins.k:108-110:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `75cdd7f2c5ddedc5d2d0eb29d46a57ac2c7b9e730d41d0a050087d8caca1471b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(48, iCons(98, binCodes(N))))
+       requires N >=Int 0
+  // negative operand: the '-' sign prefixes the magnitude's digits
+```
+
+## reference-semantics/semantics/builtins.k:111-113:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `edb0bd1ec983404de3c2e8d866c12554270e0f9fc01dbc7307d5ba0ff1510fb4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("bin", N:Int, .Vals)
+    => str(iCons(45, iCons(48, iCons(98, binCodes(0 -Int N)))))
+       requires N <Int 0
+```
+
+## reference-semantics/semantics/builtins.k:114-114:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `c616aba4766ff2aaf0704be23847369aa1831eaf4276066d724101d505f66734`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= binCodes(Int) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:115-115:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `4e15dfee6cc651ddde7fae203da6c1cac63f9526f0a298a0e12298cece607136`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule binCodes(0) => iCons(48, .IntSeq)
+```
+
+## reference-semantics/semantics/builtins.k:116-116:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7e1227c3ef64530774984a9128b2c12c553bcb563b0a0b83bc5b6e1c346beaa4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule binCodes(N:Int) => binAcc(N, .IntSeq) requires N >Int 0
+```
+
+## reference-semantics/semantics/builtins.k:117-117:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `939453dbc7b8105a40a22f0da3eb1cc17b459109ddb7ba032b38664edc20227c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= binAcc(Int, IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:118-118:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7503c649eb67d40e57fdd7614dcfa3de4a3e4715eee89ab6ca8ce6dea1dc7de8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule binAcc(0, ACC:IntSeq) => ACC
+```
+
+## reference-semantics/semantics/builtins.k:119-123:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d28a9bf00ef6efedabbbd27281019bbbdf2db021460f0a204b04f40b766cb83b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule binAcc(N:Int, ACC:IntSeq)
+    => binAcc((N -Int pyMod(N, 2)) /Int 2, iCons(48 +Int pyMod(N, 2), ACC))
+       requires N >Int 0
+
+  // ==== enumerate(xs) — pairs (i, v); materialized eagerly over a list =========
+```
+
+## reference-semantics/semantics/builtins.k:124-125:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `e69569e78ca6c9783320125b87ca20dec101ecd113e50d4ddf36a1172c8a3f10`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("enumerate")), (list(VS:ValSeq), .Vals))
+        => #alloc(list(enumVS(VS, 0))) ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:126-126:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `aeb5f1496dff1950ec1446b3259063e01a84eb972208b260c0d6f09ce9506bf5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= enumVS(ValSeq, Int) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:127-127:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `4833a908272d7c487063f0cfa562afde5a3451844e05cf3fe38d54ed348f1bc0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule enumVS(.ValSeq, _:Int) => .ValSeq
+```
+
+## reference-semantics/semantics/builtins.k:128-131:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b2ea4cb432ba78462fe13e0f9a767b5387422c3c466299bd74d8b8a5a22e0b2f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule enumVS(vCons(V:Val, R:ValSeq), I:Int)
+    => vCons(tuple(vCons(I, vCons(V, .ValSeq))), enumVS(R, I +Int 1))
+
+  // ==== map(str, xs) — eager (only the str case is in the subset) =============
+```
+
+## reference-semantics/semantics/builtins.k:132-133:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `67a2cd9a593398acdc821b86ca3300583dcd23fa6ba78888d4175a6e18b99b8e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("map")), (typeV("str"), list(VS:ValSeq), .Vals))
+        => #alloc(list(mapStrVS(VS))) ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:134-134:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `0513f86f41d97840aa4c9001828f9522be7fdfe0d34a81d66b1c7cb69dd19429`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= mapStrVS(ValSeq) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:135-135:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `289c1f88138532f4849f1759636f258f7a27e847636d3570f4d47118be315292`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule mapStrVS(.ValSeq) => .ValSeq
+```
+
+## reference-semantics/semantics/builtins.k:136-136:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `74f471f298eebc641fbb40d2d7b15dd6178b5ded64b3cfb82bf8ed4d84d78288`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))
+```
+
+## reference-semantics/semantics/builtins.k:137-139:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7030258d8cf7eb0b23c9ca84c2c68deaebf42b8db487f79d1379e150ced33703`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule mapStrVS(vCons(str(CS:IntSeq), R:ValSeq)) => vCons(str(CS), mapStrVS(R))
+
+  // ==== int(x) identities (int(round(x)) composes through) ====================
+```
+
+## reference-semantics/semantics/builtins.k:140-142:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `3651afde140b835e99def81437d7602b8509f36de5c7a77c48e47c1313815e67`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("int", I:Int, .Vals) => I
+
+  // ==== ord / chr ===========================================================
+```
+
+## reference-semantics/semantics/builtins.k:143-143:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c4bb6edca9516337358f2cb7225d3ce0895ec4e19972031b438ad7517dc71f51`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("ord", str(iCons(C:Int, .IntSeq)), .Vals) => C
+```
+
+## reference-semantics/semantics/builtins.k:144-147:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b6c400524bf5e6a9f60636f31fc7da22920910d6dff4e7b961287707cc5c4f16`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("chr", I:Int, .Vals) => str(iCons(I, .IntSeq))
+       requires 0 <=Int I andBool I <Int 128
+
+  // ==== str(int) / str(str) =================================================
+```
+
+## reference-semantics/semantics/builtins.k:148-148:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `514da827df957adc87a8c30d89c93d9a906eed57147f164b61a8a54c2c49c17f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("str", I:Int, .Vals)       => str(strToCodes(Int2String(I)))
+```
+
+## reference-semantics/semantics/builtins.k:149-151:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b3fb91d4c51d0ffd070f7ec5db02e186ed6a92e1ee2ff829f7dd3082bdd42c0d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("str", str(CS:IntSeq), .Vals) => str(CS)
+
+  // ==== int(str) — a single digit char ('0'..'9', code 48..57) to its value =====
+```
+
+## reference-semantics/semantics/builtins.k:152-155:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `2c3c6d6b9c04bbf513f37e51d487664fbabff95862149a1a8bf28c383a280019`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("int", str(iCons(C:Int, .IntSeq)), .Vals) => C -Int 48
+       requires 48 <=Int C andBool C <=Int 57
+
+  // ==== int(str) — a multi-digit non-negative numeral (Horner fold; the single-char rule covers len 1)
+```
+
+## reference-semantics/semantics/builtins.k:156-157:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `4c392478d60ededfeaea2f2717127374ee4de6f5a2cee983a551b6a261a62936`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("int", str(CS:IntSeq), .Vals) => intDigAcc(CS, 0)
+       requires isLen(CS) >=Int 2
+```
+
+## reference-semantics/semantics/builtins.k:158-158:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `5400597dd0d27beb9fb8b90889ee5e284a9ef3f9ae1719cc1cdcf297cc5222df`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= intDigAcc(IntSeq, Int) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:159-159:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `cef2f51a1185af0e38fce7f93e28a99eb22f0be9c4ef005088f534a14a65a1f0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule intDigAcc(.IntSeq, ACC:Int)             => ACC
+```
+
+## reference-semantics/semantics/builtins.k:160-162:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d9500696d63483cfee1ff7e19ef38af841b9160a70c1d569cf47efff65baef66`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule intDigAcc(iCons(C:Int, R:IntSeq), ACC:Int) => intDigAcc(R, (ACC *Int 10) +Int (C -Int 48))
+
+  // ==== zip(a, b) — parallel iterable of pairs, truncating to the shorter =====
+```
+
+## reference-semantics/semantics/builtins.k:163-163:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d3b8ae0c04fe1c9c52482cb2873d5b12f4fc0b6fc09c01fe1cf2ebea8995dfca`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("zip", list(A:ValSeq), list(B:ValSeq), .Vals) => zipObj(A, B)
+```
+
+## reference-semantics/semantics/builtins.k:164-166:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `042e91cd858c0fef4a16a92c1d2d68d9cf609df584f99df5a675a977064e4cb7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("zip", str(A:IntSeq), str(B:IntSeq), .Vals)   => zipObjS(A, B)
+
+  // zip's iterator-protocol cases (zip is created here, so its #iterNext lives here)
+```
+
+## reference-semantics/semantics/builtins.k:167-168:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `8cb29bfb42109534d81a22b5819beef8ed9a62984dad98ebe78256c04f9a4b56`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterNext(zipObj(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq)))
+        => #iterYield(tuple(vCons(A, vCons(B, .ValSeq))), zipObj(As, Bs)) ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:169-169:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `d3f91e2ffaf39ce4f03a5e18eb107ed02f5379adc28549af9402f06bfd0d7405`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterNext(zipObj(.ValSeq, _:ValSeq))               => #iterDone ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:170-170:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `84cabfd28956dc3a489c060c4e01deda2dd393855e02d4eae64649ac5a7a0885`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterNext(zipObj(vCons(_:Val, _:ValSeq), .ValSeq)) => #iterDone ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:171-172:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `b15b1c71a43b0ecd1a5f031d0b9b6159b355c026147d91a86c62a681c739b4a3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterNext(zipObjS(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)))
+        => #iterYield(tuple(vCons(str(iCons(A, .IntSeq)), vCons(str(iCons(B, .IntSeq)), .ValSeq))), zipObjS(As, Bs)) ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:173-173:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `33a124c306f4818a23bfa8b93078f972ca5fe71009360eb7b42d6c31f47a686f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterNext(zipObjS(.IntSeq, _:IntSeq))              => #iterDone ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:174-176:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `ad218665aa87834432b8394cda3ada030da434ba583004fc9604b4c435fd79a0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterNext(zipObjS(iCons(_:Int, _:IntSeq), .IntSeq)) => #iterDone ... </k>
+
+  // ==== range(stop) / range(start, stop) / range(start, stop, step) =========
+```
+
+## reference-semantics/semantics/builtins.k:177-177:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d63eee230cc9124e2b956cf84c0efc0ef84ef3867b12f9b9df52b748d85d91d9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("range", I:Int, .Vals)               => rangeObj(0, I, 1)
+```
+
+## reference-semantics/semantics/builtins.k:178-178:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b65792b63b52a804483b77517d47b25ef8655aae8d19555474c96a58fbf9ace9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("range", A:Int, B:Int, .Vals)        => rangeObj(A, B, 1)
+```
+
+## reference-semantics/semantics/builtins.k:179-186:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a1fdf4df0f8ea278340c84b6494538834384a9d6597a350f48ab9bf07322c908`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("range", A:Int, B:Int, S:Int, .Vals) => rangeObj(A, B, S)
+       requires S =/=Int 0
+
+  // ==== eval(str) — arithmetic expressions (ints, + - * // **, spaces) ========
+  // Python precedence: ** right-assoc, then * //, then + -. Promoted from 160's
+  // trusted pass evaluator, now DEFINED in the reference and driven by a
+  // code-level tokenizer. Reduces on concrete strings (krun); a symbolic
+  // argument leaves the call unevaluated for problem-level folds.
+```
+
+## reference-semantics/semantics/builtins.k:187-187:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `3115789003f5fd3304efbfa147941564256ce839d48ae9c7ec4ab0817276c8a7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("eval", str(CS:IntSeq), .Vals) => evalArith(CS)
+```
+
+## reference-semantics/semantics/builtins.k:188-188:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `ac5c7747453bcef9f306787c450027d49b33b7ccc8424f568c0a59340f7be95b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= evalArith(IntSeq) [function]
+```
+
+## reference-semantics/semantics/builtins.k:189-191:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `05258192fa0b32d9593bf71dc22e3c593e89bc6fdaa642ed42a7771ac6d9e9d4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule evalArith(CS:IntSeq)
+    => firstNdE(passAddE(passMulE(passPowE(tokOps(CS), tokNds(CS)))))
+```
+
+## reference-semantics/semantics/builtins.k:192-193:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `82f289aff1572a4406a04b267222ab0133343ece15b934ac425fb05cc70ffb83`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax OpSeq ::= ".OpSeq" | oCons(String, OpSeq)
+```
+
+## reference-semantics/semantics/builtins.k:194-194:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `b174a010e1cc48fc9c87f146d63c9f0b5fe2cc39edccb9bccec656443882ed7e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= evDigit(Int) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:195-195:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `3e38e9b3918ab5f217a28ee11803a976860adc4a4a43d7e5f0a8dbe20d6f746d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule evDigit(C:Int) => C >=Int 48 andBool C <=Int 57
+```
+
+## reference-semantics/semantics/builtins.k:196-196:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `7322fabc33c94db411ece339632320083ba49717b78a26188e9cc33fd0ba692a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= evHead42(IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:197-197:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `8943c2a4d63090268d6e9b4908ea537fadc1b77bb23ba953b72c8e042d469510`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule evHead42(iCons(42, _:IntSeq)) => true
+```
+
+## reference-semantics/semantics/builtins.k:198-198:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `ef5ec403ed147812d1bd9f3325693a9ac662c6a3aef47a6bf14e8d5190abc55f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule evHead42(_:IntSeq)            => false [owise]
+```
+
+## reference-semantics/semantics/builtins.k:199-199:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `0c7954767f99543b9df8d794bd317db6dd33a660a59579479ada56d88fcac4e4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= evHead47(IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:200-200:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `238e1f40d90ae25e3e018df6ad041e714bf374ab5bfa3a169df3a4b92a4fa8d7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule evHead47(iCons(47, _:IntSeq)) => true
+```
+
+## reference-semantics/semantics/builtins.k:201-202:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `04deaa8cfac7193805033d5c37fc46a154d3af657a803979e8659429be3ed3f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule evHead47(_:IntSeq)            => false [owise]
+```
+
+## reference-semantics/semantics/builtins.k:203-203:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `d6d582239dd5c12601e35b409a04def1e7d471de1e96122e7a75d07a819d4c1c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax OpSeq ::= tokOps(IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:204-204:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `cad0dda355df9f6c2c3fbf0f644adbc93b074ef979896386fd045b8091234f08`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokOps(.IntSeq)                 => .OpSeq
+```
+
+## reference-semantics/semantics/builtins.k:205-205:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `ac016e542b1831592a1a686c1b0a738366687014df9199482098b3e77f6c30e3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokOps(iCons(32, R:IntSeq))     => tokOps(R)
+```
+
+## reference-semantics/semantics/builtins.k:206-206:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `aeb40dc57a6a9ca90fb15f3fcf3fcc10f89ce4d1d4c49272a37a4d8343f060b7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokOps(iCons(C:Int, R:IntSeq))  => tokOps(R) requires evDigit(C)
+```
+
+## reference-semantics/semantics/builtins.k:207-207:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `011c9edcd2e8becfa114c58f13dac94960765c17469779243288ff3af8abb706`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokOps(iCons(42, iCons(42, R:IntSeq))) => oCons("**", tokOps(R))
+```
+
+## reference-semantics/semantics/builtins.k:208-208:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `884a4ea6adfc5704309ee57dbca06b293133aa5b5775c4d95a3a350ed7fc4e68`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokOps(iCons(42, R:IntSeq))     => oCons("*", tokOps(R)) requires notBool evHead42(R)
+```
+
+## reference-semantics/semantics/builtins.k:209-209:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `005eaf8a7dd6285a798e4e70b662f6a95ea2eabcc597d42dfe99af4f1b29d569`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokOps(iCons(47, iCons(47, R:IntSeq))) => oCons("//", tokOps(R))
+```
+
+## reference-semantics/semantics/builtins.k:210-210:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `edd2b8a2a0651a0e4b655497b9bf536a4a11f57b4d0cb97754d0f845c043691e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokOps(iCons(47, R:IntSeq))     => oCons("/", tokOps(R)) requires notBool evHead47(R)
+```
+
+## reference-semantics/semantics/builtins.k:211-211:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f7ba86c9174eaf528b4f3e33a5846502a86b837eecceb24f00ef5942591d3400`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokOps(iCons(43, R:IntSeq))     => oCons("+", tokOps(R))
+```
+
+## reference-semantics/semantics/builtins.k:212-213:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `bb5f349b145f18042d9eb38d1c2b885bcf7d5fa4c8a17d054ec61880783ff8c8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokOps(iCons(45, R:IntSeq))     => oCons("-", tokOps(R))
+```
+
+## reference-semantics/semantics/builtins.k:214-215:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `996ffada5296e40c9ff29122dea45b0714f97763abd44a448e4cae918e431124`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= tokNds(IntSeq) [function, total]
+                  | tokNdAcc(Int, IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:216-216:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `4254b9f7b231f8c53a5ef902854240392e5b7aa9141683eacb32daf4e6d00f8a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokNds(.IntSeq)                => .IntSeq
+```
+
+## reference-semantics/semantics/builtins.k:217-217:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1f722e6081e13a2c683b2e70fa6a9f75d3dd005bd0291ac24504f408c991231b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokNds(iCons(32, R:IntSeq))    => tokNds(R)
+```
+
+## reference-semantics/semantics/builtins.k:218-218:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `2378510f6563de1061f2178b6a21c8a76a60c0e7f601ed9be70103eddf86cf55`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokNds(iCons(C:Int, R:IntSeq)) => tokNdAcc(C -Int 48, R) requires evDigit(C)
+```
+
+## reference-semantics/semantics/builtins.k:219-220:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `50035ba8e9693ff062b7f58199809435b47b07e07ad6cf5fa711cf0f6116d97a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokNds(iCons(C:Int, R:IntSeq)) => tokNds(R)
+       requires notBool evDigit(C) andBool C =/=Int 32
+```
+
+## reference-semantics/semantics/builtins.k:221-222:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `84ee76f78e1498edefe6d1611109aef0d8fd648750f4b4fffaf7c722a42cceb2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokNdAcc(A:Int, iCons(C:Int, R:IntSeq)) => tokNdAcc(A *Int 10 +Int (C -Int 48), R)
+       requires evDigit(C)
+```
+
+## reference-semantics/semantics/builtins.k:223-224:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `a5f697b9adb7c8b0ca4ee6f23007fde8a5d61e94f3066d3bc35c79caa8395ade`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule tokNdAcc(A:Int, S:IntSeq) => iCons(A, tokNds(S)) [owise]
+```
+
+## reference-semantics/semantics/builtins.k:225-225:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `906d0c17f2fb826efe4efc82beb72a4d68f990ca14e99999640dfb946f7e6e6e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax EvPair ::= evp(OpSeq, IntSeq)
+```
+
+## reference-semantics/semantics/builtins.k:226-226:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `cdf7f8b500cfb4398499c7e394562a0b14477808f647c6ee721f498aa1fb9416`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= firstNdE(EvPair) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:227-227:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `493a0efa8ace14cbd61f46bf3d0e7a35639532c12c55fe97b0345c3e214172e5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule firstNdE(evp(_:OpSeq, iCons(N:Int, _:IntSeq))) => N
+```
+
+## reference-semantics/semantics/builtins.k:228-229:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `99460cf0fcab8942aa7842de35e012e3fdd575d398f6e967cca26cb5484b00d4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule firstNdE(_:EvPair) => 0 [owise]
+```
+
+## reference-semantics/semantics/builtins.k:230-230:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `f15a46d2a8840cf972edcb93b43af177e7e040743128ac33ac7d277186128d3e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= applyOpE(String, Int, Int) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:231-231:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f63fbddd422856e31b02a9c40bda9546a7ca97e32f6882614dce3d8b31c510bd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyOpE("+",  A:Int, B:Int) => A +Int B
+```
+
+## reference-semantics/semantics/builtins.k:232-232:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f3a95c1d102c50f4032535bff45410e55febd09f74eb9827e891934b7f295bdd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyOpE("-",  A:Int, B:Int) => A -Int B
+```
+
+## reference-semantics/semantics/builtins.k:233-233:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `83add421a5319e45071f11d85962bb7bd95b6234a6b3e5dcd5a7ea1413d5fcd0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyOpE("*",  A:Int, B:Int) => A *Int B
+```
+
+## reference-semantics/semantics/builtins.k:234-234:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `fe469f129f991e5bf72cb167734210674f0a824b896f3d490090150f7e8c8ff7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyOpE("//", A:Int, B:Int) => A divInt B
+```
+
+## reference-semantics/semantics/builtins.k:235-235:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `45890407b0492b0c493d87a536fe5c8c5b2638dec4e8ca3e6807a4de200feeba`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyOpE("**", A:Int, B:Int) => A ^Int B
+```
+
+## reference-semantics/semantics/builtins.k:236-237:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `77542379cedbe6f215bafd871a01024c1a53e4aaddb0e5c13b5a86a9ea4f4d23`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyOpE(_:String, A:Int, _:Int) => A [owise]
+```
+
+## reference-semantics/semantics/builtins.k:238-238:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `7039540535a2a934e1476e82610824ca18f40978dc212deea8d2425979e582b3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax EvPair ::= passPowE(OpSeq, IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:239-239:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `337779ec32074914e6e27bc5f85de1641f10d2afc874b25642ccdc76406e7431`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule passPowE(.OpSeq, NDS:IntSeq) => evp(.OpSeq, NDS)
+```
+
+## reference-semantics/semantics/builtins.k:240-240:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `cfc7aaf386852d921b5c016af8b582faecaf7ed85c957e07e8a45a0a8d382eb4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule passPowE(oCons("**", OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCombE(N, passPowE(OPS, NDS))
+```
+
+## reference-semantics/semantics/builtins.k:241-242:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `ebdd09e2ea6731f368c4b9e8b304b8c76ccf56cd81e1b37f5f296c16fade183c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule passPowE(oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCarryE(O, N, passPowE(OPS, NDS))
+       requires O =/=String "**"
+```
+
+## reference-semantics/semantics/builtins.k:243-243:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `25a4663fe177b1bb7951e46a96f911fa2cbb67bb09b33e61fd15260ab70bb461`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule passPowE(_:OpSeq, .IntSeq) => evp(.OpSeq, .IntSeq) [owise]
+```
+
+## reference-semantics/semantics/builtins.k:244-244:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `6a975303e128a6b1b0e7d23b8e37d9f1ae2ad9e69d282f2fa22132f46c7e50ae`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax EvPair ::= powCombE(Int, EvPair) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:245-245:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b0fe3350706d64a2ed9d52bc609d637f07d7662af49a883fd8a47391ce0ee69b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule powCombE(N:Int, evp(OPS:OpSeq, iCons(M:Int, REST:IntSeq))) => evp(OPS, iCons(N ^Int M, REST))
+```
+
+## reference-semantics/semantics/builtins.k:246-246:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `2474e1e106b7656c99a940038d99b9f219abc2e34fdc07fc22cc1333f730fd6e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule powCombE(N:Int, evp(OPS:OpSeq, .IntSeq)) => evp(OPS, iCons(N, .IntSeq))
+```
+
+## reference-semantics/semantics/builtins.k:247-247:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `ccb2ec4ebb2f9efa05e40d029742beb8cfb1dbdf2fff046fcc8a3189f9b95ab3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax EvPair ::= powCarryE(String, Int, EvPair) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:248-249:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1b1d231b33e55aff0eed8c4c991c12970b36112c2714d56965864a761949ca78`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule powCarryE(O:String, N:Int, evp(OPS:OpSeq, NDS:IntSeq)) => evp(oCons(O, OPS), iCons(N, NDS))
+```
+
+## reference-semantics/semantics/builtins.k:250-250:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `b236e49f85be5349a9675f896a77076f773e9504b7f97d14a6c867bb11b778eb`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax EvPair ::= passMulE(EvPair) [function, total] | passAddE(EvPair) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:251-251:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `e5919eeb7c7e9743f9ab2b65f117ba635202f5d7d4f266e5f792fd9922c4a5e2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule passMulE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("mul", N0, OPS, NDS, .OpSeq, .IntSeq)
+```
+
+## reference-semantics/semantics/builtins.k:252-252:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `6b1d3c71e798a33a869fa96af0ff246045b0d50f1cbae9d6e0b730faf9318ba3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule passMulE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)
+```
+
+## reference-semantics/semantics/builtins.k:253-253:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c3f2a5ab71feddf57b9ec4f6ac41ce023d2c3d261b228d3a481ecf75b457f517`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule passAddE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("add", N0, OPS, NDS, .OpSeq, .IntSeq)
+```
+
+## reference-semantics/semantics/builtins.k:254-254:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `8842e532de290ccc6229328d1ff7b4e0a8bb81f4b6833a6abe2359f186fcca76`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule passAddE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)
+```
+
+## reference-semantics/semantics/builtins.k:255-255:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `3b8c247c3782a565e300e94a2fb42976e6b99be17f945b42d7f555f31696d32f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax EvPair ::= passLGoE(String, Int, OpSeq, IntSeq, OpSeq, IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:256-256:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1232a86fdb86335bf2e99f4e74879b87030f1e6babb381980e59583e8d66bbbd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule passLGoE(_:String, CUR:Int, .OpSeq, _:IntSeq, OO:OpSeq, ON:IntSeq) => evp(OO, appendIE(ON, CUR))
+```
+
+## reference-semantics/semantics/builtins.k:257-259:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `92900e548ab821e30402231e0b637fe980c7ed5e2ebede9607e633fcfe9bbc0b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq)
+    => passLGoE(L, applyOpE(O, CUR, N), OPS, NDS, OO, ON)
+       requires inLevelE(L, O)
+```
+
+## reference-semantics/semantics/builtins.k:260-262:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c0996a5da68b6484bf1ac4d41cdc3a32977bc0440dc5f581a55d52c998a9c2fc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq)
+    => passLGoE(L, N, OPS, NDS, appendOpE(OO, O), appendIE(ON, CUR))
+       requires notBool inLevelE(L, O)
+```
+
+## reference-semantics/semantics/builtins.k:263-264:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `25373bd79114d67d6211714316bd46dbda4015954530bfc878fcbc55103a98b6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule passLGoE(_:String, CUR:Int, oCons(_:String, _:OpSeq), .IntSeq, OO:OpSeq, ON:IntSeq)
+    => evp(OO, appendIE(ON, CUR)) [owise]
+```
+
+## reference-semantics/semantics/builtins.k:265-265:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `241368398e21fbed55a3fe2220ff3fd74d5176a9b6d12d755f6576d4485dd3c9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= inLevelE(String, String) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:266-266:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `55734e1ee04564bb05f5a1222d96d045ca785db371f0dd1e412700b3137b2e2b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule inLevelE("mul", O:String) => O ==String "*" orBool O ==String "//" orBool O ==String "/"
+```
+
+## reference-semantics/semantics/builtins.k:267-267:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d4ca4934e9e1b81eff61ec775162bde071bd8f9fb90a53610d86e3fad50df9b9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule inLevelE("add", O:String) => O ==String "+" orBool O ==String "-"
+```
+
+## reference-semantics/semantics/builtins.k:268-268:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `7c8e03ff739bc71b7303f7f870446e7a75c52ec1b6e9ebcb29253ca4d8ee4dd7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule inLevelE(_:String, _:String) => false [owise]
+```
+
+## reference-semantics/semantics/builtins.k:269-269:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `b9870a621ad1be4d3a7c365468aea378f44ec26954b7e9c188db758ca114faf5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax OpSeq ::= appendOpE(OpSeq, String) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:270-270:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7a7e56f7388050cd1919f7e222333ac3b98c776e784b8539d083a19bb64848f6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule appendOpE(.OpSeq, O:String) => oCons(O, .OpSeq)
+```
+
+## reference-semantics/semantics/builtins.k:271-271:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d0623558f5e85944ab1fcd7335be39840a83c46b7d5428876c7833b4f89b5384`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule appendOpE(oCons(H:String, T:OpSeq), O:String) => oCons(H, appendOpE(T, O))
+```
+
+## reference-semantics/semantics/builtins.k:272-272:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `5895024c900ed926efd37641fc7f49c57eb17dfb01becd0b3a37b5314cd99ee0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= appendIE(IntSeq, Int) [function, total]
+```
+
+## reference-semantics/semantics/builtins.k:273-273:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `0a8e13361178e515263f1d8ae563297c568b0362c79d97efdfcea3c88117f181`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule appendIE(.IntSeq, N:Int) => iCons(N, .IntSeq)
+```
+
+## reference-semantics/semantics/builtins.k:274-278:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `2d4ab3afff7d5c47ab1cb989e40aacac1e497ad744849b7f482153690d110862`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule appendIE(iCons(H:Int, T:IntSeq), N:Int) => iCons(H, appendIE(T, N))
+
+  // ==== hashlib.md5(S).hexdigest() — a trusted opaque digest ==================
+  // The md5 value itself is a named shared trust (sortVS-style, no concrete
+  // twin); proofs use the length/hex-charset lemmas (lemmas/builtins.k).
+```
+
+## reference-semantics/semantics/builtins.k:279-279:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `daf634ba2a452a465a8979ce59cb66a1fadf69f201135b26bbf668a0b140cee6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= "#md5"
+```
+
+## reference-semantics/semantics/builtins.k:280-281:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `90e43d1cdca9942e8d565f5b758ce9eaca408ff1488d1b026ed7535b2f126c98`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Call(Attribute(Name("hashlib"), "md5"), (E:Expr, .Exprs)) => E ~> #md5 ... </k>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/builtins.k:282-282:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `3dea3e5b7893d5a8de66b418ef62a7720a4922b0196b3bf6f60da7b3ce209a46`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> str(CS:IntSeq) ~> #md5 => md5Obj(CS) ... </k>
+```
+
+## reference-semantics/semantics/builtins.k:283-283:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `697d07fdfb4368b871b79100399c9f9a6e5a9fe6cabea49f874000787d63e6c6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= md5Obj(IntSeq)
+```
+
+## reference-semantics/semantics/builtins.k:284-284:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `314edc78f759a075f1de50ee2835fb29fabb540ba0d03224597f229c4569402c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(md5Obj(CS:IntSeq), "hexdigest", .Vals) => str(md5hexCodes(CS))
+```
+
+## reference-semantics/semantics/builtins.k:285-290:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `43bc3c3c9885ba96f646c7d193944edb0e55e26e54ef298eeeaef0300629b7be`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax IntSeq ::= md5hexCodes(IntSeq) [function, total, symbol(md5hexCodes), no-evaluators]
+
+  // ==== isinstance(V, int|str) — an ordinary 2-arg builtin ===================
+  // The type argument (int/str) is an ordinary name that resolves via the builtins frame to
+  // typeV (see core.k's config); no Call-level special case. isIntV/isStrV mirror the old
+  // owise-on-Val test (concrete-sort args decide; a symbolic Val stays owise, as before).
+```
+
+## reference-semantics/semantics/builtins.k:291-291:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `89ae05ae7446b64459d70500af804820a1dd08a2e026be0482e5c3a785017dc4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("isinstance", V:Val, typeV("int"), .Vals) => isIntV(V)
+```
+
+## reference-semantics/semantics/builtins.k:292-292:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `42f642e09611be70a172dc68c2006d70fc21a4a1e53a226708cb78c84dba1a46`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("isinstance", V:Val, typeV("str"), .Vals) => isStrV(V)
+```
+
+## reference-semantics/semantics/builtins.k:293-293:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `09de746af4b8bd37b0903d806cc36bc62183fa7c6cdd818358b1c420b1dc7ec0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= isIntV(Val) [function] | isStrV(Val) [function]
+```
+
+## reference-semantics/semantics/builtins.k:294-294:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `2ac5e818e75ed1e69b10857f6e1ed2743ebfd6951704a2a8d6e3c80587f0c9d7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isIntV(_:Int)         => true
+```
+
+## reference-semantics/semantics/builtins.k:295-295:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `f15a463d63cd54777bc476ff03776ffce12d190ab1be45d29626140b9f9050a0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isIntV(_:Val)         => false [owise]
+```
+
+## reference-semantics/semantics/builtins.k:296-296:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d3c0ce1552b2b2853fc67dafe979d0d00417538151d66cb0639225f240b23ade`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isStrV(str(_:IntSeq)) => true
+```
+
+## reference-semantics/semantics/builtins.k:297-297:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `2615ec2618f0391f9b62aa9efedfcbbcf86240359ce34270a42c1eff00c42f51`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isStrV(_:Val)         => false [owise]
+```
+
+## reference-semantics/semantics/builtins.k:298-298:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/call.k:10-10:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `876a0ba2b4a12f1d7c9d9b9078fa73163bb752f12602c9436ab479a8e7586358`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-CALL
+```
+
+## reference-semantics/semantics/call.k:11-11:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `09fe9e0706aef859710b0c5447f1427e859a1a9e9660b612e310bb91d51ec923`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-METHODS
+```
+
+## reference-semantics/semantics/call.k:12-12:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `513b07985ad1b60ab1fc94f4a08021dd25a5b0aa218c3a975ce281a00395ddfa`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-BUILTINS
+```
+
+## reference-semantics/semantics/call.k:13-15:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `847aa9d4d4c0893f87ef653cf8d8e24982a5fc56ff0f41dbadcf61e792d31c97`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-FUNCTIONS
+
+  // a cooled attribute is a bound method value
+```
+
+## reference-semantics/semantics/call.k:16-18:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `24066eeea708699dd15f3cb680dd6a0beadac5587b1fdb3d15baf3b7e24cbfba`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Attribute(V:Val, M:String) => boundMethodV(V, M) ... </k>
+
+  // evaluate callee, then args ([owise]: problem-local Call interceptions beat this)
+```
+
+## reference-semantics/semantics/call.k:19-19:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `2e4b9931b31d9e16cfac26853c8ae9d20f6a224c0926e14661fb1687c29a28c5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #callee(Exprs)
+```
+
+## reference-semantics/semantics/call.k:20-20:rule
+
+- Category: `operational-rule`
+- Attributes: `['owise']`
+- SHA-256: `1e7cf6c3f022cb177607930a786e4fdcc401edb04cf97903c0420352b69ecead`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]
+```
+
+## reference-semantics/semantics/call.k:21-23:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `a17200963b4cc98f1e27da888028d0520a833a765411bb8339aab85db16e3a3e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>
+
+  // ==== dispatch on the callee value ========================================
+```
+
+## reference-semantics/semantics/call.k:24-25:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `ba0da2a7daa02786dc1db5e4224e2e2046dc13fd8f9cff675b66fa21b3e64cc3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>
+```
+
+## reference-semantics/semantics/call.k:26-26:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `9355577d2cbe61131a734689308fa7e966bed71322d4c012ae085359653437bb`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>
+```
+
+## reference-semantics/semantics/call.k:27-27:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `3025de8570574393890a15cd4f12f44326ef7035d98ea1863952a74ca2d7cbc9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ)    ... </k>
+```
+
+## reference-semantics/semantics/call.k:28-28:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `1037499b709e78e085a8b68b9987663bcdf69479642265b39e785065ededf234`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ)    ... </k>
+```
+
+## reference-semantics/semantics/call.k:29-29:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `02fe785764c60fec71b80c32baec17fb47386ffadce73ce8e553347e5a1b256a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ)   ... </k>
+```
+
+## reference-semantics/semantics/call.k:30-30:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `74e89a0d00ed78beed19cdbd21ab3aaa7c5ab7de10987d90eb0aab39276408d6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ)   ... </k>
+```
+
+## reference-semantics/semantics/call.k:31-31:rule
+
+- Category: `operational-rule`
+- Attributes: `['owise']`
+- SHA-256: `6240ee6cdac44c092bb0f74980dbda8676b27a5f3bac089732a70dcd47a4c708`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]
+```
+
+## reference-semantics/semantics/call.k:32-37:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `c54245698f6bd07e524422a02583d9ee0cd5d4cc91ae438a275dc63587ee290d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(typeV(T:String)),     ACC:Vals) => applyBuiltin(T, ACC)  ... </k>
+
+  // ==== heap-object arguments/receivers =====================================
+  // Builtins and type calls READ structure — deref the first two arg positions
+  // (covers len/sum/all/any/max/min/sorted/list/set + zip's pair). Mutating list
+  // methods take the ref itself; every other method receiver is deref'd.
+```
+
+## reference-semantics/semantics/call.k:38-41:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `ec48bd542dafde0731f10023c7e8a58229ab63adb1bd359ea5681429656834f0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV(BN:String)), (ref(H:Int), REST:Vals))
+        => #applyK(toCall(builtinV(BN)), (V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/call.k:42-46:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `fb1cf54c5dbfdb0f99a6409366ad776e35891ccfd2497bccfa83c674b0a2e3a0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV(BN:String)), (A:Val, ref(H:Int), REST:Vals))
+        => #applyK(toCall(builtinV(BN)), (A, V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isRefV(A)
+       [priority(40)]
+```
+
+## reference-semantics/semantics/call.k:47-51:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `a9d4dc84230bdfe22c691298fae2d1618f5fc7865a7e0d9d565fac3fdb49d9de`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(typeV(T:String)), (ref(H:Int), REST:Vals))
+        => #applyK(toCall(typeV(T)), (V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/call.k:52-52:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `d5c2626ac8a700308c530f067a7ff9b69d436d8a00d27e497c985cb0c3eb667a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= isMutMethod(String) [function, total]
+```
+
+## reference-semantics/semantics/call.k:53-55:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a17ba7979cef1d057abc61b1483baeb2ee9d71f001bb8ddf447c76f472cac862`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isMutMethod(M:String)
+    => M ==String "append" orBool M ==String "sort" orBool M ==String "extend"
+       orBool M ==String "insert" orBool M ==String "pop" orBool M ==String "remove"
+```
+
+## reference-semantics/semantics/call.k:56-62:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `3507960157a52a55a881a649faa6d0412c2562ae22d7efcc40798d55bc0f3e94`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), M:String)), ACC:Vals)
+        => #applyK(toCall(boundMethodV(V, M)), ACC) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isMutMethod(M)
+       [priority(40)]
+  // non-mutating methods READ their heap-object arguments too (join's list);
+  // mutators keep refs (append of a list into a list-of-lists stays aliased)
+```
+
+## reference-semantics/semantics/call.k:63-68:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `09356ec82fd2127acd32fe51cc12c08df5f60172d990f6013518fe390a64a805`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), (ref(H:Int), REST:Vals))
+        => #applyK(toCall(boundMethodV(OBJ, M)), (V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isMutMethod(M) andBool notBool isRefV(OBJ)
+       [priority(40)]
+```
+
+## reference-semantics/semantics/call.k:69-79:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `b6441b14740663e50a657820a4384981fb3685dc7fefb2341d5c1a0da8b97667`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT
+        => #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+       <env>     CALLERL:Int => NEWL </env>
+       <scopes>   STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes>
+       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+       <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+
+  // annotated closure: the frame starts with the captured freevar cells, its
+  // parent is the module scope (all enclosing-local reads go through cells),
+  // and the cellvars' fresh cells allocate before params bind (a cellvar param
+  // then writes through its cell in #bindP).
+```
+
+## reference-semantics/semantics/call.k:80-86:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `7306d23062980cefa4e0056c4fe1a45863ac7775e7f649a466aa5dd82a183ad8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(closureValC(PNS:ParamNames, CVS:ParamNames, BODY:Stmts, CM:Map)), ACC:Vals) ~> CONT
+        => #allocCells(CVS) ~> #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+       <env>     CALLERL:Int => NEWL </env>
+       <scopes>   STORE:Map => STORE [ NEWL <- scope(CM [ "$cells" <- cellsMark(CVS) ], parent(0)) ] </scopes>
+       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+       <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+```
+
+## reference-semantics/semantics/call.k:87-87:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `66b816d7dbbcb9d731590143b3d24bb779b4f8884fc7b5bb7f970cefaffb7f05`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #allocCells(ParamNames)
+```
+
+## reference-semantics/semantics/call.k:88-88:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `ab5f4beee335a8e71b2964a9d669bbe365a142f028d53ec7fe526ddc46ec1346`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #allocCells(.ParamNames) => .K ... </k>
+```
+
+## reference-semantics/semantics/call.k:89-94:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `99f0ab53a196e864a8605f370dc660d907094cb17705130aa9e0412305c41b4e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #allocCells((CV:String, R:ParamNames)) => #allocCells(R) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ CV <- cellRef(N) ], _) ... </scopes>
+       <heap>    H:Map => (N |-> cellV(noneV)) H </heap>
+       <heapLoc> N:Int => N +Int 1 </heapLoc>
+       requires notBool N in_keys(H)
+```
+
+## reference-semantics/semantics/call.k:95-95:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/comprehension.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `5d080156bedbd23cced0d31375ba799d8e28e2b518843fc2cec979392a9af1b3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-COMPREHENSION
+```
+
+## reference-semantics/semantics/comprehension.k:4-4:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics/comprehension.k:5-5:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `ee018db6efb00ffdd01d59dac03e43be2192505ed7049d1c693197e018cbc088`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-OPERATORS
+```
+
+## reference-semantics/semantics/comprehension.k:6-6:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `511c798e04e96a7ad3e9efe5e06eb4804d66d38f1294d62d46068dc7eafb0373`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-LIST
+```
+
+## reference-semantics/semantics/comprehension.k:7-7:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `47dfd92e317bb7c0d2b37ea8704d1ebdf3daf5f2ca37f0555105ffde812c5061`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CONTROLS
+```
+
+## reference-semantics/semantics/comprehension.k:8-10:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `e7f30157a50004b5316862dca0ca6d1dfa557eb04b55f3ec29637bf4422eae8c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-FUNCTIONS
+
+  // A comprehension is pure syntactic sugar
+```
+
+## reference-semantics/semantics/comprehension.k:11-11:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `4645372e277c8411d291e3fcff391daaf3c5a73e3ef74cbf6ce8cdc816de97ff`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule ListComp(ELT:Expr, Gs:CompFors) => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)
+```
+
+## reference-semantics/semantics/comprehension.k:12-13:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `dfe1627b5b2d14083bdc7e8e60dc6edade669ab733ae4de7d3d009155bba9b1c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule GenExp(ELT:Expr, Gs:CompFors)   => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)
+```
+
+## reference-semantics/semantics/comprehension.k:14-14:syntax
+
+- Category: `macro-declaration`
+- Attributes: `['macro']`
+- SHA-256: `824d607beedb6356c5932cea164d2188bc5585db6eb430ba265d3b4c19c55484`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Stmts ::= compBody(CompFors, Expr) [macro]
+```
+
+## reference-semantics/semantics/comprehension.k:15-17:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `815fb636c44d46ef130d1d585ae0f6e7c042c7c23b3138b6b8feebbda26f0016`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule compBody(Gs:CompFors, ELT:Expr)
+    => Assign(Name("$acc"), ListExpr(.Exprs)) compNest(Gs, ELT) Return(Name("$acc"))
+```
+
+## reference-semantics/semantics/comprehension.k:18-18:syntax
+
+- Category: `macro-declaration`
+- Attributes: `['macro', 'macro-rec']`
+- SHA-256: `7d588d134f4b785d98fc64c4e16c825bbe11c41d9d7d37f0e06cd1f66093fb24`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Stmt ::= compNest(CompFors, Expr) [macro-rec]
+```
+
+## reference-semantics/semantics/comprehension.k:19-20:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `03f45d480d0d06cf77afcdeb723bc2177d6d2533783069d42825cb413d76531b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule compNest(.CompFors, ELT:Expr)
+    => Assign(Name("$acc"), BinOp("+", Name("$acc"), ListExpr(ELT)))
+```
+
+## reference-semantics/semantics/comprehension.k:21-23:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `671328ad859bd1a7e54293519ef2dd7b8f94a3e2eb80653af5d234e41ded35fd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule compNest((CompFor(T:Expr, ITER:Expr, Fs:Exprs) GRest:CompFors), ELT:Expr)
+    => For(T, ITER, If(compGuard(Fs), compNest(GRest, ELT), .Stmts))
+```
+
+## reference-semantics/semantics/comprehension.k:24-24:syntax
+
+- Category: `macro-declaration`
+- Attributes: `['macro']`
+- SHA-256: `2ecdbee509dd4259654a9d1406ac80f7ab26ed49249fa5c649e11cb66b7d4134`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Expr ::= compGuard(Exprs) [macro]
+```
+
+## reference-semantics/semantics/comprehension.k:25-25:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7be24aff205ffb3a829f7c70337726d7e6fc199609e4725ea5482bdc37aa6960`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule compGuard(.Exprs)             => Bool(true)
+```
+
+## reference-semantics/semantics/comprehension.k:26-26:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `93505f664b89633f28cdf7cccc72842555b929b721d95b861d75f48ffe8f9c05`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule compGuard((F:Expr, Fs:Exprs)) => BoolOp("and", (F, Fs))
+```
+
+## reference-semantics/semantics/comprehension.k:27-27:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/concrete.k:8-8:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `31e028e78e3cd17c58c12c312a9b611cc9c541190813a73e485ea085b096dc6b`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+module MPY-CONCRETE
+```
+
+## reference-semantics/semantics/concrete.k:9-12:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `c632734fb5a009893811499e7b0255374e0cde9516e93de804c50a4e59666730`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  imports MPY
+
+  // deep equality for list compares whose elements are heap objects
+  // (list-of-lists): Python == is structural at every depth.
+```
+
+## reference-semantics/semantics/concrete.k:13-15:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `78076bacc78720fc602e7b25b88636bc05c71f4f55ac29db5925d92160d7a201`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule <k> Compare(list(A:ValSeq), CmpOp("==", list(B:ValSeq))) => deepEqVS(A, B, HP) ... </k>
+       <heap> HP:Map </heap>
+       requires hasRefVS(A) orBool hasRefVS(B)
+```
+
+## reference-semantics/semantics/concrete.k:16-24:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `ee70f13486eec034ace2dd20829cd59fd571770a1e2e07b85a7fd57c6b974ab6`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule <k> Compare(list(A:ValSeq), CmpOp("!=", list(B:ValSeq))) => notBool deepEqVS(A, B, HP) ... </k>
+       <heap> HP:Map </heap>
+       requires hasRefVS(A) orBool hasRefVS(B)
+
+  // ==== keyed sort, concrete leg ============================================
+  // Computes each key by a REAL call through the uniform #callee machinery
+  // (closures, len, type objects all work), stable-inserts on the key, and
+  // allocates the result. priority(40) beats sort.k's opaque rules, so krun
+  // runs this and proofs (which never see MPY-CONCRETE) keep sortKeyVS.
+```
+
+## reference-semantics/semantics/concrete.k:25-25:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `2a90169184182c410fe4c2ce341278c2dedd8d7d6f8601a991c3dc2e0b42f634`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  syntax Val ::= kvP(Val, Val)
+```
+
+## reference-semantics/semantics/concrete.k:26-27:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `1123d008aaa05868ae1bd9f44f1bac7b039bcfd54a355e3a6c0524c25f9511c4`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  syntax KItem ::= #ksort(ValSeq, Val, ValSeq, Bool)
+                 | #ksIns(Val, ValSeq, Val, ValSeq, Bool)
+```
+
+## reference-semantics/semantics/concrete.k:28-30:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `5caca2001b70c524ea38688e440ed76456f74d57b74521fe63fa22c57282e7fb`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals))
+        => #ksort(VS, KV, .ValSeq, false) ... </k>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/concrete.k:31-33:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `2c4b50fac01d6a9ecc6c1fdf5696919d9b2f327f3a2d7493c862cbc759bff019`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals))
+        => #ksort(VS, KV, .ValSeq, RB) ... </k>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/concrete.k:34-35:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `9a2cac29747255880807afe9acc45f2b2e308ac69028e6393d992dd0175f4953`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule <k> #ksort(.ValSeq, _:Val, ACC:ValSeq, RB:Bool)
+        => #alloc(list(condRev(unpairVS(ACC), RB))) ... </k>
+```
+
+## reference-semantics/semantics/concrete.k:36-37:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `1b960e24430bc3c08bafcd916076e9f70a53e324baf5eab208a6fa4342b62bcf`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule <k> #ksort(vCons(V:Val, R:ValSeq), KV:Val, ACC:ValSeq, RB:Bool)
+        => KV ~> #callee((V, .Exprs)) ~> #ksIns(V, R, KV, ACC, RB) ... </k>
+```
+
+## reference-semantics/semantics/concrete.k:38-41:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `833a30eb0045ffa9f4482cd525f45fec95d0ee22f4acc75221904edaaa8c4f69`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule <k> K:Val ~> #ksIns(V:Val, R:ValSeq, KV:Val, ACC:ValSeq, RB:Bool)
+        => #ksort(R, KV, insPair(ACC, K, V), RB) ... </k>
+       requires notBool isKwV(K)
+```
+
+## reference-semantics/semantics/concrete.k:42-42:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `55dc07274299e7b58a622feb28c763987b5c35ead1b9d2cf9165912436433038`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  syntax ValSeq ::= insPair(ValSeq, Val, Val) [function]
+```
+
+## reference-semantics/semantics/concrete.k:43-43:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1b9c47e83939876546f307ade1ff83df08d7a46c8ba0d6c86b5ae1a324438de2`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule insPair(.ValSeq, K:Val, V:Val) => vCons(kvP(K, V), .ValSeq)
+```
+
+## reference-semantics/semantics/concrete.k:44-46:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `111715f3eff9f38ddf862ece9e09eaf0f1f1fa5519269ffa30ff97f1262fd2c5`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val)
+    => vCons(kvP(K, V), vCons(kvP(K2, V2), R))
+       requires kLt(K, K2)
+```
+
+## reference-semantics/semantics/concrete.k:47-50:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b54f5a2a0368082cd3815636a2789e87a023e14a1045d731dae576117c2c24ca`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val)
+    => vCons(kvP(K2, V2), insPair(R, K, V))
+       requires notBool kLt(K, K2)
+```
+
+## reference-semantics/semantics/concrete.k:51-51:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `a74ccb7aaf4fb0873480901bff971b092c9dbd03f69b4a4430f9e6813bad457d`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  syntax Bool ::= kLt(Val, Val) [function]
+```
+
+## reference-semantics/semantics/concrete.k:52-52:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `2123b754255b1230f17f2af7056ef3e688448f578117a29add63f4f6fe4fdfe1`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule kLt(I1:Int, I2:Int)             => I1 <Int I2
+```
+
+## reference-semantics/semantics/concrete.k:53-53:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `fa99ec9f191b01e0ecb3f93a16c85f2ffac702c2766211bb459d8f273a015d27`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule kLt(F1:Float, F2:Float)         => F1 <Float F2
+```
+
+## reference-semantics/semantics/concrete.k:54-55:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `608ffd1665edfb59d472955da76f6ec8ad22974711f47c9d1117cc0cb9476b0a`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule kLt(str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+```
+
+## reference-semantics/semantics/concrete.k:56-56:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `4f9bc29fa28a4ee808049a44a900983a4a13f51e3667cf63740414c413645975`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  syntax ValSeq ::= unpairVS(ValSeq) [function, total]
+```
+
+## reference-semantics/semantics/concrete.k:57-57:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a2e6dd066c677c3fbb8ae42e1bb4c4e08b35e98d6758e9817a1c0e32f2ed298d`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule unpairVS(.ValSeq) => .ValSeq
+```
+
+## reference-semantics/semantics/concrete.k:58-58:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `84d1ae0473a111b622b6e1cdad885d3b2af53ee0c5cea2bb9e91888301892032`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule unpairVS(vCons(kvP(_:Val, V:Val), R:ValSeq)) => vCons(V, unpairVS(R))
+```
+
+## reference-semantics/semantics/concrete.k:59-59:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `7ae54fdad398cb576570dee684b0148c5f7a140e6fef4af4509048db2f3d63e7`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+  rule unpairVS(vCons(V:Val, R:ValSeq)) => vCons(V, unpairVS(R)) [owise]
+```
+
+## reference-semantics/semantics/concrete.k:60-60:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_CONCRETE_ONLY_OUTSIDE_PROOF`
+- Rationale: Imported only by MPY-KRUN, not by the Haskell verification definition.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/controls.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `f64b2208f5bd8e4aed5d3dc9982419bc4a18cce867ec3ca3063120a89b7c4f48`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-CONTROLS
+```
+
+## reference-semantics/semantics/controls.k:4-4:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics/controls.k:5-5:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `b1d1ddeb005d397d01d2501033a979d991b52ce94dc5c6fcb2c801237e698309`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-TUPLE
+```
+
+## reference-semantics/semantics/controls.k:6-8:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `b578ab301681605b068fff485f3b5fea1fc935e41297f6c681dfa5731dcbf7de`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-ITER
+
+  // ==== Assign / AugAssign (write the current scope; RHS evaluated by strictness) ==
+```
+
+## reference-semantics/semantics/controls.k:9-11:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `a78b31a11fb1e616fc20d1b741f692cbede4e634503bf6d86c3e2f97a09b36ca`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Assign(Name(X:String), V:Val) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>
+```
+
+## reference-semantics/semantics/controls.k:12-19:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `46fcacaf0429bbd96797c91ccdd68360486d7b3010e19fd46b9b1fc6f7f2ff23`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires "$cells" in_keys(M)
+        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+        andBool X in_keys(M) andBool isCellRef({M[X]}:>Val)
+       [priority(40)]
+```
+
+## reference-semantics/semantics/controls.k:20-26:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `86c0c2c417721c3e4d49aed026fe94905258240d033ec57f781320de5351483c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes>
+       requires X in_keys(M)
+  // `lst += [..]` where lst is a heap ref: the generic rule leaves applyBin(OP, ref, V) — but the
+  // ref-deref preemption is BinOp-level (operators.k), so applyBin never derefs and it sticks. Route
+  // the ref case through BinOp so the deref + list-concat + #alloc path fires (result is a fresh ref).
+```
+
+## reference-semantics/semantics/controls.k:27-34:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `48037c0fb312c6b734b36bbace9f11075fd13d987b853a4eb063ce7703aaeca4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires X in_keys(M) andBool isRefV({M[X]}:>Val)
+       [priority(40)]
+
+  // ==== import trivia: `from math import floor, ceil` binds the supported
+  // names as builtins in the current scope; every other import is a no-op
+```
+
+## reference-semantics/semantics/controls.k:35-35:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `f402a7269397fca0b1ac21aed748b760050ba708a163d261f974e913771da3c2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> ImportFrom("math", NS:ParamNames) => #bindImports(NS) ... </k>
+```
+
+## reference-semantics/semantics/controls.k:36-36:rule
+
+- Category: `operational-rule`
+- Attributes: `['owise']`
+- SHA-256: `52700f6597b29ddb0bc621e8272d2fed465b14604d21641c831c107ffb9411fd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> ImportFrom(_:String, _:ParamNames) => .K ... </k> [owise]
+```
+
+## reference-semantics/semantics/controls.k:37-37:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `88b5590c6cf0d241359de642778c97d21462b7df276d7ff9da14b483221cd040`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #bindImports(ParamNames)
+```
+
+## reference-semantics/semantics/controls.k:38-38:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `775670eae46ffc1b3ac3c61cc6400e6a17c0e758ff2a08cda58bb08045a0ad4d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #bindImports(.ParamNames) => .K ... </k>
+```
+
+## reference-semantics/semantics/controls.k:39-42:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `16792e79fae547f357c72fda3710d3fb1eea03d5131e31991975acacb404b3d6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ N <- builtinV(N) ], _) ... </scopes>
+       requires N ==String "floor" orBool N ==String "ceil"
+```
+
+## reference-semantics/semantics/controls.k:43-47:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `149ac3587bf6eefd33543e858da8f32fb6a15fa7064c5bf97eb42ad115c808b9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>
+       requires notBool (N ==String "floor" orBool N ==String "ceil")
+
+  // ==== Expr statement: evaluate for effect, discard the value ===============
+  // (bare calls — mutator methods, docstrings; the WP0 statement-trivia rung)
+```
+
+## reference-semantics/semantics/controls.k:48-50:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `6e525bc694fad47ae585029f37af7a70ad8359e2bb2736f2d8fff8f62e34e399`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Expr(_:Val) => .K ... </k>
+
+  // ==== If (condition evaluated by strictness) ==============================
+```
+
+## reference-semantics/semantics/controls.k:51-51:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `7b0fe50a62195a3b0fef8fb68b9e36bec75ecac9e75acf69e84b5201a689d177`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #branch(Bool, Stmts, Stmts)
+```
+
+## reference-semantics/semantics/controls.k:52-52:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `cbe0a65ca8b486f863733c806119e1f4a10dbab29dfe59f18e11ba8a0eba3c24`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>
+```
+
+## reference-semantics/semantics/controls.k:53-53:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `590ba86f9c098d790a320da93c083cc8f802c9ca35711eb1cc2cd74245b5ba9f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #branch(true,  T:Stmts, _:Stmts) => T ... </k>
+```
+
+## reference-semantics/semantics/controls.k:54-56:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `37fb93cd49df920bfbfe5eee1be09917f6b4c7d70ba1fefa275974990fd2803b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>
+
+  // ==== IfExp: ternary T if C else E ========================================
+```
+
+## reference-semantics/semantics/controls.k:57-58:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `7a11b92d5f399aa2ed578a0cd9ca0621ef427ca8023e7c60717b9100e28a1915`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k>
+       requires truthy(V)
+```
+
+## reference-semantics/semantics/controls.k:59-64:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `769d0358576822f24e291c824fb6144fcb282005cdede1a21589e886f5c714ac`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k>
+       requires notBool truthy(V)
+
+  // ==== For: one loop, in-cell continuation, over #iterNext =================
+  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+  // circularities anchor on #loop and narrowing substitutes the structure)
+```
+
+## reference-semantics/semantics/controls.k:65-68:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `527ed693357cc917d7a66c85117620efd2d6e9d63fd3c513d857d75f32c5c84e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+                 | #loopLbl(K) | "#cont" | "#brk"
+```
+
+## reference-semantics/semantics/controls.k:69-70:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `54e2c3c93eb9e29b84ab176aea9ecc6ea72a430e4d0191059235eb51231c0480`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+```
+
+## reference-semantics/semantics/controls.k:71-71:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `f6431203e70c43ecb8a36acee40238048e5ae9c14481a6f5e8cb0b7b1d58b46e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+```
+
+## reference-semantics/semantics/controls.k:72-72:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `e22f89d510cff7d36192b2a2ccfeaaf725796c8c8c827450ae307c7947ef155a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+```
+
+## reference-semantics/semantics/controls.k:73-76:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `a1af2eb81632c08ecc01d7fe70860ba932c54cb14b0f345508e8eaf3c288c931`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+
+  // ==== While ==============================================================
+```
+
+## reference-semantics/semantics/controls.k:77-77:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `cc778d0a7dee57761ad2083c164374f1ca61a417f970a113330d7964d8a869df`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>
+```
+
+## reference-semantics/semantics/controls.k:78-78:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `6b4a239ea0168f84cd9b863978fae9d5c0b970eabaf77a73c6bbda53ca569539`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>
+```
+
+## reference-semantics/semantics/controls.k:79-80:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `7954a0aef08296979e388406314e89fd6e2dba4ea575dad2bf1408e922ce13cf`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k>
+       requires truthy(V)
+```
+
+## reference-semantics/semantics/controls.k:81-84:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `df659ad8351c602a321c3d788457332fcb4a0b9bcb5d6ee95f2326f9314a21e9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k>
+       requires notBool truthy(V)
+
+  // ==== loop control (break / continue) =====================================
+```
+
+## reference-semantics/semantics/controls.k:85-85:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `bb87d59b209abee2097a69ac0521f4f49fc8162769983885860572a9797f7f3a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #loopLbl(NEXT:K) => NEXT ... </k>
+```
+
+## reference-semantics/semantics/controls.k:86-86:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `7987cb734506ffbd385ee94489bf6138d7d3e170c7e1bcf045a5de280ba0bb83`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Continue => #cont ... </k>
+```
+
+## reference-semantics/semantics/controls.k:87-87:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `0c6690a88f1d95c9312e4548a2245797efb3794c54bd0b998bc299250012679e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Break => #brk ... </k>
+```
+
+## reference-semantics/semantics/controls.k:88-88:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `8617466b01468a24391f6c8144aa24fad531384c5ac6b67bf45ac202c9903691`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>
+```
+
+## reference-semantics/semantics/controls.k:89-89:rule
+
+- Category: `operational-rule`
+- Attributes: `['owise']`
+- SHA-256: `5cabf37fa715399227a3a3ac10bbe5848811a4674872d38789dbcaaf8a962b70`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]
+```
+
+## reference-semantics/semantics/controls.k:90-90:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `5b9a5f06df03d210661bd4242bc729c182e9d98bf2ac35665f7d2c1cba2048f8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>
+```
+
+## reference-semantics/semantics/controls.k:91-94:rule
+
+- Category: `operational-rule`
+- Attributes: `['owise']`
+- SHA-256: `dfd7f5ed393c743ed03fd14d9a028e4dbfadd9ec6853f544773e668eb3c0a896`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]
+
+  // ==== heap-object deref at the truthiness/iteration consumers ==============
+  // (priority(40) preempts the generic Val rules so truthy/#loop never see a ref)
+```
+
+## reference-semantics/semantics/controls.k:95-97:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `ff65bd7ea83de9c1aac2201a6aacd05085c15bf4f7a8368a115d11754dd3088a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/controls.k:98-100:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `a42c325234497da9c2b931fb7600707181b79378e75ed4242f79fffa971045ec`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/controls.k:101-105:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `da33a9064f83cd38fa1b7ff2e0beb93bc52a83a2faaa16e9d6c6249eb11f5591`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  // For derefs its iterable ONCE at loop start (iteration is over the snapshot;
+  // mutating the iterated list inside its own loop is outside the subset)
+```
+
+## reference-semantics/semantics/controls.k:106-108:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `32f13b8026fc2ebda6564a756c9a8580ce60ecbf5ede2d77d9b9482ba95abf50`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/controls.k:109-109:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/core.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `6f8de5b253608309bc62e1e06d6c9d794fdc890af16d988e5e49d07a95e3b1df`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-CORE
+```
+
+## reference-semantics/semantics/core.k:4-4:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `53e3bff8f927183283d900a5251fa5e2512a93c8faf32e529621ebe895d93050`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-SYNTAX
+```
+
+## reference-semantics/semantics/core.k:5-5:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `e6c6a545c82f21825986f4acedb91066255b1648e6ea357da01ee474f877a7ec`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports INT
+```
+
+## reference-semantics/semantics/core.k:6-6:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `a87b57b80409f2a188407cd25e5a2bd9c412a60b8d7e64f7d839e3e9593b8569`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports BOOL
+```
+
+## reference-semantics/semantics/core.k:7-7:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `0285d3d5d999f874f605ab7b0a1c28e70d0b96e3b33c6590556e0032fa33fd39`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports STRING
+```
+
+## reference-semantics/semantics/core.k:8-8:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `acf7e2a94c16324b89d1a51d98c5e05fc55dc40954dc9fcb6723ba7baeb4ec53`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MAP
+```
+
+## reference-semantics/semantics/core.k:9-9:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `82a7d762e10459837802636cd031705c66f6df450b6e63ea0e20f72dc5a6fcd0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports LIST
+```
+
+## reference-semantics/semantics/core.k:10-12:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4b342623be24a639a98c23efc23b373554065f2469fba076be0096842896cf98`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports K-EQUAL
+
+  // ==== values, the algebraic lists, and the scope heap =====================
+```
+
+## reference-semantics/semantics/core.k:13-13:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `2768b2d6c3a17c8dc96cd3fe2032aaa71938dc7e459f3302d39650b2eb1e8be4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+```
+
+## reference-semantics/semantics/core.k:14-14:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `3571b0fa24f69901cc16fe43a413976e68db54b0f47c1857bba7bb311aec6578`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+```
+
+## reference-semantics/semantics/core.k:15-17:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `23461c6dc66dd84a5e90512c336ac88a98ec2cdb40022b6584eb385effe54d41`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Str    ::= str(IntSeq)
+
+  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+```
+
+## reference-semantics/semantics/core.k:18-24:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `2b8233305aeadb8aa309b4bcf0520698e22aaa7d3de66e0d3c007bb3c8dac0f7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Iterable ::= list(ValSeq)
+                    | tuple(ValSeq)
+                    | Str
+                    | rangeObj(Int, Int, Int)
+                    | zipObj(ValSeq, ValSeq)
+                    | zipObjS(IntSeq, IntSeq)
+```
+
+## reference-semantics/semantics/core.k:25-35:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `f0009a449e07149eee0d512f87449fc89f5b1191b21d2d840bbf1b86552dafd9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val      ::= Int
+                    | Bool
+                    | "noneV"
+                    | Iterable
+                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+                    | closureVal(ParamNames, Stmts, Int)
+                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+```
+
+## reference-semantics/semantics/core.k:36-36:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `c240ca8787f6f25f24fbb9d017955e365cc667750c631f7869bfa2650e3482b3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Parent   ::= "root" | parent(Int)
+```
+
+## reference-semantics/semantics/core.k:37-37:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `1a4b85e2b644f529e4a00633d558310cb6a0598e944493db599c6b028d03d8c2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Scope    ::= scope(Map, Parent)
+```
+
+## reference-semantics/semantics/core.k:38-38:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `190af4b16650786b1d561fa05c1505a6458261cbbc813b67fce1d8382447ed18`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KResult  ::= Val
+```
+
+## reference-semantics/semantics/core.k:39-39:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `9dbbc23d4d9f2a64968071e0fcb4980af6b3aab3382c69f567f914d65a3e3de1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Expr     ::= Val   // cooling puts results back into expression holes
+```
+
+## reference-semantics/semantics/core.k:40-40:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `c9cee1981af78d22be358515c3d40c43ddf113a6e501732215323e86c69df803`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Vals     ::= List{Val, ","}
+```
+
+## reference-semantics/semantics/core.k:41-41:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `1a9977b6818762a6c75f12776156fc9cf31d7c72a74adfb8e1e05fc0ecf94339`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Exc      ::= "NoExc" | "AssertionError"
+```
+
+## reference-semantics/semantics/core.k:42-48:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `4112a1e4d88e99897ce40f9d3da83c0f46e7109c2cc80f2c7f0e0e696869f631`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax RetState ::= "noRet" | retV(Val)
+
+  // ==== configuration =======================================================
+  // The builtins namespace is a real scope at reserved location -1 (the bottom of every
+  // chain; scopeLoc only allocates >=1, so -1 never collides). The module scope (loc 0)
+  // has it as parent, so an unbound name resolves there last — exactly LEGB. `int`/`str`
+  // resolve to their type objects; any local/global binding shadows them via normal lookup.
+```
+
+## reference-semantics/semantics/core.k:49-67:configuration
+
+- Category: `configuration`
+- Attributes: `[]`
+- SHA-256: `1e728104ed094033f0a54d1b8c25e78b1cca3894458007ea7acb46d5ae369edd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  configuration
+    <k>       #loadAll($PGM:Module) </k>
+    <env>     0 </env>
+    <scopes>   0     |-> scope(.Map, parent(-1))
+              -1    |-> builtinsScope </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap>    .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack>   .List </stack>
+    <ret>     noRet </ret>
+    <exc>     NoExc </exc>
+    <exit-code exit=""> 0 </exit-code>
+
+  // ==== heap allocation (constructed lists become objects) ==================
+  // Cons-form emission with a freshness guard (the heap-list-probe discipline:
+  // an update-form H[N <- _] never re-normalizes symbolically). heapLoc is
+  // monotonic — it does NOT wind back at #pop: returned lists escape by ref.
+  // A bare list(VS) Val stays legal (read-only inputs in claims flow unboxed);
+  // only CONSTRUCTORS in program syntax allocate.
+```
+
+## reference-semantics/semantics/core.k:68-68:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `3338ad77ca0049a96dfe1eaeb080b4c41c6be71c0c3b3f745920c8a3f234cec0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= isRefV(Val) [function, total]
+```
+
+## reference-semantics/semantics/core.k:69-69:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d1ee5822bc201a81a9e53ef1bbc95650db6ed80ae67b039110a99e1244587cac`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isRefV(ref(_:Int)) => true
+```
+
+## reference-semantics/semantics/core.k:70-74:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `4a220c8848239a5d9252f2f2c775f62d829b963cf3c7ed0b2ba6beafec5a998b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isRefV(_:Val)      => false [owise]
+
+  // closure cells (Python-faithful capture): the heap holds cellV(V); a
+  // cellRef surfacing as the k-redex reads through (lookup is the only use —
+  // cellRefs never escape to user-visible values)
+```
+
+## reference-semantics/semantics/core.k:75-75:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `21cd98225d729d9f7639156eab6a245a02779ba0a9d8b21e9f073c0ff26f5274`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax HeapVal ::= cellV(Val)
+```
+
+## reference-semantics/semantics/core.k:76-76:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `a9d42f86eb00022dec3e226b09600aaa48f1a7be55f597845133e1bd191296a1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= isCellRef(Val) [function, total]
+```
+
+## reference-semantics/semantics/core.k:77-77:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d10f04444db1ef0234b6d965704225f982b943f5f876e0dd2b84ca6cb186d00d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isCellRef(cellRef(_:Int)) => true
+```
+
+## reference-semantics/semantics/core.k:78-84:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `bfc7d2c0e8b42b4646d2c2787f235a811cd5211617d7c37212a981137bdbd83b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isCellRef(_:Val)          => false [owise]
+  // k-top deref for cell-bound reads surfacing INSIDE the annotated frame
+  // (AugAssign's in-place read and friends). The "$cells" guard keeps this
+  // DECIDABLY inapplicable in plain frames — an unguarded rule lets the
+  // prover narrow abstract k-top values into cellRef junk (probed on
+  // 26-remove-duplicates). Cross-frame reads (a comprehension closure
+  // reading the enclosing function's cellvar) deref inside #look instead.
+```
+
+## reference-semantics/semantics/core.k:85-94:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `f419fb039d2c02ee8cb8d39be861a8dae748814362aff2a4aba1b2b2dd7819b1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> cellRef(H:Int) => V ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       <heap> ... H |-> cellV(V:Val) ... </heap>
+       requires "$cells" in_keys(M)
+       [priority(40)]
+
+  // write through a cell (Assign / #bindP / #bindTgt dispatch here on
+  // cell-bound names)
+  // a keyword argument cools to a TAGGED value (consumed by kw-aware builtins)
+```
+
+## reference-semantics/semantics/core.k:95-95:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `746e63785a2ae3973e73c46044dcbf4775ebee34152fc64892f4b2b789edd83f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= kwV(String, Val)
+```
+
+## reference-semantics/semantics/core.k:96-96:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `7135e0a28684c3f959f5c02eb7518d47f4673034587be13a48e55a135987f6e2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #kwTag(String)
+```
+
+## reference-semantics/semantics/core.k:97-97:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `28d46dc1bd55f13049d73cb2bf63a371dc732d4615cdd181645239d4cd5ad537`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>
+```
+
+## reference-semantics/semantics/core.k:98-99:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `b16faf57f0a4ea99fe0c8f966f92696df0327f139ba5260288a67e046f99a2dc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k>
+       requires notBool isKwV(V)
+```
+
+## reference-semantics/semantics/core.k:100-100:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `50eabe9c99f38505cf15bf77c4bac9a1abf4f9b87d14b59bbda92ca979979de1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= isKwV(Val) [function, total]
+```
+
+## reference-semantics/semantics/core.k:101-101:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a1fa116710bde2dcf3a27bef6ca7c778952c610ebf3439a992d3b795fbb62980`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isKwV(kwV(_:String, _:Val)) => true
+```
+
+## reference-semantics/semantics/core.k:102-105:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `ba3d029375b569de28153e59f43e73dc338c4ca58cae3f1366f50b54b1d726f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isKwV(_:Val)                => false [owise]
+
+  // the frame marker carries the CONCRETE cellvar list, so cell-write dispatch
+  // decides by pnMember even over an abstract frame rest (no prover branching)
+```
+
+## reference-semantics/semantics/core.k:106-106:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `2285105441dce6794397ba48377014495fd03df64a341f3f38c98e1db8345f5a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= cellsMark(ParamNames)
+```
+
+## reference-semantics/semantics/core.k:107-107:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `ad2441054e7f455725e98d81f76b8fd041bc9ed222e5edb98a5c94ae3839523b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ParamNames ::= cellsOf(Val) [function]
+```
+
+## reference-semantics/semantics/core.k:108-108:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `dadd75df53218bc9b64ef8083a5cfdd2ce110ae737320172b4df3b74b49eca81`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule cellsOf(cellsMark(CVS:ParamNames)) => CVS
+```
+
+## reference-semantics/semantics/core.k:109-109:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `009b993788c253193b1ce0fa5b061697c6440e0788701a19869c9dab19663ff9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= pnMember(String, ParamNames) [function, total]
+```
+
+## reference-semantics/semantics/core.k:110-110:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `09cb69784187ad842a22036b322bfc6e6b6b0146b07291ed5538c1ed17fb12c8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule pnMember(_:String, .ParamNames) => false
+```
+
+## reference-semantics/semantics/core.k:111-112:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `40d3ebcbac2e7febec8650f7bec5a04bd4771fe1fb00b0029b055011e68b54d1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)
+```
+
+## reference-semantics/semantics/core.k:113-113:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `16af91ae25382cf323fddfcbec2b15113bb7f8e345fc838cffd3d1ea5c48402f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #cellW(Val, Val)
+```
+
+## reference-semantics/semantics/core.k:114-116:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `8cd98c73610f48aa57c981cb37756c66c7690094d14b1d7dd6ecc280118e508b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k>
+       <heap> ... H |-> cellV(_:Val => V) ... </heap>
+```
+
+## reference-semantics/semantics/core.k:117-117:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `584583182d331f98087811d087ed974611dcaaa6ed451b3fd1b5669db71ee113`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #alloc(Val)
+```
+
+## reference-semantics/semantics/core.k:118-123:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `8ba6ee3da8671917cdae7862260fd73aa3629a7dbcfc1d01c93b9e9d530bd976`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #alloc(V:Val) => ref(N) ... </k>
+       <heap>    H:Map => (N |-> V) H </heap>
+       <heapLoc> N:Int => N +Int 1 </heapLoc>
+       requires notBool N in_keys(H)
+
+  // ==== module load + statement sequencing ==================================
+```
+
+## reference-semantics/semantics/core.k:124-124:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `40d32b5e1ad10747cb8671cd1e429ea97d3cec1b42c0c51a97d4025ea15ec9d2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #loadAll(Module)
+```
+
+## reference-semantics/semantics/core.k:125-125:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `831765b43e688fdf9dd2115a4b939d436706f8c21eec8d12ae58d63460ea64ff`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>
+```
+
+## reference-semantics/semantics/core.k:126-126:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `622f8afd49106ea25b456b94d71e2824694c02f0a7d79c85174ee0f6bbe5aeb2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>
+```
+
+## reference-semantics/semantics/core.k:127-129:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `764b1a77381a8b2d5694d96c9ead2e33c28c890756e79d1447168b7207d1c60c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> .Stmts => .K ... </k>
+
+  // ==== Name lookup (walk the scope chain; builtins live in the -1 scope) ====
+```
+
+## reference-semantics/semantics/core.k:130-130:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `68e17b99a979fdef8ca37621b96b2adca48d3919ab7f1ce5c01b65d55df1c936`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #look(String, Int)
+```
+
+## reference-semantics/semantics/core.k:131-131:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `4dffd7efda704b7e4db7e1c647183217805e651df4dafc5254bb00bf2fdc9cbe`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>
+```
+
+## reference-semantics/semantics/core.k:132-144:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `c128140bd355d1acddcb760e70a6a242d32fcf7f737e41f0790ce43e83598913`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k>
+       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+       requires X in_keys(M)
+  // a SYNTACTICALLY cell-bound name reads through the heap cell AT THE
+  // LOOKUP (higher priority beats the plain return above on concrete cell
+  // bindings; abstract claim values take the plain rule unchanged) — this
+  // covers cross-frame cell reads (a comprehension closure reading the
+  // enclosing function's cellvar) without a narrowing-prone k-top redex
+  // guarded on the FOUND frame's DECLARED cellvars (pnMember over the
+  // cellsMark): decidable for every concrete frame pin — plain frames and
+  // non-cell names prune outright, so an abstract looked-up value never
+  // drags a narrowing cellV heap match along (probed on 5-intersperse and
+  // Q4's abstract `numbers` in the annotated frame)
+```
+
+## reference-semantics/semantics/core.k:145-151:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `3b3293c9807352b0c0c99b7a9b8c613ec00733fdcbd3fde140e26742e2aaa9a2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #look(X:String, L:Int) => V ... </k>
+       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+       <heap> ... H |-> cellV(V:Val) ... </heap>
+       requires X in_keys(M) andBool "$cells" in_keys(M)
+        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+        andBool {M[X]}:>Val ==K cellRef(H)
+       [priority(40)]
+```
+
+## reference-semantics/semantics/core.k:152-156:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `37f50d6b20003b6f407920ee423d5f90632df81f0946814039f0c11ebbd45a8a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #look(X:String, L:Int) => #look(X, P) ... </k>
+       <scopes> ... L |-> scope(M:Map, parent(P:Int)) ... </scopes>
+       requires notBool (X in_keys(M))
+
+  // the ONE predefined builtins scope (the -1 frame; claims write `-1 |-> builtinsScope`)
+```
+
+## reference-semantics/semantics/core.k:157-157:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `9b3d6c932d97b99118d4972bbf495e2ee6ff961180c802cfc8002ac45499bc28`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Scope ::= "builtinsScope" [function, total]
+```
+
+## reference-semantics/semantics/core.k:158-184:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `2feb2220c83403f0b83e62c8c1f3447bc6ab9fef39776333dbf3066eaebf2f98`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule builtinsScope
+    => scope(.Map [ "len"    <- builtinV("len")    ]
+                  [ "set"    <- builtinV("set")    ]
+                  [ "sum"    <- builtinV("sum")    ]
+                  [ "abs"    <- builtinV("abs")    ]
+                  [ "min"    <- builtinV("min")    ]
+                  [ "max"    <- builtinV("max")    ]
+                  [ "ord"    <- builtinV("ord")    ]
+                  [ "chr"    <- builtinV("chr")    ]
+                  [ "range"  <- builtinV("range")  ]
+                  [ "all"    <- builtinV("all")    ]
+                  [ "any"    <- builtinV("any")    ]
+                  [ "zip"    <- builtinV("zip")    ]
+                  [ "isinstance" <- builtinV("isinstance") ]
+                  [ "sorted" <- builtinV("sorted") ]
+                  [ "list"   <- builtinV("list")   ]
+                  [ "round"  <- builtinV("round")  ]
+                  [ "bin"    <- builtinV("bin")    ]
+                  [ "enumerate" <- builtinV("enumerate") ]
+                  [ "map"    <- builtinV("map")    ]
+                  [ "eval"   <- builtinV("eval")   ]
+                  [ "int"    <- typeV("int")       ]
+                  [ "str"    <- typeV("str")       ]
+                  [ "float"  <- typeV("float")     ], root)
+
+  // ==== argument/element evaluation: ONE left-to-right loop, tagged by destination ==
+  // (list/tuple literals and calls all use it; modules extend ApplyK with their tags)
+```
+
+## reference-semantics/semantics/core.k:185-185:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `0cd464bb92d6fbd9eb61627b5a302e8d1419fb60845e61f594eea37e505361c0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ApplyK ::= toCall(Val)
+```
+
+## reference-semantics/semantics/core.k:186-188:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `4c486ed4a149e9e305a9176e39ac7f0ff75963f04d2b8be0defa6a4db356524d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem  ::= #evalArgs(Exprs, Vals, ApplyK)
+                  | #evalArgCont(Exprs, Vals, ApplyK)
+                  | #applyK(ApplyK, Vals)
+```
+
+## reference-semantics/semantics/core.k:189-189:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `e7135690e7262635dd0046776e8c65541a1b0e833e52085a497abbab22a24c0d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>
+```
+
+## reference-semantics/semantics/core.k:190-190:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `aee090561fe2fc878e5922d8eeb9c6b759e0948f8c972db0ec10627a3d75e10a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>
+```
+
+## reference-semantics/semantics/core.k:191-193:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `6cb56fbbec2e082501dbe00c701d2caaba0843b244ce9883ee1a9c59f66080a8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>
+
+  // ==== Int / Bool / None literals ==========================================
+```
+
+## reference-semantics/semantics/core.k:194-194:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `49f810c47c2d98a8109f54c75a88554a078c9de7a27b1c9e98bab7c301f38e4c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Int(I:Int)   => I ... </k>
+```
+
+## reference-semantics/semantics/core.k:195-195:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `28c8aac589ebebb882cb3f121a4017a8cda85f190a8992d2ffac23ca9f423675`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Bool(B:Bool) => B ... </k>
+```
+
+## reference-semantics/semantics/core.k:196-198:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `ce5d21d8ba4e64077b1173ec5ffaabb255d1b939bb11424299a4d8d71a78571e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> NoneVal      => noneV ... </k>
+
+  // ==== truthy (If, Assert, BoolOp, IfExp, not, While) ======================
+```
+
+## reference-semantics/semantics/core.k:199-199:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `c70b8b2eac36b927650e58afbb71b054cb3bbaaf272b95c269b562f4cca551bf`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= truthy(Val) [function]
+```
+
+## reference-semantics/semantics/core.k:200-200:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `6a5f897dddf50fc1cc333177fd7d58fd05d5d2105120316f6e5a4151303bd335`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule truthy(B:Bool)          => B
+```
+
+## reference-semantics/semantics/core.k:201-201:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `ce79df9f62d4e794695fa9afbce647d0952b63e75c12138ff9c2bd78b074cd9d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule truthy(noneV)           => false
+```
+
+## reference-semantics/semantics/core.k:202-202:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `028df8cf7244b1e37591ce4395e7e3b07a76ae5a4290f7d0cafdf039fca50fb8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule truthy(I:Int)           => I =/=Int 0
+```
+
+## reference-semantics/semantics/core.k:203-203:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `933b3fe9dcab3bdf20db8bf4c1a2b3cba08db2f51ccb124b6ba82c35a9515bc5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)
+```
+
+## reference-semantics/semantics/core.k:204-204:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `75c0f2ab15c6fc94075bf8f9cef4918470585c955004634f0c982615be0ae0ae`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)
+```
+
+## reference-semantics/semantics/core.k:205-207:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c7afccb5eaf9817fc28909e803acd4660ef3a1e17bc5aaa86269831e5d2cfd0d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)
+
+  // ==== extensible operator dispatch (cases added by the construct modules) ==
+```
+
+## reference-semantics/semantics/core.k:208-208:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `01c72ea272fe77e59dfee2c706b635e11d09b2a04d1d76f98d60659c942fd492`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val  ::= applyUn(String, Val) [function]
+```
+
+## reference-semantics/semantics/core.k:209-209:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `182a981e83f00c3893b88729b6cf5be5479e21d6f42cdaf842eeeb76affaecf1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val  ::= applyBin(String, Val, Val) [function]
+```
+
+## reference-semantics/semantics/core.k:210-212:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `98b1c42dbd3450337a2f381e865a64d4edc29e1661d7e5be6f2aad89a37f1256`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= applyCmp(String, Val, Val) [function]
+
+  // ==== shared list helpers =================================================
+```
+
+## reference-semantics/semantics/core.k:213-213:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `763cc5fd6e1abb711ac3c786c23d3e9954aa228ccb4012bbd586bfaa5ba4fadd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Vals ::= appendVal(Vals, Val) [function, total]
+```
+
+## reference-semantics/semantics/core.k:214-214:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `60caff7a9f1fbc6feaab41eb48b1217883a3d6ad60ae5ccc2081ffcaee8d5de9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule appendVal(.Vals, V:Val)              => V , .Vals
+```
+
+## reference-semantics/semantics/core.k:215-216:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c67434450dfaea990d24b843f34d458858030555acd1f7050ad57b6ec05e65ed`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+```
+
+## reference-semantics/semantics/core.k:217-217:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `7a97605e841a91e05985c61a14143af9e0f2bfbec36c5c9bd36fc15daf540b31`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+```
+
+## reference-semantics/semantics/core.k:218-218:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `702ecbf22fe6f1758f419f11f4435c2105c06424806029125446876b94c85500`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule vals2valSeq(.Vals)            => .ValSeq
+```
+
+## reference-semantics/semantics/core.k:219-222:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a18b7dd541ca744fc70be2ac80d14ea11b29f817f4a78ab5645ce4c7f6e3ea91`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+
+  // ==== shared sequence length (len / summaries across many modules) ========
+  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+```
+
+## reference-semantics/semantics/core.k:223-223:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `dd74bc995871facfa87ea8ae2ecfdd41abc06296c877effa234a3e72b3d18dc0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= vsLen(ValSeq) [function, total]
+```
+
+## reference-semantics/semantics/core.k:224-224:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `04fc8b8adecfcc54620963a8180bac258c092189330857ed93cc23a9f5a19d1e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule vsLen(.ValSeq)                => 0
+```
+
+## reference-semantics/semantics/core.k:225-226:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c1a7ece3322915ef794297b5c75a3938b56e9ca672ce0ac429021ecfc9588598`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+```
+
+## reference-semantics/semantics/core.k:227-227:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `cefb7744efac56151396c7b5c9ca84f75f0488d25c2614a59448994443d13dc2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= isLen(IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/core.k:228-228:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `e4e059101c40b9a841f0cba7da287bef20050de08ba733f65680a2ed0ad5317e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isLen(.IntSeq)                => 0
+```
+
+## reference-semantics/semantics/core.k:229-232:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7246dff4d1113d780a0012a51faf7269bfbb726aa679c0e9169d8b7778d70eb9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+
+  // in-bounds positional write (list subscript-assign); OOB leaves the seq unchanged
+  // (valid programs write in-bounds — mirrors valSeqAt's total-but-underspecified stance)
+```
+
+## reference-semantics/semantics/core.k:233-233:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `912ccb9ff6dc8632845252b58a055e68a16f0a9118db220d4bf8ee08fca756ff`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]
+```
+
+## reference-semantics/semantics/core.k:234-234:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1ac12e956540ee0b2650a26ed63e75a50691abe9faebecbb4344c6e34fc8f0e0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq
+```
+
+## reference-semantics/semantics/core.k:235-235:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `cf509c2667abf8c2a0a68464517f173c03affc282c5df4724ce0d522e8d2d856`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val)    => vCons(V, S)
+```
+
+## reference-semantics/semantics/core.k:236-237:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `5624986ca9eb142798b212b86787df4faa532404a194a092d394737c4ad7aa9b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V))
+       requires I >Int 0
+```
+
+## reference-semantics/semantics/core.k:238-239:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `db586ecb1b4757198c769b8364d2b6845532095de51d5c937193c570eb0ca22a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule setVSAt(VS:ValSeq, I:Int, _:Val)             => VS
+       requires I <Int 0
+```
+
+## reference-semantics/semantics/core.k:240-240:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/dict.k:13-13:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `d48a71acd5079caa73133115bb3e9ea52d81522d0be0b88a52e09f8978d7cb34`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-DICT
+```
+
+## reference-semantics/semantics/dict.k:14-14:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics/dict.k:15-15:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `8ad41781e06e91093b117ccd78f6f10180a840cf3b4adaa62547edd340b26acc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-ITER
+```
+
+## reference-semantics/semantics/dict.k:16-16:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `09fe9e0706aef859710b0c5447f1427e859a1a9e9660b612e310bb91d51ec923`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-METHODS
+```
+
+## reference-semantics/semantics/dict.k:17-19:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `be3866c503798e5df79472b3edd3069ee365666ecb2a7573861290f9f90fa65a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-LIST
+
+  // dict as PARALLEL ordered key/value ValSeqs (same length; keys distinct).
+```
+
+## reference-semantics/semantics/dict.k:20-22:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `8572b253b889a241be6b019185cb140b5d10dee29b85839fe8faba88783b2fb7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= dictV(ValSeq, ValSeq)
+
+  // ==== DictExpr: {k: v, ...} literal. Eval each key then value, left to right, insert-with-dedup.
+```
+
+## reference-semantics/semantics/dict.k:23-25:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `30be194e1c62b3ee9f22057d539d83463709e382c2349504428121466ed73e68`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #dictAcc(Entries, ValSeq, ValSeq)
+                 | #dictKey(Expr, Entries, ValSeq, ValSeq)
+                 | #dictVal(Val, Entries, ValSeq, ValSeq)
+```
+
+## reference-semantics/semantics/dict.k:26-26:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `338fc50af3ecaf41411e972eea5912fd2bee7938e1bff6720692e99e334f5fba`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> DictExpr(ES:Entries) => #dictAcc(ES, .ValSeq, .ValSeq) ... </k>
+```
+
+## reference-semantics/semantics/dict.k:27-27:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `f86750e273ef1a0279ecf6f61df440040bd682375694808504d2126cfe14f07d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #dictAcc(.Entries, KS:ValSeq, VS:ValSeq) => dictV(KS, VS) ... </k>
+```
+
+## reference-semantics/semantics/dict.k:28-29:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `d45ec799e4cd836f44f484fc1d3628968a5f297cc46f82a202ee6a1dcfdeb42d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #dictAcc((Entry(K:Expr, V:Expr), REST:Entries), KS:ValSeq, VS:ValSeq)
+        => K ~> #dictKey(V, REST, KS, VS) ... </k>
+```
+
+## reference-semantics/semantics/dict.k:30-31:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `b5cfd31650441a30d759997a210bc318f97835e93dfe744fb1e03d0bb48a798c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> KV:Val ~> #dictKey(V:Expr, REST:Entries, KS:ValSeq, VS:ValSeq)
+        => V ~> #dictVal(KV, REST, KS, VS) ... </k>
+```
+
+## reference-semantics/semantics/dict.k:32-36:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `11cdf3974fe76db2e326cedebc683a75167dae668f4a3f58e718a0f0c073fd9b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> VV:Val ~> #dictVal(KV:Val, REST:Entries, KS:ValSeq, VS:ValSeq)
+        => #dictAcc(REST, dPutK(KS, KV), dPutV(KS, VS, KV, VV)) ... </k>
+
+  // insert-with-dedup helpers (concrete Val key equality via ==K). [total] so buildFold over a dict is
+  // total (its #Ceil is #Top) — needed when a symbolic proof carries a built dict as a config value.
+```
+
+## reference-semantics/semantics/dict.k:37-37:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `b1e4066d0d4acd3c64f38780d7aea22278b1bd58e3672a864ff09a7970008697`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= dHasKey(ValSeq, Val) [function, total]
+```
+
+## reference-semantics/semantics/dict.k:38-38:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a5aab27421b2f64c493da6ff97007f44f9d65c869d95728a3dc5e84548241b4b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dHasKey(.ValSeq, _:Val)                => false
+```
+
+## reference-semantics/semantics/dict.k:39-39:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `140cbc9a1aeed8d176645ace38702c79dc42da15b6e5c8c122a7d6e466494f73`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dHasKey(vCons(A:Val, _:ValSeq), K:Val) => true          requires A ==K K
+```
+
+## reference-semantics/semantics/dict.k:40-42:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `6ebdf36eb9c6d6f7f1e947131d6be5d67f10030e96fd89c20e2a0271a8e5a055`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dHasKey(vCons(A:Val, R:ValSeq), K:Val) => dHasKey(R, K) requires notBool (A ==K K)
+
+  // dPutK: KS unchanged if K already present, else append K (keep-first-position).
+```
+
+## reference-semantics/semantics/dict.k:43-43:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `97a166c788d6c17c0b8006da462d27de937efebd9f79b1205190771acf087932`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= dPutK(ValSeq, Val) [function, total]
+```
+
+## reference-semantics/semantics/dict.k:44-44:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `5164f3d147fc1e922aee8ebd927f64a7b22663f1d6062620c758c1cc398edfd1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dPutK(KS:ValSeq, K:Val) => KS                                  requires dHasKey(KS, K)
+```
+
+## reference-semantics/semantics/dict.k:45-48:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a7de53160e02cb8f0a91874e3a8731fa88d05e771f851e5d3a95e0804ce72d9f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dPutK(KS:ValSeq, K:Val) => valSeqConcat(KS, vCons(K, .ValSeq)) requires notBool dHasKey(KS, K)
+
+  // dPutV: parallel to KS — set the value at K's position if present, else append V at the end. The
+  // [owise] catch-all covers the degenerate mismatched-length case (never reached for a well-formed dict).
+```
+
+## reference-semantics/semantics/dict.k:49-49:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `a03444397cd8f766654c7e3d429905bf2ef672ac16a3d38004b0ccea0cdf26dc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= dPutV(ValSeq, ValSeq, Val, Val) [function, total]
+```
+
+## reference-semantics/semantics/dict.k:50-51:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `2527b32b669ff89090da46aa23c97bc365387cb62d3ceaf02672f50dcfdb6684`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dPutV(vCons(A:Val, _:ValSeq), vCons(_:Val, VR:ValSeq), K:Val, V:Val)  => vCons(V, VR)
+       requires A ==K K
+```
+
+## reference-semantics/semantics/dict.k:52-53:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `8b0c3eb1a71ca341f00a31aa32ffbb44b4d4c75345582c55bf33700e53537330`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dPutV(vCons(A:Val, KR:ValSeq), vCons(B:Val, VR:ValSeq), K:Val, V:Val) => vCons(B, dPutV(KR, VR, K, V))
+       requires notBool (A ==K K)
+```
+
+## reference-semantics/semantics/dict.k:54-57:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `36cb9ab00f78f3b175c3dae520524206e453b4833eeb6998457bb9e5e0f9804d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dPutV(_KS:ValSeq, VS:ValSeq, _K:Val, V:Val) => valSeqConcat(VS, vCons(V, .ValSeq)) [owise]
+
+  // ==== dict methods ========================================================
+  // d.keys() -> a FRESH list object of the ordered keys (k-cell: it allocates).
+```
+
+## reference-semantics/semantics/dict.k:58-62:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `a13bf6a27f3a583f96fb0ce4243e4ecf5cb72ef2727373517547300a2434137f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(boundMethodV(dictV(KS:ValSeq, _:ValSeq), "keys")), .Vals)
+        => #alloc(list(KS)) ... </k>
+       [priority(40)]
+
+  // ==== dict subscript READ: d[k] (assoc lookup; KeyError is out of subset) ==
+```
+
+## reference-semantics/semantics/dict.k:63-63:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `2e626ca3a0e5e06a889a4d97406f45d3659087e9efdac24f9037c7b021b61d25`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyIndexD(dictV(KS:ValSeq, VS:ValSeq), K:Val) => dGet(KS, VS, K)
+```
+
+## reference-semantics/semantics/dict.k:64-64:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `391e4efc55553a5e694ebaf97dfe170a4a08c60841a9c39d8958cc9545fc76f2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= applyIndexD(Val, Val) [function]
+```
+
+## reference-semantics/semantics/dict.k:65-69:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `970020bb47837e3a76cb62cbe7e28e25dbb9d40724b2bc9b23a52b1d16abc189`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Subscript(dictV(KS:ValSeq, VS:ValSeq), K:Val) => applyIndexD(dictV(KS, VS), K) ... </k>
+       [priority(45)]
+
+  // ==== dict subscript-assign: d[k] = v (insert/update in place) =============
+  // Only for a LOCAL dict variable X (the current scope holds it). Reuses dPutK/dPutV.
+```
+
+## reference-semantics/semantics/dict.k:70-70:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `31f3f6e36c107f354fb41ccfe3cf3cd21869f226637d592051299da74c7cdd2f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= dictSet(Val, Val, Val) [function]
+```
+
+## reference-semantics/semantics/dict.k:71-75:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1e5a897e737f46ae85f936155ad3c1923fbe273a8546efdfea49edad3917d9f1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dictSet(dictV(KS:ValSeq, VS:ValSeq), K:Val, V:Val) => dictV(dPutK(KS, K), dPutV(KS, VS, K, V))
+
+  // RHS evaluates first (Assign strictness), then the key. Dispatch on the scope
+  // value: a bare dict updates in the scope (dicts stay values); a ref (a heap
+  // list — or a heap dict later) writes the heap in place.
+```
+
+## reference-semantics/semantics/dict.k:76-76:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `882d796d0a94e03af3316fa067c35a7bb135e1dabf98f9924be715aa1ac35f94`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #dsetK(String, Val)
+```
+
+## reference-semantics/semantics/dict.k:77-77:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `4bbcefc7ea06cb0a74912a7e16f43ad37f5b0a3ee22b17219012676ff5ecc3ec`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Assign(Subscript(Name(X:String), K:Expr), VV:Val) => K ~> #dsetK(X, VV) ... </k>
+```
+
+## reference-semantics/semantics/dict.k:78-81:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `9d1ff995bd95ac2b3b5da7ff66b2cd5a4b8b73d9fbee973a032feeb27ca15697`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ X <- dictSet({M[X]}:>Val, KV, VV) ], _) ... </scopes>
+       requires X in_keys(M) andBool notBool isRefV({M[X]}:>Val)
+```
+
+## reference-semantics/semantics/dict.k:82-85:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `485423180beef1651c3f117d2f2892fd603734c3faf88d391b16407ff455af2f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => #dsetV({M[X]}:>Val, KV, VV) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires X in_keys(M) andBool isRefV({M[X]}:>Val)
+```
+
+## reference-semantics/semantics/dict.k:86-86:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `cfa9005e176ec5b6079b3150ca401aac1e59264561f6ebcd7e0052b2e1767255`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #dsetV(Val, Val, Val)
+```
+
+## reference-semantics/semantics/dict.k:87-89:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `67e131e4b8b91181107070f5f425ab8dd6a8a907217b2538ff0316d0d9165678`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #dsetV(ref(H:Int), I:Int, VV:Val) => .K ... </k>
+       <heap> ... H |-> list(VS:ValSeq => setVSAt(VS, normIdxD(I, vsLen(VS)), VV)) ... </heap>
+  // negative-index normalization local to the write (subscript.k's is not imported here)
+```
+
+## reference-semantics/semantics/dict.k:90-90:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `1c5323bfd95cd3cb664adcf89003e8bd1edfe2eefca936b6e63553bd03ca2a9b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= normIdxD(Int, Int) [function, total]
+```
+
+## reference-semantics/semantics/dict.k:91-91:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `458bf70556ac8c03ed6e21a622a978e5d34be85d627b6d4f58f5f060bc44fde4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule normIdxD(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0
+```
+
+## reference-semantics/semantics/dict.k:92-94:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d410771a907f036021b7c35688ef8480be481f1165ccc11584f6994bb02567f2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule normIdxD(I:Int, _:Int)   => I          requires I >=Int 0
+
+  // ==== dict == (order-insensitive: same size + same key->value pairs) =======
+```
+
+## reference-semantics/semantics/dict.k:95-96:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1c9db57ab415b441ba412596dcf280fbe85d60afeea5ba85521b855309f1f5f6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("==", dictV(KS1:ValSeq, VS1:ValSeq), dictV(KS2:ValSeq, VS2:ValSeq))
+    => (vsLen(KS1) ==Int vsLen(KS2)) andBool dSubset(KS1, VS1, KS2, VS2)
+```
+
+## reference-semantics/semantics/dict.k:97-97:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `24fc648b5bc5f1b87c0b113593503702ac899646af3d254d731c3d4e5ffc61ae`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= dSubset(ValSeq, ValSeq, ValSeq, ValSeq) [function]
+```
+
+## reference-semantics/semantics/dict.k:98-98:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `38e9c64805ad38d661e4e7c2f33c2399b182a2711ca7bc122061e762bf8474ee`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dSubset(.ValSeq, .ValSeq, _:ValSeq, _:ValSeq) => true
+```
+
+## reference-semantics/semantics/dict.k:99-100:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `cdfafd7d57f16e3d35b9c54663a1ba9ff34141422b1f8e6d464f8019530df075`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dSubset(vCons(K:Val, KR:ValSeq), vCons(V:Val, VR:ValSeq), KS2:ValSeq, VS2:ValSeq)
+    => dHasKey(KS2, K) andBool (dGet(KS2, VS2, K) ==K V) andBool dSubset(KR, VR, KS2, VS2)
+```
+
+## reference-semantics/semantics/dict.k:101-101:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `10fc860d42b91939926b7ddbf4700aa5545a6754489e58ab76b66d3af6d482a5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= dGet(ValSeq, ValSeq, Val) [function]
+```
+
+## reference-semantics/semantics/dict.k:102-102:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a145c44f31bfcd75ef044137ce8d42d976b8bb256225f16e85bbd2a2167205ee`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dGet(vCons(A:Val, _:ValSeq), vCons(B:Val, _:ValSeq), K:Val) => B                requires A ==K K
+```
+
+## reference-semantics/semantics/dict.k:103-103:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `6971aef401036e46e2e9df3628917fcccf09751381df9430a38bd33284b82f27`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dGet(vCons(A:Val, KR:ValSeq), vCons(_:Val, VR:ValSeq), K:Val) => dGet(KR, VR, K) requires notBool (A ==K K)
+```
+
+## reference-semantics/semantics/dict.k:104-104:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/float.k:14-14:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `987e02a6cef8bdd2686721dff327d4cb12a797c3844db8cddae4120ffb1035cc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-FLOAT
+```
+
+## reference-semantics/semantics/float.k:15-15:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `ee018db6efb00ffdd01d59dac03e43be2192505ed7049d1c693197e018cbc088`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-OPERATORS
+```
+
+## reference-semantics/semantics/float.k:16-16:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `513b07985ad1b60ab1fc94f4a08021dd25a5b0aa218c3a975ce281a00395ddfa`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-BUILTINS
+```
+
+## reference-semantics/semantics/float.k:17-19:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `f55ad623e333e29102b6de146df5ed3d8b63b6f75c2ebf41ea7395c8711c3693`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports FLOAT
+
+  // Float is a value; the float literal evaluates to the K Float.
+```
+
+## reference-semantics/semantics/float.k:20-20:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `f206c1a5ca92a9a762be3e97c9ab44ee4f72fa5d071bcb8ed4a0aa3b63cb0d34`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= Float
+```
+
+## reference-semantics/semantics/float.k:21-23:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `b207a74931910cd331b4d8c796c18a89b2d7682f65b8741c455f15af5bb64068`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Float(F:Float) => F ... </k>
+
+  // Int / float true division. OPAQUE for kprove (no-evaluators); concrete for krun.
+```
+
+## reference-semantics/semantics/float.k:24-24:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `f4862b43f760e695beb6727198d6b0bd1486a20fc8ba5871213b46541b77f8dd`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Float ::= intFloatDiv(Int, Float) [function, total, symbol(intFloatDiv), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:25-26:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `be877732fabb34242222ef0e2c0fb64b761eece113ce9bbb8de0aeaf9ce64fca`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule intFloatDiv(I:Int, F:Float) => Int2Float(I, 53, 11) /Float F [concrete]
+```
+
+## reference-semantics/semantics/float.k:27-29:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `e94b3c7e63389a67a88354dbe2a01c95eba2a2de8ff07ddac126db0dd70486a0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("/", I:Int, F:Float) => intFloatDiv(I, F)
+
+  // Int / Int true division (Python: always a float). OPAQUE for kprove; concrete for krun.
+```
+
+## reference-semantics/semantics/float.k:30-30:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `3c7cef5fcc77371d3654505ea7b198e0da74e7585aa45aca562525a59a63923b`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Float ::= divII(Int, Int) [function, total, symbol(divII), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:31-31:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `111c0e226da2c6738b3f8b5cec611cb2e1bd07bb09ee056045a36d3d6475f6c7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule divII(I1:Int, I2:Int) => Int2Float(I1, 53, 11) /Float Int2Float(I2, 53, 11) [concrete]
+```
+
+## reference-semantics/semantics/float.k:32-36:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `db8bc4510e9aec8a754ab638f26609b2fa510571c35bf994066b2d90cf86b5ec`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("/", I1:Int, I2:Int) => divII(I1, I2)
+
+  // float % float (e.g. `number % 1.0` = the fractional part). OPAQUE for kprove, concrete for
+  // krun. Python's float `%` is floor-based: a % b = a - floor(a/b)*b (K's %Float is IEEE
+  // remainder, which differs — 3.5 %Float 1.0 = -0.5 vs Python 0.5 — so it is NOT used).
+```
+
+## reference-semantics/semantics/float.k:37-37:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `26237ef2edca0917e0569815f93385224bbda0fd4d6cc2bc1419ffa94686c7ee`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Float ::= floatMod(Float, Float) [function, total, symbol(floatMod), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:38-38:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `f0f814d6f918a67f2d1dbe84073ffb15231fd42083b328d44910ae370821cf9c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule floatMod(F1:Float, F2:Float) => F1 -Float (floorFloat(F1 /Float F2) *Float F2) [concrete]
+```
+
+## reference-semantics/semantics/float.k:39-42:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `56d4267f396eccbde88384f400d0650c9cf03f5b024cdfc1c1de0ee05819bd06`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("%", F1:Float, F2:Float) => floatMod(F1, F2)
+
+  // float equality — for concrete krun asserts (e.g. `area == 7.5`); the FLOAT.eq hook is fine on
+  // concrete floats. kprove proofs return floats structurally and do not compare them.
+```
+
+## reference-semantics/semantics/float.k:43-43:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `ce568cc9c8ae662d6f5e89cde017ce3384e06a48825731fd774752aac5f9ec52`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2
+```
+
+## reference-semantics/semantics/float.k:44-49:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `3b638863c6a601b5f4d358b6bd2db87c61b6e590389b8e106137d1fe4f613e03`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2)
+
+  // float `<` and abs — OPAQUE for kprove ([no-evaluators], so a SYMBOLIC float compare stays an
+  // uninterpreted Bool a proof case-splits on — a SINGLE compare per branch, not a nonlinear cascade),
+  // [concrete] for krun. Additive, sort-disjoint from the Int rules. (has_close_elements: the pairwise
+  // `abs(a-b) < t` proximity test.)
+```
+
+## reference-semantics/semantics/float.k:50-50:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `9675cd9c7a220914d5e1ac6fd0cea726b7800b8a4e4cc8e3827dab3f1a64e40a`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Bool ::= floatLt(Float, Float) [function, total, symbol(floatLt), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:51-51:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `2a8121a4d91fa2828c6f00490d4170198174d13b61570468b22f0e42ac18f7ad`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule floatLt(F1:Float, F2:Float) => F1 <Float F2 [concrete]
+```
+
+## reference-semantics/semantics/float.k:52-53:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c073d8cee697c56f18c7591e4e094442f43e33bde7d1f323b558237de1ec7fb4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("<", F1:Float, F2:Float) => floatLt(F1, F2)
+```
+
+## reference-semantics/semantics/float.k:54-54:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `12a1faf44cdf66e02b407c54180b85b62a91e0e15d77be9b9e9206ab00a1f8b4`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Float ::= absF(Float) [function, total, symbol(absF), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:55-55:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `b00b8066b8e964faa56e75d261ba728c14a5849399b0c29bf1f32b48ec5eedec`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule absF(F:Float) => absFloat(F) [concrete]
+```
+
+## reference-semantics/semantics/float.k:56-60:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `ac3fc3bb925be97c1e4f460d119c0ec16b5c9dbe56389720173b2aedbb76e9f8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("abs", F:Float, .Vals) => absF(F)
+
+  // ==== math.ceil ===========================================================
+  // `import X` is a no-op (we intercept the specific math functions syntactically; `math` itself is
+  // never bound as a value).
+```
+
+## reference-semantics/semantics/float.k:61-64:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `c333ce9ff14345a1e3967ad007f77cba6cf898eb4d9ebf19a5fb7c3f156263c3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Import(_:String) => .K ... </k>
+
+  // math.ceil(x): ceiling to an int. Intercepted at the Call BEFORE `math` is looked up (higher
+  // priority than the generic Attribute/method dispatch in call.k).
+```
+
+## reference-semantics/semantics/float.k:65-65:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `b46507b52502d69ecd0b28bf99b17d6364e01f0ddfcc14834ec07fcafceb1f78`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= "#mathCeil"
+```
+
+## reference-semantics/semantics/float.k:66-66:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `6731784767d29f257a6e457e28ea5da072a6cdb279502efc86711cf04b62290e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Call(Attribute(Name("math"), "ceil"), (E:Expr, .Exprs)) => E ~> #mathCeil ... </k> [priority(40)]
+```
+
+## reference-semantics/semantics/float.k:67-69:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `0e161c91ce8bdd51a8d38b8494b51157cd4c308757b2696e33f7f4cff80bbc00`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> V:Val ~> #mathCeil => ceilF(V) ... </k>
+
+  // math.floor(x) — same interception shape as math.ceil
+```
+
+## reference-semantics/semantics/float.k:70-70:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `7182dabba36769b189524af8593436518f2392b447983f4d2982643bf6ca9f6d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= "#mathFloor"
+```
+
+## reference-semantics/semantics/float.k:71-71:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `8c6ed970676f93aca0ee122cdf288baef386e0d235737cd00ef0972d35539986`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Call(Attribute(Name("math"), "floor"), (E:Expr, .Exprs)) => E ~> #mathFloor ... </k> [priority(40)]
+```
+
+## reference-semantics/semantics/float.k:72-72:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `65f0f3138bd4041429d19744d61cd2ab7ae411553229ea4ff3dbdd7b1684509a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> V:Val ~> #mathFloor => floorFI(V) ... </k>
+```
+
+## reference-semantics/semantics/float.k:73-73:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total', 'symbol']`
+- SHA-256: `bb414e98ce7ce75743ab373e70347f41d2f4ee07ff45aa6580a15966550ccb50`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]
+```
+
+## reference-semantics/semantics/float.k:74-74:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `6f2278b445a3354bce4acb84b19c8366d938c41f0320cc6150412091d50ce376`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule floorFI(I:Int)   => I                        [concrete]
+```
+
+## reference-semantics/semantics/float.k:75-77:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `18ae1bc1eb508d9983233bee117836d6bae74f111d93509057fc6a88cae72f62`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule floorFI(F:Float) => Float2Int(floorFloat(F)) [concrete]
+
+  // bare floor/ceil (bound by `from math import floor, ceil`)
+```
+
+## reference-semantics/semantics/float.k:78-78:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `4f4ffc4a6628c5740fa8ade1d51ba965ebb75a520f0dee556a13f5d680058c82`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("floor", V:Val, .Vals) => floorFI(V)
+```
+
+## reference-semantics/semantics/float.k:79-81:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `8c75b87dea7b58b5a5450bf35dac397f886de32c052c64bd325f6e11c0000d64`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("ceil",  V:Val, .Vals) => ceilF(V)
+
+  // math.pow(x, y) — a two-arg interception onto powF (ints promote)
+```
+
+## reference-semantics/semantics/float.k:82-82:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `533ce20926848a932096268dcc8d19a7affc311f363f07719348863d48fca5b4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #mathPow1(Expr) | #mathPow2(Val)
+```
+
+## reference-semantics/semantics/float.k:83-83:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `841a8e8cad165e0baad70da3e93cd4b35a8e56bf91952b8dd9176dfbcc1fd55a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Call(Attribute(Name("math"), "pow"), (E1:Expr, E2:Expr, .Exprs)) => E1 ~> #mathPow1(E2) ... </k> [priority(40)]
+```
+
+## reference-semantics/semantics/float.k:84-84:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `fbcd9d035631ab0d6584bf5ad7e731663ca5f847f66a3e2c17f88cc6b8b62f59`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> V1:Val ~> #mathPow1(E2:Expr) => E2 ~> #mathPow2(V1) ... </k>
+```
+
+## reference-semantics/semantics/float.k:85-85:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `f6ee2424cb4d2471040a4178c7b5055007746c94dd088fd5fe295808e4d9ba56`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> V2:Val ~> #mathPow2(V1:Val) => powF(toF(V1), toF(V2)) ... </k>
+```
+
+## reference-semantics/semantics/float.k:86-86:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total', 'symbol']`
+- SHA-256: `5506be32391181835ed65a75fc4654d2c25ffe352ec3115b3d137d28f495bf73`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Float ::= toF(Val) [function, total, symbol(toF)]
+```
+
+## reference-semantics/semantics/float.k:87-87:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `ed62a3a7f661923ba2dc8a8100b240b37581acaf018e91c6d5f0e04b90f1b339`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule toF(F:Float) => F        [concrete]
+```
+
+## reference-semantics/semantics/float.k:88-92:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `f14e69883b5c1c912af6bbd529415a681f0cf20b66f6db374a2a0a5ccd66b6ca`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule toF(I:Int)   => intToF(I) [concrete]
+
+  // ceilF: math.ceil as an Int. TOTAL (K trusts it; a symbolic list element stays opaque for
+  // kprove — structural). [concrete] so the Int2Float/ceilFloat hooks only run for krun (llvm).
+  // Matches Python incl. negatives: ceil(-2.4) = -2 = Float2Int(ceilFloat(-2.4)).
+```
+
+## reference-semantics/semantics/float.k:93-93:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total', 'symbol']`
+- SHA-256: `52675460312419ec876e710ac18206472fab07ac74a094bd6caa45e1ec0027ed`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= ceilF(Val) [function, total, symbol(ceilF)]
+```
+
+## reference-semantics/semantics/float.k:94-94:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `c5ad02ae16417369c8125277af88c6486c901951961ba6b585a296287b4a5be8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule ceilF(I:Int)   => I                       [concrete]
+```
+
+## reference-semantics/semantics/float.k:95-98:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `145b6bb5414a1e9f6ecd3c28cd72b074f15dc027a09e5d343fbf343916a1786f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule ceilF(F:Float) => Float2Int(ceilFloat(F)) [concrete]
+
+  // unary minus on a float (e.g. the literal -2.4 = UnaryOp("-", Float(2.4))). Concrete for krun;
+  // proofs use symbolic elements, never a float literal.
+```
+
+## reference-semantics/semantics/float.k:99-102:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7d664b09c5b810fb8a0ada329642a5e6316411bdcae8ee528df89ab3813174e7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyUn("-", F:Float) => 0.0 -Float F
+
+  // ---- float - / / / + (OPAQUE for kprove [no-evaluators], concrete for krun) — for float-list
+  // element maps (x - lo) / (hi - lo). Mirror intFloatDiv: additive, sort-disjoint from the Int rules.
+```
+
+## reference-semantics/semantics/float.k:103-103:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `bd9289f118f1e03fa252abe44e6e1c934c9f1ae015ed8e3fbd4299e7f5c26494`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Float ::= subF(Float, Float) [function, total, symbol(subF), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:104-104:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `12f60d082454bd2b0805c3344bf9ab377c453dcd7d5e9c5b42bf333f5d57edb8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule subF(F1:Float, F2:Float) => F1 -Float F2 [concrete]
+```
+
+## reference-semantics/semantics/float.k:105-106:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `600f864e0d4d5f3dfe90085090dd70db36baef4d5567bb1aaeef349e99da06db`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("-", F1:Float, F2:Float) => subF(F1, F2)
+```
+
+## reference-semantics/semantics/float.k:107-107:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `91e03f2ac9cf90dce2b3ea5859601973196a3504474c25eb80ec2b21be7ffe57`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Float ::= divF(Float, Float) [function, total, symbol(divF), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:108-108:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `26654b7bcf191054c73e2246eb8532b4bd2b7243dfed90f8a8981b961ece60f8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule divF(F1:Float, F2:Float) => F1 /Float F2 [concrete]
+```
+
+## reference-semantics/semantics/float.k:109-110:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `ef46ce780b55860627d49bf1404f7f29e15fe39b90cd069c1022d94b833e6290`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("/", F1:Float, F2:Float) => divF(F1, F2)
+```
+
+## reference-semantics/semantics/float.k:111-111:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `2398531263a97112a72ea01928b6cf992a9f2306201ba7f3170536661db96622`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Float ::= addF(Float, Float) [function, total, symbol(addF), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:112-112:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `3f45f37477446abb30b2cf45ac67d631b0bf8d597d6dfac37aebfb9494124574`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule addF(F1:Float, F2:Float) => F1 +Float F2 [concrete]
+```
+
+## reference-semantics/semantics/float.k:113-114:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `034cf2b7767250b7e2e63618d233e160da84cceb00705122dacb2b21d37f9641`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("+", F1:Float, F2:Float) => addF(F1, F2)
+```
+
+## reference-semantics/semantics/float.k:115-115:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `4e0d8b299c8516d20b15b89833ed1e760641f6fa8ecc8d0069cf24fa804c9c98`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Float ::= mulF(Float, Float) [function, total, symbol(mulF), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:116-116:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `46a5b95d90aada84fb908fcccfac676a044aaa6b9f76e95e95f4c620acb0278b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule mulF(F1:Float, F2:Float) => F1 *Float F2 [concrete]
+```
+
+## reference-semantics/semantics/float.k:117-118:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7bc5c419eaac104d84561c37f738d88864aedb6a8f4fe53efafeaf9213747acd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("*", F1:Float, F2:Float) => mulF(F1, F2)
+```
+
+## reference-semantics/semantics/float.k:119-119:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `47a046af374b7333041c374f5e55c9c816bb128c6ec2b425f34da68716e8cea3`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Float ::= powF(Float, Float) [function, total, symbol(powF), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:120-120:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `88f0b7d20137e8c6cc512845c967e98e804b4966da1b2ef8eb07db88bae5b8fa`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule powF(F1:Float, F2:Float) => F1 ^Float F2 [concrete]
+```
+
+## reference-semantics/semantics/float.k:121-124:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `8e212e6890f18b2beda7c1c57253f730960d85d8621eeefd387a54adebdffbec`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("**", F1:Float, F2:Float) => powF(F1, F2)
+
+  // ---- the remaining comparisons (gtF promoted from find_zero — its summaries
+  //      case-split on the atom; >= / <= derive from the two opaque compares) ----
+```
+
+## reference-semantics/semantics/float.k:125-125:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `9fdcc02ab4ee99148d3e6503c0421d6d40e4c43f206fecef2bf271337906a0c0`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Bool ::= gtF(Float, Float) [function, total, symbol(gtF), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:126-126:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `088703ce3653f7358ab35922090d8b0c6380e7bdabc390bab127a4fb756fe9f9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule gtF(F1:Float, F2:Float) => F1 >Float F2 [concrete]
+```
+
+## reference-semantics/semantics/float.k:127-127:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `0288d338940c4dc8037d4e03ef5004dce662bd4311b988368300e3b9694a9088`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp(">",  F1:Float, F2:Float) => gtF(F1, F2)
+```
+
+## reference-semantics/semantics/float.k:128-128:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `5eb9299eb06c3b1274bb92813d634fba7250df5e932e6fbd4f10219082b4e26d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp(">=", F1:Float, F2:Float) => notBool floatLt(F1, F2)
+```
+
+## reference-semantics/semantics/float.k:129-131:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `8450a60edb040c3c79c150cb3aefc28f736f70478f273c966811cd38aa69d5d1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("<=", F1:Float, F2:Float) => notBool gtF(F1, F2)
+
+  // ---- mixed Int/Float operators promote the Int side (n ** 0.5 etc.) ----
+```
+
+## reference-semantics/semantics/float.k:132-132:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f16ef18fbd1d9024a5bbbb2180e97eb0b9b548b0a53165996dc52bd3db603161`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("**", I:Int, F:Float) => powF(intToF(I), F)
+```
+
+## reference-semantics/semantics/float.k:133-133:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `6353492521ad97f8b794ad6a43bd8fd197aa82dde113f341a78b56fbcebb6436`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("**", F:Float, I:Int) => powF(F, intToF(I))
+```
+
+## reference-semantics/semantics/float.k:134-134:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7b68c306973586de958d305580b9863c51bc797c0632e645a8be0e4e94ab5f88`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("-",  I:Int, F:Float) => subF(intToF(I), F)
+```
+
+## reference-semantics/semantics/float.k:135-135:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1409954604e558d1e20ebb673b113bb4e753382700056a9bb050e2f5877f2435`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("-",  F:Float, I:Int) => subF(F, intToF(I))
+```
+
+## reference-semantics/semantics/float.k:136-136:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `695a4d4bdd54bacc726be8bb1b947957b13ac3c1ea85079e6f37f176f5dd1e85`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("+",  I:Int, F:Float) => addF(intToF(I), F)
+```
+
+## reference-semantics/semantics/float.k:137-137:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `8105c256a812da5488c816ddc234cc23a361eaea37ba294397ab351db64ecbe8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("+",  F:Float, I:Int) => addF(F, intToF(I))
+```
+
+## reference-semantics/semantics/float.k:138-138:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `74e2f8b58bc61612bd447aba290b62193b7b0a596847a535cef8ecf17013ed6d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("*",  I:Int, F:Float) => mulF(intToF(I), F)
+```
+
+## reference-semantics/semantics/float.k:139-141:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `e6ec45cad51d54a76725d3e30f9951c2f259d5cfee54811847aaae6c1c75014c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("*",  F:Float, I:Int) => mulF(F, intToF(I))
+
+  // ---- mixed Int == Float (shared eqF; opaque symbolic / concrete twin) ----
+```
+
+## reference-semantics/semantics/float.k:142-142:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `4d0d2ce425b47cbd6bee2f255bcf3d96198d491b336ae2a39b526ef63bea2402`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Bool ::= eqF(Float, Float) [function, total, symbol(eqF), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:143-143:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `9653dcd55b20d0e03ba4d3cbe0f0bc8f742986e54a1d18bce5cea115e0effbb2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule eqF(F1:Float, F2:Float) => F1 ==Float F2 [concrete]
+```
+
+## reference-semantics/semantics/float.k:144-144:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `ac77f892cfc0b69b735ac2dedee89bcc32c18ec0b6242435d33e360dc3bdfebc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("==", I:Int, F:Float) => eqF(intToF(I), F)
+```
+
+## reference-semantics/semantics/float.k:145-145:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `722beef5b388f74df4709c027e46917747d36d8c1d7c43bf20a191f26682e6a0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("==", F:Float, I:Int) => eqF(F, intToF(I))
+```
+
+## reference-semantics/semantics/float.k:146-146:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `15bc1d1e3d08b5b6493f5463f32de91bc41aedbc0531460205fa7b219d3a0b6e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("!=", I:Int, F:Float) => notBool eqF(intToF(I), F)
+```
+
+## reference-semantics/semantics/float.k:147-147:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `330ac8e38f2c5dc2e16493d9573956960ac5ac0f1aa2ec0b94a2bab7f4776709`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("!=", F:Float, I:Int) => notBool eqF(F, intToF(I))
+```
+
+## reference-semantics/semantics/float.k:148-148:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1714c1550770bc11884e259edb53966f4938fc04546dd96c773cabee38acab6c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("<",  I:Int, F:Float) => floatLt(intToF(I), F)
+```
+
+## reference-semantics/semantics/float.k:149-149:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a3b308b7b2c2e9343ae069b0a7bbe47498537cca6859ee92873552c2df50f105`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("<",  F:Float, I:Int) => floatLt(F, intToF(I))
+```
+
+## reference-semantics/semantics/float.k:150-150:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `fc6de3b7c2f96d950f9aaca9f5df3aed76102c3b005e86cef59e2d2bce19afcf`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp(">",  I:Int, F:Float) => gtF(intToF(I), F)
+```
+
+## reference-semantics/semantics/float.k:151-153:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `6be006c5f338dff71d73987e7eecbe8de7dd26235ccbb3e159d4c986d664375d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp(">",  F:Float, I:Int) => gtF(F, intToF(I))
+
+  // ---- x == None (promoted from 137; `is` cases live in operators.k) ----
+```
+
+## reference-semantics/semantics/float.k:154-154:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `ed4df68a2d974fe706e71c86e88eb3e36801da78a3eaa8c2ecbaa51f6ced123c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("==", V:Val, noneV) => V ==K noneV
+```
+
+## reference-semantics/semantics/float.k:155-159:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `36ca091848db67ad70ff6e704b91a5654885c8d188fe4833ccdf797609b69cfa`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("!=", V:Val, noneV) => notBool (V ==K noneV)
+
+  // ---- float(str): decimal parse (promoted from 137's defined chain) ----
+  // digits '.' digits, optional leading '-'; concrete evaluation only (the
+  // symbolic side stays an opaque decStrToF term a proof case-splits on).
+```
+
+## reference-semantics/semantics/float.k:160-160:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `588f5768440e82dbce509dc1072150d464064371a95ab449d306de6c8a1ab71d`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Float ::= decStrToF(IntSeq) [function, total, symbol(decStrToF), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:161-161:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `32ad68f36a3579ddde24fed9991e513dbe124c01fa42f3cf8d325c00724072e5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule decStrToF(iCons(45, CS:IntSeq)) => 0.0 -Float decStrToF(CS) [concrete]
+```
+
+## reference-semantics/semantics/float.k:162-164:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `9f3e9336e6d4f17232515b23e758529e9713428bdc07275860865b9fabe9a17e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule decStrToF(CS:IntSeq)
+    => intToF(intPart(CS)) +Float (intToF(fracPart(CS)) /Float intToF(fracScale(CS)))
+       requires isLen(CS) >Int 0 andBool headIS(CS) =/=Int 45 [concrete]
+```
+
+## reference-semantics/semantics/float.k:165-165:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `7ccb5a6fa421529eb4d84258e8892a126f17837c883f5f769a46302b9f415a77`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= headIS(IntSeq) [function]
+```
+
+## reference-semantics/semantics/float.k:166-166:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `87f97131d232c3b3fe63af84c485392eb5fa213372961692ad8be1d4e829b6be`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule headIS(iCons(C:Int, _:IntSeq)) => C
+```
+
+## reference-semantics/semantics/float.k:167-167:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `81addd4f5596f2033c20428b0f7237369100bbb560bee73c96ad21a80d841b50`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= intPart(IntSeq) [function, total] | intPartAcc(IntSeq, Int) [function, total]
+```
+
+## reference-semantics/semantics/float.k:168-168:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `8628f4bdac5b353e03c2bc742851a9bef5270e9f55485b2fd5106110b32c91eb`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule intPart(CS:IntSeq) => intPartAcc(CS, 0)
+```
+
+## reference-semantics/semantics/float.k:169-169:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b0b8a3b71d8b773e0ac54513c6fc1487bd635290f8b43e0cde2e727212088832`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule intPartAcc(.IntSeq, A:Int) => A
+```
+
+## reference-semantics/semantics/float.k:170-170:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `afe4cef68f539bdd51c1f0a5ae8df7775d90ea5f56b631736fca0c3045775347`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule intPartAcc(iCons(46, _:IntSeq), A:Int) => A
+```
+
+## reference-semantics/semantics/float.k:171-172:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `449dadad749f7ef91ef8e6743696425941aff55a9e7c5e9632f30e047051f33e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule intPartAcc(iCons(C:Int, R:IntSeq), A:Int) => intPartAcc(R, A *Int 10 +Int (C -Int 48))
+       requires C =/=Int 46
+```
+
+## reference-semantics/semantics/float.k:173-173:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `89e3dfc58231d5383b1e61b92e817335a29e719d804013b43b7c7441c61c2b6f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= fracPart(IntSeq) [function, total] | fracAcc(IntSeq, Int) [function, total]
+```
+
+## reference-semantics/semantics/float.k:174-174:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `63e7386de829e297aa3549501083463f674402c03453af6d2af82954ea3ca089`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule fracPart(.IntSeq) => 0
+```
+
+## reference-semantics/semantics/float.k:175-175:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `336f8c20b7a91aaa9ffeb7e78c4036dc329b5eb2285b828ebdf685de71756ca5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule fracPart(iCons(46, R:IntSeq)) => fracAcc(R, 0)
+```
+
+## reference-semantics/semantics/float.k:176-176:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `517a796c8a51a532d5deec287622e3fd5c53f114d3c2c4a90d81a38845e188eb`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule fracPart(iCons(C:Int, R:IntSeq)) => fracPart(R) requires C =/=Int 46
+```
+
+## reference-semantics/semantics/float.k:177-177:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `3a7473c8713b4543d57cb02410dccb5d38aec392bbef467c280296112e6e3f98`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule fracAcc(.IntSeq, A:Int) => A
+```
+
+## reference-semantics/semantics/float.k:178-178:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a87341fff5746e9d5194086ddc44c7ad77a84af986cfb236c0eb82e4803100b8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule fracAcc(iCons(C:Int, R:IntSeq), A:Int) => fracAcc(R, A *Int 10 +Int (C -Int 48))
+```
+
+## reference-semantics/semantics/float.k:179-179:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `dffc425acef907d2815f3c09cd0f551eb3c0d4d833f812e1fd91fd039a251917`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= fracScale(IntSeq) [function, total] | fscAcc(IntSeq, Int) [function, total]
+```
+
+## reference-semantics/semantics/float.k:180-180:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f006d2881246b7d3dcd8eaf9d4618941fa02e37bba781cc8bde1ca23cf00abeb`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule fracScale(.IntSeq) => 1
+```
+
+## reference-semantics/semantics/float.k:181-181:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `abcd00241d753458f9e3c9c9b4f190a16743b72541923fda31d832a76e6e8c0a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule fracScale(iCons(46, R:IntSeq)) => fscAcc(R, 1)
+```
+
+## reference-semantics/semantics/float.k:182-182:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `abd5cc4adcbe2ff17a9a65065bab11cb91f71486cec9b3aec6b916a2dadd508f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule fracScale(iCons(C:Int, R:IntSeq)) => fracScale(R) requires C =/=Int 46
+```
+
+## reference-semantics/semantics/float.k:183-183:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1e74ce0b2611ba03551065586840c66efcef50ec31c87931ea7e1fcdd0c038d5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule fscAcc(.IntSeq, A:Int) => A
+```
+
+## reference-semantics/semantics/float.k:184-184:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `21eab0b39d565a3e9d8d58a6a31ae9dc36d9912941fde9c3fde2ba3b0e13a8b1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule fscAcc(iCons(_:Int, R:IntSeq), A:Int) => fscAcc(R, A *Int 10)
+```
+
+## reference-semantics/semantics/float.k:185-185:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a528cb142102cbb205e5e2a04f502db9659e955dbeb0b957699af3bdbb7e1409`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("float", str(CS:IntSeq), .Vals) => decStrToF(CS)
+```
+
+## reference-semantics/semantics/float.k:186-186:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `df11945a1b8f0f7bb66b9095abcda69026b9ee39f08d7621f51584b5193711e3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("float", I:Int, .Vals)          => intToF(I)
+```
+
+## reference-semantics/semantics/float.k:187-189:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `204a489bc7afe1b7ad35baf1ec8dc6ef9bf976d34a1e1eec0428b40362a3b414`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("float", F:Float, .Vals)        => F
+
+  // ---- float / int division (promoted from mean_absolute_deviation) ----
+```
+
+## reference-semantics/semantics/float.k:190-190:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `f49cc043a05b2accf64a4db2d7e01a1b3b2ad8d4c9aac725e410510fe5868681`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Float ::= divFloatIntV(Float, Int) [function, total, symbol(divFloatIntV), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:191-191:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `a71c4a7b3d8c96c0b1b11e6d910903e91cc245db5c6b79525d6f74e8d046211e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule divFloatIntV(F:Float, I:Int) => F /Float Int2Float(I, 53, 11) [concrete]
+```
+
+## reference-semantics/semantics/float.k:192-194:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `49144daa1c72e53a3326b2c41addec3efd0a7023570196bccee5f22eda3396e0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("/", F:Float, I:Int) => divFloatIntV(F, I)
+
+  // ---- int -> float promotion for the remaining mixed arithmetic/compares ----
+```
+
+## reference-semantics/semantics/float.k:195-195:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `4f21c29912e1361d8706f1bf1cde8207bd9e40372f9128ae77571effd103a990`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Float ::= intToF(Int) [function, total, symbol(intToF), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:196-196:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `389178d3dfd7c359c14f9336e08d770f7068b029dbbe053760f92d9769d2781f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule intToF(I:Int) => Int2Float(I, 53, 11) [concrete]
+```
+
+## reference-semantics/semantics/float.k:197-197:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `695a4d4bdd54bacc726be8bb1b947957b13ac3c1ea85079e6f37f176f5dd1e85`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("+", I:Int, F:Float) => addF(intToF(I), F)
+```
+
+## reference-semantics/semantics/float.k:198-198:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `8105c256a812da5488c816ddc234cc23a361eaea37ba294397ab351db64ecbe8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("+", F:Float, I:Int) => addF(F, intToF(I))
+```
+
+## reference-semantics/semantics/float.k:199-199:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7b68c306973586de958d305580b9863c51bc797c0632e645a8be0e4e94ab5f88`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("-", I:Int, F:Float) => subF(intToF(I), F)
+```
+
+## reference-semantics/semantics/float.k:200-200:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1409954604e558d1e20ebb673b113bb4e753382700056a9bb050e2f5877f2435`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("-", F:Float, I:Int) => subF(F, intToF(I))
+```
+
+## reference-semantics/semantics/float.k:201-201:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `74e2f8b58bc61612bd447aba290b62193b7b0a596847a535cef8ecf17013ed6d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("*", I:Int, F:Float) => mulF(intToF(I), F)
+```
+
+## reference-semantics/semantics/float.k:202-202:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `de611e1415d1413bffdbb0fc1e35fdc3143eee6a775b9cef2212242ec9d8114a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("*", F:Float, I:Int) => mulF(F, intToF(I))
+```
+
+## reference-semantics/semantics/float.k:203-203:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1714c1550770bc11884e259edb53966f4938fc04546dd96c773cabee38acab6c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("<", I:Int, F:Float) => floatLt(intToF(I), F)
+```
+
+## reference-semantics/semantics/float.k:204-204:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a3b308b7b2c2e9343ae069b0a7bbe47498537cca6859ee92873552c2df50f105`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("<", F:Float, I:Int) => floatLt(F, intToF(I))
+```
+
+## reference-semantics/semantics/float.k:205-205:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `fc6de3b7c2f96d950f9aaca9f5df3aed76102c3b005e86cef59e2d2bce19afcf`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp(">", I:Int, F:Float) => gtF(intToF(I), F)
+```
+
+## reference-semantics/semantics/float.k:206-208:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `23764a6ef8f4e6827f21a83b48febd198d4d0cf502b68db0426804029d198b04`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp(">", F:Float, I:Int) => gtF(F, intToF(I))
+
+  // ---- conversions: int(float) truncates toward zero; float(int); round; math.sqrt ----
+```
+
+## reference-semantics/semantics/float.k:209-209:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `11c17aa2d43131ae18ec1be82f27b6922d13447bcdad8aea53515aaf4222e7a0`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Int ::= truncF(Float) [function, total, symbol(truncF), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:210-210:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `bee730d1e87168f9dad702b1113b5a919a7ee189741db231857746a167529d25`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule truncF(F:Float) => #if F >=Float 0.0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi [concrete]
+```
+
+## reference-semantics/semantics/float.k:211-212:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `651a7c3ee92f0a9635c032666a3452b3cfa8ca92836f167a48bc06274401d3e0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("int", F:Float, .Vals) => truncF(F)
+```
+
+## reference-semantics/semantics/float.k:213-213:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `df11945a1b8f0f7bb66b9095abcda69026b9ee39f08d7621f51584b5193711e3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("float", I:Int, .Vals)   => intToF(I)
+```
+
+## reference-semantics/semantics/float.k:214-216:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `aedd7151045ce31cd73ede70f0ed364fd44f751f2d4455dda51baf9002665602`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("float", F:Float, .Vals) => F
+
+  // round: Python half-even (banker's); round(F, N) scales by 10^N
+```
+
+## reference-semantics/semantics/float.k:217-217:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `d0b7f75c69f6a7f52a6d150fa1f859c9c843ffefeea29b68a7ef6d619f7a89ba`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Int ::= roundF(Float) [function, total, symbol(roundF), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:218-222:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `eb02485bbe2629074d51e3cdcf92ebd4d3b9ea985bd5c69349a87b2bcf6107db`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule roundF(F:Float)
+    => #if (F -Float floorFloat(F)) ==Float 0.5
+       #then (#if Float2Int(floorFloat(F)) %Int 2 ==Int 0
+              #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi)
+       #else Float2Int(floorFloat(F +Float 0.5)) #fi [concrete]
+```
+
+## reference-semantics/semantics/float.k:223-223:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `73ff3255d50db9ef5ce4e5587a02f3727412ba9e564eb216091a4a44fea04c54`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Float ::= roundFN(Float, Int) [function, total, symbol(roundFN), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:224-226:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `2ae5db0795e6706028e1cee0c2674dd3a80f09d61603b97b4c52262edd039e9f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule roundFN(F:Float, N:Int)
+    => Int2Float(roundF(F *Float Int2Float(10 ^Int N, 53, 11)), 53, 11)
+       /Float Int2Float(10 ^Int N, 53, 11) [concrete]
+```
+
+## reference-semantics/semantics/float.k:227-227:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `196b869af0707a66536ccccb9f7ab759877beef029956d5731c92e1c0c669539`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("round", F:Float, .Vals)        => roundF(F)
+```
+
+## reference-semantics/semantics/float.k:228-229:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `053cb084a5421b38959bd6e86a7f16795e1408d819c3053e85c24ab6c9bd01f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBuiltin("round", F:Float, N:Int, .Vals) => roundFN(F, N)
+```
+
+## reference-semantics/semantics/float.k:230-230:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `ccbc575470399e30c153b9c247d480371d972bf5c6a908dd1deba29b7a3fb92e`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax Float ::= sqrtF(Float) [function, total, symbol(sqrtF), no-evaluators]
+```
+
+## reference-semantics/semantics/float.k:231-231:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `6233ea5230d8583f4585636e51bd39d973ee97f98281d6711e369677f7fab7c2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule sqrtF(F:Float) => sqrtFloat(F) [concrete]
+```
+
+## reference-semantics/semantics/float.k:232-232:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `cf723364ca5d681bba80f43226edcd7e8beea1e13bea0f107f710ad340966933`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= "#mathSqrt"
+```
+
+## reference-semantics/semantics/float.k:233-233:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `9708f9876df9bd54f74a36d6f213af9a101a9064261c6b8717ef86a520e5f151`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Call(Attribute(Name("math"), "sqrt"), (E:Expr, .Exprs)) => E ~> #mathSqrt ... </k> [priority(40)]
+```
+
+## reference-semantics/semantics/float.k:234-234:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `7e79b6dbd8c07376bb029b374572020a5420a378a9c49c65d56f1567c002a4c0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> F:Float ~> #mathSqrt => sqrtF(F) ... </k>
+```
+
+## reference-semantics/semantics/float.k:235-242:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `92aacf0f7d1171af573c74aad3963d52f8ca64e6286d0f3ad7e7aec588b7d280`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> I:Int ~> #mathSqrt => sqrtF(intToF(I)) ... </k>
+
+  // ---- min / max over a FLOAT list — FLOAT branch of the shared #minCont0/#maxCont0 folds (which
+  // seed/step with `requires isInt(V)`, so they are STUCK on floats). These add the `requires
+  // isFloat(V)` seed + a Float-accumulator fold via K's minFloat/maxFloat — concrete for krun. A proof
+  // over a SYMBOLIC float list intercepts min/max problem-locally to an opaque minVF/maxVF (at
+  // #applyK, priority 40, in its verification.k) BEFORE #minAcc0, so this fold is krun-only. Additive:
+  // the isFloat guard is disjoint from the existing isInt one.
+```
+
+## reference-semantics/semantics/float.k:243-243:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `a63f310fdba5a6f45aa19461da4b980cdebc96e73ac1a35a94f6c219c4f4ac1f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #maxAccF(Iterable, Float) | #maxContF(Float)
+```
+
+## reference-semantics/semantics/float.k:244-244:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `838b90fdad470a0cb9ec017aca4445c39c79d1400f0c8199bc5e379d1394c6ac`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAccF(R, {V}:>Float) ... </k> requires isFloat(V)
+```
+
+## reference-semantics/semantics/float.k:245-245:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `dfa99d6b3002d3d181db1c1b740bbb0d365de00515a7b0da3d6ccd418d8ad5f0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #maxAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #maxContF(M) ... </k>
+```
+
+## reference-semantics/semantics/float.k:246-246:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `35a797d2ae5f80419d2f097787037eeac7ac26d46a573a396d00a2c237fe0902`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterDone ~> #maxContF(M:Float) => M ... </k>
+```
+
+## reference-semantics/semantics/float.k:247-249:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `a1f41d00826cf56a35800be5d846bff2a033b3f6bcaf1397f1dcb67661b49162`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxContF(M:Float) => #maxAccF(R, maxFloat(M, {V}:>Float)) ... </k>
+       requires isFloat(V)
+```
+
+## reference-semantics/semantics/float.k:250-250:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `cd35b1a809162624d97017592cb4c67cfabdc4236752758dfc73e9223f535029`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #minAccF(Iterable, Float) | #minContF(Float)
+```
+
+## reference-semantics/semantics/float.k:251-251:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `785007e31d6e0716e9e2c2607b7db6ddc091436f5499b86dd575c0fc5b1e1546`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAccF(R, {V}:>Float) ... </k> requires isFloat(V)
+```
+
+## reference-semantics/semantics/float.k:252-252:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `6b8405dae8d41cf373535771fde16f1e70f4e5c27e9318ec9f469b6c95df0487`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #minAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #minContF(M) ... </k>
+```
+
+## reference-semantics/semantics/float.k:253-253:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `700ae0c8579a15db7131fac162e19ae25bcac57d8cb38ce3275296d31d7d0441`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterDone ~> #minContF(M:Float) => M ... </k>
+```
+
+## reference-semantics/semantics/float.k:254-260:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `8288a6943c5a58d3be8a511421eb20c63fe8f52ff4876377b587c0c96d7dcaef`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #minContF(M:Float) => #minAccF(R, minFloat(M, {V}:>Float)) ... </k>
+       requires isFloat(V)
+
+  // ---- sum over a float list (krun; mirrors the min/max float paths). The Int-only shared
+  // #sumCont sticks on a Float yield; switch to a Float-headed fold via addF (concrete twin).
+  // The switch guard carries the SYNTACTIC negation of the Int rule's guard so a symbolic proof
+  // with isInt(V) in its path condition refutes this branch without sort reasoning.
+```
+
+## reference-semantics/semantics/float.k:261-261:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `0abd52ddf475c76be88e36b6ae667fa4b020f936fe9da72fa0159555df394556`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #sumAccF(Iterable, Float) | #sumContF(Float)
+```
+
+## reference-semantics/semantics/float.k:262-264:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `2f1184f501b575d4a8952df05fc121110263a6f198ff344bf2726ed5cfb552cf`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int)
+        => #sumAccF(R, addF(intToF(ACC), {V}:>Float)) ... </k>
+       requires isFloat(V) andBool notBool (isInt(V) orBool isBool(V))
+```
+
+## reference-semantics/semantics/float.k:265-265:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `65c1e01d9cd3ba0608befb376b26333c0a382f6396af8fad36e39e1ea0018c6c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #sumAccF(IT:Iterable, ACC:Float) => #iterNext(IT) ~> #sumContF(ACC) ... </k>
+```
+
+## reference-semantics/semantics/float.k:266-266:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `a39fca22a1537ecfaa404ec9fe4c163ac7600183a1ac70ec53c1f71b2c0cd536`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterDone ~> #sumContF(ACC:Float) => ACC ... </k>
+```
+
+## reference-semantics/semantics/float.k:267-269:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `f1353b9a01f4ea8a63619a4f791a8a6904388bcec2de6fab1a0f4d467efdafc8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float)
+        => #sumAccF(R, addF(ACC, {V}:>Float)) ... </k>
+       requires isFloat(V)
+```
+
+## reference-semantics/semantics/float.k:270-272:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `dba3e0024842ced0d7c1cdf793479eaf00fa924fce0cd834d63a596490397345`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float)
+        => #sumAccF(R, addF(ACC, intToF(intOf(V)))) ... </k>
+       requires isInt(V) orBool isBool(V)
+```
+
+## reference-semantics/semantics/float.k:273-273:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/functions.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `443014fc63307393fbae4cefb1f0e0c1626a46f092c728c97ec64c4e2e9cc71d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-FUNCTIONS
+```
+
+## reference-semantics/semantics/functions.k:4-7:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `3fde5b005137e52990df7979b7e328515dbf05cd8d4b4efd1d6010567931446e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+
+  // call routing + callee/arg evaluation (#callee/#args/#argCont) live in call.k;
+  // this module owns the frame lifecycle (bind params, return, pop).
+```
+
+## reference-semantics/semantics/functions.k:8-13:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `38852cfad4176eff2e428f218ef19f8dba35bd4b9c9b795fd3e6e2346b2279b6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= frame(continuation: K, callerEnv: Int, savedLoc: Int)
+                 | #bindP(ParamNames, Vals)
+                 | "#pop"
+                 | "#endcall"
+
+  // ==== def / anonymous closure =============================================
+```
+
+## reference-semantics/semantics/functions.k:14-17:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `f981471f7fe1d37edc742ee83b218f62160ea0f267c0c7c8eaa419d7ff573576`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ F <- closureVal(PNS, BODY, L) ], _) ... </scopes>
+```
+
+## reference-semantics/semantics/functions.k:18-18:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `a6aeea98e7de047f34a60286bc922b09e47fb2b1ed36e387cb4dd043ab958d97`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Expr ::= closureExpr(ParamNames, Stmts)
+```
+
+## reference-semantics/semantics/functions.k:19-26:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `a786c280fdd8f0a0c4f58ce9c6395d6d6c05bf8d57bff3d69c2dae8895d67d99`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> closureExpr(PNS:ParamNames, BODY:Stmts) => closureVal(PNS, BODY, L) ... </k>
+       <env> L:Int </env>
+
+  // ==== annotated def/lambda (closure cells; spec 2.3) ======================
+  // closureValC(params, cellvars, body, captured-cells). No frame anchor: all
+  // enclosing-local reads are freevars (symtable-complete) and go through the
+  // captured cells; everything else is global/builtin, so the callee frame's
+  // parent is the module scope (0) — sound after the defining frame dies.
+```
+
+## reference-semantics/semantics/functions.k:27-30:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `3858d7c3acdfec6d1b91295ad71930c460dee1628153c605891cf8e23e107c37`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= closureValC(ParamNames, ParamNames, Stmts, Map)
+
+  // capture: resolve each freevar to the enclosing frame's cellRef, then bind
+  // (FuncDef) or yield (Lambda) the closure value.
+```
+
+## reference-semantics/semantics/functions.k:31-32:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `adf59ac49fac375fed8b82627c7f2e97361a74ce540c25191e7364c8443683c5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #mkClosure(String, ParamNames, ParamNames, ParamNames, Stmts, Map)
+                 | #mkLambda(ParamNames, ParamNames, ParamNames, Stmts, Map)
+```
+
+## reference-semantics/semantics/functions.k:33-35:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `c7913840b3eb69329fe66da5d3c1f4f0a3abc6b814a059ba7855eecbeb837d90`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> FuncDef(F:String, Params(PNS:ParamNames), CellVars(CVS:ParamNames),
+                   FreeVars(FVS:ParamNames), BODY:Stmts)
+        => #mkClosure(F, PNS, CVS, FVS, BODY, .Map) ... </k>
+```
+
+## reference-semantics/semantics/functions.k:36-41:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `9260d8509a74e5602f68966df89b4019a08f945c39f9d9563ecebdd490d0ded2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames,
+                      (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map)
+        => #mkClosure(F, PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires FV in_keys(M)
+```
+
+## reference-semantics/semantics/functions.k:42-46:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `79ce8ed09e9100199940db64ea62f6dd5dc3d16997661c87fb4642a5bd2b4a4d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames,
+                      .ParamNames, BODY:Stmts, CM:Map) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ F <- closureValC(PNS, CVS, BODY, CM) ], _) ... </scopes>
+```
+
+## reference-semantics/semantics/functions.k:47-49:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `deda77ab935136ffc525059ae6f3062f8de96e8d459d155d8ce231e281ab77cb`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Lambda(Params(PNS:ParamNames), E:Expr)
+        => closureVal(PNS, Return(E) .Stmts, L) ... </k>
+       <env> L:Int </env>
+```
+
+## reference-semantics/semantics/functions.k:50-52:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `37112d13ebff5c38dbbcc21f3de6bef754075cb2a431f4cbff297fb1d401c072`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Lambda(Params(PNS:ParamNames), CellVars(CVS:ParamNames),
+                  FreeVars(FVS:ParamNames), E:Expr)
+        => #mkLambda(PNS, CVS, FVS, Return(E) .Stmts, .Map) ... </k>
+```
+
+## reference-semantics/semantics/functions.k:53-58:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `ee95b3fb3c96473b23386b2b24d6b2b1414c69c651ebfb2e896cc40501679e7b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames,
+                     (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map)
+        => #mkLambda(PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires FV in_keys(M)
+```
+
+## reference-semantics/semantics/functions.k:59-62:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `ef332e7b4b11c3a69b48d143a193636e601843ca0bd3cf1ec1bacd3bed0fae85`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map)
+        => closureValC(PNS, CVS, BODY, CM) ... </k>
+
+  // ==== bind params ========================================================
+```
+
+## reference-semantics/semantics/functions.k:63-63:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `e3671d9bac62395286261253cedc1db6b2cc0499988e29cfc0fef9ecb270a51f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>
+```
+
+## reference-semantics/semantics/functions.k:64-67:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `6355110fbe6286414fa486b60fae95a3b8139792e9da9b514d2eead47937b380`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ P <- V ], _) ... </scopes>
+  // a param that is a cellvar was pre-bound to its cell at frame entry
+```
+
+## reference-semantics/semantics/functions.k:68-77:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `609a54ad1ff7fe70be985c764d59b237abf76bf1d8b1758a539804e35512ebea`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals))
+        => #cellW({M[P]}:>Val, V) ~> #bindP(PS, VS) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires "$cells" in_keys(M)
+        andBool pnMember(P, cellsOf({M["$cells"]}:>Val))
+        andBool P in_keys(M) andBool isCellRef({M[P]}:>Val)
+       [priority(40)]
+
+  // ==== return / pop the frame (the returned expr evaluates by strictness) ==
+```
+
+## reference-semantics/semantics/functions.k:78-79:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `e32ef37e336c744611c4b34d811ac7ae4ebf8b5e2de407b6775937770d40a28c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Return(V:Val) ~> _ => #pop </k>
+       <ret> noRet => retV(V) </ret>
+```
+
+## reference-semantics/semantics/functions.k:80-84:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `625259de2459d71d8ecf86ec2e2f9622e4ccb84f3076355f0153f80d19b5356b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #endcall => #pop ... </k>
+       <ret> noRet => retV(noneV) </ret>
+  // pop: restore env, DEALLOCATE the callee frame, and wind scopeLoc back (LIFO allocation
+  // makes the saved loc the callee frame's own loc). Sound because no closureVal outlives its
+  // defining frame (frontend subset: no returned/stored closures; module defs live in loc 0).
+```
+
+## reference-semantics/semantics/functions.k:85-90:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `0976ba92bcac43fd697edbd1f7198b551a421c797750f89243f796c52dab75ab`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #pop => V ~> CONT </k>
+       <ret>   retV(V) => noRet </ret>
+       <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack>
+       <env>   L:Int => CALLERL </env>
+       <scopes> SC:Map => SC [ L <- undef ] </scopes>
+       <scopeLoc> _ => SAVEDL </scopeLoc>
+```
+
+## reference-semantics/semantics/functions.k:91-91:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/int.k:4-4:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `74fc45d7398a54f6acd3ef6f2de6e8aaaa5970993284ffc2414ef9b80f8ee099`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-INT
+```
+
+## reference-semantics/semantics/int.k:5-6:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics/int.k:7-8:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `bea824a9d0c76babe487fb83fc65f9325c396843c8776705ff5df097dcbe35ab`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyUn("-", I:Int) => 0 -Int I
+```
+
+## reference-semantics/semantics/int.k:9-10:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c67b19f49aae95f3829124d96c94fe82f2e3663b6927e4c9becb8fa908c947d3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+  // Bool participates in int arithmetic (x += (a == b))
+```
+
+## reference-semantics/semantics/int.k:11-11:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `515cc9110af914220fd043ddada48c7f17365a9bfa328efa8ae0919b5473859a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+```
+
+## reference-semantics/semantics/int.k:12-12:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `335d0401d42936641828c8519f03000492eab5fdde729be9ad84a964c192e1ed`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+```
+
+## reference-semantics/semantics/int.k:13-13:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `045a3b7ba0f87b98701c029636a3617c9a7131d9a4011152d4bcca47c54b5501`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+```
+
+## reference-semantics/semantics/int.k:14-14:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b25cf4d3a0b2c5705570985e016c6a573c9b1c47be3b9f677993f1c5a998c7a3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+```
+
+## reference-semantics/semantics/int.k:15-15:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7cfc166283c78d7165e4b29b6a7a8af5e7cecf8afe34ef7d32f9fb2313a573f2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+```
+
+## reference-semantics/semantics/int.k:16-16:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `85afa4d25d1446e6442d53737a36d1cc763b73b3fc78e5ee581835eea8b7b0f2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+```
+
+## reference-semantics/semantics/int.k:17-18:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `614ae406522ba61d5dafd570459dee468b49b861442a3c456ef857b36c41e18a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+```
+
+## reference-semantics/semantics/int.k:19-19:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `c131b0a212330737a12ec60d92eb60b3277a638e494ba82dba54d486be7e0c1a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= pyMod(Int, Int) [function]
+```
+
+## reference-semantics/semantics/int.k:20-21:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `e3bb9293bfdee6b979c9f707348dfd94cb34c6ea9cc50901bfde37efe127d5f7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+```
+
+## reference-semantics/semantics/int.k:22-22:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `10360ae8affd8bc7e27f8eb3e84b9a9da97af8c4b1970f529095f4e98af3c2f6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+```
+
+## reference-semantics/semantics/int.k:23-23:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c213716c432e960423134537589932a4917bb15ada8af878e32b1f4a71d4cac9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+```
+
+## reference-semantics/semantics/int.k:24-24:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `fefdcde2267af04c1bdeb0961cbc9cb977147b091ffaebf44a694173a23e1516`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+```
+
+## reference-semantics/semantics/int.k:25-25:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `463b1de8dd3e82b0fcd03ee7033dc057a279b2a2be351a7a8b3ce80a42c98227`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+```
+
+## reference-semantics/semantics/int.k:26-26:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `533193ddf05e9682051473e0f142b3e9586ce8088bd6202dca16db0688e93fd1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+```
+
+## reference-semantics/semantics/int.k:27-27:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `14ecc12ef5abadb7bac32c0bfe2efbd9eb2f38fd37dfa7a308cec90354697399`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+```
+
+## reference-semantics/semantics/int.k:28-28:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/iter.k:6-6:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `65489422ea2a70bfef194feb6c0efcb5208a49917849941598ec8a343e2ece68`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-ITER
+```
+
+## reference-semantics/semantics/iter.k:7-7:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics/iter.k:8-8:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `2fa814827c664147e6d7c96edd48c3a829a22cd77adc337afbe1fec74dba68ec`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #iterNext(Iterable) | "#iterDone" | #iterYield(Val, Iterable)
+```
+
+## reference-semantics/semantics/iter.k:9-9:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/list.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `61efb165f96a6f5cda9e0ada6aa477f882898ac2258363d4a6911fbe5ca45ee4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-LIST
+```
+
+## reference-semantics/semantics/list.k:4-4:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics/list.k:5-5:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `8ad41781e06e91093b117ccd78f6f10180a840cf3b4adaa62547edd340b26acc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-ITER
+```
+
+## reference-semantics/semantics/list.k:6-8:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `30f0f78ff6f9a0ba25c0836ab3263c18faf646d26dd9dc5f53ef96f71377b535`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-OPERATORS
+
+  // ==== iteration (the iterator protocol's list case) =======================
+```
+
+## reference-semantics/semantics/list.k:9-9:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `92f64fe670702341ba82d9aaa63eca3a1927b56437b86ed5d187461d3f017d83`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterNext(list(.ValSeq))                => #iterDone ... </k>
+```
+
+## reference-semantics/semantics/list.k:10-12:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `fdf21a976315d3b5c3e1d500d40d9aa5d14a3a2a4c961755c9da46fed4a59f2f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterNext(list(vCons(V:Val, R:ValSeq))) => #iterYield(V, list(R)) ... </k>
+
+  // ==== ListExpr: [...] literal -> a fresh heap object =======================
+```
+
+## reference-semantics/semantics/list.k:13-13:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `3d024af826bb0836a06da6fe46f0ff98c9b78f2c58b136c80135b77c71073d7d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ApplyK ::= "toList"
+```
+
+## reference-semantics/semantics/list.k:14-14:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `f3163ec1febd09901035e7b494bbfc753c89a46a9286d5ed34309f5bf3a03b91`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>
+```
+
+## reference-semantics/semantics/list.k:15-17:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `68fcfe1bf72056b8074e8f95bf71503b090a15f862b640390e2cbcd44380db96`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>
+
+  // ==== list ops: + / == / != ===============================================
+```
+
+## reference-semantics/semantics/list.k:18-18:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `ac8c744da9bbc4a3bc2a3f5ce845163aab64e079291f25529f7fea3a7eb17b02`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]
+```
+
+## reference-semantics/semantics/list.k:19-19:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `68f539c882c79f5546657cc91f8fb71028a6aa18a578a462aa805712c1ca0b1a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule valSeqConcat(.ValSeq, T:ValSeq)                => T
+```
+
+## reference-semantics/semantics/list.k:20-23:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7c426da56f88885b5f9647671b229df65da1d25803f02c30891a308ff284b5f8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))
+
+  // list + list constructs a NEW object (k-cell — it allocates; operands land here
+  // already deref'd). priority(45) beats the generic BinOp dispatch.
+```
+
+## reference-semantics/semantics/list.k:24-26:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `e435eea17b21e910a9b3b2c2b60e93607bc638e239ecfa7cbcbb94a8bbb946c9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k>
+       [priority(45)]
+```
+
+## reference-semantics/semantics/list.k:27-27:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `408c1dfb03ffb9842e1592e2fc229c8dc323c41b1a08feced658b6845110398c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B
+```
+
+## reference-semantics/semantics/list.k:28-32:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `cf305df5136c5cbb6320a5b3547645a7f7667e8ecd4b383493bc28fae330a0b7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B)
+
+  // ==== deep equality when elements are heap objects (list-of-lists) ========
+  // Python == is structural at every depth. Fires ONLY when a ref is present
+  // (the guard decides on concrete seqs); the plain ==K path above is unchanged.
+```
+
+## reference-semantics/semantics/list.k:33-33:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `afe83d38567e7cd0f351930bbf72bf06852a8be4cd8aa7d3a8a0baedfe69508a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= hasRefVS(ValSeq) [function, total]
+```
+
+## reference-semantics/semantics/list.k:34-34:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `49b8d05956105413ccd74fc8e2dd526afaa36af0f622076cd093caa41bc828a3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule hasRefVS(.ValSeq)                => false
+```
+
+## reference-semantics/semantics/list.k:35-36:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `3e47ea875f2d3db96838bc493159b5314396db5be11a6042c7f37ccc9135968e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule hasRefVS(vCons(V:Val, R:ValSeq)) => isRefV(V) orBool hasRefVS(R)
+```
+
+## reference-semantics/semantics/list.k:37-38:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `a77ca761dd61e4592a17190e4d17103c26d555a23af39433a11386cfb680647e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= deepEqVS(ValSeq, ValSeq, Map) [function]
+                | deepEqV(Val, Val, Map)        [function]
+```
+
+## reference-semantics/semantics/list.k:39-39:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d3fe72f99ea297b17954f4c0408df1a6c642e9b0d041adc503e6d2d57a098d62`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule deepEqVS(.ValSeq, .ValSeq, _:Map)                   => true
+```
+
+## reference-semantics/semantics/list.k:40-40:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c45656fdf64a83b0f5a7eef7ff708eaf6bd7c3cbbfcb2b5efb6904193eb0c3af`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule deepEqVS(.ValSeq, vCons(_:Val, _:ValSeq), _:Map)    => false
+```
+
+## reference-semantics/semantics/list.k:41-41:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f8711893a8fa5703490159c88a3ba3325609e1a06a9560189416426704ec2cb0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule deepEqVS(vCons(_:Val, _:ValSeq), .ValSeq, _:Map)    => false
+```
+
+## reference-semantics/semantics/list.k:42-44:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `75597ae93e20789e373193439cd70ef8d7e007de1415e3b9287933e852f53953`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule deepEqVS(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq), HP:Map)
+    => deepEqV(A, B, HP) andBool deepEqVS(As, Bs, HP)
+```
+
+## reference-semantics/semantics/list.k:45-46:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c5c0bdde4aba1effd6f4522e38802d04386eea3f37f136b82351ab143641ff93`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule deepEqV(ref(H:Int), B:Val, HP:Map) => deepEqV({HP[H]}:>Val, B, HP)
+       requires H in_keys(HP)
+```
+
+## reference-semantics/semantics/list.k:47-48:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `4eab3bce7e801b1bf18fd4ce302aa8cfcc0ca93dbe8068801736b16a00c8d21b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule deepEqV(A:Val, ref(H:Int), HP:Map) => deepEqV(A, {HP[H]}:>Val, HP)
+       requires notBool isRefV(A) andBool H in_keys(HP)
+```
+
+## reference-semantics/semantics/list.k:49-49:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `3863900e8a58f55b84dfb8e7bbb5d85873021d96c873b9f9d8df464649e1fe74`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule deepEqV(list(A:ValSeq), list(B:ValSeq), HP:Map) => deepEqVS(A, B, HP)
+```
+
+## reference-semantics/semantics/list.k:50-52:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `d0920aeb362da6bdcac12ae1b8d1c517951475b00eaf2d9d2db8d43c0791a9bf`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule deepEqV(A:Val, B:Val, _:Map) => A ==K B [owise]
+
+  // ==== mutator: xs.append(v) — an in-place heap write ======================
+```
+
+## reference-semantics/semantics/list.k:53-57:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `bef1266a523e01cd7e1b5a896ced2d9f3ff1d939f6704057c6234c2da7ecd9fa`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "append")), (V:Val, .Vals)) => noneV ... </k>
+       <heap> ... H |-> list(VS:ValSeq => valSeqConcat(VS, vCons(V, .ValSeq))) ... </heap>
+       [priority(40)]
+
+  // ==== `x in list` — a <k>-cell fold over #iterNext ========================
+```
+
+## reference-semantics/semantics/list.k:58-58:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `e171041153df48d94a2b0f613d3cea691d9708f5a08bc58349b786188006ec0c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #memberAcc(Val, Iterable) | #memberCont(Val) | "#notB"
+```
+
+## reference-semantics/semantics/list.k:59-59:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `816d231c73c9744b6b61bb31856f3bff88956d64926b6a81416e9741e1af22b1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Compare(LV:Val, CmpOp("in",     list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ... </k>
+```
+
+## reference-semantics/semantics/list.k:60-60:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `81419bc508aecac692f551f75d6b28b9e01b040d4bc0084db4de317160a54492`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Compare(LV:Val, CmpOp("not in", list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ~> #notB ... </k>
+```
+
+## reference-semantics/semantics/list.k:61-61:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `e84f869d57a9b95738d25e2c08fe4c7a9fc5eee5cc83a72dce6b9b077d8e258a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #memberAcc(V:Val, IT:Iterable) => #iterNext(IT) ~> #memberCont(V) ... </k>
+```
+
+## reference-semantics/semantics/list.k:62-62:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `d8442792286ce85192874167d4b911992fb7f792c374c8aa1981e75ee444d220`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterDone ~> #memberCont(_V:Val) => false ... </k>
+```
+
+## reference-semantics/semantics/list.k:63-64:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `65f8e4204476f1e8a7c3e32409d2953ab02328d8b68c6bb0b571ed40447f714e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(E:Val, _:Iterable) ~> #memberCont(V:Val) => true ... </k>
+       requires E ==K V
+```
+
+## reference-semantics/semantics/list.k:65-66:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `8b08b93c8199fd51dded1e0ee3fd0def15ccb7eed113350ed7ef8bc5e4e3db3a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterYield(E:Val, R:Iterable) ~> #memberCont(V:Val) => #memberAcc(V, R) ... </k>
+       requires notBool (E ==K V)
+```
+
+## reference-semantics/semantics/list.k:67-67:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `5511f8c4ec4450e21911f2ff0f12e7e5b0efafc30602e42132f5d292d30a5d81`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> B:Bool ~> #notB => notBool B ... </k>
+```
+
+## reference-semantics/semantics/list.k:68-68:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/methods.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `47c4712939d78225ec8e93900e3b20269eb1c602283292296d9d06cac05c2962`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-METHODS
+```
+
+## reference-semantics/semantics/methods.k:4-4:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics/methods.k:5-5:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `5d664c02791debafd1c58c1ef3ced502c6bc84e391ab9bf326e009fc1f3c5ec9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports K-EQUAL
+```
+
+## reference-semantics/semantics/methods.k:6-6:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `1c022ad4e0c945f696aa1f9d78eb4c3caf78ef9d9b46ae55d6fd081ff4264877`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-STR
+```
+
+## reference-semantics/semantics/methods.k:7-9:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `acd494813fefc7617d302a2e5dd0d134a9081d0b3b32e25197816ec3d4249d81`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-LIST
+
+  // method-call routing + arg-eval live in call.k; this module owns applyMethod.
+```
+
+## reference-semantics/semantics/methods.k:10-12:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `04a7fbd0fd3faffef22903c6b76a6df84ab91df21f4bf5568dcc7a262b372998`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= applyMethod(Val, String, Vals) [function]
+
+  // ==== string predicates (Python semantics) =================================
+```
+
+## reference-semantics/semantics/methods.k:13-13:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `328b30a3774c14efcc41ec3ccafc8b66c15e41138c101b1814f95c16e7d3c3b5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)
+```
+
+## reference-semantics/semantics/methods.k:14-14:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a6ae81f68d63fdf6ebf7a83e4cebc6a8ea356b697bc7b9e100d0e313713cafea`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)
+```
+
+## reference-semantics/semantics/methods.k:15-15:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `eb11f68e60879a03923bdb729b6cb65379b96d936aca7636c174815b536d2af1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)
+```
+
+## reference-semantics/semantics/methods.k:16-18:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `79cee76b298365df81d9e001fd08a6c877833606542527189cedb44b5e3ef113`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS)
+
+  // ==== case maps ============================================================
+```
+
+## reference-semantics/semantics/methods.k:19-19:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d65f50abf0475fc0549e8fb763ffdc7dff8cf9adbb8d3f0a80ada868ae266892`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(str(CS:IntSeq), "lower",    .Vals) => str(mapLower(CS))
+```
+
+## reference-semantics/semantics/methods.k:20-20:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1adc9077ccda30c6f3fd532b50695c3029e0d9995b42c6db9a0841b79bdb3c4b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(str(CS:IntSeq), "upper",    .Vals) => str(mapUpper(CS))
+```
+
+## reference-semantics/semantics/methods.k:21-25:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b905f221e7b87a9e935776cd8d0bff6efe285f5d9853cb7e221ad3e3bcc19a2b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(str(CS:IntSeq), "swapcase", .Vals) => str(mapSwap(CS))
+
+  // ==== join / count / strip / encode ========================================
+  // S.join(list-of-str): fold with separator codes (receiver + arg deref'd by
+  // the call layer; the result str is a value)
+```
+
+## reference-semantics/semantics/methods.k:26-26:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7c16ae8ffba754403e7d8d5b92438d28f400facc922dec2dcfd2f19b2638b867`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(str(SEP:IntSeq), "join", list(VS:ValSeq), .Vals) => str(joinCodes(SEP, VS))
+```
+
+## reference-semantics/semantics/methods.k:27-27:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `8449bace9b91c5f0d37c5971d3b28cd1cad5edfa8c5a4b09064e3d0368f9d4c4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:28-28:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `dcb47502ba7100828de3ffb17ec481bef2af40dba346ade5600c4ff154b7e376`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule joinCodes(_:IntSeq, .ValSeq) => .IntSeq
+```
+
+## reference-semantics/semantics/methods.k:29-29:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f2558775f8dab0e8cd93a50b44fe41f53fbfa634e3f8bb69170c8354661a39e0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule joinCodes(_:IntSeq, vCons(str(CS:IntSeq), .ValSeq)) => CS
+```
+
+## reference-semantics/semantics/methods.k:30-33:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `cd8b44612b02d12b55c753c89dac4a857ede370ed31b3343fd6832b549ad986e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule joinCodes(SEP:IntSeq, vCons(str(CS:IntSeq), vCons(V:Val, R:ValSeq)))
+    => seqConcat(CS, seqConcat(SEP, joinCodes(SEP, vCons(V, R))))
+
+  // S.count(sub): non-overlapping window scan (Python str.count)
+```
+
+## reference-semantics/semantics/methods.k:34-34:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `21c9fe9f742047bb32315eba84888c896b61193306c3c917ee7c909b4828e677`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)
+```
+
+## reference-semantics/semantics/methods.k:35-35:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `277077c74e8e5c1c9b55dccc915e494892ca2a34006043a7e2e1b08e7507c261`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= cntSub(IntSeq, IntSeq) [function]
+```
+
+## reference-semantics/semantics/methods.k:36-36:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f4dfc7d2f461d391d0196a077c5f476695803634821d0edeccc7045cb02eb5c8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule cntSub(.IntSeq, _:IntSeq) => 0
+```
+
+## reference-semantics/semantics/methods.k:37-38:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `17286b8b7ff9965b222eadb3e97b25dee5120c8d78a06b9f41176e56335d61e2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC)
+       requires strPrefix(PC, iCons(C, R)) andBool isLen(PC) >Int 0
+```
+
+## reference-semantics/semantics/methods.k:39-40:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `0bf718afc195d3938512aa55dbdd340f4b08702b50c544a52e4e5ac6428deba6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => cntSub(R, PC)
+       requires notBool strPrefix(PC, iCons(C, R)) orBool isLen(PC) <=Int 0
+```
+
+## reference-semantics/semantics/methods.k:41-41:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `121d0c58dbca6c2852abf6c8fbc50c66fa47e0563465d6ee60f128d83e251aa4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= dropIS(IntSeq, Int) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:42-42:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `036bd013d44b4c1edf7a703d1d6db67965c6fa20915eca3d3946a6022c1d2ea9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dropIS(S:IntSeq, N:Int) => S requires N <=Int 0
+```
+
+## reference-semantics/semantics/methods.k:43-43:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `f7a542230356ebad6029f1716109b7d96c72f11c2d5eeba3c1f490ad8595b4a1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dropIS(.IntSeq, _:Int) => .IntSeq [owise]
+```
+
+## reference-semantics/semantics/methods.k:44-46:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `751e61e19c1c15c7f25c1dea285b929ee86c2da567b17107dd124920586e0046`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dropIS(iCons(_:Int, R:IntSeq), N:Int) => dropIS(R, N -Int 1) requires N >Int 0
+
+  // S.strip(): trim whitespace runs from both ends
+```
+
+## reference-semantics/semantics/methods.k:47-47:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `fc495b2dc6ff9d31d6c463b238bc6f4493026df5e3b1bdb6a89f40b1df908ecc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(str(CS:IntSeq), "strip", .Vals) => str(revIS(trimWS(revIS(trimWS(CS)))))
+```
+
+## reference-semantics/semantics/methods.k:48-48:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `4eeafed3826be8194a981bc1e80c6de26dba5f5a70b2bbac7793fa157606154c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= trimWS(IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:49-49:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `4291267251cee7ecfdb91403f873109d0c5ef939a1f6251e0a4fedd1156ca37b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule trimWS(.IntSeq) => .IntSeq
+```
+
+## reference-semantics/semantics/methods.k:50-50:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `879a0736a8b490a2e2b40e4831c2e1462be6bf413bab581ea2fef7fef0e2f13a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule trimWS(iCons(C:Int, R:IntSeq)) => trimWS(R) requires isWSC(C)
+```
+
+## reference-semantics/semantics/methods.k:51-51:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `988ee980274cf866a4026887cbba6282e3f7c959e268cc0e188d304b386fe20f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule trimWS(iCons(C:Int, R:IntSeq)) => iCons(C, R) requires notBool isWSC(C)
+```
+
+## reference-semantics/semantics/methods.k:52-52:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `588afa88ddb7cf7ccee3e65194d4b948b7144aff2cb57bf1c63a5b88eea31739`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= revIS(IntSeq) [function, total] | revISAcc(IntSeq, IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:53-53:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f72cb5914e4ad9c0fb018b845bab1085013c5baa882264e635d565f1ec941aee`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule revIS(S:IntSeq) => revISAcc(S, .IntSeq)
+```
+
+## reference-semantics/semantics/methods.k:54-54:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `24b1a05b8e5db65b0005965f6a85b1d0b37681f9aea425a3fd11cfee46934c89`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule revISAcc(.IntSeq, A:IntSeq) => A
+```
+
+## reference-semantics/semantics/methods.k:55-57:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `51a4dff42e7fce7cb4e975d9a1c2ae066ad6ddb2e4af8bd5272d9a5e2f752f09`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule revISAcc(iCons(C:Int, R:IntSeq), A:IntSeq) => revISAcc(R, iCons(C, A))
+
+  // S.encode('ascii'): identity on the code-sequence model (bytes == codes)
+```
+
+## reference-semantics/semantics/methods.k:58-60:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `63b34c278710c3a354d40305e0dc55aa1a6e86bdfc3806e57173927bd521b081`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(str(CS:IntSeq), "encode", str(_:IntSeq), .Vals) => str(CS)
+
+  // ==== prefix ===============================================================
+```
+
+## reference-semantics/semantics/methods.k:61-63:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c96bc358fea50d7a50db6b0ea41de225008776904d3acd83e427ca1c419c6a6b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)
+
+  // ==== list.count(v) — number of occurrences of v in the list (concrete for krun) ==========
+```
+
+## reference-semantics/semantics/methods.k:64-64:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `bf346f893e63110f2247b4095f95a28b356af1cec402e140ea43d69c26c85380`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)
+```
+
+## reference-semantics/semantics/methods.k:65-65:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `b0bd756c21697bd2cd0656ba80c117936e75820eef660f3bd1ad62020d9d73f6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= cntOccVS(ValSeq, Val) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:66-66:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `99f68ecf56cfdc12342971ad00b9ad222cce7f311f69a37259d0ee04e977c7dc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule cntOccVS(.ValSeq, _:Val)                => 0
+```
+
+## reference-semantics/semantics/methods.k:67-67:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `87d9bfa2c6dc520cacd075a24b600fd6e56f675d04b6531d733a9a0b13ef16fe`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V
+```
+
+## reference-semantics/semantics/methods.k:68-71:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `2a3f9f97f1d56d41353306df543f335eba8ce4bbd2c9dc98794c6e87c6fa180e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => cntOccVS(R, V)        requires notBool (A ==K V)
+
+  // ==== split (no-arg: on whitespace runs, dropping empty tokens) + replace (single char) ==========
+  // Concrete string ops for krun. A proof over a symbolic string intercepts the split problem-locally.
+```
+
+## reference-semantics/semantics/methods.k:72-74:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `3ffc01180f48516f665143fefab8bc2d10f3a90e4b440dbab43a546c5896b78c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals)
+        => #alloc(list(splitWS(CS, .IntSeq, .ValSeq))) ... </k>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/methods.k:75-75:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `a861b5acc26b88da626b2e056a4a3496b1edd0fb54ca6a85d42e9a9674f11711`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= splitWS(IntSeq, IntSeq, ValSeq) [function]  // remaining, current token, result
+```
+
+## reference-semantics/semantics/methods.k:76-76:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `e52130b97ceec63beef441b26323fc08c38cfe3a90e45c887dc3dc5e1a00b6d4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule splitWS(.IntSeq, CUR:IntSeq, ACC:ValSeq) => flushTok(ACC, CUR)
+```
+
+## reference-semantics/semantics/methods.k:77-78:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c4024da56e0b8a5d044270b87973bb28ef152b4fdf599c139531bfd764399696`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, .IntSeq, flushTok(ACC, CUR))
+       requires isWSC(C)
+```
+
+## reference-semantics/semantics/methods.k:79-81:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f1cc1f9753c6e2f941e0409bc3f49d0112990eb36b160f80d428148624d4a4a2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, seqConcat(CUR, iCons(C, .IntSeq)), ACC)
+       requires notBool isWSC(C)
+  // flush the current token to the result list iff non-empty.
+```
+
+## reference-semantics/semantics/methods.k:82-82:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `002dffc41af21f640ec2d6c3961dac9a3d4c9f70cd750b85ea4637646913c277`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= flushTok(ValSeq, IntSeq) [function]
+```
+
+## reference-semantics/semantics/methods.k:83-83:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7b979b52a54648dbaaa049ad6a0a93c72745c0cbb0cdfdce36eb0894c104f7fa`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule flushTok(ACC:ValSeq, .IntSeq)            => ACC
+```
+
+## reference-semantics/semantics/methods.k:84-84:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `0c970d4acf65c9b6165ba1fe9178229acd7b60d37a1f841e0a59864678cb91d1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule flushTok(ACC:ValSeq, iCons(C:Int, T:IntSeq)) => valSeqConcat(ACC, vCons(str(iCons(C, T)), .ValSeq))
+```
+
+## reference-semantics/semantics/methods.k:85-85:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `37f133bfa155728fbce4d8d71377c834d069d72a03b76ab067d8d40e862021b7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= isWSC(Int) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:86-88:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f7b83fe95e9cf49cea73b651209535befb5ad89aaad9152a3cf28306d46976e1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isWSC(C:Int) => C ==Int 32 orBool C ==Int 9 orBool C ==Int 10 orBool C ==Int 13
+
+  // split(sep='x') keyword form delegates to the positional k-cell rule
+```
+
+## reference-semantics/semantics/methods.k:89-93:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `d2822bd51bea93bfabdc467ba09afefd74d4de9175b39e1df2343813cb3ab8ed`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (kwV("sep", str(S:IntSeq)), .Vals))
+        => #applyK(toCall(boundMethodV(str(CS), "split")), (str(S), .Vals)) ... </k>
+       [priority(39)]
+
+  // str.split(sep) — single-char separator, KEEPING empty parts (Python's sep-split; len == #sep + 1).
+```
+
+## reference-semantics/semantics/methods.k:94-96:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `01261c3f8fa4d7dfe9acaf5bf8dd34b42df1337d00fc410ea9a8ae86de65e656`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (str(iCons(SEP:Int, .IntSeq)), .Vals))
+        => #alloc(list(splitSep(CS, SEP, .IntSeq))) ... </k>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/methods.k:97-97:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `e3a030c4362de118998bbe4e457b0c9f42b24dd9aba97e915500d6360404bdb2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= splitSep(IntSeq, Int, IntSeq) [function]  // remaining, sep code, current token
+```
+
+## reference-semantics/semantics/methods.k:98-98:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `2d26406190b8fe4d095469d908ccc588bb8789d747ed0ab811785f67fbd807ca`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule splitSep(.IntSeq, _SEP:Int, CUR:IntSeq)              => vCons(str(CUR), .ValSeq)
+```
+
+## reference-semantics/semantics/methods.k:99-100:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `83564ea69e6a28d64aa789e33d2d724b287ed9ca68e59d12103f3dfd13562b53`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => vCons(str(CUR), splitSep(R, SEP, .IntSeq))
+       requires C ==Int SEP
+```
+
+## reference-semantics/semantics/methods.k:101-103:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `73831c9297876f11165c47b33c6f020e6223a81f97af0ba7bbd7f242faf5a821`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => splitSep(R, SEP, seqConcat(CUR, iCons(C, .IntSeq)))
+       requires notBool (C ==Int SEP)
+```
+
+## reference-semantics/semantics/methods.k:104-105:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `83ed72ac9f08df5ffc184930b2a2d967a803bce5c85691948f11bf7475838b25`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(str(CS:IntSeq), "replace", str(iCons(A:Int, .IntSeq)), str(iCons(B:Int, .IntSeq)), .Vals)
+    => str(replaceC(CS, A, B))
+```
+
+## reference-semantics/semantics/methods.k:106-106:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `6c0dfc288cc629a1d6c7002d834de9ab6467f109d87dbf2def009ecf65e4feab`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= replaceC(IntSeq, Int, Int) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:107-107:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `31431694b27dd91eb6dbd75e188f48cfc5c5a66c6a6f1da80062279242313505`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule replaceC(.IntSeq, _:Int, _:Int)             => .IntSeq
+```
+
+## reference-semantics/semantics/methods.k:108-108:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `439491c8316246eaa540a332a8b69e523cad49c2c7c4d2d0142a7365c4cf940a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(B, replaceC(R, A, B)) requires C ==Int A
+```
+
+## reference-semantics/semantics/methods.k:109-111:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `bd8e5ce805e4af2ae66a1c5a9bae2c3017dc497fabc51e3cedb578abe9a22738`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(C, replaceC(R, A, B)) requires notBool (C ==Int A)
+
+  // ==== char helpers =========================================================
+```
+
+## reference-semantics/semantics/methods.k:112-112:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `d60af3772ac0b1d7afb4df9a5320f88f50130c50810ac094f36f4dea6537df54`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= isUpperC(Int) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:113-114:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `885fc4123b6066087a19a87a681f895f6a86f9bd1e02f3fb3fc7e1fabb14b2b9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90
+```
+
+## reference-semantics/semantics/methods.k:115-115:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `9dc54db4cfe6c121597250d661d41de3feca896e01340e6952fd90fcb31ce21d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= isLowerC(Int) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:116-117:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `35a981d9ee7cc6a503019df0faf56e3a0884553ea859feb5618daf57b8c6bff0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122
+```
+
+## reference-semantics/semantics/methods.k:118-118:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `219ceeed6ce776a0cfbb90795c30070c969387af50acdaa041efb347388ebaad`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= isAlphaC(Int) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:119-120:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `63bc2def4f489009546f9a91e24b3ffa9b670b80bb92ed494d9f785e22e6a388`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)
+```
+
+## reference-semantics/semantics/methods.k:121-121:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `86d0c30136f327303a3cc2a5006d27a5df63a97799f3af186fe9019679b73e77`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= isDigitC(Int) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:122-123:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `12088c599f6ae2e51e489ac82576f0474dcf76486270f1ffaff23590a7bab546`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57
+```
+
+## reference-semantics/semantics/methods.k:124-124:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `79b65077c768714576df510d062c7f8faa40fe671016c74452cd3b326438bd4a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= hasUpper(IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:125-125:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f3875f726b38d830797bc05ebd9ea38aeceaa3ff362480e1ec324d01e25f4320`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule hasUpper(.IntSeq) => false
+```
+
+## reference-semantics/semantics/methods.k:126-127:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `bb1d921fad33840fa9314b732b8ed9dd765886085bed5d9b21fa20b789c14bf7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)
+```
+
+## reference-semantics/semantics/methods.k:128-128:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `6e2fe9388187f1af6d0cf6bdcea2ad9ae2e428d0d55469410899d36935ee8028`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= hasLower(IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:129-129:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `abfddcd09b065362b502cf7768f28f8ee5f6d898a45f56d45c8bfbc53a8ba812`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule hasLower(.IntSeq) => false
+```
+
+## reference-semantics/semantics/methods.k:130-131:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `92b0385b90924f1ce474b41530a85aa81e35ee0483da7c4a5c61c6d90fb8654b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)
+```
+
+## reference-semantics/semantics/methods.k:132-132:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `436a79dc0dbd23f2ea8e95271377a016097e63ec1ecb5b86f931f66254a7a8a2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= allAlpha(IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:133-133:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `2c1e5b1f9b4f6cc557d89df272622562ec767c1ca8c2ec9d8fcf085fa517a4f0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule allAlpha(.IntSeq) => true
+```
+
+## reference-semantics/semantics/methods.k:134-135:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `5e18a35dd26e8c9cb3e89130f9750947ca76c88f34f983ab0751c48b4a5473f9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)
+```
+
+## reference-semantics/semantics/methods.k:136-136:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `1f98366143eb8709385692f7c489f3d72f2146ce57ccd75f9c27f47831343b0e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= allDigit(IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:137-137:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f2d51c623b4f2e0ea5399348883dbdc07255c9149ba598c76056243e453f9bd6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule allDigit(.IntSeq) => true
+```
+
+## reference-semantics/semantics/methods.k:138-139:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `5aeec07d2a569d8b38690fc423330e53e233eec18bbe87600b6fa028e54285ff`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)
+```
+
+## reference-semantics/semantics/methods.k:140-141:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `6bbb30e0ba93ff7cbd72b0ca2116bad44a072d06879d4c5892bd5800df4b53b2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= lowerC(Int) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:142-142:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `16ec3ccc73d9d1c032b0b52705b63c081ad99d9d02564e45a35458fb98a66b24`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)
+```
+
+## reference-semantics/semantics/methods.k:143-144:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `90acf91ce79484f7d21db17b777db5b8e116cff0e1e2e3dccbeb234c9add0508`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule lowerC(C:Int) => C         [owise]
+```
+
+## reference-semantics/semantics/methods.k:145-145:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `b6e1b4db46d46812d2d9e708dcbcc28ed0c9fa23966a9b5c1035a57b5ef6ca17`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= upperC(Int) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:146-146:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `36f1da2397a7408e107373eaac1feb468111c8e72ed831db508700e91ed6ab22`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule upperC(C:Int) => C -Int 32 requires isLowerC(C)
+```
+
+## reference-semantics/semantics/methods.k:147-148:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `786ab98c703f00112b7a6a04ac841fbff13154c44dea0eb9f47aa6fec9988345`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule upperC(C:Int) => C         [owise]
+```
+
+## reference-semantics/semantics/methods.k:149-149:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `3d8ce436184a4c4495b0b26833fb2a717cbd1270b0934f7734dbacb108d11a6a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= swapC(Int) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:150-150:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `ec05513118cd81cddd31f795a5d04a9f9b8a10f18de362f897479bb0cf8e312c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule swapC(C:Int) => C +Int 32 requires isUpperC(C)
+```
+
+## reference-semantics/semantics/methods.k:151-151:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `960de195b818c1402cb93fbbe2472de8a315493bc6e31dd6c2b7d78de68bf879`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule swapC(C:Int) => C -Int 32 requires isLowerC(C)
+```
+
+## reference-semantics/semantics/methods.k:152-153:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `['owise']`
+- SHA-256: `88a95ca55d3e2dd34b64c5eca2f9079cee35b0d23e1a859d38d7c1881a5830eb`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule swapC(C:Int) => C         [owise]
+```
+
+## reference-semantics/semantics/methods.k:154-154:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `0fb973df4891969082e7f1d3cf1e9f88b6a17a0c072021a4189f7793642d418b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= mapLower(IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:155-155:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `5cd9c020c2bdc744cad3eb03c33a9cb4f5218be4399bf62ab8f2ec83bcc8fd6c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule mapLower(.IntSeq) => .IntSeq
+```
+
+## reference-semantics/semantics/methods.k:156-157:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `da21f8430ee48bda4a7b47ed0a026e86f516a8e0b9ec9a783e3d195cfe6b1bfc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule mapLower(iCons(C:Int, S:IntSeq)) => iCons(lowerC(C), mapLower(S))
+```
+
+## reference-semantics/semantics/methods.k:158-158:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `82523acd09b2270edd4b6be02553a0cbb2ba2c922402a18b1a9e0423720d0da7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= mapUpper(IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:159-159:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b31cc456b204df571c2fa73c6fcff30f4d4c7482f5dccce7ba3dda73b929a5f2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule mapUpper(.IntSeq) => .IntSeq
+```
+
+## reference-semantics/semantics/methods.k:160-161:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `2c01ef3cfffe93f5acb69b81b093ff77bc4328522f80f09fbbfad0c7f482a87c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule mapUpper(iCons(C:Int, S:IntSeq)) => iCons(upperC(C), mapUpper(S))
+```
+
+## reference-semantics/semantics/methods.k:162-162:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `39e9100dbb4b6a5bd52d0d8d277ad0bb5d62b70091df8e253bd378d08a6799e1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= mapSwap(IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:163-163:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `6de81779e3a07c5a099b1102e3b61d790bbc2ca485d70dc6e23b26707eb7b546`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule mapSwap(.IntSeq) => .IntSeq
+```
+
+## reference-semantics/semantics/methods.k:164-165:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `039a7b17bd0223be5271105c7dfc0ca12d94b194b82a63cdafdbd3a81980c73d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule mapSwap(iCons(C:Int, S:IntSeq)) => iCons(swapC(C), mapSwap(S))
+```
+
+## reference-semantics/semantics/methods.k:166-166:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `6f6a4aa0687d9e9c143e72eb2b0b1f23855f06d49db9aa9ba2692155c087e32e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= startsWith(IntSeq, IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/methods.k:167-167:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7e2343bdac73058ce3e7d7332d71fc6fa6353475fcfaefb08b7b378e68bfe493`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule startsWith(.IntSeq, _:IntSeq)               => true
+```
+
+## reference-semantics/semantics/methods.k:168-168:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c22b5ffce270c2c5a950eb89cd6c83284507f173b95439017116cd2bba8a05a3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule startsWith(iCons(_:Int, _:IntSeq), .IntSeq) => false
+```
+
+## reference-semantics/semantics/methods.k:169-169:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `4e5497c6f435ecbdd36b9d4489a31b6d6ebcdc34f56c48531301b97a31b0ff0a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule startsWith(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool startsWith(As, Bs)
+```
+
+## reference-semantics/semantics/methods.k:170-170:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/operators.k:6-6:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `45e2448ad0cc46cb22870ee06d94f85e37bb4b1d5cd0a61f153e870e11385a1e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-OPERATORS
+```
+
+## reference-semantics/semantics/operators.k:7-7:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics/operators.k:8-9:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `8ad41781e06e91093b117ccd78f6f10180a840cf3b4adaa62547edd340b26acc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-ITER
+```
+
+## reference-semantics/semantics/operators.k:10-11:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `ec04b29e2d1b46254cb3f8a70fed7bc53b6920095b428522d967063442fc073b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>
+```
+
+## reference-semantics/semantics/operators.k:12-14:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `c21855ae2fbb53fc2f5fc8b57becda2cb553be95a87ded15f5520515d3d2b5a5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+
+  // Compare's right operand sits under the CmpOp wrapper — contexts instead of attributes
+```
+
+## reference-semantics/semantics/operators.k:15-15:context
+
+- Category: `evaluation-context`
+- Attributes: `[]`
+- SHA-256: `e4932b24484a885d34b3f53705eeeb1fed84fc516b3ed52d0654f78929b823f1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  context Compare(HOLE, _)
+```
+
+## reference-semantics/semantics/operators.k:16-16:context
+
+- Category: `evaluation-context`
+- Attributes: `[]`
+- SHA-256: `ca9e40a2c27b7a232b7510b580b93e5ae8114c5866de16dfeea069acb5d453d0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  context Compare(_:Val, CmpOp(_, HOLE))
+```
+
+## reference-semantics/semantics/operators.k:17-18:rule
+
+- Category: `operational-rule`
+- Attributes: `['owise']`
+- SHA-256: `262226c0a44f44c7a4f1da356324355babc5b5d4fb8f040deb3476d6fcd78288`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]
+```
+
+## reference-semantics/semantics/operators.k:19-19:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `8ccf167a4ebcff08513286fa040a242f6d1106362b2089afb114a4f4098ad409`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("is",     V:Val, noneV) => V ==K noneV
+```
+
+## reference-semantics/semantics/operators.k:20-24:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `0d4c09c2599c480a43490e33bbab4969d118c5e5ee88318d88723cb3993bca3f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)
+
+  // ==== operand deref: heap objects combine/compare by STRUCTURE ============
+  // (Python: list == is structural; identity only via `is`.) priority(40)
+  // preempts the generic dispatch so applyUn/applyBin/applyCmp never see a ref.
+```
+
+## reference-semantics/semantics/operators.k:25-27:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `5a6092f742c5bd0605c3a52addd5182891cc94460efd44cdc226d58664d70230`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/operators.k:28-33:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `75d0a7af5c820b2bdf260038fbf16f4dd27438a96906980f76bf5a6cb59f93d3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isRefV(L)
+       [priority(40)]
+
+  // the left operand of `in`/`not in` is an ELEMENT (compares by ==K) — never deref'd
+```
+
+## reference-semantics/semantics/operators.k:34-37:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `d56481fd1327961bcc7dfabad56a78e9d80287e9bb4b71e8ed42450c3069408b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires OP =/=String "in" andBool OP =/=String "not in"
+       [priority(40)]
+```
+
+## reference-semantics/semantics/operators.k:38-43:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `575d5da0be9c5a705af46eb426acc0945a7e57c4f8dd33f85024a9f42c205773`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isRefV(L)
+        orBool OP ==String "in" orBool OP ==String "not in"
+       [priority(40)]
+```
+
+## reference-semantics/semantics/operators.k:44-46:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `0d606e97b2daea643faef6251047b6cd1f4acd6b86eb37b1102069ab9e66d79d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> UnaryOp(OP:String, ref(H:Int)) => UnaryOp(OP, V) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/operators.k:47-47:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/range.k:5-5:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `3245f59acaa6746804c8828bc1367c52002d920809be287b0ba05af1d0e0aabf`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-RANGE
+```
+
+## reference-semantics/semantics/range.k:6-6:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics/range.k:7-8:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `8ad41781e06e91093b117ccd78f6f10180a840cf3b4adaa62547edd340b26acc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-ITER
+```
+
+## reference-semantics/semantics/range.k:9-9:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `dec39b9740c8dd9d0236a292381d109809f8767a4531aef24a40002ccc2123ea`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= inRange(Int, Int, Int) [function, total]
+```
+
+## reference-semantics/semantics/range.k:10-11:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f93b1245c72320e5aa7cbc51256b44d4efb5755c048893f6ba2f6d35d191c295`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule inRange(I:Int, HI:Int, ST:Int) => (ST >Int 0 andBool I <Int HI) orBool (ST <Int 0 andBool I >Int HI)
+```
+
+## reference-semantics/semantics/range.k:12-12:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `9f9f1aaeaee29256645f794ab24ac2a68d22b03a0716b38717979c26620d48f6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= rangeLen(Int, Int, Int) [function]
+```
+
+## reference-semantics/semantics/range.k:13-14:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `9af49b302485c841cd923ccba6b67e7d286f4b61b934bf2401585a37d520a5c7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule rangeLen(LO:Int, HI:Int, ST:Int) => (HI -Int LO +Int ST -Int 1) /Int ST
+       requires ST >Int 0 andBool HI >Int LO
+```
+
+## reference-semantics/semantics/range.k:15-16:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d5350a65a2baba91f97b52d175ef4ca5dd5b2f8d7bf75a90ffec26e884280e69`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule rangeLen(LO:Int, HI:Int, ST:Int) => (LO -Int HI -Int ST -Int 1) /Int (0 -Int ST)
+       requires ST <Int 0 andBool HI <Int LO
+```
+
+## reference-semantics/semantics/range.k:17-19:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `80ff51ad02417a4598d4431b9f0ddf671f442ade49c6a07519d95c3064f1f290`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule rangeLen(LO:Int, HI:Int, ST:Int) => 0
+       requires (ST >Int 0 andBool HI <=Int LO) orBool (ST <Int 0 andBool HI >=Int LO)
+```
+
+## reference-semantics/semantics/range.k:20-22:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `55e600477e369ffe6f7e93603b422c0207a0d4dbab23094a49d82b531277c8a4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int))
+        => #iterYield(I, rangeObj(I +Int ST, HI, ST)) ... </k>
+       requires inRange(I, HI, ST)
+```
+
+## reference-semantics/semantics/range.k:23-24:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `c4b7668164923fa9a010dec9a8bb69d36f63e776e24deb0c489f3901f90b1f65`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterDone ... </k>
+       requires notBool inRange(I, HI, ST)
+```
+
+## reference-semantics/semantics/range.k:25-25:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/set.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `a61579bc570f8ff47f9955153b49516c35a9ec599610a638f928f0e7cc5ea32b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-SET
+```
+
+## reference-semantics/semantics/set.k:4-7:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `5dfb625da36c2cfbd1a76c7a075e1dbd76d1c708245ccc6eab0259511a340fac`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+
+  // a set value, carried as its distinct codes in first-seen order (order is irrelevant
+  // to membership/cardinality — the two observations sets support here).
+```
+
+## reference-semantics/semantics/set.k:8-10:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `288e97fc1a4c830a93f1e22af31302744d87dce7500cdb544d14ca6bd7d1968c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= setV(IntSeq)
+
+  // membership of a code in the accumulated distinct-code sequence
+```
+
+## reference-semantics/semantics/set.k:11-11:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `be0ae2291d5d6df7e27aeb082308a7eef47f89db683207f1bf0a156860e1c128`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= codeIn(Int, IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/set.k:12-12:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f60a5083116078439f260e8947e8e121be108610461db1e62e5dde42edec6d9f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule codeIn(_:Int, .IntSeq)                => false
+```
+
+## reference-semantics/semantics/set.k:13-15:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `908740ede17c8928e812a18aaf147fbab25cbe053f3c54202ccfab4bfd8dd079`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule codeIn(C:Int, iCons(H:Int, T:IntSeq)) => C ==Int H orBool codeIn(C, T)
+
+  // the distinct codes of CS (insert-if-absent fold, first-seen order)
+```
+
+## reference-semantics/semantics/set.k:16-17:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `dae5291dcfaa5bfe81733d0e0c7161c7d4784f6ef84f0ae162e6ef6e915130ba`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= dedupCodes(IntSeq)         [function, total]
+                  | dedupFrom(IntSeq, IntSeq)  [function, total]
+```
+
+## reference-semantics/semantics/set.k:18-18:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d766b83ec2d86623c34078fd5baac96439ef9df58e2905582ef9572bf4141f92`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dedupCodes(CS:IntSeq) => dedupFrom(CS, .IntSeq)
+```
+
+## reference-semantics/semantics/set.k:19-19:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `43f63938c9877ea6964a01be9a0975520ad7bcd1547963caf64819fb8899825e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dedupFrom(.IntSeq, ACC:IntSeq) => ACC
+```
+
+## reference-semantics/semantics/set.k:20-21:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `045bd0dd1ac5c844b07bb281dcaf17d59728efd2d9558f6845debf02614419a9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, ACC)
+       requires codeIn(C, ACC)
+```
+
+## reference-semantics/semantics/set.k:22-24:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `af80178bc6f52f381da6ad70967e436e533c9e0328e8253018f434fa2dbbc055`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, snocCode(ACC, C))
+       requires notBool codeIn(C, ACC)
+```
+
+## reference-semantics/semantics/set.k:25-25:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `c59b599a912dfbe757f346db515843be1349471c0c709ed66b796ec08ec1cdd1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= snocCode(IntSeq, Int) [function, total]
+```
+
+## reference-semantics/semantics/set.k:26-26:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c906946c4c7df0578465aadaa39fda1399e11d26a08b9c1d9157e1052febcf72`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule snocCode(.IntSeq, C:Int)                => iCons(C, .IntSeq)
+```
+
+## reference-semantics/semantics/set.k:27-30:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a4561635907cc02777866a1af805091f45648b953e23ac573b2b4b145552a3a0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule snocCode(iCons(H:Int, T:IntSeq), C:Int) => iCons(H, snocCode(T, C))
+
+  // ==== set equality: two sets are equal iff mutually subsuming ==============
+  // subsetCodes(A, B) — every code of A occurs in B (duplicates in A are harmless).
+```
+
+## reference-semantics/semantics/set.k:31-31:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `b1d04ee84fabe3f58ed28b05901d2634c5c530b5391f4673cdf9b2dedafdacc7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= subsetCodes(IntSeq, IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/set.k:32-32:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `fb4a56d463fb7ae7e7343b070a815f4e3f405282ea8c247dd34df6c5ace2051a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule subsetCodes(.IntSeq, _:IntSeq)                => true
+```
+
+## reference-semantics/semantics/set.k:33-34:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `850be538170a9edb22a44a4ce2568f35b29fa79f58888e09984a4033d6aebbaf`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule subsetCodes(iCons(C:Int, S:IntSeq), B:IntSeq) => codeIn(C, B) andBool subsetCodes(S, B)
+```
+
+## reference-semantics/semantics/set.k:35-35:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `6156266fe9d9b07a383778418b8a8a6b768dca1807dfad3ee0498cff0ecc75f7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= sameSet(IntSeq, IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/set.k:36-38:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `aa7872fffe94bf239532627e84da19a690d3913da9aa053e9ee7681386b57b1c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule sameSet(A:IntSeq, B:IntSeq) => subsetCodes(A, B) andBool subsetCodes(B, A)
+
+  // set == set  (the only comparison sets support here)
+```
+
+## reference-semantics/semantics/set.k:39-39:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7a5ed6b4e8d675889fbd0c888e0097b0f319b6b1c37872ccf6716c2f2afc0565`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("==", setV(A:IntSeq), setV(B:IntSeq)) => sameSet(A, B)
+```
+
+## reference-semantics/semantics/set.k:40-40:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/sort.k:10-10:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `2324159bdf28df653f286067082feb187a9e02a44c740456dae31b27022b595d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-SORT
+```
+
+## reference-semantics/semantics/sort.k:11-11:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `513b07985ad1b60ab1fc94f4a08021dd25a5b0aa218c3a975ce281a00395ddfa`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-BUILTINS
+```
+
+## reference-semantics/semantics/sort.k:12-17:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `3b7d30bdfb44c51a3fe7dfd288272fd23ad1f5574f436460d5929317b4efc529`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-SUBSCRIPT
+
+  // sortVS(VS): the ascending sort of the Val list VS. Opaque for symbolic VS (no-evaluators);
+  // concrete insertion sort for krun.
+  // Concrete sort matches Int-sorted elements directly (an int Val IS an Int); projectIntTotal
+  // (lemmas-only) is not available in the semantics. Int and str lists.
+```
+
+## reference-semantics/semantics/sort.k:18-18:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `c6d761b986e34bb35057126ad5885215fea615a238764749865f535e470fa43b`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax ValSeq ::= sortVS(ValSeq) [function, total, symbol(sortVS), no-evaluators]
+```
+
+## reference-semantics/semantics/sort.k:19-19:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `0a76cca66b26bec5620b0fa0900cfbae5de0d5c61ed2c375e74ec5aed8aacf19`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= insVS(Int, ValSeq) [function]
+```
+
+## reference-semantics/semantics/sort.k:20-20:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `6bd401e364fe74eb4cae6d3763a8f7e2d4d3982191aa427f54e6b11a4b4c2475`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule sortVS(.ValSeq)                => .ValSeq          [concrete]
+```
+
+## reference-semantics/semantics/sort.k:21-21:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `afe20c3cfa1af6db4fd20a8050faf019552807fa0b01572e504e92491be14b63`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule sortVS(vCons(X:Int, R:ValSeq)) => insVS(X, sortVS(R)) [concrete]
+```
+
+## reference-semantics/semantics/sort.k:22-22:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `0e61d8cbcf2421314bfb6e247679e9540c25158a77c3032126b86ab622ffe70c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule insVS(X:Int, .ValSeq)                => vCons(X, .ValSeq) [concrete]
+```
+
+## reference-semantics/semantics/sort.k:23-23:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `e38dbfdea30a930ec41dc76e1fc86def100bfbfcfd88853d63d1fd9597a78ee5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]
+```
+
+## reference-semantics/semantics/sort.k:24-25:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `ecd0fc7b5c1fd5548e7e19cadcf9a364d476d2ab80c7a5a4d3a462ae4695a2fe`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X  >Int Y [concrete]
+  // str elements insert by the shared lexicographic strLt (methods.k)
+```
+
+## reference-semantics/semantics/sort.k:26-26:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `f778a322aece37266d282b5757dcb47aa66fbd6bcd3cb99133579990e1ea7411`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]
+```
+
+## reference-semantics/semantics/sort.k:27-27:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `f56269f2805fdf6e8a4ee27fc629bc2b5ad70b59c74649375bb93f7ddd171898`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]
+```
+
+## reference-semantics/semantics/sort.k:28-28:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `1f2df95775eb233969123f430eb5df8ccfc8e3c063894b7b20733a158307ff84`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]
+```
+
+## reference-semantics/semantics/sort.k:29-30:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `302f445859987e6c1b7aeafc49449d0e468c659b7c6d3b14ba52a771f210f519`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(A), vCons(str(B), R))
+       requires strLt(A, B) orBool A ==K B [concrete]
+```
+
+## reference-semantics/semantics/sort.k:31-35:rule
+
+- Category: `concrete-rule`
+- Attributes: `['concrete']`
+- SHA-256: `417317762dc3e15286f1b017e39e10b4f385f915f6f314cfec4eeb260d3b3246`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(B), insVSs(A, R))
+       requires notBool (strLt(A, B) orBool A ==K B) [concrete]
+
+  // sorted(list) constructs a NEW object: k-cell pre-dispatch (beats the [owise]
+  // applyBuiltin routing in call.k) so the result allocates.
+```
+
+## reference-semantics/semantics/sort.k:36-39:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `b80d34d1b4d653d384c61ef35080c26894c402e805945d47700765c9ab26ca28`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), .Vals))
+        => #alloc(list(sortVS(VS))) ... </k>
+
+  // mutator: xs.sort() — the in-place heap write over the same trusted sortVS
+```
+
+## reference-semantics/semantics/sort.k:40-48:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `2f7f7ea23353bc14c0d721cc28bd5b7813dc98f52db95c5946fe84267e6b0003`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "sort")), .Vals) => noneV ... </k>
+       <heap> ... H |-> list(VS:ValSeq => sortVS(VS)) ... </heap>
+       [priority(40)]
+
+  // ==== keyed / reversed sorted() (WP2) =====================================
+  // sortKeyVS(VS, KV): the stable ascending sort of VS by the key value KV
+  // (a closure/builtin/type — anything callable). OPAQUE here; the concrete
+  // leg (MPY-CONCRETE, llvm only) computes keys by REAL calls and stable-
+  // inserts, at priority(40) over these.
+```
+
+## reference-semantics/semantics/sort.k:49-50:syntax
+
+- Category: `opaque-symbol-declaration`
+- Attributes: `['function', 'total', 'symbol', 'no-evaluators']`
+- SHA-256: `f2ac55ee34d899f8dea02d048fbe04c31e9380eb65b24fe7a665a4c459a47fce`
+- Disposition: `DECLARED_UNUSED_TRUST_BOUNDARY`
+- Rationale: Opaque supplied primitive is unreachable from the submitted all_prefixes term.
+
+```k
+  syntax ValSeq ::= sortKeyVS(ValSeq, Val) [function, total, symbol(sortKeyVS), no-evaluators]
+```
+
+## reference-semantics/semantics/sort.k:51-52:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `da8fbe9dd99b0d35fe225182a9017408c9cbe8a36110d0f6205ae6896c20bb27`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= revVS(ValSeq) [function, total]
+                  | revVSAcc(ValSeq, ValSeq) [function, total]
+```
+
+## reference-semantics/semantics/sort.k:53-53:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `ce0aa18a536023617b5fa012c4896693902eb851d32017e9e0add330616fdfbd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule revVS(S:ValSeq) => revVSAcc(S, .ValSeq)
+```
+
+## reference-semantics/semantics/sort.k:54-54:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `726a2866a59e53374aab2b1bed31946a74b1866463d1adc19b016a7017ae08fd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule revVSAcc(.ValSeq, A:ValSeq) => A
+```
+
+## reference-semantics/semantics/sort.k:55-56:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `5fd679052347f58f5e3637566616cd1304da061a3232edc871028bc59707c5f3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule revVSAcc(vCons(V:Val, R:ValSeq), A:ValSeq) => revVSAcc(R, vCons(V, A))
+```
+
+## reference-semantics/semantics/sort.k:57-57:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `7e8ff8d017c7edb7bd2d8f72a2de7fb5fcf8c1afde10e1aa97a2656fb519c6d3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= condRev(ValSeq, Bool) [function, total]
+```
+
+## reference-semantics/semantics/sort.k:58-58:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a1e37b0851c34a5eb84ec7d35cfb0b013cf9a4c94a656167b6fbc8fbe0204cea`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule condRev(S:ValSeq, false) => S
+```
+
+## reference-semantics/semantics/sort.k:59-60:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b59c3f4a824c81f6f9f14886f3458aa04d45bfce3feccec9077e43f9707b9305`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule condRev(S:ValSeq, true)  => revVS(S)
+```
+
+## reference-semantics/semantics/sort.k:61-62:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `72cacce57534e83f92e153d66b43090b202234e875e5d0f24f69fcc6d4b6709e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals))
+        => #alloc(list(sortKeyVS(VS, KV))) ... </k>
+```
+
+## reference-semantics/semantics/sort.k:63-64:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `9934b02daf557e7c112bf5a5b8e9e08b538570f16ce23b53fc1fb4df695dec9c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals))
+        => #alloc(list(condRev(sortKeyVS(VS, KV), RB))) ... </k>
+```
+
+## reference-semantics/semantics/sort.k:65-71:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `1ce051984ec6a6daa0db14d45b48945349867865c066710498c6e59305295bd0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("reverse", RB:Bool), .Vals))
+        => #alloc(list(condRev(sortVS(VS), RB))) ... </k>
+
+  // Indexing the opaque sorted list: `valSeqAt(sortVS(VS), I)` is DEFINED because valSeqAt is
+  // [total] (subscript.k) — it stays an abstract total value for a symbolic sort and reduces
+  // over the concrete sort for krun. No separate sortedAt indirection is needed; wrappers write
+  // their postcondition directly as valSeqAt(sortVS(VS), …).
+```
+
+## reference-semantics/semantics/sort.k:72-72:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/str.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `6e503b11331c16b57328e9bf82938cba732cd5f1a51afa54ca44810b505a770a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-STR
+```
+
+## reference-semantics/semantics/str.k:4-4:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics/str.k:5-7:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4c55a93b575a74fa3602560feab9963049314ede396467cdf15e92e8ee30b9a6`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-ITER
+
+  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+```
+
+## reference-semantics/semantics/str.k:8-8:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `c96529154572047b7a2cf28199875992fd3580e240d1dfcd1ce795c5d718fa31`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+```
+
+## reference-semantics/semantics/str.k:9-12:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `d785d2163878f36e810ddac94e50560681fea05771cb4098b54ed19b3650f32d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+
+  // ==== str literal (ASCII-only) ============================================
+```
+
+## reference-semantics/semantics/str.k:13-13:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `4c7f66efcd88665dff4c35a17dc03b67c9783ab5b67b51e3f1f429be8c12c225`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= strToCodes(String) [function]
+```
+
+## reference-semantics/semantics/str.k:14-14:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `70d0a8a9935761aeff6d90853c1ce79fe6b2d3d84e32ade7a48810ae01e1c6bc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+```
+
+## reference-semantics/semantics/str.k:15-15:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c7b4b4fc80bd1dab004d1c0cff5999112395445d816bdc9b0edecc99a8798b39`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule strToCodes("") => .IntSeq
+```
+
+## reference-semantics/semantics/str.k:16-19:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `277e19f524bc0f7186680d447acfaae5d7dca386bf8d174b4b132253be1c4ef7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+
+  // ==== operators: + / == / != / in =========================================
+```
+
+## reference-semantics/semantics/str.k:20-20:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `4dcfe32d71db24ec5955e3d81daa08ca2c8c1c4249a4a4c3817f846f0b17c0f5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/str.k:21-21:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1bc8690035f06e8c955b45eed00c60d116bdfdc1c944476306b32dc8e906e093`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule seqConcat(.IntSeq, T:IntSeq)                => T
+```
+
+## reference-semantics/semantics/str.k:22-23:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b8aaa07a8414960ab2e09a7e8d287988619c5616b854d3a0fa67a9011c4c911d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+```
+
+## reference-semantics/semantics/str.k:24-24:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `6b69c6c1fd75e820f054be1bbfabbbb714742e62d4a49b6d3a9735edf52858e1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+```
+
+## reference-semantics/semantics/str.k:25-25:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `8039b62069c1e72239f18ede04a673fdc8c5822d023118b6a05d14faaa5bd94e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+```
+
+## reference-semantics/semantics/str.k:26-28:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `38a24a190cf21e89035c18eb2a6a2b8b01bf1f5d83e9051f1e911918857da58c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)
+
+  // substring membership: `P in X` iff the code-seq P occurs contiguously in X
+```
+
+## reference-semantics/semantics/str.k:29-29:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `44d8a30fde58d7208121984e832bbe657faef28a89c2af536a1a04cf95e95e56`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)
+```
+
+## reference-semantics/semantics/str.k:30-31:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b646f3d3387b9d153ef8f01453f878e378af6f9923a2fa437887132d7ff05e8f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)
+```
+
+## reference-semantics/semantics/str.k:32-32:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `0c2a240d2f88394551e618a37947d5264f22335393502b4e0b535fe4ee17b42e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/str.k:33-33:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `57c619a4cc231d9095f54d25d8702d98126dd6137c9ed395b54d94d7cf232e61`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule strPrefix(.IntSeq, _:IntSeq)               => true
+```
+
+## reference-semantics/semantics/str.k:34-34:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `0e758c7b129dc20e372ee10b7d456c59868ce228e665daed0b04bd14738c35df`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false
+```
+
+## reference-semantics/semantics/str.k:35-36:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d6816398ab1624e9bdb2e81cae94e7049aa5a1faab17f799f6e2d0563a83f669`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)
+```
+
+## reference-semantics/semantics/str.k:37-37:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `e5d82a70ec2aaeff27e0dbaebe4f7c40ff0ac2535c50906ea65726e53c9f7851`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/str.k:38-38:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `fe5302406eba932257f5c94d088471ffedb1134a437eb3b947f53f4da407978b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)
+```
+
+## reference-semantics/semantics/str.k:39-39:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `6c197a2767cc14fc11dc5cbc1358ddfd15d76a2b6ddf5eb092b8f67d513e10a2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)
+```
+
+## reference-semantics/semantics/str.k:40-47:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `04c4c5381ecb9a285045a5e19f136787e9c03fde71eabf22c90ac3cbead3e125`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs)
+       requires notBool strPrefix(P, iCons(C, Xs))
+
+  // ==== lexicographic order: < / <= / > / >= by code point (= Python str order on the code
+  // model). strLt reduces on GROUND code-seqs (krun) but is inert/OPAQUE on symbolic ones
+  // (a proof's codesProj(V) is an abstract IntSeq — no constructor rule matches), so a symbolic
+  // str `<` stays a trusted opaque term the way sortVS / intFloatDiv do. Additive: fires only on
+  // str </<=/>/>= comparisons.
+```
+
+## reference-semantics/semantics/str.k:48-48:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `e6a79420c495be30ba61123f1b16b3235ce1737390d5e7d920ed4d34624726c2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]
+```
+
+## reference-semantics/semantics/str.k:49-49:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d9faa5615105aeee1bec17ec6cd1a3d566adb7b531d78fb3619243c63425f62a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule strLt(.IntSeq, .IntSeq)                => false
+```
+
+## reference-semantics/semantics/str.k:50-50:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1d055a6c97d452ded1f5b8522897bd99bfa0dd9ba3d5bab09339e76d0f414fbc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true
+```
+
+## reference-semantics/semantics/str.k:51-51:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d1e1c922c4b206ef8c71888f6f964968eb7bc34ab9c172778c6243675c445926`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false
+```
+
+## reference-semantics/semantics/str.k:52-52:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a15116dcda039e8bc63b028465b2952534a8b734cb0a7557e99625bf38c45aae`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true          requires A  <Int B
+```
+
+## reference-semantics/semantics/str.k:53-53:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7c98b79b0e03f30301eaf288d846a7fc26ea5866562926bd94dd2e8c26a1ba26`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false         requires A  >Int B
+```
+
+## reference-semantics/semantics/str.k:54-55:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d72e4a9c68cd264b7906d638a49bcf274a4fae7e0c350f191081f81696042a79`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B
+```
+
+## reference-semantics/semantics/str.k:56-56:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `3f16844c8a96e226925c07325a24c28ae0dc01bd05d6b97ffc08534e62789bbd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("<",  str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+```
+
+## reference-semantics/semantics/str.k:57-57:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d14e65d751c2eb72a84110b0da37606308ef5eaf2af2c9f0b4686be52ed69e3b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp(">",  str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)
+```
+
+## reference-semantics/semantics/str.k:58-58:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `fd8254e2aad6ddc722ec79acfc57d3d9f56eeb5a7cedabedeb40aab07d805865`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)
+```
+
+## reference-semantics/semantics/str.k:59-59:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `0bb37c9e5117e140f89907947627e32d6756cc5e18e9518e3823c2710a62fc6c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)
+```
+
+## reference-semantics/semantics/str.k:60-60:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/subscript.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `a6d1f94e4e770f9c24016905d16a5d2ab9f0dcb7ac9955f1d47d6bd6fd7e4ded`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-SUBSCRIPT
+```
+
+## reference-semantics/semantics/subscript.k:4-10:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `547ab1e4cdcd84e28f4e427a5b1f26afd13bdc2b5757dc648180328bb763ab10`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+
+  // ==== positional access + negative-index normalization (used only here) ===
+  // valSeqAt is [total]: in-bounds vCons access reduces as usual; on an OPAQUE sequence (e.g.
+  // a trusted sort's sortVS(VS)) or OOB it stays an abstract total value — so indexing the
+  // opaque sorted list is DEFINED (no undischarged #Ceil), matching the old semantics' total
+  // atK. K trusts the [total] annotation; valid programs index in-bounds.
+```
+
+## reference-semantics/semantics/subscript.k:11-11:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `92dd5a3cbdae995653f421008f9fa2c2f911d143c899dee80374413a92482473`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= valSeqAt(ValSeq, Int) [function, total]
+```
+
+## reference-semantics/semantics/subscript.k:12-12:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `5efae5e636659046dd3ad38178f893753f16c5b26ea08cfe11b0f323d3990453`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule valSeqAt(vCons(V:Val, _:ValSeq), 0)     => V
+```
+
+## reference-semantics/semantics/subscript.k:13-15:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `463bd5d63df534f3d4cc313ec80e81f0c7c645e266732d113ea8b10dbac478d1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule valSeqAt(vCons(_:Val, S:ValSeq), I:Int) => valSeqAt(S, I -Int 1)
+       requires I >Int 0
+```
+
+## reference-semantics/semantics/subscript.k:16-16:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `d573fee41395263868cfcc4fbae6df6d4a3bcc1a7bca14e633a30ec4f77887a1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= intSeqAt(IntSeq, Int) [function]
+```
+
+## reference-semantics/semantics/subscript.k:17-17:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `8eb9da7cc0451bafd5812077c689538105618e705c93eb17820917ff139bbc4c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule intSeqAt(iCons(C:Int, _:IntSeq), 0)     => C
+```
+
+## reference-semantics/semantics/subscript.k:18-20:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a89deb267298a13e5d86fa826aa9f476cc9f836461b46ade60423a8f364bdd37`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule intSeqAt(iCons(_:Int, S:IntSeq), I:Int) => intSeqAt(S, I -Int 1)
+       requires I >Int 0
+```
+
+## reference-semantics/semantics/subscript.k:21-21:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `8d0629ddf60abdd87d1319c61a91897635eaf44a195cae23c3e4a9059fb8d475`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= normIdx(Int, Int) [function, total]
+```
+
+## reference-semantics/semantics/subscript.k:22-22:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `0398dfbaabb1dbe0748c4a93874c453d7143a94e0f0d3d18c8b11359439b2c9a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule normIdx(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0
+```
+
+## reference-semantics/semantics/subscript.k:23-26:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `be71b64b7c4b0040aab23eb4aec3a6cbe49c46235f52a3195f291ea67109a8d9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule normIdx(I:Int, _:Int)   => I          requires I >=Int 0
+
+  // ==== Subscript: indexing obj[i] (list / tuple / str) =====================
+  // contexts (not strict attrs): the Index slot's Slice alternative must never heat
+```
+
+## reference-semantics/semantics/subscript.k:27-27:context
+
+- Category: `evaluation-context`
+- Attributes: `[]`
+- SHA-256: `e235a553cf7939b217e6aad3c563f19136b897acadf2bfa842db991933f28e85`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  context Subscript(HOLE, _)
+```
+
+## reference-semantics/semantics/subscript.k:28-30:context
+
+- Category: `evaluation-context`
+- Attributes: `[]`
+- SHA-256: `5ee62afca97fe43eee119eb30dbd4606d50f306c7f548305e83b7c47a56c194e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  context Subscript(_:Val, HOLE:Expr)
+
+  // heap-object deref (covers both the index and slice forms via the Index slot)
+```
+
+## reference-semantics/semantics/subscript.k:31-34:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `ba2015156656f7c6f341b0f480baae5329d86ae155b09fbc73a635bdcd103d67`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Subscript(ref(H:Int), IX:Index) => Subscript(V, IX) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/subscript.k:35-36:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `e2cbe99533f0bbd2f5a28abaaea776b05e2d8eb2f238a9406b0c9ab6b8287633`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Subscript(OBJ:Val, I:Int) => applyIndex(OBJ, I) ... </k>
+```
+
+## reference-semantics/semantics/subscript.k:37-37:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `83aa86951e423ee652f166e56f679403febdfb828febf5216d59b54bda2753a5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= applyIndex(Val, Int) [function]
+```
+
+## reference-semantics/semantics/subscript.k:38-38:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c494188c31ef997e96906aae550573a54345c081fe24563a1f05a92f0396ffed`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyIndex(list(VS:ValSeq),  I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+```
+
+## reference-semantics/semantics/subscript.k:39-39:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `52ab84557b24a72bd0e049cec6cb67ec53e2d262f19c93e2abec650a0e856c1e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyIndex(tuple(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+```
+
+## reference-semantics/semantics/subscript.k:40-43:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `02afdec95b66f820bcfe8c315f7789ef75eed848b66f75455c3642976f81f536`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyIndex(str(IS:IntSeq),   I:Int)
+    => str(iCons(intSeqAt(IS, normIdx(I, isLen(IS))), .IntSeq))
+
+  // ==== Slice: obj[lo:hi:step] (list / str) — CPython slice.indices ==========
+```
+
+## reference-semantics/semantics/subscript.k:44-48:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `3586c0bf2e67a9c1eb55c902a81beaed999d84bf8ceb386870415106ecc297be`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #evalB(Bound) | "#toSome"
+                 | #slLo(Val, Bound, Bound)
+                 | #slHi(Val, OptInt, Bound)
+                 | #slStep(Val, OptInt, OptInt)
+```
+
+## reference-semantics/semantics/subscript.k:49-49:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `560ebb71a2e12f9a78694f384d19cb1d73190b6c9e724c4bdc202b583f111b3f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax OptInt ::= "noB" | someB(Int)
+```
+
+## reference-semantics/semantics/subscript.k:50-50:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `260093ac1ada7ada03d8f9e469670753e5253e805768f1d008f660cfdbdc34ab`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #evalB(NoBound)  => noB ... </k>
+```
+
+## reference-semantics/semantics/subscript.k:51-51:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `c05e824ec7d02b0ff48467bfe475709470965fc34d4376b8c53afcd4dee95f9d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #evalB(E:Expr)   => E ~> #toSome ... </k>
+```
+
+## reference-semantics/semantics/subscript.k:52-53:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `55c49487ba7821307656b279fb60c670618fe70606d57783c776ef4b2986550c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> I:Int ~> #toSome => someB(I) ... </k>
+```
+
+## reference-semantics/semantics/subscript.k:54-54:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `b39cd50c6c413a35564da1aa0434956df105d8e124a63f8867bec71c7c410abd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Subscript(OBJ:Val, Slice(LO:Bound, HI:Bound, ST:Bound)) => #evalB(LO) ~> #slLo(OBJ, HI, ST) ... </k>
+```
+
+## reference-semantics/semantics/subscript.k:55-55:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `ba8162a4d94407c48b3a07a2686d8691c56de9280ab431f061eb6defe0ddfd8c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> LO:OptInt ~> #slLo(OBJ:Val, HI:Bound, ST:Bound)   => #evalB(HI) ~> #slHi(OBJ, LO, ST) ... </k>
+```
+
+## reference-semantics/semantics/subscript.k:56-57:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `0a67a100f00ee3b69c74dbb4f5672271c053af4150991e5d90738537d3c5b923`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> HI:OptInt ~> #slHi(OBJ:Val, LO:OptInt, ST:Bound)  => #evalB(ST) ~> #slStep(OBJ, LO, HI) ... </k>
+  // a list slice constructs a NEW object; a str slice stays a value
+```
+
+## reference-semantics/semantics/subscript.k:58-60:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `8d45174aef8739b21b538bb13740c6b0c0c0936fed9723b9adf51b3f8297d642`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> ST:OptInt ~> #slStep(list(VS:ValSeq), LO:OptInt, HI:OptInt)
+        => #alloc(doSlice(list(VS), LO, HI, ST)) ... </k>
+       [priority(45)]
+```
+
+## reference-semantics/semantics/subscript.k:61-62:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `4b6c937f1b27b309ca57781e12cde5632c9fe631b46769f8b5fb2ae27e5d3559`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> ST:OptInt ~> #slStep(OBJ:Val, LO:OptInt, HI:OptInt) => doSlice(OBJ, LO, HI, ST) ... </k>
+```
+
+## reference-semantics/semantics/subscript.k:63-63:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `35803b4f4140c58723c0e31492a1715f532186e38b4e9b68650e58ae677e48dd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Val ::= doSlice(Val, OptInt, OptInt, OptInt) [function]
+```
+
+## reference-semantics/semantics/subscript.k:64-65:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f98c4d73aaf2650365e7250aa3b8f9de0da52a8d7e678ad474769b372db234fd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule doSlice(list(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    => list(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))
+```
+
+## reference-semantics/semantics/subscript.k:66-67:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `6e8f59ed2ecb112dbbdd350b1235fec686f6ea424b8654ce5e02cc6e21fa3fcc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule doSlice(tuple(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    => tuple(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))
+```
+
+## reference-semantics/semantics/subscript.k:68-71:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `0b28898fb685b3173c0ffb213423c7176895b6877a23739e5bdc2f8ddfc54f36`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule doSlice(str(IS:IntSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    => str(buildIS(IS, slStart(LO, ST, isLen(IS)), slStop(HI, ST, isLen(IS)), slStep(ST)))
+
+  // ==== slice.indices: step / start / stop / clamp ==========================
+```
+
+## reference-semantics/semantics/subscript.k:72-72:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `3673727509ac1987488ad8a299c7a4a1ed9143e108520907ed8ae746269699c8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= slStep(OptInt) [function, total]
+```
+
+## reference-semantics/semantics/subscript.k:73-73:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `080183421a02aea58098f319cf047707ed71b0951438d28d977948f4e0d478a2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule slStep(noB)          => 1
+```
+
+## reference-semantics/semantics/subscript.k:74-75:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `38520b2d08df510dd573e03a40c5d25b7f8b89388b18d9d7aec6e9196ba1f6a1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule slStep(someB(S:Int)) => S
+```
+
+## reference-semantics/semantics/subscript.k:76-76:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `12940b25c9d85c4c575623a2d2085f8f09acda4390e58e7e27114df698e02858`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= slStart(OptInt, OptInt, Int) [function]
+```
+
+## reference-semantics/semantics/subscript.k:77-78:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f071f630a8f9d29c647b36ce94d423b9fbf40e83a653df82f1c26b442e07bcf9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule slStart(noB,          ST:OptInt, _LEN:Int) => 0
+       requires slStep(ST) >Int 0
+```
+
+## reference-semantics/semantics/subscript.k:79-80:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `9a3afd20003e73154e811d7548e5a7375c143659696969695a76a6249e1197e1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule slStart(noB,          ST:OptInt, LEN:Int)  => LEN -Int 1
+       requires slStep(ST) <Int 0
+```
+
+## reference-semantics/semantics/subscript.k:81-82:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `2e19a63f1664fef54fab562622ede417ba53fd30ced6cdedcde492feccb68677`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule slStart(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))
+```
+
+## reference-semantics/semantics/subscript.k:83-83:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `def902114717732bd04bddb5459b883a7e72943d9905a006fa2908eeda667d1b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= slStop(OptInt, OptInt, Int) [function]
+```
+
+## reference-semantics/semantics/subscript.k:84-85:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `f8868ca0ab86614540c4f1dd48f166d89ac29e79ec0ddfd95983531c1f8a92fa`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule slStop(noB,          ST:OptInt, LEN:Int)  => LEN
+       requires slStep(ST) >Int 0
+```
+
+## reference-semantics/semantics/subscript.k:86-87:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `fde349e77a3a9bdf581389ada6da29e7655b032852946cc55dd6d0fe7e6ebd17`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule slStop(noB,          ST:OptInt, _LEN:Int) => -1
+       requires slStep(ST) <Int 0
+```
+
+## reference-semantics/semantics/subscript.k:88-89:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `8422a8ba8f8d7ea7a1411c4e9c0a955a66108a5220822111d4bc6be937bd70b9`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule slStop(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))
+```
+
+## reference-semantics/semantics/subscript.k:90-90:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `9ec1896aa81dbda8d1ea3e6687ee086beea967bc3822cd10a318a2f04b3aa7bd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= slAdjust(Int, Int, Int) [function, total]
+```
+
+## reference-semantics/semantics/subscript.k:91-92:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `58c9216d8b6d4a214dea9e45411319b249515ac57ddfabc8f134b0b9ee6a0273`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampLo(I +Int LEN, STEP)
+       requires I  <Int 0
+```
+
+## reference-semantics/semantics/subscript.k:93-95:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `1c4d6ca3d3534697cd74873e69461efdcea7866ec6b97a95f3557568bf626378`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampHi(I, LEN, STEP)
+       requires I >=Int 0
+```
+
+## reference-semantics/semantics/subscript.k:96-96:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `74b1e671d5bc2675c57a6e37b0517ae907a75fd226523c01205ef0a8bd3ac2f3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= clampLo(Int, Int) [function, total]
+```
+
+## reference-semantics/semantics/subscript.k:97-98:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a2e92eace44c06709afc4171de72f4f7aa640e356954efd5daa3b03cda75b4c1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule clampLo(J:Int, _STEP:Int) => J
+       requires J >=Int 0
+```
+
+## reference-semantics/semantics/subscript.k:99-101:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `0a357da8ed32fb6e8c29409f20c6100498859b45a42da73570dd2d839e702e0f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule clampLo(J:Int, STEP:Int)  => #if STEP <Int 0 #then -1 #else 0 #fi
+       requires J <Int 0
+```
+
+## reference-semantics/semantics/subscript.k:102-102:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `cf49fd584aa0aaff635d15fbfb5b3e627a19462ba2e20a330262744fbc4167da`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= clampHi(Int, Int, Int) [function, total]
+```
+
+## reference-semantics/semantics/subscript.k:103-104:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `706a4096d6eca2beac22bf86a9339c5af4255e57fc45f3205b67b0348c58b94a`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule clampHi(I:Int, LEN:Int, _STEP:Int) => I
+       requires I  <Int LEN
+```
+
+## reference-semantics/semantics/subscript.k:105-108:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `b3f79aaddc21c43c09b8388348001eff1cbd95823ff792107b83f087229d4374`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule clampHi(I:Int, LEN:Int, STEP:Int)  => #if STEP <Int 0 #then LEN -Int 1 #else LEN #fi
+       requires I >=Int LEN
+
+  // ==== build the strided sub-sequence (indices in range by construction) ====
+```
+
+## reference-semantics/semantics/subscript.k:109-109:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `328023ed05394848428d502f2282a83f2f6fce266a9ff7c7187134b098872146`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ValSeq ::= buildVS(ValSeq, Int, Int, Int) [function]
+```
+
+## reference-semantics/semantics/subscript.k:110-112:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `d6ecccf0b62d26633cbbbc1872d4e8696544682181c2fc2edc10eaada63d4aaa`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule buildVS(VS:ValSeq, I:Int, STOP:Int, STEP:Int)
+    => vCons(valSeqAt(VS, I), buildVS(VS, I +Int STEP, STOP, STEP))
+       requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)
+```
+
+## reference-semantics/semantics/subscript.k:113-115:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `0150c19c37152837babd9486a766951b2129d60e7537092d2eaa38a9e16453e5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule buildVS(_:ValSeq, I:Int, STOP:Int, STEP:Int) => .ValSeq
+       requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))
+```
+
+## reference-semantics/semantics/subscript.k:116-116:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `0a55bc39332ca672124112c173cf443fc87f1059e0eab1577ce827bbbc559228`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax IntSeq ::= buildIS(IntSeq, Int, Int, Int) [function]
+```
+
+## reference-semantics/semantics/subscript.k:117-119:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `723e67f7af3e57e507162191080547158653bebe4dbd6fdb322201406c8852e1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule buildIS(IS:IntSeq, I:Int, STOP:Int, STEP:Int)
+    => iCons(intSeqAt(IS, I), buildIS(IS, I +Int STEP, STOP, STEP))
+       requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)
+```
+
+## reference-semantics/semantics/subscript.k:120-121:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `68b366dedd7d79096626e82fbaa88bc954129111f50f44fe8e7be568f11ea4a2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule buildIS(_:IntSeq, I:Int, STOP:Int, STEP:Int) => .IntSeq
+       requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))
+```
+
+## reference-semantics/semantics/subscript.k:122-122:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/syntax.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `f08baa14168e33e40c6ea094538294709ff69e62fe8705a5b36d30f64f9b9e58`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-SYNTAX
+```
+
+## reference-semantics/semantics/syntax.k:4-4:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `549ff9577e48f84166cff97c44b34be0e7224b138ffc651802ef6e9dcfde5500`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports INT-SYNTAX
+```
+
+## reference-semantics/semantics/syntax.k:5-5:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `57afda1786d22d995573523f49342280f158fcd841d333439b17a44120be7b40`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports FLOAT-SYNTAX
+```
+
+## reference-semantics/semantics/syntax.k:6-6:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `53df7c7bde9742b651b6208bf2d29aed7e6cfec6eeed12c7af5ebc790e3c8608`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports BOOL-SYNTAX
+```
+
+## reference-semantics/semantics/syntax.k:7-8:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `5a171c0d093c3345d9e07e15e5f3768211a92909782e475d3d50063a338f319c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports STRING-SYNTAX
+```
+
+## reference-semantics/semantics/syntax.k:9-31:syntax
+
+- Category: `macro-declaration`
+- Attributes: `['strict', 'seqstrict', 'macro']`
+- SHA-256: `970a5d907eb7e8719c2231b6232969f2dc9f205fd1d7c210c1529f39ef36afe0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Expr ::= "Int"      "(" Int ")"
+                | "Float"    "(" Float ")"
+                | "Bool"     "(" Bool ")"
+                | "Name"     "(" String ")"
+                | "Str"      "(" String ")"
+                | "UnaryOp"  "(" String "," Expr ")" [strict(2)]
+                | "BinOp"    "(" String "," Expr "," Expr ")" [seqstrict(2, 3)]
+                | "BoolOp"    "(" String "," Exprs ")"
+                | "ListExpr"  "(" Exprs ")"
+                | "DictExpr"  "(" Entries ")"
+                | "ListComp"  "(" Expr "," CompFors ")" [macro]
+                | "GenExp"    "(" Expr "," CompFors ")" [macro]
+                | "TupleExpr" "(" Exprs ")"
+                | "Subscript" "(" Expr "," Index ")"
+                | "IfExp"     "(" Expr "," Expr "," Expr ")" [strict(1)]
+                | "Lambda"    "(" Params "," Expr ")"
+                | "KwArg"     "(" String "," Expr ")"
+                | "Lambda"    "(" Params "," CellVars "," FreeVars "," Expr ")"
+                | "NoneVal"
+                | "Call"      "(" Expr "," Exprs ")"
+                | "Attribute" "(" Expr "," String ")" [strict(1)]
+                | "Compare"   "(" Expr "," CmpOp ")"
+```
+
+## reference-semantics/semantics/syntax.k:32-32:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `31fa5777bd647a4f25c58d68c85eb6c09619c01637f6df1bab48dc8b483e1a58`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax CmpOp    ::= "CmpOp" "(" String "," Expr ")"
+```
+
+## reference-semantics/semantics/syntax.k:33-33:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `3bf94dbad23a84b43e9aa25c15c21623947d6e776c73abfcae7187615db19847`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Entry    ::= "Entry" "(" Expr "," Expr ")"
+```
+
+## reference-semantics/semantics/syntax.k:34-34:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `0e6de400c48346b7d36a41e6bd8bf0980e98ec9480c37c9e1447cdd6f20eeee0`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Entries  ::= List{Entry, ","}
+```
+
+## reference-semantics/semantics/syntax.k:35-35:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `5bb59c5f0dc165e1a3c95708cf38f932c8f75c3f79b40696254c91e9ce14d48c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax CompFor  ::= "CompFor" "(" Expr "," Expr "," Exprs ")"
+```
+
+## reference-semantics/semantics/syntax.k:36-36:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `76d2ff7278fb79223076a48063fb3990b4456a793dc2ebc0dae8979f1c8a8177`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax CompFors ::= List{CompFor, ""}
+```
+
+## reference-semantics/semantics/syntax.k:37-37:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `5d0831f6c932f17e2c6a98fb109159767a6973adcf6c887c24f437ca5bac1a8e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Exprs    ::= List{Expr, ","}
+```
+
+## reference-semantics/semantics/syntax.k:38-38:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `2d7648621bd02a753995ccf8dc080239ab17e1e24b7d352f86ca59e91a27e7c8`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Index    ::= Expr | "Slice" "(" Bound "," Bound "," Bound ")"
+```
+
+## reference-semantics/semantics/syntax.k:39-40:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `0a207e7f6805a1fa7e9f84cb33748203011d32695e6a85d35c0ad0a2dd9da87c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Bound    ::= Expr | "NoBound"
+```
+
+## reference-semantics/semantics/syntax.k:41-55:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `['strict']`
+- SHA-256: `1fdf12132fa6e34f9320cff44f77ddd81272816de7922284fab69897bf43f4db`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Stmt ::= "Assign"    "(" Expr "," Expr ")" [strict(2)]
+                | "Import"    "(" String ")"
+                | "ImportFrom" "(" String "," ParamNames ")"
+                | "AugAssign" "(" Expr "," String "," Expr ")" [strict(3)]
+                | "For"       "(" Expr "," Expr "," Stmts ")" [strict(2)]
+                | "While"     "(" Expr "," Stmts ")"
+                | "Break"
+                | "Continue"
+                | "If"        "(" Expr "," Stmts "," Stmts ")" [strict(1)]
+                | "Return"    "(" Expr ")" [strict]
+                | "Assert"    "(" Expr ")" [strict]
+                | "Expr"      "(" Expr ")" [strict]
+                | "FuncDef"   "(" String "," Params "," Stmts ")"
+                | "FuncDef"   "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"
+```
+
+## reference-semantics/semantics/syntax.k:56-56:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `a815785974c2b381c1312f576d97ec94ebca743960cc443c92b8f44c8a0d74fe`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Stmts      ::= List{Stmt, ""}
+```
+
+## reference-semantics/semantics/syntax.k:57-57:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `f9fd64833dd16dab12d5564129d63d642aefec063a071b470a02478201643b04`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Params     ::= "Params" "(" ParamNames ")"
+```
+
+## reference-semantics/semantics/syntax.k:58-58:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `19c7da008dd612726936901b0d383a1c69bae9bb11460463187ccbc85b485212`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax CellVars   ::= "CellVars" "(" ParamNames ")"
+```
+
+## reference-semantics/semantics/syntax.k:59-59:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `ff2cf5e4bb8759039c00ed5554e68f13d9298d8895d0d4df552558eeac2195bf`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax FreeVars   ::= "FreeVars" "(" ParamNames ")"
+```
+
+## reference-semantics/semantics/syntax.k:60-60:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `8788a8da7c08b959b55f76539af04c5a55abe26a1584ada00a2820ee79b3501e`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ParamNames ::= List{String, ","}
+```
+
+## reference-semantics/semantics/syntax.k:61-61:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `8da28960d4db086d4929161f541cf022015dc577e72bf3fa9a3c5249ddb90cdb`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Module     ::= "Module" "(" Stmts ")"
+```
+
+## reference-semantics/semantics/syntax.k:62-62:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## reference-semantics/semantics/tuple.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `a660cd1e92e23d91d092c593b0d7ec83407e40b5085309e11090d5b01bc4f030`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+module MPY-TUPLE
+```
+
+## reference-semantics/semantics/tuple.k:4-4:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `4258a966960e81238ac1318ebb92f5cd383bcf94ed5077b6dea55341a4254bfd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-CORE
+```
+
+## reference-semantics/semantics/tuple.k:5-5:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `8ad41781e06e91093b117ccd78f6f10180a840cf3b4adaa62547edd340b26acc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-ITER
+```
+
+## reference-semantics/semantics/tuple.k:6-6:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `511c798e04e96a7ad3e9efe5e06eb4804d66d38f1294d62d46068dc7eafb0373`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-LIST
+```
+
+## reference-semantics/semantics/tuple.k:7-9:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `1e2cd5461704c4d4484238cf2149b916e9167a54f6a9f44124457820eef6d4d1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  imports MPY-METHODS
+
+  // ==== iteration (the iterator protocol's tuple case) ======================
+```
+
+## reference-semantics/semantics/tuple.k:10-10:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `6088fae06255bb7360c99a675f37b1b629f669561408698b684244d07f7f15cb`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterNext(tuple(.ValSeq))                => #iterDone ... </k>
+```
+
+## reference-semantics/semantics/tuple.k:11-13:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `354a4a5539b7fc3e5d109dd53eafbb2984bbe658e41ee36588686dcd3b74a1bc`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #iterNext(tuple(vCons(V:Val, R:ValSeq))) => #iterYield(V, tuple(R)) ... </k>
+
+  // ==== TupleExpr: tuple(ValSeq) literal + == != ===========================
+```
+
+## reference-semantics/semantics/tuple.k:14-14:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `508a95f61aed6d1129b9e3f84b2cc6d4021eb25accb256e816573049feff554b`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax ApplyK ::= "toTuple"
+```
+
+## reference-semantics/semantics/tuple.k:15-15:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `ff193ea2849e97ee999677d4a6b7f490cbe8fd917a21c5b418eb6620def33124`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> TupleExpr(ES:Exprs) => #evalArgs(ES, .Vals, toTuple) ... </k>
+```
+
+## reference-semantics/semantics/tuple.k:16-17:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `b0d84d481730d06c5882783cccdcdbaf7a0b81c185e990531bf607fc1dc9b01d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #applyK(toTuple, ACC:Vals) => tuple(vals2valSeq(ACC)) ... </k>
+```
+
+## reference-semantics/semantics/tuple.k:18-19:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `bf0ac96e9f033b75425984e84315f23de15acf5f53915723c90ced8bb976d143`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("==", tuple(A:ValSeq), tuple(B:ValSeq)) => A ==K B
+  // membership routes through the same k-cell fold as lists (list.k)
+```
+
+## reference-semantics/semantics/tuple.k:20-20:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `4e02486b9482d2cace94eb83c1cb2c6dfa8fda78806420970245c05e9408c1cd`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Compare(LV:Val, CmpOp("in",     tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ... </k>
+```
+
+## reference-semantics/semantics/tuple.k:21-22:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `feaa26e61df69568b2c60f51bfb8290dd1a11a604a657d00098e514c11ef3d7f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Compare(LV:Val, CmpOp("not in", tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ~> #notB ... </k>
+  // t.index(v): first index of v (ValueError out of subset)
+```
+
+## reference-semantics/semantics/tuple.k:23-23:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `bd7254bbf1105af77c015d6c37e329774f93ff7da7628dac38536f793e7eaf75`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyMethod(tuple(VS:ValSeq), "index", V:Val, .Vals) => idxOfVS(VS, V, 0)
+```
+
+## reference-semantics/semantics/tuple.k:24-24:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `df13ef70912b4ded4f2c2f97e50011c9ef936dff982309cfb623b77d247755d2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax Int ::= idxOfVS(ValSeq, Val, Int) [function]
+```
+
+## reference-semantics/semantics/tuple.k:25-25:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `663f7ddf889dc5c9c1fd12455b160afe66ad15883ae2930da18fb89d423d57ce`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule idxOfVS(vCons(A:Val, _:ValSeq), V:Val, I:Int) => I requires A ==K V
+```
+
+## reference-semantics/semantics/tuple.k:26-27:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `11dc3e7b5407cf8290d6db0b5c907d3d24396c53d91de763f2e5262412fc95d2`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule idxOfVS(vCons(A:Val, R:ValSeq), V:Val, I:Int) => idxOfVS(R, V, I +Int 1)
+       requires notBool (A ==K V)
+```
+
+## reference-semantics/semantics/tuple.k:28-30:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `796dabf5001e95130a624bec398129396c916d4ca42d9778a408932cd3b0ad4f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule applyCmp("!=", tuple(A:ValSeq), tuple(B:ValSeq)) => notBool (A ==K B)
+
+  // ==== target binding: bind a Name or a TupleExpr target to a value ========
+```
+
+## reference-semantics/semantics/tuple.k:31-31:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `98b229b9b4321ace7e17cbcc2dc0408fe6d1dfad46dffa400d30f3c40ccaad7d`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #bindTgt(Expr, Val)
+```
+
+## reference-semantics/semantics/tuple.k:32-34:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `c3fab775730b56fa281ed34cd936ba5a5b472887c8359d897366a7399e4ec366`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #bindTgt(Name(X:String), V:Val) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>
+```
+
+## reference-semantics/semantics/tuple.k:35-41:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `bc76f6241e7dc38c889bd7385b99c3b84b3c97ab0caccdc38cc73a989f9b5068`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #bindTgt(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires "$cells" in_keys(M)
+        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+        andBool X in_keys(M) andBool isCellRef({M[X]}:>Val)
+       [priority(40)]
+```
+
+## reference-semantics/semantics/tuple.k:42-42:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `0d5b4092fa171333cbf5df6b548b5769cbb17dc4e57757e026b955c62cd7a9f3`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #bindTgt(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>
+```
+
+## reference-semantics/semantics/tuple.k:43-43:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `a816acd68173f30a351177661e1ba49e2973160662cab9411e1a005ba8fd01c5`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #bindTgt(TupleExpr(TS:Exprs), list(VS:ValSeq))  => #unpackSeq(TS, VS) ... </k>
+```
+
+## reference-semantics/semantics/tuple.k:44-48:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `a50c06a628426cdd8e0e0daf5fa1c27d74994c9f2ab04e60818c7e9ba9459611`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #bindTgt(TupleExpr(TS:Exprs), ref(H:Int)) => #bindTgt(TupleExpr(TS), V) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+
+  // ==== unpacking: a, b = <tuple|list> (RHS evaluated by strictness) ========
+```
+
+## reference-semantics/semantics/tuple.k:49-49:syntax
+
+- Category: `syntax-declaration`
+- Attributes: `[]`
+- SHA-256: `7dbe45ad3aa2cd3bf8ecd6f3515826ea6cbe564d227a73d51ed9eb4c590411e1`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  syntax KItem ::= #unpackSeq(Exprs, ValSeq)
+```
+
+## reference-semantics/semantics/tuple.k:50-50:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `3187abeadb723949255c0b48fe693a94615b14483be47e07de1b13b7a83b4a5c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Assign(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>
+```
+
+## reference-semantics/semantics/tuple.k:51-51:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `441a29fab67a3f419ca7d4e56794565181965d88658ae3d0aee1955872cc8c5c`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Assign(TupleExpr(TS:Exprs), list(VS:ValSeq))  => #unpackSeq(TS, VS) ... </k>
+```
+
+## reference-semantics/semantics/tuple.k:52-54:rule
+
+- Category: `operational-rule`
+- Attributes: `['priority']`
+- SHA-256: `f7778b4441622195b3db508c4c0c2de69955765341598d49a4776dee3790868f`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> Assign(TupleExpr(TS:Exprs), ref(H:Int)) => Assign(TupleExpr(TS), V) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+```
+
+## reference-semantics/semantics/tuple.k:55-56:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `d538f44e4a19103a092dbf9a77a9075f2ee785584b073b22709dbccb1d090415`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #unpackSeq((T:Expr, TS:Exprs), vCons(V:Val, VS:ValSeq))
+        => #bindTgt(T, V) ~> #unpackSeq(TS, VS) ... </k>
+```
+
+## reference-semantics/semantics/tuple.k:57-57:rule
+
+- Category: `operational-rule`
+- Attributes: `[]`
+- SHA-256: `2377fb943da101e36f2c0d35e43554ee1815fe1b1fe043893a271defc9620fd7`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+  rule <k> #unpackSeq(.Exprs, .ValSeq) => .K ... </k>
+```
+
+## reference-semantics/semantics/tuple.k:58-58:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SUPPLIED_SEMANTICS`
+- Rationale: Reviewed against its selected subset role; no false conclusion witness is enabled on the intended all_prefixes input domain.
+
+```k
+endmodule
+```
+
+## verification.k:1-2:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `1c2b9a0599db3b222eb2fb8233fe3d4a55cced9a6f48ad7da66751161e12d634`
+- Disposition: `ACCEPTED_PROOF_MODULE_SCAFFOLDING`
+- Rationale: No semantic conclusion is introduced.
+
+```k
+requires "reference-semantics/semantics.k"
+```
+
+## verification.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `9dda73b03276745b904150a0076f9ff4fd15320b17685603e1aba2a99a8200b2`
+- Disposition: `ACCEPTED_PROOF_MODULE_SCAFFOLDING`
+- Rationale: No semantic conclusion is introduced.
+
+```k
+module VERIFICATION
+```
+
+## verification.k:4-9:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `d15a61e8ac90311782168d6674da43f4abc40c76fc7ad1e85df912acf1ee725d`
+- Disposition: `ACCEPTED_PROOF_MODULE_SCAFFOLDING`
+- Rationale: No semantic conclusion is introduced.
+
+```k
+  imports MPY
+
+  // The mathematical result of finishing the source loop from END to STOP,
+  // starting with accumulator ACC.  doSlice is the reference semantics'
+  // definition of Python slicing, so this definition also covers empty and
+  // out-of-range slice bounds without an extra assumption.
+```
+
+## verification.k:10-10:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `37e5ac26576d448b9c2c197c40f4bfbe9a608475cc45b1c4dbc8aaeb15e2a5ca`
+- Disposition: `ACCEPTED_PROGRAM_CONSTRUCTOR_NORMALIZATION`
+- Rationale: Ground helper expands to submitted constructor syntax and was mechanically compared.
+
+```k
+  syntax ValSeq ::= prefixesAcc(IntSeq, Int, Int, ValSeq) [function]
+```
+
+## verification.k:11-19:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `304d2987c766d8fd47b4acd75d897a4990ad3f33be34064740db13cb12cd7973`
+- Disposition: `ACCEPTED_PROOF_LOCAL_MATHEMATICS`
+- Rationale: Guarded, descending equations define the exact prefix fold; no execution is replaced.
+
+```k
+  rule prefixesAcc(S:IntSeq, END:Int, STOP:Int, ACC:ValSeq)
+    => prefixesAcc(
+         S,
+         END +Int 1,
+         STOP,
+         valSeqConcat(
+           ACC,
+           vCons(doSlice(str(S), noB, someB(END), noB), .ValSeq)))
+    requires END <Int STOP
+```
+
+## verification.k:20-22:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `a73447fc9c4a07cb4db21f913f63ec0a12d22016eaa29d60d69da2c2c09b3343`
+- Disposition: `ACCEPTED_PROOF_LOCAL_MATHEMATICS`
+- Rationale: Guarded, descending equations define the exact prefix fold; no execution is replaced.
+
+```k
+  rule prefixesAcc(_:IntSeq, END:Int, STOP:Int, ACC:ValSeq) => ACC
+    requires END >=Int STOP
+```
+
+## verification.k:23-23:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function']`
+- SHA-256: `03b599e300dc46ddc794f82fe86adb7ef601519db86a867e477cb4ab361bba8f`
+- Disposition: `ACCEPTED_PROGRAM_CONSTRUCTOR_NORMALIZATION`
+- Rationale: Ground helper expands to submitted constructor syntax and was mechanically compared.
+
+```k
+  syntax ValSeq ::= allPrefixes(IntSeq) [function]
+```
+
+## verification.k:24-28:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `c664818cee4870891325fcc30d8bd7a301e2ebe000ec8f499f64757f220d75ad`
+- Disposition: `ACCEPTED_PROOF_LOCAL_MATHEMATICS`
+- Rationale: Guarded, descending equations define the exact prefix fold; no execution is replaced.
+
+```k
+  rule allPrefixes(S:IntSeq)
+    => prefixesAcc(S, 1, isLen(S) +Int 1, .ValSeq)
+
+  // Constructor terms copied exactly from solution.mpy.  Keeping them named
+  // makes the claims readable while still executing the translated program.
+```
+
+## verification.k:29-29:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `4e8504dde77d69ef1f81ec10e819a2cd4b3e61a890a2288ca812ea38e6244226`
+- Disposition: `ACCEPTED_PROGRAM_CONSTRUCTOR_NORMALIZATION`
+- Rationale: Ground helper expands to submitted constructor syntax and was mechanically compared.
+
+```k
+  syntax Stmts ::= allPrefixesLoopBody() [function, total]
+```
+
+## verification.k:30-37:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `4b8d3d3d4f7336421c9303880f0fb545ba0266b6523b5a08d9004f09ac25eb6c`
+- Disposition: `ACCEPTED_PROGRAM_CONSTRUCTOR_NORMALIZATION`
+- Rationale: Ground helper expands to submitted constructor syntax and was mechanically compared.
+
+```k
+  rule allPrefixesLoopBody()
+    => Expr(Call(
+         Attribute(Name("prefixes"), "append"),
+         Subscript(
+           Name("string"),
+           Slice(NoBound, Name("end"), NoBound))))
+       .Stmts
+```
+
+## verification.k:38-38:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `38b6188b3d482cbadfc1712484874ddf730e3717859f15b4c6d7d5257eee93ce`
+- Disposition: `ACCEPTED_PROGRAM_CONSTRUCTOR_NORMALIZATION`
+- Rationale: Ground helper expands to submitted constructor syntax and was mechanically compared.
+
+```k
+  syntax Stmts ::= allPrefixesBody() [function, total]
+```
+
+## verification.k:39-51:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `7c22c576e8210ec39056f4e4da36810495c640312df98f28d9c8d2bbd7ce68a6`
+- Disposition: `ACCEPTED_PROGRAM_CONSTRUCTOR_NORMALIZATION`
+- Rationale: Ground helper expands to submitted constructor syntax and was mechanically compared.
+
+```k
+  rule allPrefixesBody()
+    => Expr(Str("Return all nonempty prefixes of string, shortest first."))
+       Assign(Name("prefixes"), ListExpr(.Exprs))
+       For(
+         Name("end"),
+         Call(
+           Name("range"),
+           Int(1),
+           BinOp("+", Call(Name("len"), Name("string")), Int(1))),
+         allPrefixesLoopBody())
+       Return(Name("prefixes"))
+       .Stmts
+```
+
+## verification.k:52-52:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `cf9aa5f9c5209903cb38cfe1497a8c015271bb622ea5f4d5da44d824c2a606aa`
+- Disposition: `ACCEPTED_PROGRAM_CONSTRUCTOR_NORMALIZATION`
+- Rationale: Ground helper expands to submitted constructor syntax and was mechanically compared.
+
+```k
+  syntax Stmt ::= allPrefixesDef() [function, total]
+```
+
+## verification.k:53-55:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `8e477bcfeff61e45ce366cc0bc9c0d31da737fcc36a3d3245a97fe3999a4b623`
+- Disposition: `ACCEPTED_PROGRAM_CONSTRUCTOR_NORMALIZATION`
+- Rationale: Ground helper expands to submitted constructor syntax and was mechanically compared.
+
+```k
+  rule allPrefixesDef()
+    => FuncDef("all_prefixes", Params("string"), allPrefixesBody())
+```
+
+## verification.k:56-56:syntax
+
+- Category: `function-declaration`
+- Attributes: `['function', 'total']`
+- SHA-256: `8764ee26f01c11903165445cba261fd9099560edd3c8344b453ad01282d29910`
+- Disposition: `ACCEPTED_PROGRAM_CONSTRUCTOR_NORMALIZATION`
+- Rationale: Ground helper expands to submitted constructor syntax and was mechanically compared.
+
+```k
+  syntax Module ::= solutionModule() [function, total]
+```
+
+## verification.k:57-58:rule
+
+- Category: `equational-or-macro-rule`
+- Attributes: `[]`
+- SHA-256: `eca51dfe7c73830a4d8f1299f6714500181d4e7011cddec0c87182f65d948a14`
+- Disposition: `ACCEPTED_PROGRAM_CONSTRUCTOR_NORMALIZATION`
+- Rationale: Ground helper expands to submitted constructor syntax and was mechanically compared.
+
+```k
+  rule solutionModule()
+    => Module(ImportFrom("typing", "List") allPrefixesDef())
+```
+
+## verification.k:59-59:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_PROOF_MODULE_SCAFFOLDING`
+- Rationale: No semantic conclusion is introduced.
+
+```k
+endmodule
+```
+
+## spec.k:1-2:requires
+
+- Category: `file-requirement`
+- Attributes: `[]`
+- SHA-256: `570d3928c063038a6634bd975a1bbfddbc2f4b3918c5f0bb9b2c8356310bfcd2`
+- Disposition: `ACCEPTED_SPEC_SCAFFOLDING`
+- Rationale: No executable semantic rule is introduced.
+
+```k
+requires "verification.k"
+```
+
+## spec.k:3-3:module
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `c6567408bb5c38e7013f6daa38b909379d4edf5653f933dc6606de6284e37144`
+- Disposition: `ACCEPTED_SPEC_SCAFFOLDING`
+- Rationale: No executable semantic rule is introduced.
+
+```k
+module SPEC
+```
+
+## spec.k:4-7:imports
+
+- Category: `module-import`
+- Attributes: `[]`
+- SHA-256: `3fbf0dcf8d706272548b0134f76a01f69bbdbe83d610af219dea6bea83e5b9e6`
+- Disposition: `ACCEPTED_SPEC_SCAFFOLDING`
+- Rationale: No executable semantic rule is introduced.
+
+```k
+  imports VERIFICATION
+
+  // Loop invariant.  The loop may update its local `end` binding; the observed
+  // heap list is the specified fold from END through STOP - 1.
+```
+
+## spec.k:8-39:claim
+
+- Category: `reachability-claim`
+- Attributes: `[]`
+- SHA-256: `84c50991122b86e0ccf6a01a86574dd274ab0bd7f3f33058db92c0e61bea27d9`
+- Disposition: `TARGET_OR_AUXILIARY_CLAIM`
+- Rationale: Audited dynamically, for satisfiability, result constraint, and real-program pinning.
+
+```k
+  claim
+    <k>
+      #loop(
+        rangeObj(END:Int, STOP:Int, 1),
+        Name("end"),
+        allPrefixesLoopBody()) ~> CONT:K
+      => CONT
+    </k>
+    <env> L:Int </env>
+    <scopes>
+      SC:Map
+      L |-> scope(
+        "end" |-> _PREV:Int
+        "prefixes" |-> ref(H:Int)
+        "string" |-> str(S:IntSeq),
+        P:Parent)
+      => SC
+         L |-> scope(
+           "end" |-> ?FINAL:Int
+           "prefixes" |-> ref(H)
+           "string" |-> str(S),
+           P)
+    </scopes>
+    <heap>
+      HP:Map H |-> list(ACC:ValSeq)
+      => HP H |-> list(prefixesAcc(S, END, STOP, ACC))
+    </heap>
+    requires END <=Int STOP
+
+  // End-to-end functional correctness for every string value S.  The claim
+  // loads the exact translated definition, calls it, and observes both the
+  // returned list reference and the list stored in the semantics' heap.
+```
+
+## spec.k:40-64:claim
+
+- Category: `reachability-claim`
+- Attributes: `[]`
+- SHA-256: `ebdd85f17c28a7e05f0c69850161b6d13196f00d658a043a0173df926be2cbb7`
+- Disposition: `TARGET_OR_AUXILIARY_CLAIM`
+- Rationale: Audited dynamically, for satisfiability, result constraint, and real-program pinning.
+
+```k
+  claim
+    <k>
+      #loadAll(solutionModule())
+      ~> Call(Name("all_prefixes"), (str(S:IntSeq), .Exprs))
+      => ref(0)
+    </k>
+    <env> 0 </env>
+    <scopes>
+      0 |-> scope(.Map, parent(-1))
+      -1 |-> builtinsScope
+      => 0 |-> scope(
+           "all_prefixes" |-> closureVal(
+             "string", .ParamNames, allPrefixesBody(), 0),
+           parent(-1))
+         -1 |-> builtinsScope
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap>
+      .Map => 0 |-> list(allPrefixes(S))
+    </heap>
+    <heapLoc> 0 => 1 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+```
+
+## spec.k:65-65:endmodule
+
+- Category: `module-boundary`
+- Attributes: `[]`
+- SHA-256: `4c5df27adc717388cee7175c70de02f160d4f9a8e25c48eb0fc23e1968ad13f4`
+- Disposition: `ACCEPTED_SPEC_SCAFFOLDING`
+- Rationale: No executable semantic rule is introduced.
+
+```k
+endmodule
+```

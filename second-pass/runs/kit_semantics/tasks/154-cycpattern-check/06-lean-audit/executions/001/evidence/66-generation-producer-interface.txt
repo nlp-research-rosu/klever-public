@@ -1,0 +1,583 @@
+$ generation klean_export imports and CLI tail
+#!/usr/bin/env python3
+"""Deterministically export one frozen K proof workspace to a Lean project."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import shlex
+import stat
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
+
+
+REPO = Path(__file__).resolve().parent.parent
+KLEAN = REPO / "tools/klean.py"
+KOMPILE_TIMEOUT = 480
+KLEAN_TIMEOUT = 300
+BUILD_TIMEOUT = 600
+
+K_IDENTIFIER = r"[A-Za-z][A-Za-z0-9_'-]*"
+SYNTAX_BLOCK_RE = re.compile(
+    rf"(?ms)^[ \t]*syntax\s+(?P<ret>{K_IDENTIFIER})\s*::=\s*"
+    r"(?P<body>.*?)"
+    r"(?=^[ \t]*(?:syntax|rule|module|endmodule|imports)\b|\Z)"
+)
+FUNC_PRODUCTION_RE = re.compile(
+    r"(?:\A|^[ \t]*\|)\s*"
+    rf"(?P<name>{K_IDENTIFIER})\s*\((?P<args>[^)]*)\)\s*"
+    r"\[(?P<attrs>[^\]]*)\]",
+    re.M,
+)
+K_IDENTIFIER_END = r"(?![A-Za-z0-9_'-])"
+MODULE_RE = re.compile(
+    rf"(?m)^[ \t]*module\s+({K_IDENTIFIER}){K_IDENTIFIER_END}"
+)
+MODULE_BLOCK_RE = re.compile(
+    rf"(?ms)^[ \t]*module\s+(?P<name>{K_IDENTIFIER}){K_IDENTIFIER_END}"
+    r"(?P<body>.*?)\bendmodule\b"
+)
+IMPORT_RE = re.compile(
+    rf"(?m)^[ \t]*imports\s+({K_IDENTIFIER}){K_IDENTIFIER_END}"
+)
+REQUIRES_RE = re.compile(r'requires\s+"([^"]+)"')
+_TERM_HEAD_RE = re.compile(r"fail to show termination for\s*\n\s*(«[^»]+»|\S+)")
+_TERM_CALL_RE = re.compile(r"Call from («[^»]+»|\S+) to («[^»]+»|\S+)")
+_ELAB_LINE_RE = re.compile(
+    r"error:\s+\S*Func\.lean:(\d+):\d+:\s+"
+    r"(?:unknown identifier|Application type mismatch)"
+)
+_DEF_RE = re.compile(r"^(\s*)(?:noncomputable\s+)?def\s+(\S+)\b")
+_NONCOMPUTABLE_RE = re.compile(r"(?m)^\s*noncomputable\s+def\s+(\S+)")
+_LEAN_NAMESPACE_RE = re.compile(r"^\s*namespace\s+(\S+)\s*$")
+_LEAN_END_RE = re.compile(r"^\s*end(?:\s+(\S+))?\s*$")
+_LEAN_TRUST_DECL_RE = re.compile(
+    r"^\s*(axiom|opaque)\s+(\S+)\s+(.+?)\s*$"
+)
+_RULE_HEAD_RE = re.compile(
+    rf"(?m)^\s*rule(?:\s+\[[^\]]+\]:)?\s+"
+    rf"(?P<name>{K_IDENTIFIER}){K_IDENTIFIER_END}"
+)
+_SYNTAX_PRODUCTION_LINE_RE = re.compile(
+    rf"^(?P<prefix>[ \t]*(?:syntax\s+{K_IDENTIFIER}\s*::=\s*|\|\s*))"
+    rf"(?P<name>{K_IDENTIFIER})\s*\((?P<args>[^)]*)\)"
+    r"(?P<spacing>[ \t]*)(?P<attrs>\[[^\]]*\])?"
+    r"(?P<suffix>[ \t]*(?://.*)?)$"
+)
+
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from tools import k_rule_inventory, lemma_discovery_contract
+
+
+class KleanExportError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class Func:
+    name: str
+    ret: str
+    args: list[str]
+
+
+@dataclass(frozen=True)
+class DefinitionResolution:
+    verification_file: Path
+    verification_module: str
+    syntax_module: str
+    required_files: tuple[Path, ...]
+    entry_files: tuple[Path, ...]
+
+
+@dataclass(frozen=True)
+class KompileCommand:
+    source: Path
+    main_module: str | None
+    syntax_module: str | None
+    backend: str | None
+
+
+def _proof_kompile_commands(workspace: Path) -> tuple[KompileCommand, ...]:
+    prove = workspace / "prove.sh"
+    if not prove.is_file() or prove.is_symlink():
+        return ()
+    logical_lines = prove.read_text().replace("\\\n", " ").splitlines()
+    commands: list[KompileCommand] = []
+    for line in logical_lines:
+        try:
+            words = shlex.split(line, comments=True)
+        except ValueError:
+            continue
+        try:
+            index = words.index("kompile")
+        except ValueError:
+            continue
+        arguments = words[index + 1 :]
+        source_word = next(
+            (
+                word
+                for word in arguments
+                if not word.startswith("-") and word.endswith(".k")
+            ),
+            None,
+        )
+        if source_word is None:
+            continue
+        source = (workspace / source_word).resolve()
+        try:
+            source.relative_to(workspace)
+        except ValueError:
+            continue
+        if not source.is_file() or source.is_symlink():
+            continue
+
+        def option(name: str) -> str | None:
+            if name not in arguments:
+                return None
+            option_index = arguments.index(name)
+            if option_index + 1 >= len(arguments):
+                return None
+            return arguments[option_index + 1]
+
+        commands.append(
+            KompileCommand(
+                source=source,
+                main_module=option("--main-module"),
+                syntax_module=option("--syntax-module"),
+                backend=option("--backend"),
+            )
+        )
+    return tuple(commands)
+
+
+def _workspace_k_files(workspace: Path) -> tuple[Path, ...]:
+    workspace = Path(workspace)
+    if not workspace.is_dir() or workspace.is_symlink():
+        raise KleanExportError("K definition workspace must be a real directory")
+    files = tuple(
+        path.resolve()
+        for _relative, kind, path in _tree_entries(workspace)
+        if kind == "file" and path.suffix == ".k"
+    )
+    if not files:
+        raise KleanExportError("K definition workspace contains no .k files")
+    return tuple(sorted(files, key=str))
+
+
+def _local_required_file(source: Path, required: str, workspace: Path) -> Path | None:
+    candidate = Path(required)
+    unresolved = (
+        candidate
+                ),
+                "problem": problem,
+                "generated_tree_sha256": generator_manifest[
+                    "generated_tree_sha256"
+                ],
+                "frozen_input_sha256": before_hash,
+                "stage3_discovery_manifest_sha256": (
+                    discovery_manifest_sha256
+                ),
+                "trust_inventory_sha256": "",
+                "obligation_count": len(obligations),
+            }
+            _write_json(publish_staging / "input-manifest.json", input_manifest)
+            _write_json(
+                publish_staging / "generator-manifest.json",
+                generator_manifest,
+            )
+            _write_json(publish_staging / "trust-inventory.json", inventory)
+            result["trust_inventory_sha256"] = hashlib.sha256(
+                (publish_staging / "trust-inventory.json").read_bytes()
+            ).hexdigest()
+            _write_json(publish_staging / "export-result.json", result)
+        publish_staging.rename(destination)
+        return result
+    except BaseException:
+        if publish_staging.exists():
+            shutil.rmtree(publish_staging)
+        raise
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", required=True, type=Path)
+    parser.add_argument("--discovery-manifest", required=True, type=Path)
+    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--problem", required=True)
+    parser.add_argument("--generator-image-id")
+    parser.add_argument(
+        "--toolchain-lock",
+        type=Path,
+        default=REPO / "data/klean-toolchain.lock.json",
+    )
+    arguments = parser.parse_args(argv)
+    try:
+        result = export_frozen(
+            arguments.input,
+            arguments.discovery_manifest,
+            arguments.output,
+            problem=arguments.problem,
+            toolchain_lock=arguments.toolchain_lock,
+            generator_image_id=arguments.generator_image_id,
+        )
+    except KleanExportError as error:
+        print(f"Klean export failed: {error}", file=sys.stderr)
+        return 1
+    print(json.dumps(result, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+$ generation klean.py imports/CLI
+#!/usr/bin/env python3
+"""Float-aware, lemma-emitting wrapper around the pinned pyk Klean generator."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import stat
+import sys
+from collections.abc import Collection, Mapping
+from graphlib import TopologicalSorter
+from pathlib import Path
+from typing import Callable, TypeVar
+
+
+_PRELUDE_FLOAT_ABBREV = "abbrev SortFloat        : Type := Float\n"
+_PRELUDE_ANCHOR = "abbrev SortInt          : Type := Int\n"
+T = TypeVar("T")
+
+_LEAN_RESERVED_WORDS = frozenset(
+    {
+        "as",
+        "by",
+        "class",
+        "def",
+        "deriving",
+        "do",
+        "else",
+        "end",
+        "export",
+        "extends",
+        "extern",
+        "false",
+        "for",
+        "forall",
+        "from",
+        "fun",
+        "if",
+        "import",
+        "in",
+        "inductive",
+        "infix",
+        "infixl",
+        "infixr",
+        "instance",
+        "let",
+        "macro",
+        "match",
+        "mutual",
+        "namespace",
+        "opaque",
+        "open",
+        "partial",
+        "prefix",
+        "prec",
+        "private",
+        "protected",
+        "return",
+        "section",
+        "structure",
+        "syntax",
+        "then",
+        "theorem",
+        "true",
+        "universe",
+        "unsafe",
+        "variable",
+        "where",
+        "while",
+        "with",
+    }
+)
+
+
+def deterministic_subsort_pairs(
+    subsorts: Mapping[str, Collection[str]],
+) -> tuple[tuple[str, str], ...]:
+    """Return K subsort edges in a canonical order."""
+
+    return tuple(
+        (subsort, supersort)
+        for supersort in sorted(subsorts)
+        for subsort in sorted(subsorts[supersort])
+    )
+
+
+def deterministic_ordered_sccs(
+    dependencies: Mapping[str, Collection[str]],
+) -> list[list[str]]:
+    """Match pinned Klean's SCC ordering without hash-order dependence."""
+
+    normalized = {
+        element: tuple(sorted(dependencies[element]))
+        for element in sorted(dependencies)
+    }
+    component_by_element: dict[str, int] = {}
+    next_component = 0
+    for element, dependency_elements in normalized.items():
+        if element in component_by_element:
+            continue
+        component_by_element[element] = next_component
+        for dependency in dependency_elements:
+            if element in normalized[dependency]:
+                component_by_element[dependency] = next_component
+        next_component += 1
+
+    elements_by_component: dict[int, set[str]] = {}
+    for element, component in component_by_element.items():
+        elements_by_component.setdefault(component, set()).add(element)
+
+    component_dependencies: dict[int, tuple[int, ...]] = {}
+    ordered_components = sorted(
+        elements_by_component,
+        key=lambda component: tuple(sorted(elements_by_component[component])),
+    )
+    for component in ordered_components:
+        dependency_components = {
+            component_by_element[dependency]
+            for element in elements_by_component[component]
+            for dependency in normalized[element]
+            if component_by_element[dependency] != component
+        }
+        component_dependencies[component] = tuple(
+            sorted(
+                dependency_components,
+                key=lambda dependency: tuple(
+                    sorted(elements_by_component[dependency])
+                ),
+            )
+        )
+
+    order = tuple(TopologicalSorter(component_dependencies).static_order())
+    return [sorted(elements_by_component[component]) for component in order]
+
+
+def _install_deterministic_klean_ordering() -> None:
+    """Replace the two hash-sensitive orderings in pinned pyk/Klean."""
+
+    from pyk.klean import k2lean4
+
+    def deterministic_inj_commands(converter: object) -> tuple[object, ...]:
+        return tuple(
+            converter._inj_instance(subsort, supersort)
+            for subsort, supersort in deterministic_subsort_pairs(
+                converter.defn.subsorts
+            )
+            if not supersort.endswith("CellMap")
+        )
+
+    k2lean4._ordered_sccs = deterministic_ordered_sccs
+    k2lean4.K2Lean4._inj_commands = deterministic_inj_commands
+
+
+def quote_reserved_lean_identifiers(
+    text: str, identifiers: set[str]
+) -> str:
+    """Quote bare K identifiers which Lean parses as reserved words."""
+
+    for identifier in sorted(identifiers & _LEAN_RESERVED_WORDS):
+        text = re.sub(
+            rf"(?<![«A-Za-z0-9_?!'])(?:{re.escape(identifier)})"
+            rf"(?![»A-Za-z0-9_?!'])",
+            f"«{identifier}»",
+            text,
+        )
+    return text
+
+
+def _quoted_identifier(identifier: str) -> str:
+    if identifier in _LEAN_RESERVED_WORDS:
+        return f"«{identifier}»"
+    return identifier
+
+
+def lean_typed_equality(left: str, right: str, lean_type: str) -> str:
+    return f"({left} : {lean_type}) = ({right} : {lean_type})"
+
+
+def canonicalize_lean_injection_chains(
+    text: str,
+    subsorts: Mapping[str, Collection[str]],
+) -> str:
+    """Render explicit injections with Klean's canonical subsort semantics."""
+
+    descendants = {
+        supersort: set(direct_subsorts)
+        for supersort, direct_subsorts in subsorts.items()
+    }
+    changed = True
+    while changed:
+        changed = False
+        for supersort, current in descendants.items():
+            expanded = set(current)
+            for subsort in current:
+                expanded.update(descendants.get(subsort, ()))
+            if expanded != current:
+                descendants[supersort] = expanded
+                changed = True
+
+    head = re.compile(
+        r"(?P<outer>Sort[A-Za-z0-9_]+)\.inj_"
+        r"(?P<middle>Sort[A-Za-z0-9_]+)\s+"
+    )
+
+    def strip_balanced_parentheses(argument: str) -> str:
+        stripped = argument.strip()
+        while stripped.startswith("("):
+            try:
+                inner, end = _lean_application_argument(stripped, 0)
+            except ValueError:
+                break
+            if end != len(stripped):
+                break
+            stripped = inner[1:-1].strip()
+        return stripped
+
+    while True:
+        replacement: tuple[int, int, str] | None = None
+    _install_float_support()
+    arguments = list(sys.argv)
+    emit_lemmas = "--lemmas" in arguments
+    arguments = [argument for argument in arguments if argument != "--lemmas"]
+    summary_functions: list[str] = []
+    while "--spec-func" in arguments:
+        index = arguments.index("--spec-func")
+        if index + 1 >= len(arguments):
+            raise SystemExit("error: --spec-func requires a value")
+        summary_functions.append(arguments[index + 1])
+        del arguments[index : index + 2]
+    source_marker = "verification.k"
+    if "--lemma-source" in arguments:
+        index = arguments.index("--lemma-source")
+        if index + 1 >= len(arguments):
+            raise SystemExit("error: --lemma-source requires a value")
+        source_marker = arguments[index + 1]
+        del arguments[index : index + 2]
+    source_rule_inventory = None
+    if "--source-rule-inventory" in arguments:
+        index = arguments.index("--source-rule-inventory")
+        if index + 1 >= len(arguments):
+            raise SystemExit("error: --source-rule-inventory requires a value")
+        source_rule_inventory = Path(arguments[index + 1])
+        del arguments[index : index + 2]
+    if emit_lemmas and source_rule_inventory is None:
+        raise SystemExit("error: --lemmas requires --source-rule-inventory")
+    sys.argv = arguments
+
+    namespace = _parse_args(sys.argv)
+    output_directory = namespace.output_dir or Path()
+    package_directory = output_directory / namespace.package_name
+    if package_directory.exists() or package_directory.is_symlink():
+        raise SystemExit(f"error: directory exists: {package_directory}")
+    definition = _load_defn(namespace.definition_dir)
+    lemma_symbols: set[str] = set()
+    lemma_sorts: set[str] = set()
+    trust_rewrite_uids: set[str] = set()
+    needs_operational_rewrites = False
+    if emit_lemmas:
+        (
+            lemma_symbols,
+            lemma_sorts,
+            trust_rewrite_uids,
+            needs_operational_rewrites,
+        ) = _trust_lemma_dependencies(
+            namespace.definition_dir,
+            tuple(summary_functions),
+            source_marker,
+            source_rule_inventory,
+        )
+    if needs_operational_rewrites:
+        observed = {
+            rewrite.uid
+            for rewrite in definition.rewrites
+            if rewrite.uid in trust_rewrite_uids
+        }
+        if observed != trust_rewrite_uids:
+            raise RuntimeError(
+                "Klean rewrite model is missing a selected trust rule"
+            )
+        definition = definition.let(
+            rewrites=tuple(
+                rewrite
+                for rewrite in definition.rewrites
+                if rewrite.uid not in trust_rewrite_uids
+            )
+        )
+    elif namespace.rules:
+        substrings = tuple(namespace.rules)
+        rewrites = tuple(
+            rewrite
+            for rewrite in definition.rewrites
+            if rewrite.label
+            and any(value in rewrite.label for value in substrings)
+        )
+        definition = definition.let(rewrites=rewrites)
+    if lemma_symbols or lemma_sorts:
+        definition = _widen_projection(
+            definition, lemma_symbols, lemma_sorts
+        )
+    else:
+        definition = definition.project_to_rewrites()
+    result_directory = generate(
+        defn=definition,
+        output_dir=output_directory,
+        context={
+            "package_name": namespace.package_name,
+            "library_name": namespace.library_name,
+        },
+        config={
+            "derive_beq": namespace.derive_beq,
+            "derive_decidableeq": namespace.derive_decidableeq,
+        },
+    )
+    make_generated_tree_owner_writable(result_directory)
+    from pyk.klean.k2lean4 import _symbol_ident
+
+    reserved_identifiers = _definition_reserved_identifiers(
+        definition, _symbol_ident
+    )
+    _quote_generated_tree(result_directory, reserved_identifiers)
+    _patch_prelude(result_directory, namespace.library_name)
+    if emit_lemmas:
+        count = emit_lemmas_or_raise(
+            lambda: _emit_lemmas(
+                namespace.definition_dir,
+                result_directory,
+                namespace.library_name,
+                tuple(summary_functions),
+                source_marker,
+                source_rule_inventory,
+            )
+        )
+        print(f"lemmas: {count}", file=sys.stderr)
+    print(result_directory)
+
+
+if __name__ == "__main__":
+    main()

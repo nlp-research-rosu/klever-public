@@ -1,0 +1,240 @@
+Script started on 2026-07-28 17:38:53-05:00 [<not executed on terminal>]
+     1	def same_chars(s0: str, s1: str):
+     2	    return set(s0) == set(s1)
+     1	Module(
+     2	  FuncDef("same_chars", Params("s0", "s1"),
+     3	    Return(
+     4	      Compare(
+     5	        Call(Name("set"), Name("s0")),
+     6	        CmpOp("==", Call(Name("set"), Name("s1")))))))
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module SAME-CHARS-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // This closure is the constructor-level form of solution.mpy.  Calling it
+     7	  // directly keeps the module scope unchanged across a proof claim.
+     8	  syntax KItem ::= "#sameChars" "(" IntSeq "," IntSeq ")"
+     9	
+    10	  rule <k> #sameChars(S0:IntSeq, S1:IntSeq)
+    11	        => Call(
+    12	             closureVal(
+    13	               ("s0", "s1", .ParamNames),
+    14	               (Return(
+    15	                  Compare(
+    16	                    Call(Name("set"), (Name("s0"), .Exprs)),
+    17	                    CmpOp("==",
+    18	                      Call(Name("set"), (Name("s1"), .Exprs)))))
+    19	                .Stmts),
+    20	               0),
+    21	             (str(S0), str(S1), .Exprs))
+    22	           ...
+    23	       </k>
+    24	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SAME-CHARS-SPEC
+     4	  imports SAME-CHARS-VERIFICATION
+     5	
+     6	  // For arbitrary strings, the result is equality of their distinct
+     7	  // character-code sets.  sameSet is mutual membership, as defined by MPY-SET.
+     8	  claim
+     9	    <k>
+    10	      #sameChars(S0:IntSeq, S1:IntSeq)
+    11	      =>
+    12	      sameSet(dedupCodes(S0), dedupCodes(S1))
+    13	    </k>
+    14	    <env> 0 </env>
+    15	    <scopes>
+    16	      0  |-> scope(.Map, parent(-1))
+    17	      -1 |-> builtinsScope
+    18	    </scopes>
+    19	    <scopeLoc> 1 </scopeLoc>
+    20	    <heap> .Map </heap>
+    21	    <heapLoc> 0 </heapLoc>
+    22	    <stack> .List </stack>
+    23	    <ret> noRet </ret>
+    24	    <exc> NoExc </exc>
+    25	    <exit-code> 0 </exit-code>
+    26	endmodule
+    18	  // evaluate callee, then args ([owise]: problem-local Call interceptions beat this)
+    19	  syntax KItem ::= #callee(Exprs)
+    20	  rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]
+    21	  rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>
+    22	
+    23	  // ==== dispatch on the callee value ========================================
+    24	  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>
+    25	
+    26	  rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>
+    27	  rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ)    ... </k>
+    28	  rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ)    ... </k>
+    29	  rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ)   ... </k>
+    30	  rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ)   ... </k>
+    31	  rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]
+    32	  rule <k> #applyK(toCall(typeV(T:String)),     ACC:Vals) => applyBuiltin(T, ACC)  ... </k>
+    69	  rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT
+    70	        => #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+    71	       <env>     CALLERL:Int => NEWL </env>
+    72	       <scopes>   STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes>
+    73	       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+    74	       <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+    75	
+   129	  // ==== Name lookup (walk the scope chain; builtins live in the -1 scope) ====
+   130	  syntax KItem ::= #look(String, Int)
+   131	  rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>
+   132	  rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k>
+   133	       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+   134	       requires X in_keys(M)
+   135	  // a SYNTACTICALLY cell-bound name reads through the heap cell AT THE
+   136	  // LOOKUP (higher priority beats the plain return above on concrete cell
+   137	  // bindings; abstract claim values take the plain rule unchanged) — this
+   138	  // covers cross-frame cell reads (a comprehension closure reading the
+   139	  // enclosing function's cellvar) without a narrowing-prone k-top redex
+   140	  // guarded on the FOUND frame's DECLARED cellvars (pnMember over the
+   141	  // cellsMark): decidable for every concrete frame pin — plain frames and
+   142	  // non-cell names prune outright, so an abstract looked-up value never
+   143	  // drags a narrowing cellV heap match along (probed on 5-intersperse and
+   144	  // Q4's abstract `numbers` in the annotated frame)
+   145	  rule <k> #look(X:String, L:Int) => V ... </k>
+   146	       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+   147	       <heap> ... H |-> cellV(V:Val) ... </heap>
+   148	       requires X in_keys(M) andBool "$cells" in_keys(M)
+   149	        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+   150	        andBool {M[X]}:>Val ==K cellRef(H)
+   151	       [priority(40)]
+   152	  rule <k> #look(X:String, L:Int) => #look(X, P) ... </k>
+   153	       <scopes> ... L |-> scope(M:Map, parent(P:Int)) ... </scopes>
+   154	       requires notBool (X in_keys(M))
+   155	
+   156	  // the ONE predefined builtins scope (the -1 frame; claims write `-1 |-> builtinsScope`)
+   157	  syntax Scope ::= "builtinsScope" [function, total]
+   158	  rule builtinsScope
+   159	    => scope(.Map [ "len"    <- builtinV("len")    ]
+   160	                  [ "set"    <- builtinV("set")    ]
+   161	                  [ "sum"    <- builtinV("sum")    ]
+   162	                  [ "abs"    <- builtinV("abs")    ]
+   163	                  [ "min"    <- builtinV("min")    ]
+   164	                  [ "max"    <- builtinV("max")    ]
+   165	                  [ "ord"    <- builtinV("ord")    ]
+   166	                  [ "chr"    <- builtinV("chr")    ]
+   167	                  [ "range"  <- builtinV("range")  ]
+   168	                  [ "all"    <- builtinV("all")    ]
+   169	                  [ "any"    <- builtinV("any")    ]
+   170	                  [ "zip"    <- builtinV("zip")    ]
+   171	                  [ "isinstance" <- builtinV("isinstance") ]
+   172	                  [ "sorted" <- builtinV("sorted") ]
+   173	                  [ "list"   <- builtinV("list")   ]
+   174	                  [ "round"  <- builtinV("round")  ]
+   175	                  [ "bin"    <- builtinV("bin")    ]
+   176	                  [ "enumerate" <- builtinV("enumerate") ]
+   177	                  [ "map"    <- builtinV("map")    ]
+   178	                  [ "eval"   <- builtinV("eval")   ]
+   179	                  [ "int"    <- typeV("int")       ]
+   180	                  [ "str"    <- typeV("str")       ]
+    62	  // ==== bind params ========================================================
+    63	  rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>
+    64	  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k>
+    65	       <env> L:Int </env>
+    66	       <scopes> ... L |-> scope(M:Map => M [ P <- V ], _) ... </scopes>
+    67	  // a param that is a cellvar was pre-bound to its cell at frame entry
+    68	  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals))
+    69	        => #cellW({M[P]}:>Val, V) ~> #bindP(PS, VS) ... </k>
+    70	       <env> L:Int </env>
+    71	       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+    72	       requires "$cells" in_keys(M)
+    73	        andBool pnMember(P, cellsOf({M["$cells"]}:>Val))
+    74	        andBool P in_keys(M) andBool isCellRef({M[P]}:>Val)
+    75	       [priority(40)]
+    76	
+    77	  // ==== return / pop the frame (the returned expr evaluates by strictness) ==
+    78	  rule <k> Return(V:Val) ~> _ => #pop </k>
+    79	       <ret> noRet => retV(V) </ret>
+    80	  rule <k> #endcall => #pop ... </k>
+    81	       <ret> noRet => retV(noneV) </ret>
+    82	  // pop: restore env, DEALLOCATE the callee frame, and wind scopeLoc back (LIFO allocation
+    83	  // makes the saved loc the callee frame's own loc). Sound because no closureVal outlives its
+    84	  // defining frame (frontend subset: no returned/stored closures; module defs live in loc 0).
+    85	  rule <k> #pop => V ~> CONT </k>
+    86	       <ret>   retV(V) => noRet </ret>
+    87	       <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack>
+    88	       <env>   L:Int => CALLERL </env>
+    89	       <scopes> SC:Map => SC [ L <- undef ] </scopes>
+    90	       <scopeLoc> _ => SAVEDL </scopeLoc>
+    91	endmodule
+    12	  // the builtins REGISTRY is core.k's builtinsScope (the -1 frame); names resolve by lookup
+    13	
+    14	  // Call routing + argument evaluation live in call.k, which also routes the fold
+    15	  // builtins (sum/all/any/max/min) to the #_Acc folds below and everything else to
+    16	  // applyBuiltin. This module owns applyBuiltin + the fold implementations.
+    17	  syntax Val ::= applyBuiltin(String, Vals) [function]
+    18	
+    19	  // ==== len(obj) — O(1) per kind ============================================
+    20	  syntax Int ::= seqLen(Val) [function]
+    21	  rule applyBuiltin("len", OBJ:Val, .Vals) => seqLen(OBJ)
+    22	  rule seqLen(list(VS:ValSeq))                  => vsLen(VS)
+    23	  rule seqLen(tuple(VS:ValSeq))                 => vsLen(VS)
+    24	  rule seqLen(str(IS:IntSeq))                   => isLen(IS)
+    25	  rule seqLen(setV(DS:IntSeq))                  => isLen(DS)
+    26	  rule seqLen(rangeObj(LO:Int, HI:Int, ST:Int)) => rangeLen(LO, HI, ST)
+    27	
+    28	  // ==== list(seq) — materialize a list/tuple into a list (e.g. list(d.keys())) ==
+    29	  // Minimal: the "copy a sequence" case (list of a list is itself; list of a tuple keeps order).
+    30	  // list() of other iterables (str/range/set/zip) is added via the iterator fold when needed.
+    31	  // (k-cell — list() constructs a NEW object)
+    32	  rule <k> #applyK(toCall(builtinV("list")), (list(VS:ValSeq),  .Vals)) => #alloc(list(VS)) ... </k>
+    33	  rule <k> #applyK(toCall(builtinV("list")), (tuple(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>
+    34	  rule <k> #applyK(toCall(builtinV("list")), .Vals)                     => #alloc(list(.ValSeq)) ... </k>
+    35	  rule <k> #applyK(toCall(builtinV("list")), (str(CS:IntSeq), .Vals))   => #alloc(list(charsOf(CS))) ... </k>
+    36	  syntax ValSeq ::= charsOf(IntSeq) [function, total]
+    37	  rule charsOf(.IntSeq)                => .ValSeq
+    38	  rule charsOf(iCons(C:Int, R:IntSeq)) => vCons(str(iCons(C, .IntSeq)), charsOf(R))
+    39	
+    40	  // ==== set(str) — distinct character codes =================================
+    41	  rule applyBuiltin("set", str(CS:IntSeq), .Vals) => setV(dedupCodes(CS))
+    42	
+    10	  rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>
+    11	
+    12	  rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+    13	
+    14	  // Compare's right operand sits under the CmpOp wrapper — contexts instead of attributes
+    15	  context Compare(HOLE, _)
+    16	  context Compare(_:Val, CmpOp(_, HOLE))
+    17	  rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]
+    18	
+     6	  // a set value, carried as its distinct codes in first-seen order (order is irrelevant
+     7	  // to membership/cardinality — the two observations sets support here).
+     8	  syntax Val ::= setV(IntSeq)
+     9	
+    10	  // membership of a code in the accumulated distinct-code sequence
+    11	  syntax Bool ::= codeIn(Int, IntSeq) [function, total]
+    12	  rule codeIn(_:Int, .IntSeq)                => false
+    13	  rule codeIn(C:Int, iCons(H:Int, T:IntSeq)) => C ==Int H orBool codeIn(C, T)
+    14	
+    15	  // the distinct codes of CS (insert-if-absent fold, first-seen order)
+    16	  syntax IntSeq ::= dedupCodes(IntSeq)         [function, total]
+    17	                  | dedupFrom(IntSeq, IntSeq)  [function, total]
+    18	  rule dedupCodes(CS:IntSeq) => dedupFrom(CS, .IntSeq)
+    19	  rule dedupFrom(.IntSeq, ACC:IntSeq) => ACC
+    20	  rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, ACC)
+    21	       requires codeIn(C, ACC)
+    22	  rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, snocCode(ACC, C))
+    23	       requires notBool codeIn(C, ACC)
+    24	
+    25	  syntax IntSeq ::= snocCode(IntSeq, Int) [function, total]
+    26	  rule snocCode(.IntSeq, C:Int)                => iCons(C, .IntSeq)
+    27	  rule snocCode(iCons(H:Int, T:IntSeq), C:Int) => iCons(H, snocCode(T, C))
+    28	
+    29	  // ==== set equality: two sets are equal iff mutually subsuming ==============
+    30	  // subsetCodes(A, B) — every code of A occurs in B (duplicates in A are harmless).
+    31	  syntax Bool ::= subsetCodes(IntSeq, IntSeq) [function, total]
+    32	  rule subsetCodes(.IntSeq, _:IntSeq)                => true
+    33	  rule subsetCodes(iCons(C:Int, S:IntSeq), B:IntSeq) => codeIn(C, B) andBool subsetCodes(S, B)
+    34	
+    35	  syntax Bool ::= sameSet(IntSeq, IntSeq) [function, total]
+    36	  rule sameSet(A:IntSeq, B:IntSeq) => subsetCodes(A, B) andBool subsetCodes(B, A)
+    37	
+    38	  // set == set  (the only comparison sets support here)
+    39	  rule applyCmp("==", setV(A:IntSeq), setV(B:IntSeq)) => sameSet(A, B)
+    40	endmodule
+
+Script done on 2026-07-28 17:38:53-05:00 [COMMAND_EXIT_CODE="0"]

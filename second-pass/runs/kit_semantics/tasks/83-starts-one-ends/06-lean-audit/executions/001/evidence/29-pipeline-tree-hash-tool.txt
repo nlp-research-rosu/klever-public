@@ -1,0 +1,183 @@
+Script started on 2026-07-31 06:56:59-05:00 [<not executed on terminal>]
+#!/usr/bin/env python3
+"""Contracts and filesystem layout for resumable benchmark pipeline runs."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+import fcntl
+import hashlib
+import json
+import os
+import re
+import shutil
+import stat
+import tempfile
+import uuid
+from pathlib import Path
+from typing import Any, Callable, Iterable
+
+
+SCHEMA_VERSION = 3
+CODEX_CLI_VERSION = "0.144.6"
+K_VERSION = "7.1.293"
+K_BASE_IMAGE = (
+    "runtimeverificationinc/kframework-k:ubuntu-jammy-7.1.293@"
+    "sha256:f3f64ab72bd7b560082d50e4c6c23e107025cf217ca62ab73700104fc45de09a"
+)
+K_COMMIT = "ff15baac9e66426612ec45ff912af7f14965b64a"
+PYK_VERSION = "7.1.293"
+PYK_PROJECT = "pyk@runtimeverification/k"
+LEAN_TOOLCHAIN = "leanprover/lean4:v4.22.0"
+LEAN_COMMIT = "ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05"
+FROZEN_TOOLCHAIN_LOCK = {
+    "codex_cli_version": CODEX_CLI_VERSION,
+    "k_base_image": K_BASE_IMAGE,
+    "k_version": K_VERSION,
+    "lean_commit": LEAN_COMMIT,
+    "lean_toolchain": LEAN_TOOLCHAIN,
+    "pyk_version": PYK_VERSION,
+    "pyk_project": PYK_PROJECT,
+    "runtimeverification_k_commit": K_COMMIT,
+}
+STAGE_NAMES = (
+    "01-k-proof",
+    "02-k-audit",
+    "03-lemma-discovery",
+    "04-klean-generation",
+    "05-lean-proof",
+    "06-lean-audit",
+)
+_INVOCATION_STAGES = {
+    "01-k-proof": ("k_initial_s", "k_total_s"),
+    "03-lemma-discovery": ("lemma_initial_s", "lemma_total_s"),
+    "05-lean-proof": ("lean_initial_s", "lean_total_s"),
+}
+
+_CONDITIONS = (
+    ("kit-semantics", True, True, "kit-semantics.md"),
+    ("semantics", False, True, "with-semantics.md"),
+    ("kit", True, False, "kit-bare.md"),
+    ("bare", False, False, "bare.md"),
+)
+_CODEX_CONFIG = re.compile(r"^codex-(?P<model>.+)-xhigh-(?P<condition>.+)$")
+_HASH_CHUNK_SIZE = 1024 * 1024
+_BWRAP_NAMESPACE_DENIAL = (
+    b"bwrap: No permissions to create a new namespace"
+)
+
+
+class PipelineContractError(RuntimeError):
+    """Raised when a pipeline path, manifest, or state violates the contract."""
+
+
+def _usage_accounting_module():
+    try:
+        from tools import usage_accounting
+    except ImportError as error:
+        raise PipelineContractError(
+            "usage accounting support is unavailable"
+        ) from error
+    return usage_accounting
+
+
+@dataclass(frozen=True)
+class Condition:
+    name: str
+    kit: bool
+    semantics: bool
+    prompt_file: str
+
+
+@dataclass(frozen=True)
+class CodexConfig:
+    name: str
+    model: str
+    effort: str
+    condition: Condition
+
+
+@dataclass(frozen=True)
+class Invocation:
+    stage: str
+    name: str
+    kind: str
+    path: Path
+    allocation_s: int
+    session_id: str | None
+
+
+def validate_safe_component(value: object, label: str) -> str:
+    if not isinstance(value, str):
+        raise PipelineContractError(f"{label} must be a string path component")
+    path = Path(value)
+    if (
+        not value
+        or value in {".", ".."}
+        or value.startswith(".")
+        or path.is_absolute()
+        or len(path.parts) != 1
+        or "/" in value
+        or "\\" in value
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+    ):
+        raise PipelineContractError(
+            f"{label} must be one safe nonhidden path component: {value!r}"
+        )
+    return value
+
+
+def parse_codex_config(config: str) -> CodexConfig:
+    validate_safe_component(config, "config")
+    match = _CODEX_CONFIG.fullmatch(config)
+    if match is None:
+        raise PipelineContractError(f"invalid Codex config grammar: {config}")
+    condition_name = match.group("condition")
+    condition = next(
+        (
+            Condition(name, kit, semantics, prompt)
+            for name, kit, semantics, prompt in _CONDITIONS
+            if name == condition_name
+        ),
+        None,
+    )
+    if condition is None:
+        raise PipelineContractError(f"unsupported benchmark condition: {condition_name}")
+    return CodexConfig(
+        name=config,
+        model=match.group("model"),
+        effort="xhigh",
+        condition=condition,
+    )
+
+
+def _lstat(path: Path, label: str) -> os.stat_result:
+    try:
+        return path.lstat()
+    except OSError as error:
+        raise PipelineContractError(f"{label} is missing: {path}") from error
+
+
+def require_real_directory(path: Path, label: str) -> Path:
+    if not stat.S_ISDIR(_lstat(path, label).st_mode):
+        raise PipelineContractError(f"{label} must be a real directory: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise PipelineContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def require_regular_file(path: Path, label: str) -> Path:
+    if not stat.S_ISREG(_lstat(path, label).st_mode):
+        raise PipelineContractError(f"{label} must be a real regular file: {path}")
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        raise PipelineContractError(f"{label} cannot be resolved: {path}") from error
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+
+Script done on 2026-07-31 06:56:59-05:00 [COMMAND_EXIT_CODE="0"]

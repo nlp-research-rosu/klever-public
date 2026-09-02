@@ -1,0 +1,440 @@
+COMMAND: bash -lc sed\ -n\ \"600\,730p\"\ /reference/tools/klean_export.py\;\ sed\ -n\ \"130\,230p\"\ /reference/tools/audit_contract.py\;\ rg\ -n\ \"def\ sha256_tree\"\ /reference/tools/pipeline_contract.py\ /reference/tools/audit_contract.py\;\ sed\ -n\ \"400\,520p\"\ /reference/tools/klean_audit_contract.py\;\ sed\ -n\ \"150\,230p\"\ /reference/tools/klean_final_gate.py
+
+                end += 1
+            output.append(_def_to_axiom(lines[index:end]))
+            index = end
+        else:
+            output.append(lines[index])
+            index += 1
+    return "\n".join(output)
+
+
+def needs_noncomputable(build_output: str) -> bool:
+    return (
+        "consider marking definition as 'noncomputable'" in build_output
+        or "not supported by code generator" in build_output
+        or "has no executable code" in build_output
+    )
+
+
+def mark_all_noncomputable(function_text: str) -> str:
+    return re.sub(
+        r"(?m)^(\s*)def ", r"\1noncomputable def ", function_text
+    )
+
+
+def _patch_lake_build_directory(package: Path) -> None:
+    lakefile = package / "lakefile.toml"
+    if not lakefile.is_file() or lakefile.is_symlink():
+        raise KleanExportError("generated package is missing regular lakefile.toml")
+    text = lakefile.read_text()
+    build_setting = 'buildDir = "/tmp/klean-generated-build"\n'
+    stack_setting = (
+        'moreLeanArgs = ["-D maxRecDepth=100000", "-s", "65536"]\n'
+    )
+    if build_setting in text and stack_setting in text:
+        return
+    setting = ""
+    if build_setting not in text:
+        setting += build_setting
+    if stack_setting not in text:
+        setting += stack_setting
+    marker = "[[lean_lib]]"
+    if marker in text:
+        text = text.replace(marker, setting + "\n" + marker, 1)
+    else:
+        text = text.rstrip() + "\n" + setting
+    lakefile.write_text(text)
+
+
+def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+    if not root.is_dir() or root.is_symlink():
+        raise KleanExportError(f"tree root must be a real directory: {root}")
+    entries: list[tuple[str, str, Path]] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        for child in os.scandir(directory):
+            path = Path(child.path)
+            mode = child.stat(follow_symlinks=False).st_mode
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise KleanExportError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    return sorted(entries)
+
+
+def tree_digest(root: Path) -> str:
+    digest = hashlib.sha256()
+    for relative, kind, path in _tree_entries(Path(root)):
+        digest.update(relative.encode() + b"\0" + kind.encode() + b"\0")
+        if kind == "file":
+            digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def _regular_json(path: Path) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise KleanExportError(f"required JSON is not a regular file: {path}")
+    try:
+        document = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise KleanExportError(f"malformed JSON: {path}") from error
+    if not isinstance(document, dict):
+        raise KleanExportError(f"JSON must be an object: {path}")
+    return document
+
+
+def _run_command(
+    command: list[str] | str,
+    *,
+    cwd: Path | None,
+    timeout: int,
+    env: dict[str, str],
+    shell: bool = False,
+) -> tuple[int, str]:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            timeout=timeout,
+            shell=shell,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        return result.returncode, result.stdout
+    except subprocess.TimeoutExpired:
+        return 124, f"TIMEOUT after {timeout}s"
+
+
+def _trust_inventory(
+    package: Path,
+    *,
+    axiomatized: set[str],
+    noncomputable_repair: bool,
+) -> dict[str, Any]:
+    axioms: set[str] = set()
+    allowlist: dict[str, dict[str, str]] = {}
+    noncomputable: set[str] = set()
+    designated_sorries = 0
+    other_sorries = 0
+    for _relative, kind, path in _tree_entries(package):
+        if kind != "file" or path.suffix != ".lean":
+            continue
+        text = path.read_text()
+        for declaration in lean_trust_declarations(path):
+def _optional_regular_file_hash(path: Path) -> str | None:
+    try:
+        mode = path.lstat().st_mode
+    except OSError:
+        return None
+    if not stat.S_ISREG(mode):
+        return None
+    try:
+        return sha256_file(path)
+    except AuditContractError:
+        return None
+
+
+def _tree_entry_type(mode: int) -> str:
+    if stat.S_ISDIR(mode):
+        return "directory"
+    if stat.S_ISREG(mode):
+        return "file"
+    if stat.S_ISLNK(mode):
+        return "symlink"
+    if stat.S_ISFIFO(mode):
+        return "fifo"
+    if stat.S_ISSOCK(mode):
+        return "socket"
+    if stat.S_ISBLK(mode):
+        return "block-device"
+    if stat.S_ISCHR(mode):
+        return "character-device"
+    return "unknown"
+
+
+def _framed_update(digest: Any, value: bytes) -> None:
+    digest.update(len(value).to_bytes(8, "big"))
+    digest.update(value)
+
+
+def _framed_file_update(
+    digest: Any, path: Path, expected_size: int
+) -> None:
+    digest.update(expected_size.to_bytes(8, "big"))
+    bytes_read = 0
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        with os.fdopen(os.open(path, flags), "rb") as stream:
+            for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                bytes_read += len(chunk)
+                digest.update(chunk)
+    except OSError as error:
+        raise AuditContractError(f"cannot read tree file {path}: {error}") from error
+    if bytes_read != expected_size:
+        raise AuditContractError(
+            f"tree file changed size while hashing: {path} "
+            f"(expected {expected_size}, read {bytes_read})"
+        )
+
+
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, f"tree root {root}")
+    entries: list[tuple[str, str, Path, int]] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as iterator:
+                children = list(iterator)
+        except OSError as error:
+            raise AuditContractError(f"cannot scan tree {directory}: {error}") from error
+        for entry in children:
+            path = Path(entry.path)
+            try:
+                entry_stat = entry.stat(follow_symlinks=False)
+            except OSError as error:
+                raise AuditContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            mode = entry_stat.st_mode
+            entry_type = _tree_entry_type(mode)
+            relative = path.relative_to(root).as_posix()
+            entries.append((relative, entry_type, path, entry_stat.st_size))
+            if entry_type == "directory":
+                pending.append(path)
+
+    digest = hashlib.sha256()
+    for relative, entry_type, path, size in sorted(
+        entries, key=lambda item: item[0]
+    ):
+        _framed_update(digest, os.fsencode(relative))
+        _framed_update(digest, entry_type.encode())
+        if entry_type == "file":
+            _framed_file_update(digest, path, size)
+        elif entry_type == "symlink":
+            try:
+                target = os.readlink(path)
+            except OSError as error:
+                raise AuditContractError(
+                    f"cannot read tree symlink {path}: {error}"
+                ) from error
+            _framed_update(digest, os.fsencode(target))
+        else:
+            _framed_update(digest, b"")
+    return digest.hexdigest()
+/reference/tools/audit_contract.py:186:def sha256_tree(root: Path) -> str:
+/reference/tools/pipeline_contract.py:190:def sha256_tree(root: Path) -> str:
+        ):
+            raise KleanAuditContractError(
+                "no-obligation Stage 4 generation has an unexpected target"
+            )
+
+        lean_workspace: Path | None = None
+        lean_invocation: Path | None = None
+        lean_result: dict[str, Any] | None = None
+        if generation_status == "PASS":
+            mode = "CLASSIFICATION_AND_PROOF"
+            lean_workspace, lean_invocation, lean_result = (
+                _require_stage5(task)
+            )
+        else:
+            mode = "CLASSIFICATION_ONLY"
+            stage5_result = task / "05-lean-proof/result.json"
+            if stage5_result.exists() or stage5_result.is_symlink():
+                raise KleanAuditContractError(
+                    "KLEAN_NO_OBLIGATIONS must not have a Stage 5 result"
+                )
+        condition = run.get("condition")
+        if not isinstance(condition, dict):
+            raise KleanAuditContractError("run condition is malformed")
+        resolved = {
+            "schema_version": stage6_resolution_contract.SCHEMA_VERSION,
+            "run_id": run_id,
+            "problem_id": problem,
+            "condition": condition.get("name"),
+            "mode": mode,
+            "semantics_mode": (
+                "SUPPLIED_SEMANTICS"
+                if condition.get("semantics") is True
+                else "GENERATED_SEMANTICS"
+            ),
+            "k_workspace": str(k_workspace),
+            "k_audit": str(k_audit),
+            "discovery_manifest": str(discovery.path),
+            "klean_generation": str(generation),
+            "generation_producer_sources": str(
+                generation_producer_sources
+            ),
+            "lean_workspace": (
+                str(lean_workspace)
+                if lean_workspace is not None
+                else None
+            ),
+            "lean_invocation": (
+                str(lean_invocation)
+                if lean_invocation is not None
+                else None
+            ),
+            "target": target,
+            "stage1_source_hashes": stage1_source_hashes,
+            "trust_inventory": str(
+                pipeline_contract.require_regular_file(
+                    generation / "trust-inventory.json",
+                    "Stage 4 trust inventory",
+                )
+            ),
+            "hashes": {
+                "k_workspace_sha256": k_hash,
+                "stage1_export_sha256": stage1_export_hash,
+                "discovery_manifest_sha256": discovery.sha256,
+                "k_audit_sha256": pipeline_contract.sha256_tree(k_audit),
+                "klean_generation_sha256": pipeline_contract.sha256_tree(
+                    generation
+                ),
+                "generation_producer_sources_sha256": (
+                    producer_sources_hash
+                ),
+                "generated_tree_sha256": generated_hash,
+                "lean_workspace_sha256": (
+                    pipeline_contract.sha256_tree(lean_workspace)
+                    if lean_workspace is not None
+                    else None
+                ),
+                "lean_invocation_sha256": (
+                    pipeline_contract.sha256_tree(lean_invocation)
+                    if lean_invocation is not None
+                    else None
+                ),
+            },
+            "selections": {
+                "k_audit": k_audit_selection,
+                "klean_generation": generation_selection,
+            },
+            "stage4_preflight": preflight,
+            "stage5_result": lean_result,
+        }
+        return _stage6_audit_input(resolved)
+    except klean_export.KleanExportError as error:
+        raise KleanAuditContractError(str(error)) from error
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _execution_directories(executions: Path) -> list[Path]:
+    try:
+        executions = pipeline_contract.require_real_directory(
+            executions, "Stage 6 executions"
+        )
+        children: list[Path] = []
+        for entry in os.scandir(executions):
+            mode = entry.stat(follow_symlinks=False).st_mode
+            path = Path(entry.path)
+            if not stat.S_ISDIR(mode) or not re.fullmatch(
+                r"[0-9]{3}", path.name
+            ):
+                raise KleanAuditContractError(
+                    f"invalid Stage 6 execution entry: {path}"
+                )
+            children.append(path)
+        return sorted(children)
+    except OSError as error:
+        raise KleanAuditContractError(
+            f"cannot scan Stage 6 executions: {error}"
+        ) from error
+    except pipeline_contract.PipelineContractError as error:
+        raise _translate(error) from error
+
+
+def _audit_input_binding(path: Path) -> dict[str, Any]:
+    document = _regular_json(path, "Stage 6 audit input")
+    try:
+        resolution, digest = (
+            stage6_resolution_contract.verify_audit_input(document)
+        )
+    except (
+        stage6_resolution_contract.Stage6ResolutionContractError
+    ) as error:
+        raise KleanFinalGateError(str(error)) from error
+    mode = resolution.get("mode")
+    hashes = resolution.get("hashes")
+    if (
+        mode not in {
+            "CLASSIFICATION_ONLY",
+            "CLASSIFICATION_AND_PROOF",
+        }
+        or not isinstance(hashes, dict)
+    ):
+        raise KleanFinalGateError(
+            "Stage 6 audit input binding is malformed"
+        )
+    return {
+        "resolution": resolution,
+        "resolved_input_sha256": digest,
+    }
+
+
+def _input_hashes(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    candidate: Path | None,
+) -> dict[str, Any]:
+    try:
+        return {
+            "k_workspace_sha256": pipeline_contract.sha256_tree(
+                frozen_input
+            ),
+            "stage1_export_sha256": klean_export.tree_digest(
+                frozen_input
+            ),
+            "discovery_manifest_sha256": (
+                pipeline_contract.sha256_file(discovery_manifest)
+            ),
+            "klean_generation_sha256": (
+                pipeline_contract.sha256_tree(generation)
+            ),
+            "lean_workspace_sha256": (
+                pipeline_contract.sha256_tree(candidate)
+                if candidate is not None
+                else None
+            ),
+        }
+    except (
+        OSError,
+        klean_export.KleanExportError,
+        pipeline_contract.PipelineContractError,
+    ) as error:
+        raise KleanFinalGateError(
+            "cannot hash Stage 6 mechanical inputs"
+        ) from error
+
+
+def _require_bound_inputs(
+    audit_input: dict[str, Any],
+    observed: dict[str, Any],
+) -> None:
+    expected = audit_input["resolution"]["hashes"]
+    for key, digest in observed.items():
+        if expected.get(key) != digest:
+            raise KleanFinalGateError(
+                f"Stage 6 {key} differs from audit input"
+            )
+
+
+def _result_binding(audit_input: Path) -> dict[str, Any]:
+    try:
+        document = _audit_input_binding(Path(audit_input))
+    except KleanFinalGateError:
+        return {}
+
+EXIT_CODE: 0

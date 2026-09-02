@@ -1,0 +1,438 @@
+Script started on 2026-07-31 07:37:10-05:00 [<not executed on terminal>]
+// reference/src/semantics/core.k — MPY-CORE
+
+module MPY-CORE
+  imports MPY-SYNTAX
+  imports INT
+  imports BOOL
+  imports STRING
+  imports MAP
+  imports LIST
+  imports K-EQUAL
+
+  // ==== values, the algebraic lists, and the scope heap =====================
+  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+  syntax Str    ::= str(IntSeq)
+
+  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+  syntax Iterable ::= list(ValSeq)
+                    | tuple(ValSeq)
+                    | Str
+                    | rangeObj(Int, Int, Int)
+                    | zipObj(ValSeq, ValSeq)
+                    | zipObjS(IntSeq, IntSeq)
+
+  syntax Val      ::= Int
+                    | Bool
+                    | "noneV"
+                    | Iterable
+                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+                    | closureVal(ParamNames, Stmts, Int)
+                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+
+  syntax Parent   ::= "root" | parent(Int)
+  syntax Scope    ::= scope(Map, Parent)
+  syntax KResult  ::= Val
+  syntax Expr     ::= Val   // cooling puts results back into expression holes
+  syntax Vals     ::= List{Val, ","}
+  syntax Exc      ::= "NoExc" | "AssertionError"
+  syntax RetState ::= "noRet" | retV(Val)
+
+  // ==== configuration =======================================================
+  // The builtins namespace is a real scope at reserved location -1 (the bottom of every
+  // chain; scopeLoc only allocates >=1, so -1 never collides). The module scope (loc 0)
+  // has it as parent, so an unbound name resolves there last — exactly LEGB. `int`/`str`
+  // resolve to their type objects; any local/global binding shadows them via normal lookup.
+  configuration
+    <k>       #loadAll($PGM:Module) </k>
+    <env>     0 </env>
+    <scopes>   0     |-> scope(.Map, parent(-1))
+              -1    |-> builtinsScope </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap>    .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack>   .List </stack>
+    <ret>     noRet </ret>
+    <exc>     NoExc </exc>
+    <exit-code exit=""> 0 </exit-code>
+
+  // ==== heap allocation (constructed lists become objects) ==================
+  // Cons-form emission with a freshness guard (the heap-list-probe discipline:
+  // an update-form H[N <- _] never re-normalizes symbolically). heapLoc is
+  // monotonic — it does NOT wind back at #pop: returned lists escape by ref.
+  // A bare list(VS) Val stays legal (read-only inputs in claims flow unboxed);
+  // only CONSTRUCTORS in program syntax allocate.
+  syntax Bool ::= isRefV(Val) [function, total]
+  rule isRefV(ref(_:Int)) => true
+  rule isRefV(_:Val)      => false [owise]
+
+  // closure cells (Python-faithful capture): the heap holds cellV(V); a
+  // cellRef surfacing as the k-redex reads through (lookup is the only use —
+  // cellRefs never escape to user-visible values)
+  syntax HeapVal ::= cellV(Val)
+  syntax Bool ::= isCellRef(Val) [function, total]
+  rule isCellRef(cellRef(_:Int)) => true
+  rule isCellRef(_:Val)          => false [owise]
+  // k-top deref for cell-bound reads surfacing INSIDE the annotated frame
+  // (AugAssign's in-place read and friends). The "$cells" guard keeps this
+  // DECIDABLY inapplicable in plain frames — an unguarded rule lets the
+  // prover narrow abstract k-top values into cellRef junk (probed on
+  // 26-remove-duplicates). Cross-frame reads (a comprehension closure
+  // reading the enclosing function's cellvar) deref inside #look instead.
+  rule <k> cellRef(H:Int) => V ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       <heap> ... H |-> cellV(V:Val) ... </heap>
+       requires "$cells" in_keys(M)
+       [priority(40)]
+
+  // write through a cell (Assign / #bindP / #bindTgt dispatch here on
+  // cell-bound names)
+  // a keyword argument cools to a TAGGED value (consumed by kw-aware builtins)
+  syntax Val ::= kwV(String, Val)
+  syntax KItem ::= #kwTag(String)
+  rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>
+  rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k>
+       requires notBool isKwV(V)
+  syntax Bool ::= isKwV(Val) [function, total]
+  rule isKwV(kwV(_:String, _:Val)) => true
+  rule isKwV(_:Val)                => false [owise]
+
+  // the frame marker carries the CONCRETE cellvar list, so cell-write dispatch
+  // decides by pnMember even over an abstract frame rest (no prover branching)
+  syntax Val ::= cellsMark(ParamNames)
+  syntax ParamNames ::= cellsOf(Val) [function]
+  rule cellsOf(cellsMark(CVS:ParamNames)) => CVS
+  syntax Bool ::= pnMember(String, ParamNames) [function, total]
+  rule pnMember(_:String, .ParamNames) => false
+  rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)
+
+  syntax KItem ::= #cellW(Val, Val)
+  rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k>
+       <heap> ... H |-> cellV(_:Val => V) ... </heap>
+
+  syntax KItem ::= #alloc(Val)
+  rule <k> #alloc(V:Val) => ref(N) ... </k>
+       <heap>    H:Map => (N |-> V) H </heap>
+       <heapLoc> N:Int => N +Int 1 </heapLoc>
+  rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>
+  rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>
+
+  // ==== Int / Bool / None literals ==========================================
+  rule <k> Int(I:Int)   => I ... </k>
+  rule <k> Bool(B:Bool) => B ... </k>
+  rule <k> NoneVal      => noneV ... </k>
+
+  // ==== truthy (If, Assert, BoolOp, IfExp, not, While) ======================
+  syntax Bool ::= truthy(Val) [function]
+  rule truthy(B:Bool)          => B
+  rule truthy(noneV)           => false
+  rule truthy(I:Int)           => I =/=Int 0
+  rule truthy(str(S:IntSeq))   => notBool (S ==K .IntSeq)
+  rule truthy(list(V:ValSeq))  => notBool (V ==K .ValSeq)
+  rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)
+
+  // ==== extensible operator dispatch (cases added by the construct modules) ==
+  syntax Val  ::= applyUn(String, Val) [function]
+  syntax Val  ::= applyBin(String, Val, Val) [function]
+  syntax Bool ::= applyCmp(String, Val, Val) [function]
+
+  // ==== shared list helpers =================================================
+  syntax Vals ::= appendVal(Vals, Val) [function, total]
+  rule appendVal(.Vals, V:Val)              => V , .Vals
+  rule appendVal((V0:Val, VS:Vals), V:Val)  => V0 , appendVal(VS, V)
+
+  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+  rule vals2valSeq(.Vals)            => .ValSeq
+  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+
+  // ==== shared sequence length (len / summaries across many modules) ========
+  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+  syntax Int ::= vsLen(ValSeq) [function, total]
+  rule vsLen(.ValSeq)                => 0
+  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+
+  syntax Int ::= isLen(IntSeq) [function, total]
+  rule isLen(.IntSeq)                => 0
+  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+
+  // in-bounds positional write (list subscript-assign); OOB leaves the seq unchanged
+  // (valid programs write in-bounds — mirrors valSeqAt's total-but-underspecified stance)
+  syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]
+  rule setVSAt(.ValSeq, _:Int, _:Val)               => .ValSeq
+  rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val)    => vCons(V, S)
+  rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V))
+       requires I >Int 0
+  rule setVSAt(VS:ValSeq, I:Int, _:Val)             => VS
+       requires I <Int 0
+endmodule
+// reference/src/semantics/sort.k — MPY-SORT
+// Trusted sorted(): sorted(list) as an opaque ascending permutation `sortVS` — opaque symbolic
+// for kprove (a trusted primitive, correctness/ordering proved in Lean / notes/sort-probe),
+// and a concrete insertion sort for krun. Wrappers verify the logic AROUND the sort (index /
+// slice / filter / dedup); indexing an opaque sortVS(VS) carries through as an opaque term, so
+// no ordering lemma is needed in K — the trust (sortVS = real sorted) is discharged by each
+// problem's differential test. Only int lists (compared by projectIntTotal); keyed / string
+// sorts are separate. Fires only via the "sorted" builtin, so inert for non-sorting programs.
+
+module MPY-SORT
+  imports MPY-BUILTINS
+  imports MPY-SUBSCRIPT
+
+  // sortVS(VS): the ascending sort of the Val list VS. Opaque for symbolic VS (no-evaluators);
+  // concrete insertion sort for krun.
+  // Concrete sort matches Int-sorted elements directly (an int Val IS an Int); projectIntTotal
+  // (lemmas-only) is not available in the semantics. Int and str lists.
+  syntax ValSeq ::= sortVS(ValSeq) [function, total, symbol(sortVS), no-evaluators]
+  syntax ValSeq ::= insVS(Int, ValSeq) [function]
+  rule sortVS(.ValSeq)                => .ValSeq          [concrete]
+  rule sortVS(vCons(X:Int, R:ValSeq)) => insVS(X, sortVS(R)) [concrete]
+  rule insVS(X:Int, .ValSeq)                => vCons(X, .ValSeq) [concrete]
+  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]
+  rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X  >Int Y [concrete]
+  // str elements insert by the shared lexicographic strLt (methods.k)
+  syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]
+  rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]
+  rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]
+  rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(A), vCons(str(B), R))
+       requires strLt(A, B) orBool A ==K B [concrete]
+  rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(B), insVSs(A, R))
+       requires notBool (strLt(A, B) orBool A ==K B) [concrete]
+
+  // sorted(list) constructs a NEW object: k-cell pre-dispatch (beats the [owise]
+  // applyBuiltin routing in call.k) so the result allocates.
+  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), .Vals))
+        => #alloc(list(sortVS(VS))) ... </k>
+
+  // mutator: xs.sort() — the in-place heap write over the same trusted sortVS
+  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "sort")), .Vals) => noneV ... </k>
+       <heap> ... H |-> list(VS:ValSeq => sortVS(VS)) ... </heap>
+       [priority(40)]
+
+  // ==== keyed / reversed sorted() (WP2) =====================================
+  // sortKeyVS(VS, KV): the stable ascending sort of VS by the key value KV
+  // (a closure/builtin/type — anything callable). OPAQUE here; the concrete
+  // leg (MPY-CONCRETE, llvm only) computes keys by REAL calls and stable-
+  // inserts, at priority(40) over these.
+  syntax ValSeq ::= sortKeyVS(ValSeq, Val) [function, total, symbol(sortKeyVS), no-evaluators]
+
+  syntax ValSeq ::= revVS(ValSeq) [function, total]
+                  | revVSAcc(ValSeq, ValSeq) [function, total]
+  rule revVS(S:ValSeq) => revVSAcc(S, .ValSeq)
+  rule revVSAcc(.ValSeq, A:ValSeq) => A
+  rule revVSAcc(vCons(V:Val, R:ValSeq), A:ValSeq) => revVSAcc(R, vCons(V, A))
+
+  syntax ValSeq ::= condRev(ValSeq, Bool) [function, total]
+  rule condRev(S:ValSeq, false) => S
+  rule condRev(S:ValSeq, true)  => revVS(S)
+
+  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals))
+        => #alloc(list(sortKeyVS(VS, KV))) ... </k>
+  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals))
+        => #alloc(list(condRev(sortKeyVS(VS, KV), RB))) ... </k>
+  rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("reverse", RB:Bool), .Vals))
+        => #alloc(list(condRev(sortVS(VS), RB))) ... </k>
+
+  // Indexing the opaque sorted list: `valSeqAt(sortVS(VS), I)` is DEFINED because valSeqAt is
+  // [total] (subscript.k) — it stays an abstract total value for a symbolic sort and reduces
+  // over the concrete sort for krun. No separate sortedAt indirection is needed; wrappers write
+  // their postcondition directly as valSeqAt(sortVS(VS), …).
+endmodule
+// reference/src/semantics/subscript.k — MPY-SUBSCRIPT
+
+module MPY-SUBSCRIPT
+  imports MPY-CORE
+
+  // ==== positional access + negative-index normalization (used only here) ===
+  // valSeqAt is [total]: in-bounds vCons access reduces as usual; on an OPAQUE sequence (e.g.
+  // a trusted sort's sortVS(VS)) or OOB it stays an abstract total value — so indexing the
+  // opaque sorted list is DEFINED (no undischarged #Ceil), matching the old semantics' total
+  // atK. K trusts the [total] annotation; valid programs index in-bounds.
+  syntax Val ::= valSeqAt(ValSeq, Int) [function, total]
+  rule valSeqAt(vCons(V:Val, _:ValSeq), 0)     => V
+  rule valSeqAt(vCons(_:Val, S:ValSeq), I:Int) => valSeqAt(S, I -Int 1)
+       requires I >Int 0
+
+  syntax Int ::= intSeqAt(IntSeq, Int) [function]
+  rule intSeqAt(iCons(C:Int, _:IntSeq), 0)     => C
+  rule intSeqAt(iCons(_:Int, S:IntSeq), I:Int) => intSeqAt(S, I -Int 1)
+       requires I >Int 0
+
+  syntax Int ::= normIdx(Int, Int) [function, total]
+  rule normIdx(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0
+  rule normIdx(I:Int, _:Int)   => I          requires I >=Int 0
+
+  // ==== Subscript: indexing obj[i] (list / tuple / str) =====================
+  // contexts (not strict attrs): the Index slot's Slice alternative must never heat
+  context Subscript(HOLE, _)
+  context Subscript(_:Val, HOLE:Expr)
+
+  // heap-object deref (covers both the index and slice forms via the Index slot)
+  rule <k> Subscript(ref(H:Int), IX:Index) => Subscript(V, IX) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+
+  rule <k> Subscript(OBJ:Val, I:Int) => applyIndex(OBJ, I) ... </k>
+
+  syntax Val ::= applyIndex(Val, Int) [function]
+  rule applyIndex(list(VS:ValSeq),  I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+  rule applyIndex(tuple(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+  rule applyIndex(str(IS:IntSeq),   I:Int)
+    => str(iCons(intSeqAt(IS, normIdx(I, isLen(IS))), .IntSeq))
+
+  // ==== Slice: obj[lo:hi:step] (list / str) — CPython slice.indices ==========
+  syntax KItem ::= #evalB(Bound) | "#toSome"
+                 | #slLo(Val, Bound, Bound)
+                 | #slHi(Val, OptInt, Bound)
+                 | #slStep(Val, OptInt, OptInt)
+
+  syntax OptInt ::= "noB" | someB(Int)
+  rule <k> #evalB(NoBound)  => noB ... </k>
+  rule <k> #evalB(E:Expr)   => E ~> #toSome ... </k>
+  rule <k> I:Int ~> #toSome => someB(I) ... </k>
+// reference/src/semantics/int.k — MPY-INT
+// Int cases of the operator dispatch; Python // and % are floored (pyMod).
+
+module MPY-INT
+  imports MPY-CORE
+
+  rule applyUn("-", I:Int) => 0 -Int I
+
+  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+  // Bool participates in int arithmetic (x += (a == b))
+  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+
+  syntax Int ::= pyMod(Int, Int) [function]
+  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+
+  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+endmodule
+// reference/src/semantics/bool.k — MPY-BOOL
+// Bool operator cases + the truthy boolean operations (not / and / or; and-or are
+// value-returning short-circuit over any Vals, per Python).
+
+module MPY-BOOL
+  imports MPY-CORE
+
+  rule applyUn("not", V:Val) => notBool truthy(V)
+
+  rule applyCmp("==", B1:Bool, B2:Bool) => B1 ==Bool B2
+  rule applyCmp("!=", B1:Bool, B2:Bool) => B1 =/=Bool B2
+
+  // ==== BoolOp: short-circuit, value-returning and / or =====================
+  // the node is its own accumulator: heat the HEAD element only, then either return it
+  // (short-circuit) or drop it and continue
+  context BoolOp(_, (HOLE:Expr, _:Exprs))
+  rule <k> BoolOp(_:String, (V:Val, .Exprs)) => V ... </k>
+  rule <k> BoolOp("and", (V:Val, A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>
+       requires truthy(V)
+  rule <k> BoolOp("and", (V:Val, _:Expr, _:Exprs)) => V ... </k>
+       requires notBool truthy(V)
+  rule <k> BoolOp("or",  (V:Val, _:Expr, _:Exprs)) => V ... </k>
+       requires truthy(V)
+  rule <k> BoolOp("or",  (V:Val, A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>
+       requires notBool truthy(V)
+
+  // ==== heap-object head: decide truthiness THROUGH the heap, never rewrite the
+  // operand — and/or return the OBJECT itself (Python identity), not its structure
+  rule <k> BoolOp(_:String, (ref(H:Int), .Exprs)) => ref(H) ... </k>
+       [priority(40)]
+  rule <k> BoolOp("and", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires truthy(V)
+       [priority(40)]
+  rule <k> BoolOp("and", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool truthy(V)
+       [priority(40)]
+  rule <k> BoolOp("or", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires truthy(V)
+       [priority(40)]
+  rule <k> BoolOp("or", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool truthy(V)
+       [priority(40)]
+endmodule
+
+  // ==== Expr statement: evaluate for effect, discard the value ===============
+  // (bare calls — mutator methods, docstrings; the WP0 statement-trivia rung)
+  rule <k> Expr(_:Val) => .K ... </k>
+
+  // ==== If (condition evaluated by strictness) ==============================
+  syntax KItem ::= #branch(Bool, Stmts, Stmts)
+  rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>
+  rule <k> #branch(true,  T:Stmts, _:Stmts) => T ... </k>
+  rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>
+
+  // ==== IfExp: ternary T if C else E ========================================
+  rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k>
+       requires truthy(V)
+  rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k>
+       requires notBool truthy(V)
+
+  // ==== For: one loop, in-cell continuation, over #iterNext =================
+  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+  // circularities anchor on #loop and narrowing substitutes the structure)
+  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+                 | #loopLbl(K) | "#cont" | "#brk"
+
+  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+
+  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+
+  // ==== While ==============================================================
+  rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>
+  rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>
+  rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k>
+       requires truthy(V)
+  rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k>
+       requires notBool truthy(V)
+
+  // ==== loop control (break / continue) =====================================
+  rule <k> #loopLbl(NEXT:K) => NEXT ... </k>
+  rule <k> Continue => #cont ... </k>
+  rule <k> Break => #brk ... </k>
+  rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>
+  rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]
+  rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>
+  rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]
+
+  // ==== heap-object deref at the truthiness/iteration consumers ==============
+  // (priority(40) preempts the generic Val rules so truthy/#loop never see a ref)
+  rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  // For derefs its iterable ONCE at loop start (iteration is over the snapshot;
+  // mutating the iterated list inside its own loop is outside the subset)
+  rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+endmodule
+
+Script done on 2026-07-31 07:37:10-05:00 [COMMAND_EXIT_CODE="0"]

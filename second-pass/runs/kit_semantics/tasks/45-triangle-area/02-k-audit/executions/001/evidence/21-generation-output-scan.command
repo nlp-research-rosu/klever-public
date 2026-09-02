@@ -1,0 +1,1 @@
+wc -l -c /generation-evidence/codex-output.log && sha256sum /generation-evidence/codex-output.log && rg -n "^exec$|^apply_patch$|^ succeeded|^ exited|#Top|WarnStuckClaimState|\\[Error\\]|EXPECTED FAILURE|RESULT:|tokens used" /generation-evidence/codex-output.log

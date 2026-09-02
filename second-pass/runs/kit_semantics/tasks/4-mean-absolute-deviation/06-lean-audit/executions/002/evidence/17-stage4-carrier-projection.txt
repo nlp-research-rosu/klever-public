@@ -1,0 +1,169 @@
+Stage 4 carrier-projection audit
+================================
+
+Frozen K source command
+-----------------------
+
+$ nl -ba /reference/k-proof/reference-semantics/semantics/core.k | sed -n '12,35p'
+    12  // ==== values, the algebraic lists, and the scope heap =====================
+    13  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+    14  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+    15  syntax Str    ::= str(IntSeq)
+    16
+    17  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+    18  syntax Iterable ::= list(ValSeq)
+    19                    | tuple(ValSeq)
+    20                    | Str
+    21                    | rangeObj(Int, Int, Int)
+    22                    | zipObj(ValSeq, ValSeq)
+    23                    | zipObjS(IntSeq, IntSeq)
+    24
+    25  syntax Val      ::= Int
+    26                    | Bool
+    27                    | "noneV"
+    28                    | Iterable
+    29                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+    30                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+    31                    | closureVal(ParamNames, Stmts, Int)
+    32                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+    33                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+    34                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+
+The frozen semantics therefore contains the constructor/subsort path
+str(IntSeq) : Str < Iterable < Val.
+
+Frozen compiled-definition query
+--------------------------------
+
+$ PYTHONPATH=/reference python - <<'PY'
+from pathlib import Path
+from pyk.klean.__main__ import _load_defn
+d = _load_defn(Path('/reference/k-proof/verification-kompiled'))
+for sort in ('SortVal','SortIterable','SortStr'):
+    print(sort)
+    print('  constructors:', *d.constructors.get(sort, ()), sep='\n    ')
+    print('  subsorts:', sorted(d.subsorts.get(sort, ())))
+PY
+SortVal
+  constructors:
+    LblboundMethodV'LParUndsCommUndsRParUnds'MPY-CORE'Unds'Val'Unds'Val'Unds'String
+    LblbuiltinV'LParUndsRParUnds'MPY-CORE'Unds'Val'Unds'String
+    LblcellRef'LParUndsRParUnds'MPY-CORE'Unds'Val'Unds'Int
+    LblcellsMark'LParUndsRParUnds'MPY-CORE'Unds'Val'Unds'ParamNames
+    LblclosureVal'LParUndsCommUndsCommUndsRParUnds'MPY-CORE'Unds'Val'Unds'ParamNames'Unds'Stmts'Unds'Int
+    LblclosureValC'LParUndsCommUndsCommUndsCommUndsRParUnds'MPY-FUNCTIONS'Unds'Val'Unds'ParamNames'Unds'ParamNames'Unds'Stmts'Unds'Map
+    LbldictV'LParUndsCommUndsRParUnds'MPY-DICT'Unds'Val'Unds'ValSeq'Unds'ValSeq
+    LblkwV'LParUndsCommUndsRParUnds'MPY-CORE'Unds'Val'Unds'String'Unds'Val
+    Lblmd5Obj'LParUndsRParUnds'MPY-BUILTINS'Unds'Val'Unds'IntSeq
+    LblnoneV'Unds'MPY-CORE'Unds'Val
+    Lblref'LParUndsRParUnds'MPY-CORE'Unds'Val'Unds'Int
+    LblsetV'LParUndsRParUnds'MPY-SET'Unds'Val'Unds'IntSeq
+    LbltypeV'LParUndsRParUnds'MPY-CORE'Unds'Val'Unds'String
+  subsorts: ['SortBool', 'SortFloat', 'SortInt', 'SortIterable', 'SortStr']
+SortIterable
+  constructors:
+    Lbllist'LParUndsRParUnds'MPY-CORE'Unds'Iterable'Unds'ValSeq
+    LblrangeObj'LParUndsCommUndsCommUndsRParUnds'MPY-CORE'Unds'Iterable'Unds'Int'Unds'Int'Unds'Int
+    Lbltuple'LParUndsRParUnds'MPY-CORE'Unds'Iterable'Unds'ValSeq
+    LblzipObj'LParUndsCommUndsRParUnds'MPY-CORE'Unds'Iterable'Unds'ValSeq'Unds'ValSeq
+    LblzipObjS'LParUndsCommUndsRParUnds'MPY-CORE'Unds'Iterable'Unds'IntSeq'Unds'IntSeq
+  subsorts: ['SortStr']
+SortStr
+  constructors:
+    Lblstr'LParUndsRParUnds'MPY-CORE'Unds'Str'Unds'IntSeq
+  subsorts: []
+
+Exact generation-time projection reconstruction
+-----------------------------------------------
+
+The exporter staging functions were applied to the frozen workspace and
+protected discovery manifest, and the resulting export.k was compiled with:
+
+$ kompile /tmp/audit-work/stage4-projection/export.k --backend haskell \
+    --main-module VERIFICATION-KLEAN-EXPORT --syntax-module MPY-SYNTAX \
+    --output-definition /tmp/audit-work/stage4-projection/kompiled
+[exit 0; four unused-variable warnings in semantics/str.k]
+
+The generation-time producer was then applied through its dependency and
+projection functions, including the actual `-r kxExport` rewrite selection:
+
+$ PYTHONPATH=/reference python - <<'PY'
+import importlib.util
+from pathlib import Path
+from pyk.klean.__main__ import _load_defn
+spec = importlib.util.spec_from_file_location(
+    'klean_old', '/reference/generation-tools/klean.py'
+)
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+definition_dir = Path('/tmp/audit-work/stage4-projection/kompiled')
+inventory = Path('/tmp/audit-work/stage4-projection/source-rule-inventory.json')
+summary = ('allFloatVS', 'projectFloat', 'sumFloatVS',
+           'deviationFloatVS', 'madResult')
+d = _load_defn(definition_dir)
+symbols, sorts, uids, needs = m._trust_lemma_dependencies(
+    definition_dir, summary, 'verification.k', inventory
+)
+if needs:
+    d = d.let(rewrites=tuple(r for r in d.rewrites if r.uid not in uids))
+else:
+    d = d.let(rewrites=tuple(
+        r for r in d.rewrites if r.label and 'kxExport' in r.label
+    ))
+p = m._widen_projection(d, symbols, sorts)
+str_symbol = "Lblstr'LParUndsRParUnds'MPY-CORE'Unds'Str'Unds'IntSeq"
+print('generation-time')
+print('  needs operational rewrites:', needs)
+print('  selected kxExport rewrites:', len(d.rewrites))
+print('  SortStr retained:', 'SortStr' in p.sorts)
+print('  str constructor symbol retained:', str_symbol in p.symbols)
+print('  SortVal subsorts:', sorted(p.subsorts.get('SortVal', ())))
+print('  SortIterable subsorts:', sorted(p.subsorts.get('SortIterable', ())))
+print('  projected symbols:', len(p.symbols), 'sorts:', len(p.sorts))
+PY
+generation-time
+  needs operational rewrites: False
+  selected kxExport rewrites: 5
+  SortStr retained: False
+  str constructor symbol retained: False
+  SortVal subsorts: ['SortBool', 'SortFloat', 'SortInt', 'SortIterable']
+  SortIterable subsorts: []
+  projected symbols: 219 sorts: 43
+
+Selected generated Lean output
+------------------------------
+
+$ sed -n '318,337p' /reference/klean-generation/generated/Klean4MeanAbsoluteDeviation/Sorts.lean
+  inductive SortVal : Type where
+    | inj_SortBool (x : SortBool) : SortVal
+    | inj_SortFloat (x : SortFloat) : SortVal
+    | inj_SortInt (x : SortInt) : SortVal
+    | inj_SortIterable (x : SortIterable) : SortVal
+    | «boundMethodV(_,_)_MPY-CORE_Val_Val_String» (x0 : SortVal) (x1 : SortString) : SortVal
+    | «builtinV(_)_MPY-CORE_Val_String» (x0 : SortString) : SortVal
+    | «cellRef(_)_MPY-CORE_Val_Int» (x0 : SortInt) : SortVal
+    | «cellsMark(_)_MPY-CORE_Val_ParamNames» (x0 : SortParamNames) : SortVal
+    | «closureVal(_,_,_)_MPY-CORE_Val_ParamNames_Stmts_Int» (x0 : SortParamNames) (x1 : SortStmts) (x2 : SortInt) : SortVal
+    | «closureValC(_,_,_,_)_MPY-FUNCTIONS_Val_ParamNames_ParamNames_Stmts_Map» (x0 : SortParamNames) (x1 : SortParamNames) (x2 : SortStmts) (x3 : SortMap) : SortVal
+    | «dictV(_,_)_MPY-DICT_Val_ValSeq_ValSeq» (x0 : SortValSeq) (x1 : SortValSeq) : SortVal
+    | «kwV(_,_)_MPY-CORE_Val_String_Val» (x0 : SortString) (x1 : SortVal) : SortVal
+    | «md5Obj(_)_MPY-BUILTINS_Val_IntSeq» (x0 : SortIntSeq) : SortVal
+    | «noneV_MPY-CORE_Val» : SortVal
+    | «ref(_)_MPY-CORE_Val_Int» (x0 : SortInt) : SortVal
+    | «setV(_)_MPY-SET_Val_IntSeq» (x0 : SortIntSeq) : SortVal
+    | «typeV(_)_MPY-CORE_Val_String» (x0 : SortString) : SortVal
+
+There is no generated SortStr, no `str(IntSeq)` constructor, no
+`Inj SortStr SortIterable`, and no `Inj SortStr SortVal`.
+
+The immutable target nevertheless claims to translate a universal frozen rule:
+
+$ nl -ba /reference/klean-generation/generated/Klean4MeanAbsoluteDeviation/Lemmas.lean | sed -n '17,19p'
+    17      (∀ (V : SortVal), ((«project:Float?» (SortK.kseq ((@inj SortVal SortKItem) V) SortK.dotk)).isSome = true) ↔ (((isFloat (SortK.kseq ((@inj SortVal SortKItem) V) SortK.dotk) : SortBool) = (true : SortBool)) ∧ (True)))
+    18      ∧ (∀ (V : SortVal) (A : SortFloat) (h : (isFloat (SortK.kseq ((@inj SortVal SortKItem) V) SortK.dotk)) = true), («applyBin(_,_,_)_MPY-CORE_Val_String_Val_Val» "+" (SortVal.inj_SortFloat A) V : SortVal) = (SortVal.inj_SortFloat (addF A (projectFloat V)) : SortVal))
+    19      ∧ (∀ (M : SortFloat) (V : SortVal) (h : (isFloat (SortK.kseq ((@inj SortVal SortKItem) V) SortK.dotk)) = true), («applyBin(_,_,_)_MPY-CORE_Val_String_Val_Val» "-" V (SortVal.inj_SortFloat M) : SortVal) = (SortVal.inj_SortFloat (subF (projectFloat V) M) : SortVal))
+
+Conclusion: the generated SortVal is a strict subset of the frozen K Val
+carrier. In particular, the frozen value `str(.IntSeq)` has no generated Lean
+representation. The first universal domain lemma (and syntactically the other
+two) is therefore weakened by carrier restriction before theorem emission.

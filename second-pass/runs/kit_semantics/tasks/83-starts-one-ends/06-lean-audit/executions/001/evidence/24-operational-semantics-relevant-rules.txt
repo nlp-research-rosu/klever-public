@@ -1,0 +1,206 @@
+Script started on 2026-07-31 06:56:49-05:00 [<not executed on terminal>]
+/reference/k-proof/reference-semantics/semantics/int.k
+6-
+7-  rule applyUn("-", I:Int) => 0 -Int I
+8-
+9:  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+10-  // Bool participates in int arithmetic (x += (a == b))
+11:  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+12:  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+13:  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+14:  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+15:  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+16:  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+17:  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+18-
+19-  syntax Int ::= pyMod(Int, Int) [function]
+20-  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+21-
+22:  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+23:  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+24:  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+25:  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+26:  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+27:  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+28-endmodule
+
+/reference/k-proof/reference-semantics/semantics/functions.k
+45-       <scopes> ... L |-> scope(M:Map => M [ F <- closureValC(PNS, CVS, BODY, CM) ], _) ... </scopes>
+46-
+47-  rule <k> Lambda(Params(PNS:ParamNames), E:Expr)
+48:        => closureVal(PNS, Return(E) .Stmts, L) ... </k>
+49-       <env> L:Int </env>
+50-  rule <k> Lambda(Params(PNS:ParamNames), CellVars(CVS:ParamNames),
+51-                  FreeVars(FVS:ParamNames), E:Expr)
+52:        => #mkLambda(PNS, CVS, FVS, Return(E) .Stmts, .Map) ... </k>
+53-  rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames,
+54-                     (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map)
+55-        => #mkLambda(PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k>
+--
+75-       [priority(40)]
+76-
+77-  // ==== return / pop the frame (the returned expr evaluates by strictness) ==
+78:  rule <k> Return(V:Val) ~> _ => #pop </k>
+79-       <ret> noRet => retV(V) </ret>
+80-  rule <k> #endcall => #pop ... </k>
+81-       <ret> noRet => retV(noneV) </ret>
+
+/reference/k-proof/reference-semantics/semantics/operators.k
+1-// reference/src/semantics/operators.k — MPY-OPERATORS
+2-// The operator DISPATCH layer: operands evaluate by strictness (heat/cool over KResult=Val),
+3:// the cooled node hands to applyUn/applyBin/applyCmp (declared in core.k; each domain file
+4-// owns its cases — bool.k, int.k, float.k, str.k, list.k, tuple.k, set.k, dict.k).
+5-
+6-module MPY-OPERATORS
+--
+9-
+10-  rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>
+11-
+12:  rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+13-
+14-  // Compare's right operand sits under the CmpOp wrapper — contexts instead of attributes
+15:  context Compare(HOLE, _)
+16:  context Compare(_:Val, CmpOp(_, HOLE))
+17:  rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]
+18-
+19:  rule applyCmp("is",     V:Val, noneV) => V ==K noneV
+20:  rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)
+21-
+22-  // ==== operand deref: heap objects combine/compare by STRUCTURE ============
+23-  // (Python: list == is structural; identity only via `is`.) priority(40)
+24:  // preempts the generic dispatch so applyUn/applyBin/applyCmp never see a ref.
+25:  rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k>
+26-       <heap> ... H |-> V:Val ... </heap>
+27-       [priority(40)]
+28:  rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k>
+29-       <heap> ... H |-> V:Val ... </heap>
+30-       requires notBool isRefV(L)
+31-       [priority(40)]
+32-
+33-  // the left operand of `in`/`not in` is an ELEMENT (compares by ==K) — never deref'd
+34:  rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k>
+35-       <heap> ... H |-> V:Val ... </heap>
+36-       requires OP =/=String "in" andBool OP =/=String "not in"
+37-       [priority(40)]
+38:  rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k>
+39-       <heap> ... H |-> V:Val ... </heap>
+40-       requires notBool isRefV(L)
+41-        orBool OP ==String "in" orBool OP ==String "not in"
+
+/reference/k-proof/reference-semantics/semantics/core.k
+182-
+183-  // ==== argument/element evaluation: ONE left-to-right loop, tagged by destination ==
+184-  // (list/tuple literals and calls all use it; modules extend ApplyK with their tags)
+185:  syntax ApplyK ::= toCall(Val)
+186-  syntax KItem  ::= #evalArgs(Exprs, Vals, ApplyK)
+187-                  | #evalArgCont(Exprs, Vals, ApplyK)
+188-                  | #applyK(ApplyK, Vals)
+--
+206-
+207-  // ==== extensible operator dispatch (cases added by the construct modules) ==
+208-  syntax Val  ::= applyUn(String, Val) [function]
+209:  syntax Val  ::= applyBin(String, Val, Val) [function]
+210:  syntax Bool ::= applyCmp(String, Val, Val) [function]
+211-
+212-  // ==== shared list helpers =================================================
+213-  syntax Vals ::= appendVal(Vals, Val) [function, total]
+
+/reference/k-proof/reference-semantics/semantics/controls.k
+19-
+20-  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k>
+21-       <env> L:Int </env>
+22:       <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes>
+23-       requires X in_keys(M)
+24:  // `lst += [..]` where lst is a heap ref: the generic rule leaves applyBin(OP, ref, V) — but the
+25:  // ref-deref preemption is BinOp-level (operators.k), so applyBin never derefs and it sticks. Route
+26-  // the ref case through BinOp so the deref + list-concat + #alloc path fires (result is a fresh ref).
+27:  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k>
+28-       <env> L:Int </env>
+29-       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+30-       requires X in_keys(M) andBool isRefV({M[X]}:>Val)
+--
+54-  rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>
+55-
+56-  // ==== IfExp: ternary T if C else E ========================================
+57:  rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k>
+58-       requires truthy(V)
+59:  rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k>
+60-       requires notBool truthy(V)
+61-
+62-  // ==== For: one loop, in-cell continuation, over #iterNext =================
+--
+95-  rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k>
+96-       <heap> ... H |-> V:Val ... </heap>
+97-       [priority(40)]
+98:  rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k>
+99-       <heap> ... H |-> V:Val ... </heap>
+100-       [priority(40)]
+101-  rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k>
+
+/reference/k-proof/reference-semantics/semantics/call.k
+17-
+18-  // evaluate callee, then args ([owise]: problem-local Call interceptions beat this)
+19-  syntax KItem ::= #callee(Exprs)
+20:  rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]
+21:  rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>
+22-
+23-  // ==== dispatch on the callee value ========================================
+24:  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>
+25-
+26:  rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>
+27:  rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ)    ... </k>
+28:  rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ)    ... </k>
+29:  rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ)   ... </k>
+30:  rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ)   ... </k>
+31:  rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]
+32:  rule <k> #applyK(toCall(typeV(T:String)),     ACC:Vals) => applyBuiltin(T, ACC)  ... </k>
+33-
+34-  // ==== heap-object arguments/receivers =====================================
+35-  // Builtins and type calls READ structure — deref the first two arg positions
+36-  // (covers len/sum/all/any/max/min/sorted/list/set + zip's pair). Mutating list
+37-  // methods take the ref itself; every other method receiver is deref'd.
+38:  rule <k> #applyK(toCall(builtinV(BN:String)), (ref(H:Int), REST:Vals))
+39:        => #applyK(toCall(builtinV(BN)), (V, REST)) ... </k>
+40-       <heap> ... H |-> V:Val ... </heap>
+41-       [priority(40)]
+42:  rule <k> #applyK(toCall(builtinV(BN:String)), (A:Val, ref(H:Int), REST:Vals))
+43:        => #applyK(toCall(builtinV(BN)), (A, V, REST)) ... </k>
+44-       <heap> ... H |-> V:Val ... </heap>
+45-       requires notBool isRefV(A)
+46-       [priority(40)]
+47:  rule <k> #applyK(toCall(typeV(T:String)), (ref(H:Int), REST:Vals))
+48:        => #applyK(toCall(typeV(T)), (V, REST)) ... </k>
+49-       <heap> ... H |-> V:Val ... </heap>
+50-       [priority(40)]
+51-
+--
+53-  rule isMutMethod(M:String)
+54-    => M ==String "append" orBool M ==String "sort" orBool M ==String "extend"
+55-       orBool M ==String "insert" orBool M ==String "pop" orBool M ==String "remove"
+56:  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), M:String)), ACC:Vals)
+57:        => #applyK(toCall(boundMethodV(V, M)), ACC) ... </k>
+58-       <heap> ... H |-> V:Val ... </heap>
+59-       requires notBool isMutMethod(M)
+60-       [priority(40)]
+61-  // non-mutating methods READ their heap-object arguments too (join's list);
+62-  // mutators keep refs (append of a list into a list-of-lists stays aliased)
+63:  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), (ref(H:Int), REST:Vals))
+64:        => #applyK(toCall(boundMethodV(OBJ, M)), (V, REST)) ... </k>
+65-       <heap> ... H |-> V:Val ... </heap>
+66-       requires notBool isMutMethod(M) andBool notBool isRefV(OBJ)
+67-       [priority(40)]
+68-
+69:  rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT
+70-        => #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+71-       <env>     CALLERL:Int => NEWL </env>
+72-       <scopes>   STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes>
+--
+77-  // parent is the module scope (all enclosing-local reads go through cells),
+78-  // and the cellvars' fresh cells allocate before params bind (a cellvar param
+79-  // then writes through its cell in #bindP).
+80:  rule <k> #applyK(toCall(closureValC(PNS:ParamNames, CVS:ParamNames, BODY:Stmts, CM:Map)), ACC:Vals) ~> CONT
+81-        => #allocCells(CVS) ~> #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+82-       <env>     CALLERL:Int => NEWL </env>
+83-       <scopes>   STORE:Map => STORE [ NEWL <- scope(CM [ "$cells" <- cellsMark(CVS) ], parent(0)) ] </scopes>
+
+Script done on 2026-07-31 06:56:49-05:00 [COMMAND_EXIT_CODE="0"]

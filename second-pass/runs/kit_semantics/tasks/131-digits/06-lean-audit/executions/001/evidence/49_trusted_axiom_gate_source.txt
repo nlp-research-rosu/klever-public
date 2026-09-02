@@ -1,0 +1,201 @@
+Script started on 2026-07-31 02:36:42-05:00 [<not executed on terminal>]
+/reference/tools/klean_audit_contract.py
+455:                    generation / "trust-inventory.json",
+
+/reference/tools/klean_preflight.py
+34:    "trust-inventory.json",
+423:        generation / "trust-inventory.json", "trust inventory"
+545:            "generated axiom/opaque declarations differ from trust allowlist"
+553:            "trust-inventory.json"
+
+/reference/tools/klean_final_gate.py
+132:def _allowed_axioms(inventory: dict[str, Any]) -> set[str]:
+136:    names = {"Classical.choice", "propext", "Quot.sound"}
+153:        raise KleanFinalGateError("#print axioms output is missing or ambiguous")
+170:                    "#print axioms output contains an empty axiom name"
+181:    raise KleanFinalGateError("#print axioms output has no closing bracket")
+204:        generation / "trust-inventory.json", "trust inventory"
+222:            "#print axioms final\n\n"
+259:    if "sorryAx" in used_axioms:
+260:        raise KleanFinalGateError("Proof.final depends on forbidden sorryAx")
+261:    allowed = _allowed_axioms(inventory)
+263:        axiom for axiom in used_axioms if axiom not in allowed
+#!/usr/bin/env python3
+"""Model-free acceptance check for one Stage 5 Lean proof candidate."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from tools import klean_final_gate
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--generation", required=True, type=Path)
+    parser.add_argument("--candidate", required=True, type=Path)
+    arguments = parser.parse_args(argv)
+    gate = subprocess.run(
+        ["/usr/local/bin/assert-frozen-toolchain", "agent"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    if gate.returncode != 0:
+        result = {
+            "status": "AUDIT_ERROR",
+            "error": "frozen toolchain gate failed",
+            "toolchain_output_tail": gate.stdout[-4000:],
+        }
+    else:
+        result = klean_final_gate.evaluate_proof_candidate(
+            arguments.generation, arguments.candidate
+        )
+        result["toolchain_gate"] = "PASS"
+    print(json.dumps(result, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+    document = _regular_json(path, "Stage 6 audit input")
+    try:
+        resolution, digest = (
+            stage6_resolution_contract.verify_audit_input(document)
+        )
+    except (
+        stage6_resolution_contract.Stage6ResolutionContractError
+    ) as error:
+        raise KleanFinalGateError(str(error)) from error
+    mode = resolution.get("mode")
+    hashes = resolution.get("hashes")
+    if (
+        mode not in {
+            "CLASSIFICATION_ONLY",
+            "CLASSIFICATION_AND_PROOF",
+        }
+        or not isinstance(hashes, dict)
+    ):
+        raise KleanFinalGateError(
+            "Stage 6 audit input binding is malformed"
+        )
+    return {
+        "resolution": resolution,
+        "resolved_input_sha256": digest,
+    }
+
+
+def _input_hashes(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    candidate: Path | None,
+) -> dict[str, Any]:
+    try:
+        return {
+            "k_workspace_sha256": pipeline_contract.sha256_tree(
+                frozen_input
+            ),
+            "stage1_export_sha256": klean_export.tree_digest(
+                frozen_input
+            ),
+            "discovery_manifest_sha256": (
+                pipeline_contract.sha256_file(discovery_manifest)
+            ),
+            "klean_generation_sha256": (
+                pipeline_contract.sha256_tree(generation)
+            ),
+            "lean_workspace_sha256": (
+                pipeline_contract.sha256_tree(candidate)
+                if candidate is not None
+                else None
+            ),
+        }
+    except (
+        OSError,
+        klean_export.KleanExportError,
+        pipeline_contract.PipelineContractError,
+    ) as error:
+        raise KleanFinalGateError(
+            "cannot hash Stage 6 mechanical inputs"
+        ) from error
+
+
+def _require_bound_inputs(
+    audit_input: dict[str, Any],
+    observed: dict[str, Any],
+) -> None:
+    expected = audit_input["resolution"]["hashes"]
+    for key, digest in observed.items():
+        if expected.get(key) != digest:
+            raise KleanFinalGateError(
+                f"Stage 6 {key} differs from audit input"
+            )
+
+
+def _result_binding(audit_input: Path) -> dict[str, Any]:
+    try:
+        document = _audit_input_binding(Path(audit_input))
+    except KleanFinalGateError:
+        return {}
+    return {
+        "mode": document["resolution"]["mode"],
+        "resolved_input_sha256": document[
+            "resolved_input_sha256"
+        ],
+        "input_hashes": document["resolution"]["hashes"],
+    }
+
+
+def check_final(
+    frozen_input: Path,
+    discovery_manifest: Path,
+    generation: Path,
+    candidate: Path | None,
+    *,
+    toolchain_lock: Path,
+    audit_input: Path,
+    run_command: Callable[..., tuple[int, str]] = _run,
+) -> dict[str, Any]:
+    frozen_input = Path(frozen_input)
+    discovery_manifest = Path(discovery_manifest)
+    generation = Path(generation)
+    candidate = Path(candidate) if candidate is not None else None
+    audit_binding = _audit_input_binding(Path(audit_input))
+    signed_resolution = audit_binding["resolution"]
+    if (
+        signed_resolution["mode"] == "CLASSIFICATION_AND_PROOF"
+        and candidate is None
+    ):
+        raise KleanFinalGateError(
+            "proof-bearing audit requires a Stage 5 Lean candidate"
+        )
+    if (
+        signed_resolution["mode"] == "CLASSIFICATION_ONLY"
+        and candidate is not None
+    ):
+        raise KleanFinalGateError(
+            "classification-only audit must not use a Stage 5 Lean "
+            "candidate"
+        )
+    expected_mode = signed_resolution["mode"]
+    observed_mode = (
+        "CLASSIFICATION_AND_PROOF"
+        if candidate is not None
+        else "CLASSIFICATION_ONLY"
+    )
+    if observed_mode != expected_mode:
+        raise KleanFinalGateError(
+            "Stage 6 mechanical mode differs from audit input"
+        )
+    before_hashes = _input_hashes(
+
+Script done on 2026-07-31 02:36:42-05:00 [COMMAND_EXIT_CODE="0"]

@@ -1,0 +1,267 @@
+$ controls.k loop rules
+
+  // ==== IfExp: ternary T if C else E ========================================
+  rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k>
+       requires truthy(V)
+  rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k>
+       requires notBool truthy(V)
+
+  // ==== For: one loop, in-cell continuation, over #iterNext =================
+  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+  // circularities anchor on #loop and narrowing substitutes the structure)
+  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+                 | #loopLbl(K) | "#cont" | "#brk"
+
+  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+
+  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+
+  // ==== While ==============================================================
+  rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>
+  rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>
+  rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k>
+       requires truthy(V)
+  rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k>
+       requires notBool truthy(V)
+
+  // ==== loop control (break / continue) =====================================
+  rule <k> #loopLbl(NEXT:K) => NEXT ... </k>
+  rule <k> Continue => #cont ... </k>
+  rule <k> Break => #brk ... </k>
+  rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>
+  rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]
+  rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>
+  rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]
+
+  // ==== heap-object deref at the truthiness/iteration consumers ==============
+  // (priority(40) preempts the generic Val rules so truthy/#loop never see a ref)
+  rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  // For derefs its iterable ONCE at loop start (iteration is over the snapshot;
+  // mutating the iterated list inside its own loop is outside the subset)
+  rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+endmodule
+$ subscript.k slice normalization
+  rule <k> Subscript(OBJ:Val, I:Int) => applyIndex(OBJ, I) ... </k>
+
+  syntax Val ::= applyIndex(Val, Int) [function]
+  rule applyIndex(list(VS:ValSeq),  I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+  rule applyIndex(tuple(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+  rule applyIndex(str(IS:IntSeq),   I:Int)
+    => str(iCons(intSeqAt(IS, normIdx(I, isLen(IS))), .IntSeq))
+
+  // ==== Slice: obj[lo:hi:step] (list / str) — CPython slice.indices ==========
+  syntax KItem ::= #evalB(Bound) | "#toSome"
+                 | #slLo(Val, Bound, Bound)
+                 | #slHi(Val, OptInt, Bound)
+                 | #slStep(Val, OptInt, OptInt)
+
+  syntax OptInt ::= "noB" | someB(Int)
+  rule <k> #evalB(NoBound)  => noB ... </k>
+  rule <k> #evalB(E:Expr)   => E ~> #toSome ... </k>
+  rule <k> I:Int ~> #toSome => someB(I) ... </k>
+
+  rule <k> Subscript(OBJ:Val, Slice(LO:Bound, HI:Bound, ST:Bound)) => #evalB(LO) ~> #slLo(OBJ, HI, ST) ... </k>
+  rule <k> LO:OptInt ~> #slLo(OBJ:Val, HI:Bound, ST:Bound)   => #evalB(HI) ~> #slHi(OBJ, LO, ST) ... </k>
+  rule <k> HI:OptInt ~> #slHi(OBJ:Val, LO:OptInt, ST:Bound)  => #evalB(ST) ~> #slStep(OBJ, LO, HI) ... </k>
+  // a list slice constructs a NEW object; a str slice stays a value
+  rule <k> ST:OptInt ~> #slStep(list(VS:ValSeq), LO:OptInt, HI:OptInt)
+        => #alloc(doSlice(list(VS), LO, HI, ST)) ... </k>
+       [priority(45)]
+  rule <k> ST:OptInt ~> #slStep(OBJ:Val, LO:OptInt, HI:OptInt) => doSlice(OBJ, LO, HI, ST) ... </k>
+
+  syntax Val ::= doSlice(Val, OptInt, OptInt, OptInt) [function]
+  rule doSlice(list(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    => list(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))
+  rule doSlice(tuple(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    => tuple(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))
+  rule doSlice(str(IS:IntSeq), LO:OptInt, HI:OptInt, ST:OptInt)
+    => str(buildIS(IS, slStart(LO, ST, isLen(IS)), slStop(HI, ST, isLen(IS)), slStep(ST)))
+
+  // ==== slice.indices: step / start / stop / clamp ==========================
+  syntax Int ::= slStep(OptInt) [function, total]
+  rule slStep(noB)          => 1
+  rule slStep(someB(S:Int)) => S
+
+  syntax Int ::= slStart(OptInt, OptInt, Int) [function]
+  rule slStart(noB,          ST:OptInt, _LEN:Int) => 0
+       requires slStep(ST) >Int 0
+  rule slStart(noB,          ST:OptInt, LEN:Int)  => LEN -Int 1
+       requires slStep(ST) <Int 0
+  rule slStart(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))
+
+  syntax Int ::= slStop(OptInt, OptInt, Int) [function]
+  rule slStop(noB,          ST:OptInt, LEN:Int)  => LEN
+       requires slStep(ST) >Int 0
+  rule slStop(noB,          ST:OptInt, _LEN:Int) => -1
+       requires slStep(ST) <Int 0
+  rule slStop(someB(I:Int), ST:OptInt, LEN:Int)  => slAdjust(I, LEN, slStep(ST))
+
+  syntax Int ::= slAdjust(Int, Int, Int) [function, total]
+  rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampLo(I +Int LEN, STEP)
+       requires I  <Int 0
+  rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampHi(I, LEN, STEP)
+       requires I >=Int 0
+
+  syntax Int ::= clampLo(Int, Int) [function, total]
+  rule clampLo(J:Int, _STEP:Int) => J
+       requires J >=Int 0
+  rule clampLo(J:Int, STEP:Int)  => #if STEP <Int 0 #then -1 #else 0 #fi
+       requires J <Int 0
+
+  syntax Int ::= clampHi(Int, Int, Int) [function, total]
+  rule clampHi(I:Int, LEN:Int, _STEP:Int) => I
+       requires I  <Int LEN
+  rule clampHi(I:Int, LEN:Int, STEP:Int)  => #if STEP <Int 0 #then LEN -Int 1 #else LEN #fi
+       requires I >=Int LEN
+
+  // ==== build the strided sub-sequence (indices in range by construction) ====
+  syntax ValSeq ::= buildVS(ValSeq, Int, Int, Int) [function]
+  rule buildVS(VS:ValSeq, I:Int, STOP:Int, STEP:Int)
+    => vCons(valSeqAt(VS, I), buildVS(VS, I +Int STEP, STOP, STEP))
+       requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)
+  rule buildVS(_:ValSeq, I:Int, STOP:Int, STEP:Int) => .ValSeq
+       requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))
+
+  syntax IntSeq ::= buildIS(IntSeq, Int, Int, Int) [function]
+  rule buildIS(IS:IntSeq, I:Int, STOP:Int, STEP:Int)
+    => iCons(intSeqAt(IS, I), buildIS(IS, I +Int STEP, STOP, STEP))
+       requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)
+  rule buildIS(_:IntSeq, I:Int, STOP:Int, STEP:Int) => .IntSeq
+       requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))
+endmodule
+$ str.k operations
+// reference/src/semantics/str.k — MPY-STR
+
+module MPY-STR
+  imports MPY-CORE
+  imports MPY-ITER
+
+  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+
+  // ==== str literal (ASCII-only) ============================================
+  syntax IntSeq ::= strToCodes(String) [function]
+  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+  rule strToCodes("") => .IntSeq
+  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+
+  // ==== operators: + / == / != / in =========================================
+  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+  rule seqConcat(.IntSeq, T:IntSeq)                => T
+  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+
+  rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+  rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+  rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)
+
+  // substring membership: `P in X` iff the code-seq P occurs contiguously in X
+  rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)
+  rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)
+
+  syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]
+  rule strPrefix(.IntSeq, _:IntSeq)               => true
+  rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false
+  rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)
+
+  syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]
+  rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)
+  rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)
+  rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs)
+       requires notBool strPrefix(P, iCons(C, Xs))
+
+  // ==== lexicographic order: < / <= / > / >= by code point (= Python str order on the code
+  // model). strLt reduces on GROUND code-seqs (krun) but is inert/OPAQUE on symbolic ones
+  // (a proof's codesProj(V) is an abstract IntSeq — no constructor rule matches), so a symbolic
+  // str `<` stays a trusted opaque term the way sortVS / intFloatDiv do. Additive: fires only on
+  // str </<=/>/>= comparisons.
+  syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]
+  rule strLt(.IntSeq, .IntSeq)                => false
+  rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true
+  rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true          requires A  <Int B
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false         requires A  >Int B
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B
+
+$ operators compare/binop dispatch
+1-// reference/src/semantics/operators.k — MPY-OPERATORS
+2-// The operator DISPATCH layer: operands evaluate by strictness (heat/cool over KResult=Val),
+3:// the cooled node hands to applyUn/applyBin/applyCmp (declared in core.k; each domain file
+4-// owns its cases — bool.k, int.k, float.k, str.k, list.k, tuple.k, set.k, dict.k).
+5-
+6-module MPY-OPERATORS
+7-  imports MPY-CORE
+8-  imports MPY-ITER
+9-
+10-  rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>
+11-
+12:  rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+13-
+14-  // Compare's right operand sits under the CmpOp wrapper — contexts instead of attributes
+15:  context Compare(HOLE, _)
+16:  context Compare(_:Val, CmpOp(_, HOLE))
+17:  rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]
+18-
+19:  rule applyCmp("is",     V:Val, noneV) => V ==K noneV
+20:  rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)
+21-
+22-  // ==== operand deref: heap objects combine/compare by STRUCTURE ============
+23-  // (Python: list == is structural; identity only via `is`.) priority(40)
+24:  // preempts the generic dispatch so applyUn/applyBin/applyCmp never see a ref.
+25:  rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k>
+26-       <heap> ... H |-> V:Val ... </heap>
+27-       [priority(40)]
+28:  rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k>
+29-       <heap> ... H |-> V:Val ... </heap>
+30-       requires notBool isRefV(L)
+31-       [priority(40)]
+32-
+33-  // the left operand of `in`/`not in` is an ELEMENT (compares by ==K) — never deref'd
+34:  rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k>
+35-       <heap> ... H |-> V:Val ... </heap>
+36-       requires OP =/=String "in" andBool OP =/=String "not in"
+37-       [priority(40)]
+38:  rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k>
+39-       <heap> ... H |-> V:Val ... </heap>
+40-       requires notBool isRefV(L)
+41-        orBool OP ==String "in" orBool OP ==String "not in"
+42-       [priority(40)]
+43-
+$ assignment/name rules
+/reference/k-proof/reference-semantics/semantics/core.k-126-  rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>
+/reference/k-proof/reference-semantics/semantics/core.k-127-  rule <k> .Stmts => .K ... </k>
+/reference/k-proof/reference-semantics/semantics/core.k-128-
+/reference/k-proof/reference-semantics/semantics/core.k-129-  // ==== Name lookup (walk the scope chain; builtins live in the -1 scope) ====
+/reference/k-proof/reference-semantics/semantics/core.k-130-  syntax KItem ::= #look(String, Int)
+/reference/k-proof/reference-semantics/semantics/core.k:131:  rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>
+/reference/k-proof/reference-semantics/semantics/core.k-132-  rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k>
+/reference/k-proof/reference-semantics/semantics/core.k-133-       <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes>
+/reference/k-proof/reference-semantics/semantics/core.k-134-       requires X in_keys(M)
+/reference/k-proof/reference-semantics/semantics/core.k-135-  // a SYNTACTICALLY cell-bound name reads through the heap cell AT THE
+/reference/k-proof/reference-semantics/semantics/core.k-136-  // LOOKUP (higher priority beats the plain return above on concrete cell
+$ string iteration
+1-// reference/src/semantics/iter.k — MPY-ITER
+2:// The iterator protocol, DECLARATION ONLY. Each iterable's #iterNext case lives in that
+3-// iterable's own module (list/tuple/str in their modules, rangeObj in range.k, zip in
+4-// builtins.k). Consumers (the for-loop, `x in _`, sum/all/any/max/min) import this.
+5-
+6-module MPY-ITER
+7-  imports MPY-CORE
+8:  syntax KItem ::= #iterNext(Iterable) | "#iterDone" | #iterYield(Val, Iterable)
+9-endmodule

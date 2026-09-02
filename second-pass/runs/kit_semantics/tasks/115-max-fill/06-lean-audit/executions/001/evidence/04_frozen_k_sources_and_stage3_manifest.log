@@ -1,0 +1,388 @@
+Script started on 2026-07-31 02:06:31-05:00 [<not executed on terminal>]
++ nl -ba /reference/k-proof/verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module MAX-FILL-SUMMARY
+     4	  imports MPY
+     5	
+     6	  // Guarded total projections for the dynamic Val supersort. Their values are
+     7	  // used only under the matching sort/constructor guards below.
+     8	  syntax Bool ::= definedProjectInt(Val) [function, total]
+     9	  rule definedProjectInt(V) => isInt(V)
+    10	
+    11	  syntax Int ::= projectInt(Val)
+    12	    [function, total, symbol(maxFillProjectInt), no-evaluators]
+    13	
+    14	  rule #Ceil({@V:Val}:>Int)
+    15	    => ({ definedProjectInt(@V) #Equals true } #And #Ceil(@V))
+    16	    [simplification]
+    17	  rule projectInt(V:Val) => {V}:>Int
+    18	    requires definedProjectInt(V)
+    19	    [concrete, simplification(10), preserves-definedness]
+    20	  rule {V:Val}:>Int => projectInt(V)
+    21	    requires definedProjectInt(V)
+    22	    [symbolic(V), simplification, preserves-definedness]
+    23	  rule projectInt(I:Int) => I [simplification]
+    24	
+    25	  syntax ValSeq ::= rowVals(Val)
+    26	    [function, total, symbol(maxFillRowVals), no-evaluators]
+    27	  rule rowVals(list(VS)) => VS [simplification]
+    28	
+    29	  syntax Bool ::= isListVal(Val) [function, total]
+    30	  rule isListVal(V) => V ==K list(rowVals(V))
+    31	
+    32	  // Domain predicates. allRows permits any finite number and length of rows,
+    33	  // but every element must be an integer 0 or 1.
+    34	  syntax Bool ::= allBinary(ValSeq) [function, total]
+    35	                | allRows(ValSeq)   [function, total]
+    36	
+    37	  rule allBinary(.ValSeq) => true
+    38	  rule allBinary(vCons(V, VS))
+    39	    => isInt(V)
+    40	       andBool (V ==K projectInt(V))
+    41	       andBool (projectInt(V) ==Int 0 orBool projectInt(V) ==Int 1)
+    42	       andBool allBinary(VS)
+    43	
+    44	  rule allRows(.ValSeq) => true
+    45	  rule allRows(vCons(V, VS))
+    46	    => isListVal(V) andBool allBinary(rowVals(V)) andBool allRows(VS)
+    47	
+    48	  // Exact value summaries. rowSum deliberately uses MPY-BUILTINS' intOf:
+    49	  // on allBinary rows that is exactly the transition performed by #sumAcc.
+    50	  syntax Int ::= rowSum(ValSeq)          [function, total]
+    51	               | bucketCost(ValSeq, Int) [function, total]
+    52	               | gridCost(ValSeq, Int)   [function, total]
+    53	
+    54	  rule rowSum(.ValSeq)       => 0
+    55	  rule rowSum(vCons(V, VS))  => intOf(V) +Int rowSum(VS)
+    56	
+    57	  // This is MPY-INT's exact positive-divisor // equation, after the numerator
+    58	  // expression in solution.py has evaluated.
+    59	  rule bucketCost(VS, C)
+    60	    => ((rowSum(VS) +Int C -Int 1)
+    61	          -Int pyMod(rowSum(VS) +Int C -Int 1, C)) /Int C
+    62	    requires C >Int 0
+    63	  rule bucketCost(_VS, C) => 0
+    64	    requires C <=Int 0
+    65	
+    66	  rule gridCost(.ValSeq, _C)      => 0
+    67	  rule gridCost(vCons(V, VS), C)  => bucketCost(rowVals(V), C) +Int gridCost(VS, C)
+    68	
+    69	  // The for target is initialized before the loop. This helper records the
+    70	  // exact value left in it after consuming an arbitrary suffix.
+    71	  syntax Val ::= finalRow(ValSeq, Val) [function, total]
+    72	  rule finalRow(.ValSeq, PREV)       => PREV
+    73	  rule finalRow(vCons(V, VS), _PREV) => finalRow(VS, V)
+    74	
+    75	endmodule
+    76	
+    77	module MAX-FILL-VERIFICATION
+    78	  imports MAX-FILL-SUMMARY
+    79	
+    80	  // Guarded static-dispatch twin of MPY-BUILTINS' intOf(I:Int) => I.
+    81	  rule intOf(V:Val) => projectInt(V)
+    82	    requires isInt(V)
+    83	    [simplification]
+    84	
+    85	  // Guarded dispatch twin for the existing MPY-CALL sum rule. isListVal(V)
+    86	  // is definitionally V ==K list(rowVals(V)), so the RHS is exactly the fixed
+    87	  // rule's #sumAcc(V, 0). No continuation or state cell is changed.
+    88	  rule <k> #applyK(toCall(builtinV("sum")), (V:Val, .Vals))
+    89	        => #sumAcc(list(rowVals(V)), 0) ... </k>
+    90	    requires isListVal(V)
+    91	    [priority(40)]
+    92	endmodule
++ nl -ba /reference/k-proof/spec.k
+     1	requires "verification.k"
+     2	
+     3	module MAX-FILL-SPEC
+     4	  imports MAX-FILL-VERIFICATION
+     5	
+     6	  // Fixed-semantics auxiliary circularity for sum(row).
+     7	  claim [sum-loop]:
+     8	    <k> #sumAcc(list(VS:ValSeq), A:Int)
+     9	          => A +Int rowSum(VS) ... </k>
+    10	    requires allBinary(VS)
+    11	
+    12	  // Program-loop circularity. The body is the exact AST emitted in solution.mpy.
+    13	  claim [grid-loop]:
+    14	    <k> #loop(
+    15	          list(GS:ValSeq),
+    16	          Name("row"),
+    17	          AugAssign(
+    18	            Name("total"),
+    19	            "+",
+    20	            BinOp(
+    21	              "//",
+    22	              BinOp(
+    23	                "-",
+    24	                BinOp("+", Call(Name("sum"), Name("row")), Name("capacity")),
+    25	                Int(1)),
+    26	              Name("capacity"))))
+    27	          => .K
+    28	          ... </k>
+    29	    <env> 1 </env>
+    30	    <scopes>
+    31	      1 |-> scope(
+    32	            "capacity" |-> C:Int
+    33	            "grid"     |-> _ORIGINAL_GRID:Val
+    34	            "total"    |-> (S:Int => S +Int gridCost(GS, C))
+    35	            "row"      |-> (PREV:Val => finalRow(GS, PREV))
+    36	            .Map,
+    37	            parent(0))
+    38	      0 |-> scope(GLOBALS:Map, parent(-1))
+    39	      -1 |-> builtinsScope
+    40	    </scopes>
+    41	    requires C >Int 0
+    42	      andBool allRows(GS)
+    43	      andBool notBool ("sum" in_keys(GLOBALS))
+    44	
+    45	  // Exact invocation theorem: normal lookup selects the exact closure body,
+    46	  // arguments are evaluated and bound by MPY-CALL, and return/pop execute.
+    47	  claim [max-fill]:
+    48	    <k> Call(Name("max_fill"), list(GS:ValSeq), C:Int)
+    49	          => gridCost(GS, C) </k>
+    50	    <env> 0 </env>
+    51	    <scopes>
+    52	      0 |-> scope(
+    53	        "max_fill" |->
+    54	          closureVal(
+    55	            ("grid", "capacity"),
+    56	            Assign(Name("total"), Int(0))
+    57	            Assign(Name("row"), Int(0))
+    58	            For(
+    59	              Name("row"),
+    60	              Name("grid"),
+    61	              AugAssign(
+    62	                Name("total"),
+    63	                "+",
+    64	                BinOp(
+    65	                  "//",
+    66	                  BinOp(
+    67	                    "-",
+    68	                    BinOp(
+    69	                      "+",
+    70	                      Call(Name("sum"), Name("row")),
+    71	                      Name("capacity")),
+    72	                    Int(1)),
+    73	                  Name("capacity"))))
+    74	            Return(Name("total")),
+    75	            0),
+    76	        parent(-1))
+    77	      -1 |-> builtinsScope
+    78	    </scopes>
+    79	    <scopeLoc> 1 </scopeLoc>
+    80	    <heap> .Map </heap>
+    81	    <heapLoc> 0 </heapLoc>
+    82	    <stack> .List </stack>
+    83	    <ret> noRet </ret>
+    84	    <exc> NoExc </exc>
+    85	    <exit-code> 0 </exit-code>
+    86	    requires C >Int 0 andBool allRows(GS)
+    87	endmodule
++ nl -ba /reference/k-proof/connection-spec.k
+     1	requires "verification.k"
+     2	
+     3	// This module is proved against a definition whose main module is
+     4	// MAX-FILL-SUMMARY, so neither dispatch twin in MAX-FILL-VERIFICATION exists
+     5	// in the executable theory.
+     6	module MAX-FILL-CONNECTION-SPEC
+     7	  imports MAX-FILL-SUMMARY
+     8	
+     9	  claim [fixed-int-of]:
+    10	    <k> intOf(I:Int) => I ... </k>
+    11	
+    12	  claim [fixed-sum-dispatch]:
+    13	    <k> #applyK(toCall(builtinV("sum")), (list(VS:ValSeq), .Vals))
+    14	          => #sumAcc(list(VS), 0) ... </k>
+    15	endmodule
++ nl -ba /reference/k-proof/solution.py
+     1	def max_fill(grid, capacity):
+     2	    total = 0
+     3	    row = 0
+     4	    for row in grid:
+     5	        total += (sum(row) + capacity - 1) // capacity
+     6	    return total
++ nl -ba /reference/k-proof/solution.mpy
+     1	Module(
+     2	  FuncDef("max_fill", Params("grid", "capacity"),
+     3	    Assign(Name("total"), Int(0))
+     4	    Assign(Name("row"), Int(0))
+     5	    For(Name("row"), Name("grid"),
+     6	      AugAssign(
+     7	        Name("total"),
+     8	        "+",
+     9	        BinOp(
+    10	          "//",
+    11	          BinOp(
+    12	            "-",
+    13	            BinOp("+", Call(Name("sum"), Name("row")), Name("capacity")),
+    14	            Int(1)),
+    15	          Name("capacity"))))
+    16	    Return(Name("total"))))
++ nl -ba /reference/k-proof/prove.sh
+     1	#!/bin/sh
+     2	set -eu
+     3	
+     4	expect_failure() {
+     5	  label=$1
+     6	  shift
+     7	  if "$@"; then
+     8	    echo "UNEXPECTED SUCCESS: $label" >&2
+     9	    exit 1
+    10	  else
+    11	    status=$?
+    12	    echo "EXPECTED FAILURE: $label (exit $status)"
+    13	  fi
+    14	}
+    15	
+    16	python3 py2mpy.py solution.py > solution.mpy
+    17	python3 py2mpy.py smoke.py > smoke.mpy
+    18	python3 differential_test.py
+    19	
+    20	kompile reference-semantics/semantics.k \
+    21	  --backend llvm \
+    22	  --main-module MPY-KRUN \
+    23	  --syntax-module MPY-SYNTAX \
+    24	  --output-definition runtime-kompiled
+    25	krun smoke.mpy --definition runtime-kompiled
+    26	
+    27	kompile --backend haskell verification.k \
+    28	  --main-module MAX-FILL-VERIFICATION \
+    29	  --syntax-module MPY-SYNTAX \
+    30	  --output-definition verification-kompiled
+    31	kprove spec.k \
+    32	  --definition verification-kompiled \
+    33	  --spec-module MAX-FILL-SPEC
+    34	krun smoke.mpy --definition verification-kompiled
+    35	
+    36	kompile --backend haskell verification.k \
+    37	  --main-module MAX-FILL-SUMMARY \
+    38	  --syntax-module MPY-SYNTAX \
+    39	  --output-definition connection-kompiled
+    40	kprove connection-spec.k \
+    41	  --definition connection-kompiled \
+    42	  --spec-module MAX-FILL-CONNECTION-SPEC
+    43	
+    44	expect_failure false-result \
+    45	  kprove spec-vacuity.k \
+    46	    --definition verification-kompiled \
+    47	    --spec-module MAX-FILL-VACUITY-SPEC
+    48	expect_failure mutated-body \
+    49	  kprove spec-body-mutation.k \
+    50	    --definition verification-kompiled \
+    51	    --spec-module MAX-FILL-BODY-MUTATION-SPEC
+    52	expect_failure wrong-int-projection \
+    53	  kprove projection-mutation-spec.k \
+    54	    --definition connection-kompiled \
+    55	    --spec-module MAX-FILL-PROJECTION-MUTATION-SPEC \
+    56	    --claims MAX-FILL-PROJECTION-MUTATION-SPEC.wrong-int
+    57	expect_failure wrong-row-projection \
+    58	  kprove projection-mutation-spec.k \
+    59	    --definition connection-kompiled \
+    60	    --spec-module MAX-FILL-PROJECTION-MUTATION-SPEC \
+    61	    --claims MAX-FILL-PROJECTION-MUTATION-SPEC.wrong-row
++ sed -n 1,320p /reference/lemma-discovery.json
+{
+  "schema_version": 2,
+  "inventory_sha256": "c38d770ae0a9652b812217694490b3b0706fee0fe43a7d38653391e673572a78",
+  "rules": [
+    {
+      "source_rule_id": "rule-3d79da82b43c275c9d34980f5c70a5d2655a97a29064001247280c1e26e49628",
+      "classification": "DEFINITION",
+      "rationale": "Defines the named domain predicate definedProjectInt as the existing sort test isInt."
+    },
+    {
+      "source_rule_id": "rule-0312858a8718cb93d212cdb7b679a2875534dc14191dff8edf7bccf9a96d8b43",
+      "classification": "DOMAIN_LEMMA",
+      "rationale": "Asserts the definedness characterization of the built-in partial Val-to-Int cast; it is a simplification fact about the cast domain and has no prior exact proof in Stage 1."
+    },
+    {
+      "source_rule_id": "rule-44699459891b0065e1274df000145d152d5593dbc795d66a9108a23233e8be46",
+      "classification": "DEFINITION",
+      "rationale": "Defines the named projectInt proof term by the built-in partial Int cast under its explicit definedness guard."
+    },
+    {
+      "source_rule_id": "rule-2f319fc608bca611d97f73f2eccd57da4594fe7eccf200e64ea8ed18a6d1d77c",
+      "classification": "DEFINITION",
+      "rationale": "Provides the reverse definitional orientation between the guarded built-in Int cast and the named projectInt term."
+    },
+    {
+      "source_rule_id": "rule-46034a138591ba84c5320bfdce28ff27c4aa3b71ab6d96d8b058b079aaf09395",
+      "classification": "DEFINITION",
+      "rationale": "Defines the projectInt collapse equation on values already of sort Int."
+    },
+    {
+      "source_rule_id": "rule-a84abb0c9f7460007105f14618fe68e01c23ed95d5e76276d9dbbbf6caaaa4ab",
+      "classification": "DEFINITION",
+      "rationale": "Defines the rowVals structural projection for a list value by returning its contained ValSeq."
+    },
+    {
+      "source_rule_id": "rule-ba030e77444ea0ae71094841ccfc19ed9c36a3a4d7d781feeba64d83869abd91",
+      "classification": "DEFINITION",
+      "rationale": "Defines the named isListVal predicate through equality with the list reconstructed from rowVals."
+    },
+    {
+      "source_rule_id": "rule-d485439b4f9a7bc2e21a43a788c49763ed95bb43ce67c13ed8de6c7ae72e5684",
+      "classification": "DEFINITION",
+      "rationale": "Defines the empty-sequence base case of the recursive allBinary domain predicate."
+    },
+    {
+      "source_rule_id": "rule-39d37bb16064c309a28bcf1621f1b5d89ffcb8e6e081129875411ff8b13e3020",
+      "classification": "DEFINITION",
+      "rationale": "Defines the structurally recursive nonempty case of allBinary, including the exact 0-or-1 head condition."
+    },
+    {
+      "source_rule_id": "rule-1881128594a7caf02b04803f8a2dfcfc888430ef33bfa5b8a5caabafcdd6327e",
+      "classification": "DEFINITION",
+      "rationale": "Defines the empty-grid base case of the recursive allRows domain predicate."
+    },
+    {
+      "source_rule_id": "rule-5ff5b6060b1a32de00d5fe758e5eaf41e5a1abf0b58b43d5e111a32c905a2fc8",
+      "classification": "DEFINITION",
+      "rationale": "Defines the structurally recursive nonempty case of allRows from isListVal, allBinary, and the remaining rows."
+    },
+    {
+      "source_rule_id": "rule-41943ae4d2d233c4fc22178aa9c1fc1f6c7d9fd9d3c074edcb6f474c9c114cc3",
+      "classification": "DEFINITION",
+      "rationale": "Defines the zero base case of the mathematical rowSum recurrence."
+    },
+    {
+      "source_rule_id": "rule-86b1ccf093b81e9c9d9ca5149e3534f3b4b7600685efab3663b1175e00d352f2",
+      "classification": "DEFINITION",
+      "rationale": "Defines the nonempty rowSum recurrence by adding the head's integer value to the tail summary."
+    },
+    {
+      "source_rule_id": "rule-64d73f88068d2576ba631bbefba2d4b4d016acc401b9b48b4abfb2466e99b7fb",
+      "classification": "DEFINITION",
+      "rationale": "Defines bucketCost for positive capacity using the exact integer-floor expression summarized by the proof."
+    },
+    {
+      "source_rule_id": "rule-d212810cc7f5c01a08d820bb3797b78d481037be2ba27fcf8d82366426404bfb",
+      "classification": "DEFINITION",
+      "rationale": "Defines the disjoint nonpositive-capacity totalization branch of bucketCost."
+    },
+    {
+      "source_rule_id": "rule-d64dccd6306357f40c9b821cb592e9b1ae30964f44f52576617a90c97cb434cb",
+      "classification": "DEFINITION",
+      "rationale": "Defines the empty-grid base case of the gridCost recurrence."
+    },
+    {
+      "source_rule_id": "rule-8e4ed42ce768056a9a2107e00bc2962b9a3f934581c589d848903da0a97a8dc2",
+      "classification": "DEFINITION",
+      "rationale": "Defines the nonempty gridCost recurrence as the head-row bucket cost plus the tail-grid cost."
+    },
+    {
+      "source_rule_id": "rule-63b8f99214b24f4293f9007e279bd8591f69b68897b3583455f02e39940ab1a8",
+      "classification": "DEFINITION",
+      "rationale": "Defines finalRow on an empty suffix as the previously bound loop-target value."
+    },
+    {
+      "source_rule_id": "rule-979fbd648068a0707834be206f2ec357c17842a5f3a3e6191fbe12989c1a186c",
+      "classification": "DEFINITION",
+      "rationale": "Defines the structurally recursive finalRow step by carrying the current head as the new previous value."
+    }
+  ]
+}
+
+Script done on 2026-07-31 02:06:31-05:00 [COMMAND_EXIT_CODE="0"]

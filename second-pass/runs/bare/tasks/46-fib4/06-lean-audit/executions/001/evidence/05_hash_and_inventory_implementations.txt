@@ -1,0 +1,865 @@
+--- inventory_verification return ---
+    spans = [span for module in modules for span in _rule_spans(text, module)]
+    spans.sort(key=lambda span: span.start_offset)
+    return [dataclasses.asdict(span.rule) for span in spans]
+
+
+def _attribute_token_spans(
+    text: str,
+    masked_text: str,
+) -> list[tuple[int, int, str]]:
+    spans: list[tuple[int, int, str]] = []
+    start = 0
+    depth = 0
+    for index, character in enumerate(masked_text):
+        if character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth = max(depth - 1, 0)
+        elif character == "," and depth == 0:
+            spans.append(
+                (
+                    start,
+                    index,
+                    _without_comments(text[start:index]).strip(),
+                )
+            )
+            start = index + 1
+    spans.append(
+        (
+            start,
+            len(text),
+            _without_comments(text[start:]).strip(),
+        )
+    )
+    return spans
+
+
+def _blank_non_newlines(text: str) -> str:
+    return "".join(
+        character if character in "\r\n" else " "
+        for character in text
+    )
+
+
+def desimplify_rule_ids(
+    text: str,
+    source_rule_ids: list[str],
+) -> str:
+    """Remove simplification from exactly the selected canonical rule IDs."""
+
+    if len(source_rule_ids) != len(set(source_rule_ids)):
+        raise KRuleInventoryError(
+            "exact rule transformation contains a duplicate source rule ID"
+        )
+    selected = set(source_rule_ids)
+    modules = _modules(_mask_non_code(text))
+    spans = [
+        span
+        for local_module in modules
+        for span in _rule_spans(text, local_module)
+    ]
+    by_id = {span.rule.source_rule_id: span for span in spans}
+    unknown = sorted(selected - set(by_id))
+    if unknown:
+        raise KRuleInventoryError(
+            "exact rule transformation names an unknown source rule ID: "
+            + ", ".join(unknown)
+        )
+
+    edits: list[tuple[int, int]] = []
+    for source_rule_id in source_rule_ids:
+        span = by_id[source_rule_id]
+        if span.attribute_start is None or span.attribute_end is None:
+            raise KRuleInventoryError(
+                "selected source rule has no simplification attribute: "
+                f"{source_rule_id}"
+            )
+        attribute_text = text[
+            span.attribute_start + 1 : span.attribute_end - 1
+        ]
+        masked_attributes = _mask_non_code(attribute_text)
+        tokens = _attribute_token_spans(
+            attribute_text,
+            masked_attributes,
+        )
+        matches = [
+            index
+            for index, (_start, _end, token) in enumerate(tokens)
+            if token == "simplification"
+        ]
+        if len(matches) != 1:
+            raise KRuleInventoryError(
+                "selected source rule has ambiguous simplification "
+                f"attributes: {source_rule_id}"
+            )
+        token_index = matches[0]
+        if len(tokens) == 1:
+            edit_start = span.attribute_start
+            edit_end = span.attribute_end
+        elif token_index < len(tokens) - 1:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index][0]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index + 1][0]
+            )
+        else:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index - 1][1]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index][1]
+            )
+        edits.append((edit_start, edit_end))
+
+    transformed = text
+    for start, end in sorted(edits, reverse=True):
+        transformed = (
+            transformed[:start]
+            + _blank_non_newlines(transformed[start:end])
+            + transformed[end:]
+        )
+    return transformed
+
+
+def inventory_verification(workspace: Path) -> dict[str, Any]:
+    workspace = Path(workspace)
+    try:
+        workspace_mode = workspace.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        ) from error
+    if not stat.S_ISDIR(workspace_mode):
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        )
+    verification = workspace / "verification.k"
+    try:
+        verification_mode = verification.stat(
+            follow_symlinks=False
+        ).st_mode
+--- tree_digest implementation ---
+    )
+
+
+def _patch_lake_build_directory(package: Path) -> None:
+    lakefile = package / "lakefile.toml"
+    if not lakefile.is_file() or lakefile.is_symlink():
+        raise KleanExportError("generated package is missing regular lakefile.toml")
+    text = lakefile.read_text()
+    build_setting = 'buildDir = "/tmp/klean-generated-build"\n'
+    stack_setting = (
+        'moreLeanArgs = ["-D maxRecDepth=100000", "-s", "65536"]\n'
+    )
+    if build_setting in text and stack_setting in text:
+        return
+    setting = ""
+    if build_setting not in text:
+        setting += build_setting
+    if stack_setting not in text:
+        setting += stack_setting
+    marker = "[[lean_lib]]"
+    if marker in text:
+        text = text.replace(marker, setting + "\n" + marker, 1)
+    else:
+        text = text.rstrip() + "\n" + setting
+    lakefile.write_text(text)
+
+
+def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+    if not root.is_dir() or root.is_symlink():
+        raise KleanExportError(f"tree root must be a real directory: {root}")
+    entries: list[tuple[str, str, Path]] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        for child in os.scandir(directory):
+            path = Path(child.path)
+            mode = child.stat(follow_symlinks=False).st_mode
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise KleanExportError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    return sorted(entries)
+
+
+def tree_digest(root: Path) -> str:
+    digest = hashlib.sha256()
+    for relative, kind, path in _tree_entries(Path(root)):
+        digest.update(relative.encode() + b"\0" + kind.encode() + b"\0")
+        if kind == "file":
+            digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def _regular_json(path: Path) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise KleanExportError(f"required JSON is not a regular file: {path}")
+    try:
+        document = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise KleanExportError(f"malformed JSON: {path}") from error
+    if not isinstance(document, dict):
+        raise KleanExportError(f"JSON must be an object: {path}")
+    return document
+
+
+def _run_command(
+    command: list[str] | str,
+    *,
+    cwd: Path | None,
+    timeout: int,
+    env: dict[str, str],
+    shell: bool = False,
+) -> tuple[int, str]:
+    try:
+        result = subprocess.run(
+--- producer source hashing call sites ---
+/reference/tools/audit_contract.py-181-            f"tree file changed size while hashing: {path} "
+/reference/tools/audit_contract.py-182-            f"(expected {expected_size}, read {bytes_read})"
+/reference/tools/audit_contract.py-183-        )
+/reference/tools/audit_contract.py-184-
+/reference/tools/audit_contract.py-185-
+/reference/tools/audit_contract.py:186:def sha256_tree(root: Path) -> str:
+/reference/tools/audit_contract.py-187-    root = require_real_directory(root, f"tree root {root}")
+/reference/tools/audit_contract.py-188-    entries: list[tuple[str, str, Path, int]] = []
+/reference/tools/audit_contract.py-189-    pending = [root]
+/reference/tools/audit_contract.py-190-    while pending:
+/reference/tools/audit_contract.py-191-        directory = pending.pop()
+--
+/reference/tools/audit_contract.py-236-    except OSError:
+/reference/tools/audit_contract.py-237-        return None
+/reference/tools/audit_contract.py-238-    if not stat.S_ISDIR(mode):
+/reference/tools/audit_contract.py-239-        return None
+/reference/tools/audit_contract.py-240-    try:
+/reference/tools/audit_contract.py:241:        return sha256_tree(root)
+/reference/tools/audit_contract.py-242-    except AuditContractError:
+/reference/tools/audit_contract.py-243-        return None
+/reference/tools/audit_contract.py-244-
+/reference/tools/audit_contract.py-245-
+/reference/tools/audit_contract.py-246-def legacy_content_tree_hash(root: Path) -> str:
+--
+/reference/tools/audit_contract.py-323-    candidate_prompt_hash = _optional_regular_file_hash(candidate / "prompt.py")
+/reference/tools/audit_contract.py-324-    candidate_translator_hash = _optional_regular_file_hash(candidate / "py2mpy.py")
+/reference/tools/audit_contract.py-325-    candidate_semantics_hash = _optional_tree_hash(candidate / "reference-semantics")
+/reference/tools/audit_contract.py-326-    trusted_prompt_hash = sha256_file(prompt)
+/reference/tools/audit_contract.py-327-    trusted_translator_hash = sha256_file(translator)
+/reference/tools/audit_contract.py:328:    trusted_semantics_hash = sha256_tree(semantics) if semantics is not None else None
+/reference/tools/audit_contract.py-329-
+/reference/tools/audit_contract.py-330-    hashes = {
+/reference/tools/audit_contract.py:331:        "candidate_tree_sha256": sha256_tree(candidate),
+/reference/tools/audit_contract.py-332-        "manifest_sha256": sha256_file(manifest_path),
+/reference/tools/audit_contract.py-333-        "canonical_sha256": sha256_file(canonical),
+/reference/tools/audit_contract.py-334-        "trusted_prompt_sha256": trusted_prompt_hash,
+/reference/tools/audit_contract.py-335-        "candidate_prompt_sha256": candidate_prompt_hash,
+/reference/tools/audit_contract.py-336-        "trusted_translator_sha256": trusted_translator_hash,
+--
+/reference/tools/audit_contract.py-342-            generation_evidence["codex_output"]
+/reference/tools/audit_contract.py-343-        ),
+/reference/tools/audit_contract.py-344-        "generation_codex_last_sha256": sha256_file(
+/reference/tools/audit_contract.py-345-            generation_evidence["codex_last"]
+/reference/tools/audit_contract.py-346-        ),
+/reference/tools/audit_contract.py:347:        "generation_codex_trace_sha256": sha256_tree(
+/reference/tools/audit_contract.py-348-            generation_evidence["codex_trace"]
+/reference/tools/audit_contract.py-349-        ),
+/reference/tools/audit_contract.py-350-    }
+/reference/tools/audit_contract.py-351-    integrity = {
+/reference/tools/audit_contract.py-352-        "candidate_prompt_matches_trusted": candidate_prompt_hash == trusted_prompt_hash,
+--
+/reference/tools/audit_contract.py-557-        required_artifacts = tuple(
+/reference/tools/audit_contract.py-558-            name for name in required_artifacts if name != "PROOF.md"
+/reference/tools/audit_contract.py-559-        )
+/reference/tools/audit_contract.py-560-    for name in required_artifacts:
+/reference/tools/audit_contract.py-561-        require_regular_file(workspace / name, f"Stage 1 {name}")
+/reference/tools/audit_contract.py:562:    candidate_hash = pipeline_contract.sha256_tree(workspace)
+/reference/tools/audit_contract.py-563-    if expected_workspace_hash != candidate_hash:
+/reference/tools/audit_contract.py-564-        raise AuditContractError(
+/reference/tools/audit_contract.py-565-            "Stage 1 workspace changed after its successful result was recorded"
+/reference/tools/audit_contract.py-566-        )
+/reference/tools/audit_contract.py-567-    generation_evidence = require_generation_evidence(invocation)
+--
+/reference/tools/audit_contract.py-623-        manifest,
+/reference/tools/audit_contract.py-624-        task_manifest_path,
+/reference/tools/audit_contract.py-625-        generation_evidence,
+/reference/tools/audit_contract.py-626-    )
+/reference/tools/audit_contract.py-627-    if semantics is not None:
+/reference/tools/audit_contract.py:628:        manifest_semantics_hash = pipeline_contract.sha256_tree(semantics)
+/reference/tools/audit_contract.py-629-        accepted_manifest_hashes = {manifest_semantics_hash}
+/reference/tools/audit_contract.py-630-        if legacy_selected_invocation:
+/reference/tools/audit_contract.py-631-            legacy_semantics_hash = legacy_content_tree_hash(semantics)
+/reference/tools/audit_contract.py-632-            resolution["hashes"][
+/reference/tools/audit_contract.py-633-                "trusted_reference_semantics_legacy_sha256"
+--
+/reference/tools/audit_contract.py-784-        require_real_directory(stage / "executions", "Stage 2 executions"),
+/reference/tools/audit_contract.py-785-        parts[1],
+/reference/tools/audit_contract.py-786-        "selected Stage 2 execution",
+/reference/tools/audit_contract.py-787-    )
+/reference/tools/audit_contract.py-788-    try:
+/reference/tools/audit_contract.py:789:        current_hash = pipeline_contract.sha256_tree(execution)
+/reference/tools/audit_contract.py-790-    except pipeline_contract.PipelineContractError as error:
+/reference/tools/audit_contract.py-791-        raise AuditContractError(str(error)) from error
+/reference/tools/audit_contract.py-792-    if current_hash != selected.get("artifact_sha256"):
+/reference/tools/audit_contract.py-793-        raise AuditContractError(
+/reference/tools/audit_contract.py-794-            "selected Stage 2 audit changed after selection"
+--
+/reference/tools/usage_accounting.py-143-                f"cannot hash tree file {path}: {error}"
+/reference/tools/usage_accounting.py-144-            ) from error
+/reference/tools/usage_accounting.py-145-    return digest.hexdigest()
+/reference/tools/usage_accounting.py-146-
+/reference/tools/usage_accounting.py-147-
+/reference/tools/usage_accounting.py:148:def sha256_tree(root: Path) -> str:
+/reference/tools/usage_accounting.py-149-    """Hash a real regular-file tree using the pipeline's framed format."""
+/reference/tools/usage_accounting.py-150-
+/reference/tools/usage_accounting.py-151-    return _hash_tree_entries(_tree_entries(root))
+/reference/tools/usage_accounting.py-152-
+/reference/tools/usage_accounting.py-153-
+--
+/reference/tools/stage6_resolution_contract.py-20-        "semantics_mode",
+/reference/tools/stage6_resolution_contract.py-21-        "k_workspace",
+/reference/tools/stage6_resolution_contract.py-22-        "k_audit",
+/reference/tools/stage6_resolution_contract.py-23-        "discovery_manifest",
+/reference/tools/stage6_resolution_contract.py-24-        "klean_generation",
+/reference/tools/stage6_resolution_contract.py:25:        "generation_producer_sources",
+/reference/tools/stage6_resolution_contract.py-26-        "lean_workspace",
+/reference/tools/stage6_resolution_contract.py-27-        "lean_invocation",
+/reference/tools/stage6_resolution_contract.py-28-        "target",
+/reference/tools/stage6_resolution_contract.py-29-        "stage1_source_hashes",
+/reference/tools/stage6_resolution_contract.py-30-        "trust_inventory",
+--
+/reference/tools/legacy_migration.py-1495-        metrics,
+/reference/tools/legacy_migration.py-1496-    )
+/reference/tools/legacy_migration.py-1497-
+/reference/tools/legacy_migration.py-1498-    workspace = staged_task / "01-k-proof/workspace"
+/reference/tools/legacy_migration.py-1499-    source_tree_sha256 = _source_inventory_sha256(task_plan)
+/reference/tools/legacy_migration.py:1500:    workspace_sha256 = pipeline_contract.sha256_tree(workspace)
+/reference/tools/legacy_migration.py-1501-    outputs = pipeline_contract._invocation_output_hashes(
+/reference/tools/legacy_migration.py-1502-        invocation,
+/reference/tools/legacy_migration.py-1503-        workspace,
+/reference/tools/legacy_migration.py-1504-    )
+/reference/tools/legacy_migration.py-1505-    pipeline_contract.write_json_atomic(
+--
+/reference/tools/legacy_migration.py-1839-        raise _error("staged Stage 2 selection timestamp is invalid") from error
+/reference/tools/legacy_migration.py-1840-    expected_selection = {
+/reference/tools/legacy_migration.py-1841-        "schema_version": pipeline_contract.SCHEMA_VERSION,
+/reference/tools/legacy_migration.py-1842-        "stage": "02-k-audit",
+/reference/tools/legacy_migration.py-1843-        "relative_path": "executions/001",
+/reference/tools/legacy_migration.py:1844:        "artifact_sha256": pipeline_contract.sha256_tree(execution),
+/reference/tools/legacy_migration.py-1845-        "status": task_plan.audit_verdict,
+/reference/tools/legacy_migration.py-1846-        "selected_at": selected_at,
+/reference/tools/legacy_migration.py-1847-        "replaces": None,
+/reference/tools/legacy_migration.py-1848-    }
+/reference/tools/legacy_migration.py-1849-    if (
+--
+/reference/tools/legacy_migration.py-1883-        )
+/reference/tools/legacy_migration.py-1884-        if _sha256_file(destination, "staged retained file") != expected:
+/reference/tools/legacy_migration.py-1885-            raise _error("staged retained file hash mismatch", destination)
+/reference/tools/legacy_migration.py-1886-
+/reference/tools/legacy_migration.py-1887-    source_tree_sha256 = _source_inventory_sha256(task_plan)
+/reference/tools/legacy_migration.py:1888:    workspace_sha256 = pipeline_contract.sha256_tree(workspace)
+/reference/tools/legacy_migration.py-1889-    legacy_manifest: dict[str, Any] | None = None
+/reference/tools/legacy_migration.py-1890-    prompt_sha256: str | None = None
+/reference/tools/legacy_migration.py-1891-    if task_plan.input_provenance == "COMPLETE":
+/reference/tools/legacy_migration.py-1892-        legacy_manifest = _read_json(
+/reference/tools/legacy_migration.py-1893-            invocation / "legacy-run-input.json",
+--
+/reference/tools/legacy_migration.py-2559-                    )
+/reference/tools/legacy_migration.py-2560-                ),
+/reference/tools/legacy_migration.py-2561-                "final": str(source),
+/reference/tools/legacy_migration.py-2562-                "state_staging": str(state_staging),
+/reference/tools/legacy_migration.py-2563-                "state_final": str(repo / "runner-state" / run_id),
+/reference/tools/legacy_migration.py:2564:                "source_sha256": pipeline_contract.sha256_tree(source),
+/reference/tools/legacy_migration.py:2565:                "staged_sha256": pipeline_contract.sha256_tree(staging),
+/reference/tools/legacy_migration.py:2566:                "state_sha256": pipeline_contract.sha256_tree(state_staging),
+/reference/tools/legacy_migration.py-2567-            }
+/reference/tools/legacy_migration.py-2568-        )
+/reference/tools/legacy_migration.py-2569-    audit_runs = tuple(
+/reference/tools/legacy_migration.py-2570-        run.audit_run_id for run in plan.runs if run.audit_run_id is not None
+/reference/tools/legacy_migration.py-2571-    )
+--
+/reference/tools/legacy_migration.py-2582-            / (
+/reference/tools/legacy_migration.py-2583-                f".legacy-migration-{staged.transaction_id}"
+/reference/tools/legacy_migration.py-2584-                f"-quarantine-{audit_runs[0]}"
+/reference/tools/legacy_migration.py-2585-            )
+/reference/tools/legacy_migration.py-2586-        ),
+/reference/tools/legacy_migration.py:2587:        "source_sha256": pipeline_contract.sha256_tree(audit_source),
+/reference/tools/legacy_migration.py-2588-    }
+/reference/tools/legacy_migration.py-2589-    journal: dict[str, Any] = {
+/reference/tools/legacy_migration.py-2590-        "schema_version": _JOURNAL_SCHEMA_VERSION,
+/reference/tools/legacy_migration.py-2591-        "transaction_id": staged.transaction_id,
+/reference/tools/legacy_migration.py-2592-        "phase": "STAGED",
+--
+/reference/tools/legacy_migration.py-2665-def _validate_restored_sources(journal: Mapping[str, Any]) -> None:
+/reference/tools/legacy_migration.py-2666-    paths = journal["paths"]
+/reference/tools/legacy_migration.py-2667-    for run in paths["runs"]:
+/reference/tools/legacy_migration.py-2668-        source = Path(run["source"])
+/reference/tools/legacy_migration.py-2669-        expected = run["source_sha256"]
+/reference/tools/legacy_migration.py:2670:        if pipeline_contract.sha256_tree(source) != expected:
+/reference/tools/legacy_migration.py-2671-            raise _error("rolled-back run source hash changed", source)
+/reference/tools/legacy_migration.py-2672-    audit = paths["audit"]
+/reference/tools/legacy_migration.py-2673-    source = Path(audit["source"])
+/reference/tools/legacy_migration.py:2674:    if pipeline_contract.sha256_tree(source) != audit["source_sha256"]:
+/reference/tools/legacy_migration.py-2675-        raise _error("rolled-back audit source hash changed", source)
+/reference/tools/legacy_migration.py-2676-
+/reference/tools/legacy_migration.py-2677-
+/reference/tools/legacy_migration.py-2678-def _rollback_transaction(
+/reference/tools/legacy_migration.py-2679-    repo: Path,
+--
+/reference/tools/legacy_migration.py-2739-
+/reference/tools/legacy_migration.py-2740-def _validate_published_hashes(journal: Mapping[str, Any]) -> None:
+/reference/tools/legacy_migration.py-2741-    for run in journal["paths"]["runs"]:
+/reference/tools/legacy_migration.py-2742-        final = Path(run["final"])
+/reference/tools/legacy_migration.py-2743-        state_final = Path(run["state_final"])
+/reference/tools/legacy_migration.py:2744:        if pipeline_contract.sha256_tree(final) != run["staged_sha256"]:
+/reference/tools/legacy_migration.py-2745-            raise _error("published run hash changed", final)
+/reference/tools/legacy_migration.py:2746:        if pipeline_contract.sha256_tree(state_final) != run["state_sha256"]:
+/reference/tools/legacy_migration.py-2747-            raise _error("published runner state hash changed", state_final)
+/reference/tools/legacy_migration.py-2748-
+/reference/tools/legacy_migration.py-2749-
+/reference/tools/legacy_migration.py-2750-def _remove_validated_quarantines(
+/reference/tools/legacy_migration.py-2751-    repo: Path,
+--
+/reference/tools/stage5_runner.py-318-    except Stage3RunnerError as error:
+/reference/tools/stage5_runner.py-319-        raise Stage5RunnerError(str(error)) from error
+/reference/tools/stage5_runner.py-320-    if (
+/reference/tools/stage5_runner.py-321-        after_selection_data != selection_data
+/reference/tools/stage5_runner.py-322-        or after_selection_identity != selection_identity
+/reference/tools/stage5_runner.py:323:        or pipeline_contract.sha256_tree(generation) != validated_sha256
+/reference/tools/stage5_runner.py-324-    ):
+/reference/tools/stage5_runner.py-325-        raise Stage5RunnerError(
+/reference/tools/stage5_runner.py-326-            "Stage 4 selection changed during protected validation"
+/reference/tools/stage5_runner.py-327-        )
+/reference/tools/stage5_runner.py-328-    manifest = _json_from_bytes(
+--
+/reference/tools/stage4_runner.py-67-    expected = (
+/reference/tools/stage4_runner.py-68-        outputs.get("workspace_sha256")
+/reference/tools/stage4_runner.py-69-        if isinstance(outputs, dict)
+/reference/tools/stage4_runner.py-70-        else None
+/reference/tools/stage4_runner.py-71-    )
+/reference/tools/stage4_runner.py:72:    current = pipeline_contract.sha256_tree(workspace)
+/reference/tools/stage4_runner.py-73-    if result.get("status") != "SUCCEEDED" or expected != current:
+/reference/tools/stage4_runner.py-74-        raise Stage4RunnerError(
+/reference/tools/stage4_runner.py-75-            "finalized Stage 1 workspace does not match its successful result"
+/reference/tools/stage4_runner.py-76-        )
+/reference/tools/stage4_runner.py-77-    return workspace, current
+--
+/reference/tools/stage4_runner.py-305-    expected_candidate_sha256: str,
+/reference/tools/stage4_runner.py-306-    problem: str,
+/reference/tools/stage4_runner.py-307-    stage1_workspace_sha256: str,
+/reference/tools/stage4_runner.py-308-    stage3_discovery_manifest_sha256: str,
+/reference/tools/stage4_runner.py-309-) -> str:
+/reference/tools/stage4_runner.py:310:    before_sha256 = pipeline_contract.sha256_tree(generation)
+/reference/tools/stage4_runner.py-311-    if before_sha256 != expected_candidate_sha256:
+/reference/tools/stage4_runner.py-312-        raise Stage4RunnerError(
+/reference/tools/stage4_runner.py-313-            "Stage 4 candidate changed during final protected-input checks"
+/reference/tools/stage4_runner.py-314-        )
+/reference/tools/stage4_runner.py-315-    preflight, _preflight_bytes = _candidate_json(
+--
+/reference/tools/stage4_runner.py-404-            != obligation_count
+/reference/tools/stage4_runner.py-405-        ):
+/reference/tools/stage4_runner.py-406-            raise Stage4RunnerError(
+/reference/tools/stage4_runner.py-407-                "Stage 4 candidate sidecar obligation counts are invalid"
+/reference/tools/stage4_runner.py-408-            )
+/reference/tools/stage4_runner.py:409:    after_sha256 = pipeline_contract.sha256_tree(generation)
+/reference/tools/stage4_runner.py-410-    if (
+/reference/tools/stage4_runner.py-411-        after_sha256 != before_sha256
+/reference/tools/stage4_runner.py-412-        or after_sha256 != expected_candidate_sha256
+/reference/tools/stage4_runner.py-413-    ):
+/reference/tools/stage4_runner.py-414-        raise Stage4RunnerError(
+--
+/reference/tools/stage4_runner.py-478-        after = audit_contract.stage2_eligibility(repo, run_id, problem)
+/reference/tools/stage4_runner.py-479-        if after != eligibility:
+/reference/tools/stage4_runner.py-480-            raise Stage4RunnerError(
+/reference/tools/stage4_runner.py-481-                "Stage 2 selected audit changed during Klean generation"
+/reference/tools/stage4_runner.py-482-            )
+/reference/tools/stage4_runner.py:483:        if pipeline_contract.sha256_tree(frozen) != frozen_hash:
+/reference/tools/stage4_runner.py-484-            raise Stage4RunnerError(
+/reference/tools/stage4_runner.py-485-                "finalized Stage 1 workspace changed during Klean generation"
+/reference/tools/stage4_runner.py-486-            )
+/reference/tools/stage4_runner.py-487-        after_discovery = _protected_stage3_discovery(task)
+/reference/tools/stage4_runner.py-488-        if after_discovery != discovery:
+--
+/reference/tools/stage4_runner.py-496-            )
+/reference/tools/stage4_runner.py-497-        if generation.exists() or generation.is_symlink():
+/reference/tools/stage4_runner.py-498-            raise Stage4RunnerError(
+/reference/tools/stage4_runner.py-499-                "Klean generation destination appeared during execution"
+/reference/tools/stage4_runner.py-500-            )
+/reference/tools/stage4_runner.py:501:        produced_hash = pipeline_contract.sha256_tree(produced)
+/reference/tools/stage4_runner.py-502-        publication = Path(
+/reference/tools/stage4_runner.py-503-            tempfile.mkdtemp(prefix=f".{generation_id}-", dir=root)
+/reference/tools/stage4_runner.py-504-        )
+/reference/tools/stage4_runner.py-505-        publication.rmdir()
+/reference/tools/stage4_runner.py-506-        shutil.copytree(produced, publication)
+/reference/tools/stage4_runner.py:507:        if pipeline_contract.sha256_tree(publication) != produced_hash:
+/reference/tools/stage4_runner.py-508-            raise Stage4RunnerError(
+/reference/tools/stage4_runner.py-509-                "Klean generation changed while copying for publication"
+/reference/tools/stage4_runner.py-510-            )
+/reference/tools/stage4_runner.py-511-        publication.rename(generation)
+/reference/tools/stage4_runner.py-512-        publication = None
+--
+/reference/tools/stage4_runner.py-528-        preflight,
+/reference/tools/stage4_runner.py-529-        result.returncode,
+/reference/tools/stage4_runner.py-530-        stage1_workspace_sha256=stage1_workspace_sha256,
+/reference/tools/stage4_runner.py-531-        stage3_discovery_manifest_sha256=discovery.sha256,
+/reference/tools/stage4_runner.py-532-    )
+/reference/tools/stage4_runner.py:533:    candidate_sha256 = pipeline_contract.sha256_tree(generation)
+/reference/tools/stage4_runner.py-534-    if audit_contract.stage2_eligibility(
+/reference/tools/stage4_runner.py-535-        repo, run_id, problem
+/reference/tools/stage4_runner.py-536-    ) != eligibility:
+/reference/tools/stage4_runner.py-537-        raise Stage4RunnerError(
+/reference/tools/stage4_runner.py-538-            "Stage 2 selected audit changed before Stage 4 selection"
+/reference/tools/stage4_runner.py-539-        )
+/reference/tools/stage4_runner.py:540:    if pipeline_contract.sha256_tree(frozen) != frozen_hash or (
+/reference/tools/stage4_runner.py-541-        klean_export.tree_digest(frozen) != stage1_workspace_sha256
+/reference/tools/stage4_runner.py-542-    ):
+/reference/tools/stage4_runner.py-543-        raise Stage4RunnerError(
+/reference/tools/stage4_runner.py-544-            "finalized Stage 1 workspace changed before Stage 4 selection"
+/reference/tools/stage4_runner.py-545-        )
+--
+/reference/tools/klean_final_gate.py-181-    generation: Path,
+/reference/tools/klean_final_gate.py-182-    candidate: Path | None,
+/reference/tools/klean_final_gate.py-183-) -> dict[str, Any]:
+/reference/tools/klean_final_gate.py-184-    try:
+/reference/tools/klean_final_gate.py-185-        return {
+/reference/tools/klean_final_gate.py:186:            "k_workspace_sha256": pipeline_contract.sha256_tree(
+/reference/tools/klean_final_gate.py-187-                frozen_input
+/reference/tools/klean_final_gate.py-188-            ),
+/reference/tools/klean_final_gate.py-189-            "stage1_export_sha256": klean_export.tree_digest(
+/reference/tools/klean_final_gate.py-190-                frozen_input
+/reference/tools/klean_final_gate.py-191-            ),
+/reference/tools/klean_final_gate.py-192-            "discovery_manifest_sha256": (
+/reference/tools/klean_final_gate.py-193-                pipeline_contract.sha256_file(discovery_manifest)
+/reference/tools/klean_final_gate.py-194-            ),
+/reference/tools/klean_final_gate.py-195-            "klean_generation_sha256": (
+/reference/tools/klean_final_gate.py:196:                pipeline_contract.sha256_tree(generation)
+/reference/tools/klean_final_gate.py-197-            ),
+/reference/tools/klean_final_gate.py-198-            "lean_workspace_sha256": (
+/reference/tools/klean_final_gate.py:199:                pipeline_contract.sha256_tree(candidate)
+/reference/tools/klean_final_gate.py-200-                if candidate is not None
+/reference/tools/klean_final_gate.py-201-                else None
+/reference/tools/klean_final_gate.py-202-            ),
+/reference/tools/klean_final_gate.py-203-        }
+/reference/tools/klean_final_gate.py-204-    except (
+--
+/reference/tools/klean_final_gate.py-355-
+/reference/tools/klean_final_gate.py-356-    diagnostics: list[dict[str, Any]] = []
+/reference/tools/klean_final_gate.py-357-    with tempfile.TemporaryDirectory(prefix="klean-final-gate-") as temporary:
+/reference/tools/klean_final_gate.py-358-        project = Path(temporary) / "project"
+/reference/tools/klean_final_gate.py-359-        shutil.copytree(candidate, project)
+/reference/tools/klean_final_gate.py:360:        if pipeline_contract.sha256_tree(project) != before_hashes[
+/reference/tools/klean_final_gate.py-361-            "lean_workspace_sha256"
+/reference/tools/klean_final_gate.py-362-        ]:
+/reference/tools/klean_final_gate.py-363-            raise KleanFinalGateError(
+/reference/tools/klean_final_gate.py-364-                "candidate changed while copying for mechanical audit"
+/reference/tools/klean_final_gate.py-365-            )
+--
+/reference/tools/stage3_runner.py-117-    expected = (
+/reference/tools/stage3_runner.py-118-        outputs.get("workspace_sha256")
+/reference/tools/stage3_runner.py-119-        if isinstance(outputs, dict)
+/reference/tools/stage3_runner.py-120-        else None
+/reference/tools/stage3_runner.py-121-    )
+/reference/tools/stage3_runner.py:122:    current = pipeline_contract.sha256_tree(workspace)
+/reference/tools/stage3_runner.py-123-    if result.get("status") != "SUCCEEDED" or expected != current:
+/reference/tools/stage3_runner.py-124-        raise Stage3RunnerError(
+/reference/tools/stage3_runner.py-125-            "finalized Stage 1 workspace does not match its successful result"
+/reference/tools/stage3_runner.py-126-        )
+/reference/tools/stage3_runner.py-127-    return workspace, current
+--
+/reference/tools/stage3_runner.py-210-        and b"refresh_token_invalidated" in output
+/reference/tools/stage3_runner.py-211-    ):
+/reference/tools/stage3_runner.py-212-        raise Stage3RunnerError(
+/reference/tools/stage3_runner.py-213-            "Stage 3 infrastructure retry requires token invalidation evidence"
+/reference/tools/stage3_runner.py-214-        )
+/reference/tools/stage3_runner.py:215:    workspace_hash = pipeline_contract.sha256_tree(stage_root / "workspace")
+/reference/tools/stage3_runner.py-216-    inputs = document.get("inputs")
+/reference/tools/stage3_runner.py-217-    if (
+/reference/tools/stage3_runner.py-218-        not isinstance(inputs, dict)
+/reference/tools/stage3_runner.py-219-        or inputs.get("workspace_sha256") != workspace_hash
+/reference/tools/stage3_runner.py-220-        or not isinstance(outputs, dict)
+--
+/reference/tools/stage3_runner.py-494-    eligibility: dict[str, object],
+/reference/tools/stage3_runner.py-495-    *,
+/reference/tools/stage3_runner.py-496-    require_trace: bool,
+/reference/tools/stage3_runner.py-497-    protected: ProtectedManifest | None,
+/reference/tools/stage3_runner.py-498-) -> None:
+/reference/tools/stage3_runner.py:499:    if pipeline_contract.sha256_tree(k_reference) != expected_k_hash:
+/reference/tools/stage3_runner.py-500-        raise Stage3RunnerError(
+/reference/tools/stage3_runner.py-501-            "finalized Stage 1 workspace changed during Stage 3"
+/reference/tools/stage3_runner.py-502-        )
+/reference/tools/stage3_runner.py-503-    if (
+/reference/tools/stage3_runner.py-504-        pipeline_contract.sha256_file(inventory_path)
+--
+/reference/tools/klean_audit_contract.py-95-            stage / container_name,
+/reference/tools/klean_audit_contract.py-96-            parts[1],
+/reference/tools/klean_audit_contract.py-97-            f"selected {stage_name} output",
+/reference/tools/klean_audit_contract.py-98-        )
+/reference/tools/klean_audit_contract.py-99-        if (
+/reference/tools/klean_audit_contract.py:100:            pipeline_contract.sha256_tree(candidate)
+/reference/tools/klean_audit_contract.py-101-            != selected.get("artifact_sha256")
+/reference/tools/klean_audit_contract.py-102-        ):
+/reference/tools/klean_audit_contract.py-103-            noun = (
+/reference/tools/klean_audit_contract.py-104-                "generation"
+/reference/tools/klean_audit_contract.py-105-                if stage_name == "04-klean-generation"
+--
+/reference/tools/klean_audit_contract.py-216-        }
+/reference/tools/klean_audit_contract.py-217-    except pipeline_contract.PipelineContractError as error:
+/reference/tools/klean_audit_contract.py-218-        raise _translate(error) from error
+/reference/tools/klean_audit_contract.py-219-
+/reference/tools/klean_audit_contract.py-220-
+/reference/tools/klean_audit_contract.py:221:def _generation_producer_sources(
+/reference/tools/klean_audit_contract.py-222-    repo: Path, generator_manifest: dict[str, Any]
+/reference/tools/klean_audit_contract.py-223-) -> tuple[Path, str]:
+/reference/tools/klean_audit_contract.py-224-    provenance = generator_manifest.get("provenance")
+/reference/tools/klean_audit_contract.py-225-    image_id = (
+/reference/tools/klean_audit_contract.py-226-        provenance.get("generator_image_id")
+--
+/reference/tools/klean_audit_contract.py-287-            if pipeline_contract.sha256_file(source) != digest:
+/reference/tools/klean_audit_contract.py-288-                raise KleanAuditContractError(
+/reference/tools/klean_audit_contract.py-289-                    f"Stage 4 producer source {name} SHA-256 differs "
+/reference/tools/klean_audit_contract.py-290-                    "from generator provenance"
+/reference/tools/klean_audit_contract.py-291-                )
+/reference/tools/klean_audit_contract.py:292:        return bundle, pipeline_contract.sha256_tree(bundle)
+/reference/tools/klean_audit_contract.py-293-    except pipeline_contract.PipelineContractError as error:
+/reference/tools/klean_audit_contract.py-294-        raise _translate(error) from error
+/reference/tools/klean_audit_contract.py-295-
+/reference/tools/klean_audit_contract.py-296-
+/reference/tools/klean_audit_contract.py-297-def resolve_stage6_audit(
+--
+/reference/tools/klean_audit_contract.py-313-        k_result = pipeline_contract._read_regular_json(
+/reference/tools/klean_audit_contract.py-314-            k_stage / "result.json", "Stage 1 result"
+/reference/tools/klean_audit_contract.py-315-        )
+/reference/tools/klean_audit_contract.py-316-        if k_result.get("status") != "SUCCEEDED":
+/reference/tools/klean_audit_contract.py-317-            raise KleanAuditContractError("Stage 1 is not successful")
+/reference/tools/klean_audit_contract.py:318:        k_hash = pipeline_contract.sha256_tree(k_workspace)
+/reference/tools/klean_audit_contract.py-319-        if (
+/reference/tools/klean_audit_contract.py-320-            not isinstance(k_result.get("outputs"), dict)
+/reference/tools/klean_audit_contract.py-321-            or k_result["outputs"].get("workspace_sha256") != k_hash
+/reference/tools/klean_audit_contract.py-322-        ):
+/reference/tools/klean_audit_contract.py-323-            raise KleanAuditContractError(
+--
+/reference/tools/klean_audit_contract.py-365-                "Stage 4 selection status differs from its preflight"
+/reference/tools/klean_audit_contract.py-366-            )
+/reference/tools/klean_audit_contract.py-367-        generator_manifest = pipeline_contract._read_regular_json(
+/reference/tools/klean_audit_contract.py-368-            generation / "generator-manifest.json", "generator manifest"
+/reference/tools/klean_audit_contract.py-369-        )
+/reference/tools/klean_audit_contract.py:370:        generation_producer_sources, producer_sources_hash = (
+/reference/tools/klean_audit_contract.py:371:            _generation_producer_sources(repo, generator_manifest)
+/reference/tools/klean_audit_contract.py-372-        )
+/reference/tools/klean_audit_contract.py-373-        generated = pipeline_contract.require_real_directory(
+/reference/tools/klean_audit_contract.py-374-            generation / "generated", "generated Klean project"
+/reference/tools/klean_audit_contract.py-375-        )
+/reference/tools/klean_audit_contract.py-376-        generated_hash = klean_export.tree_digest(generated)
+--
+/reference/tools/klean_audit_contract.py-433-            ),
+/reference/tools/klean_audit_contract.py-434-            "k_workspace": str(k_workspace),
+/reference/tools/klean_audit_contract.py-435-            "k_audit": str(k_audit),
+/reference/tools/klean_audit_contract.py-436-            "discovery_manifest": str(discovery.path),
+/reference/tools/klean_audit_contract.py-437-            "klean_generation": str(generation),
+/reference/tools/klean_audit_contract.py:438:            "generation_producer_sources": str(
+/reference/tools/klean_audit_contract.py:439:                generation_producer_sources
+/reference/tools/klean_audit_contract.py-440-            ),
+/reference/tools/klean_audit_contract.py-441-            "lean_workspace": (
+/reference/tools/klean_audit_contract.py-442-                str(lean_workspace)
+/reference/tools/klean_audit_contract.py-443-                if lean_workspace is not None
+/reference/tools/klean_audit_contract.py-444-                else None
+--
+/reference/tools/klean_audit_contract.py-458-            ),
+/reference/tools/klean_audit_contract.py-459-            "hashes": {
+/reference/tools/klean_audit_contract.py-460-                "k_workspace_sha256": k_hash,
+/reference/tools/klean_audit_contract.py-461-                "stage1_export_sha256": stage1_export_hash,
+/reference/tools/klean_audit_contract.py-462-                "discovery_manifest_sha256": discovery.sha256,
+/reference/tools/klean_audit_contract.py:463:                "k_audit_sha256": pipeline_contract.sha256_tree(k_audit),
+/reference/tools/klean_audit_contract.py:464:                "klean_generation_sha256": pipeline_contract.sha256_tree(
+/reference/tools/klean_audit_contract.py-465-                    generation
+/reference/tools/klean_audit_contract.py-466-                ),
+/reference/tools/klean_audit_contract.py:467:                "generation_producer_sources_sha256": (
+/reference/tools/klean_audit_contract.py:468:                    producer_sources_hash
+/reference/tools/klean_audit_contract.py-469-                ),
+/reference/tools/klean_audit_contract.py-470-                "generated_tree_sha256": generated_hash,
+/reference/tools/klean_audit_contract.py-471-                "lean_workspace_sha256": (
+/reference/tools/klean_audit_contract.py:472:                    pipeline_contract.sha256_tree(lean_workspace)
+/reference/tools/klean_audit_contract.py-473-                    if lean_workspace is not None
+/reference/tools/klean_audit_contract.py-474-                    else None
+/reference/tools/klean_audit_contract.py-475-                ),
+/reference/tools/klean_audit_contract.py-476-                "lean_invocation_sha256": (
+/reference/tools/klean_audit_contract.py:477:                    pipeline_contract.sha256_tree(lean_invocation)
+/reference/tools/klean_audit_contract.py-478-                    if lean_invocation is not None
+/reference/tools/klean_audit_contract.py-479-                    else None
+/reference/tools/klean_audit_contract.py-480-                ),
+/reference/tools/klean_audit_contract.py-481-            },
+/reference/tools/klean_audit_contract.py-482-            "selections": {
+--
+/reference/tools/klean_audit_contract.py-709-    binding_error = _mechanical_binding_error(
+/reference/tools/klean_audit_contract.py-710-        mechanical, audit_input
+/reference/tools/klean_audit_contract.py-711-    )
+/reference/tools/klean_audit_contract.py-712-    if binding_error is not None:
+/reference/tools/klean_audit_contract.py-713-        raise KleanAuditContractError(binding_error)
+/reference/tools/klean_audit_contract.py:714:    if pipeline_contract.sha256_tree(candidate) != expected_candidate:
+/reference/tools/klean_audit_contract.py-715-        raise KleanAuditContractError(
+/reference/tools/klean_audit_contract.py-716-            "Stage 6 candidate changed before publication"
+/reference/tools/klean_audit_contract.py-717-        )
+/reference/tools/klean_audit_contract.py-718-    try:
+/reference/tools/klean_audit_contract.py-719-        fresh_audit_input = resolve_stage6_audit(
+--
+/reference/tools/run_pipeline.py-117-        raise PipelineOrchestrationError(f"{stage} selection path is malformed")
+/reference/tools/run_pipeline.py-118-    candidate = pipeline_contract._require_direct_directory(
+/reference/tools/run_pipeline.py-119-        root / container, parts[1], f"{stage} selected output"
+/reference/tools/run_pipeline.py-120-    )
+/reference/tools/run_pipeline.py-121-    status = pipeline_contract._selection_status(stage, candidate)
+/reference/tools/run_pipeline.py:122:    if pipeline_contract.sha256_tree(candidate) != selected.get(
+/reference/tools/run_pipeline.py-123-        "artifact_sha256"
+/reference/tools/run_pipeline.py-124-    ):
+/reference/tools/run_pipeline.py-125-        raise PipelineOrchestrationError(
+/reference/tools/run_pipeline.py-126-            f"{stage} selected output changed after selection"
+/reference/tools/run_pipeline.py-127-        )
+--
+/reference/tools/populate_runs.py-86-
+/reference/tools/populate_runs.py-87-def sha256_file(path: Path) -> str:
+/reference/tools/populate_runs.py-88-    return hashlib.sha256(path.read_bytes()).hexdigest()
+/reference/tools/populate_runs.py-89-
+/reference/tools/populate_runs.py-90-
+/reference/tools/populate_runs.py:91:def sha256_tree(root: Path) -> str:
+/reference/tools/populate_runs.py-92-    digest = hashlib.sha256()
+/reference/tools/populate_runs.py-93-    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+/reference/tools/populate_runs.py-94-        relative = path.relative_to(root).as_posix().encode()
+/reference/tools/populate_runs.py-95-        digest.update(len(relative).to_bytes(4, "big"))
+/reference/tools/populate_runs.py-96-        digest.update(relative)
+--
+/reference/tools/populate_runs.py-375-            "instruction_prompt_sha256": sha256_file(instruction),
+/reference/tools/populate_runs.py-376-            "translator_sha256": sha256_file(repo / "tools/py2mpy.py"),
+/reference/tools/populate_runs.py-377-        },
+/reference/tools/populate_runs.py-378-    }
+/reference/tools/populate_runs.py-379-    if condition.semantics:
+/reference/tools/populate_runs.py:380:        manifest["inputs"]["reference_semantics_sha256"] = sha256_tree(
+/reference/tools/populate_runs.py-381-            repo / "data/reference/src"
+/reference/tools/populate_runs.py-382-        )
+/reference/tools/populate_runs.py-383-    if condition.kit:
+/reference/tools/populate_runs.py-384-        lock = json.loads((repo / "data/kit-skills.lock.json").read_text())
+/reference/tools/populate_runs.py-385-        manifest["kit"] = {
+--
+/reference/tools/migrate_six_stage_layout.py-144-        raise _error(str(error), path) from error
+/reference/tools/migrate_six_stage_layout.py-145-
+/reference/tools/migrate_six_stage_layout.py-146-
+/reference/tools/migrate_six_stage_layout.py-147-def _tree_hash(path: Path, label: str) -> str:
+/reference/tools/migrate_six_stage_layout.py-148-    try:
+/reference/tools/migrate_six_stage_layout.py:149:        return pipeline_contract.sha256_tree(path)
+/reference/tools/migrate_six_stage_layout.py-150-    except pipeline_contract.PipelineContractError as error:
+/reference/tools/migrate_six_stage_layout.py-151-        raise _error(f"cannot hash {label}", path) from error
+/reference/tools/migrate_six_stage_layout.py-152-
+/reference/tools/migrate_six_stage_layout.py-153-
+/reference/tools/migrate_six_stage_layout.py-154-def _task_ids(run: Path, manifest: Mapping[str, Any]) -> list[str]:
+--
+/reference/tools/pipeline_contract.py-185-    except OSError as error:
+/reference/tools/pipeline_contract.py-186-        raise PipelineContractError(f"cannot hash file {path}: {error}") from error
+/reference/tools/pipeline_contract.py-187-    return digest.hexdigest()
+/reference/tools/pipeline_contract.py-188-
+/reference/tools/pipeline_contract.py-189-
+/reference/tools/pipeline_contract.py:190:def sha256_tree(root: Path) -> str:
+/reference/tools/pipeline_contract.py-191-    root = require_real_directory(root, "tree root")
+/reference/tools/pipeline_contract.py-192-    digest = hashlib.sha256()
+/reference/tools/pipeline_contract.py-193-    pending = [root]
+/reference/tools/pipeline_contract.py-194-    entries: list[tuple[str, str, Path]] = []
+/reference/tools/pipeline_contract.py-195-    while pending:
+--
+/reference/tools/pipeline_contract.py-424-    semantics = None
+/reference/tools/pipeline_contract.py-425-    if config.condition.semantics:
+/reference/tools/pipeline_contract.py-426-        semantics = require_real_directory(
+/reference/tools/pipeline_contract.py-427-            repo / "data/reference/src", "reference semantics"
+/reference/tools/pipeline_contract.py-428-        )
+/reference/tools/pipeline_contract.py:429:        sha256_tree(semantics)
+/reference/tools/pipeline_contract.py-430-    for problem_id in problem_ids:
+/reference/tools/pipeline_contract.py-431-        problem_id = validate_safe_component(problem_id, "problem ID")
+/reference/tools/pipeline_contract.py-432-        if problem_id in seen:
+/reference/tools/pipeline_contract.py-433-            raise PipelineContractError(f"duplicate problem ID: {problem_id}")
+/reference/tools/pipeline_contract.py-434-        seen.add(problem_id)
+--
+/reference/tools/pipeline_contract.py-444-                "translator": translator,
+/reference/tools/pipeline_contract.py-445-                "translator_sha256": sha256_file(translator),
+/reference/tools/pipeline_contract.py-446-                "instruction_sha256": sha256_file(instruction),
+/reference/tools/pipeline_contract.py-447-                "semantics": semantics,
+/reference/tools/pipeline_contract.py-448-                "semantics_sha256": (
+/reference/tools/pipeline_contract.py:449:                    sha256_tree(semantics) if semantics is not None else None
+/reference/tools/pipeline_contract.py-450-                ),
+/reference/tools/pipeline_contract.py-451-            }
+/reference/tools/pipeline_contract.py-452-        )
+/reference/tools/pipeline_contract.py-453-    if not validated:
+/reference/tools/pipeline_contract.py-454-        raise PipelineContractError("at least one problem ID is required")
+--
+/reference/tools/pipeline_contract.py-939-        "session_id": session_id,
+/reference/tools/pipeline_contract.py-940-        "prompt_sha256": task_manifest.get("inputs", {}).get(
+/reference/tools/pipeline_contract.py-941-            "instruction_prompt_sha256"
+/reference/tools/pipeline_contract.py-942-        ),
+/reference/tools/pipeline_contract.py-943-        "inputs": {
+/reference/tools/pipeline_contract.py:944:            "workspace_sha256": sha256_tree(stage_root / "workspace"),
+/reference/tools/pipeline_contract.py-945-        },
+/reference/tools/pipeline_contract.py-946-        "outputs": None,
+/reference/tools/pipeline_contract.py-947-    }
+/reference/tools/pipeline_contract.py-948-    try:
+/reference/tools/pipeline_contract.py-949-        write_json_atomic(destination / "invocation.json", document)
+--
+/reference/tools/pipeline_contract.py-990-    previous = existing[-1]
+/reference/tools/pipeline_contract.py-991-    previous_document = _read_regular_json(
+/reference/tools/pipeline_contract.py-992-        previous / "invocation.json", "previous invocation manifest"
+/reference/tools/pipeline_contract.py-993-    )
+/reference/tools/pipeline_contract.py-994-    result = _read_regular_json(stage_root / "result.json", "Stage 1 result")
+/reference/tools/pipeline_contract.py:995:    current_workspace = sha256_tree(stage_root / "workspace")
+/reference/tools/pipeline_contract.py-996-    previous_outputs = previous_document.get("outputs")
+/reference/tools/pipeline_contract.py-997-    if (
+/reference/tools/pipeline_contract.py-998-        previous_document.get("status") != "OOM"
+/reference/tools/pipeline_contract.py-999-        or result.get("status") != "OOM"
+/reference/tools/pipeline_contract.py-1000-        or result.get("invocation") != previous.name
+--
+/reference/tools/pipeline_contract.py-1093-        )
+/reference/tools/pipeline_contract.py-1094-    previous_document = _read_regular_json(
+/reference/tools/pipeline_contract.py-1095-        previous / "invocation.json", "previous invocation manifest"
+/reference/tools/pipeline_contract.py-1096-    )
+/reference/tools/pipeline_contract.py-1097-    result = _read_regular_json(stage_root / "result.json", "Stage 1 result")
+/reference/tools/pipeline_contract.py:1098:    current_workspace = sha256_tree(stage_root / "workspace")
+/reference/tools/pipeline_contract.py-1099-    previous_outputs = previous_document.get("outputs")
+/reference/tools/pipeline_contract.py-1100-    if (
+/reference/tools/pipeline_contract.py-1101-        previous_document.get("status") != expected_status
+/reference/tools/pipeline_contract.py-1102-        or result.get("status") != expected_status
+/reference/tools/pipeline_contract.py-1103-        or result.get("invocation") != previous.name
+--
+/reference/tools/pipeline_contract.py-1212-    session_id = _read_session_state(state)["session_id"]
+/reference/tools/pipeline_contract.py-1213-    if second_document.get("session_id") != session_id:
+/reference/tools/pipeline_contract.py-1214-        raise PipelineContractError(
+/reference/tools/pipeline_contract.py-1215-            "infrastructure retry session does not match persisted session"
+/reference/tools/pipeline_contract.py-1216-        )
+/reference/tools/pipeline_contract.py:1217:    current_workspace = sha256_tree(stage_root / "workspace")
+/reference/tools/pipeline_contract.py-1218-
+/reference/tools/pipeline_contract.py-1219-    def require_unchanged_workspace(
+/reference/tools/pipeline_contract.py-1220-        document: dict[str, Any], label: str
+/reference/tools/pipeline_contract.py-1221-    ) -> dict[str, Any]:
+/reference/tools/pipeline_contract.py-1222-        inputs = document.get("inputs")
+--
+/reference/tools/pipeline_contract.py-1391-    for path in _walk_regular_files(invocation, "invocation evidence"):
+/reference/tools/pipeline_contract.py-1392-        if path.name in {"invocation.json", "metrics.json"}:
+/reference/tools/pipeline_contract.py-1393-            continue
+/reference/tools/pipeline_contract.py-1394-        evidence[path.relative_to(invocation).as_posix()] = sha256_file(path)
+/reference/tools/pipeline_contract.py-1395-    return {
+/reference/tools/pipeline_contract.py:1396:        "workspace_sha256": sha256_tree(workspace),
+/reference/tools/pipeline_contract.py-1397-        "evidence": evidence,
+/reference/tools/pipeline_contract.py-1398-    }
+/reference/tools/pipeline_contract.py-1399-
+/reference/tools/pipeline_contract.py-1400-
+/reference/tools/pipeline_contract.py-1401-def previous_session_cumulative(
+--
+/reference/tools/pipeline_contract.py-1936-        )
+/reference/tools/pipeline_contract.py-1937-        if not retryable and not replace_selected:
+/reference/tools/pipeline_contract.py-1938-            raise PipelineContractError(
+/reference/tools/pipeline_contract.py-1939-                f"{stage} selection is terminal and cannot be replaced"
+/reference/tools/pipeline_contract.py-1940-            )
+/reference/tools/pipeline_contract.py:1941:    candidate_sha256 = sha256_tree(candidate)
+/reference/tools/pipeline_contract.py-1942-    if (
+/reference/tools/pipeline_contract.py-1943-        expected_candidate_sha256 is not None
+/reference/tools/pipeline_contract.py-1944-        and candidate_sha256 != expected_candidate_sha256
+/reference/tools/pipeline_contract.py-1945-    ):
+/reference/tools/pipeline_contract.py-1946-        raise PipelineContractError(

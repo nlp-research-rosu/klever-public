@@ -1,0 +1,175 @@
+a626029bc26186bab035d72ca0984ae2f0df782523de23ba28f1412bff9e400d  semantic.k
+b7c1fa3dd85aa9ae2f86be343439b418add64496fe3b1477818c95addcbac005  verification.k
+235c657689e67fdcd1d4680559dd4a97fdf24518d111cd23e2258afc9dface05  spec.k
+ab83d1f82b73af6aa67b6272b8cce230d0a9034553bfa8fd44c9ab3f751a9186  solution.mpy
+590b17035fd8d0243e93b25178d7b05f18cc5c7039fd345a6862a5a975cddd0b  solution.py
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports BOOL-SYNTAX
+     4	  imports STRING-SYNTAX
+     5	
+     6	  // The source subset emitted by py2mpy.py for solution.py.
+     7	  syntax Pgm    ::= "Module" "(" Stmts ")"
+     8	  syntax Stmts  ::= List{Stmt, ""}
+     9	  syntax Stmt   ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    10	                  | "For" "(" Expr "," Expr "," Stmts ")"
+    11	                  | "If" "(" Expr "," Stmts "," Stmts ")"
+    12	                  | "Return" "(" Expr ")"
+    13	  syntax ParamItems ::= List{String, ","}
+    14	  syntax Params ::= "Params" "(" ParamItems ")"
+    15	  syntax Expr   ::= "Name" "(" String ")"
+    16	                  | "Bool" "(" Bool ")"
+    17	                  | "Compare" "(" Expr "," CmpOp ")"
+    18	  syntax CmpOp  ::= "CmpOp" "(" String "," Expr ")"
+    19	
+    20	  // A recursive input representation gives the prover an inductive shape.
+    21	  syntax IntSeq ::= "nil"
+    22	                  | "cons" "(" Int "," IntSeq ")"
+    23	endmodule
+    24	
+    25	module MPY
+    26	  imports MPY-SYNTAX
+    27	  imports INT
+    28	  imports BOOL
+    29	
+    30	  syntax Value ::= VInt(Int) | VBool(Bool) | VList(IntSeq)
+    31	  syntax Slot ::= "unbound" | "slot" "(" Value ")"
+    32	  syntax Result ::= "noResult" | "result" "(" Bool ")"
+    33	
+    34	  syntax KItem ::= "boot"
+    35	                 | "exec" "(" Stmts ")"
+    36	                 | "eval" "(" Expr ")"
+    37	                 | "ifK" "(" Stmts "," Stmts ")"
+    38	                 | "forK" "(" Expr "," Stmts ")"
+    39	                 | "loop" "(" Expr "," IntSeq "," Stmts ")"
+    40	                 | "cmpRight" "(" Expr ")"
+    41	                 | "cmpValues" "(" Value "," String ")"
+    42	                 | "returnK"
+    43	
+    44	  configuration
+    45	    <bt>
+    46	      <k> boot </k>
+    47	      <program> $PGM:Pgm </program>
+    48	      <input> $INPUT:IntSeq </input>
+    49	      <threshold> $THRESHOLD:Int </threshold>
+    50	      <l> unbound </l>
+    51	      <t> unbound </t>
+    52	      <x> unbound </x>
+    53	      <result> noResult </result>
+    54	    </bt>
+    55	
+    56	  // Loading the module and invoking its required two-argument entry point.
+    57	  rule <k> boot => exec(BODY) ... </k>
+    58	       <program>
+    59	         Module(FuncDef("below_threshold", Params("l", "t"), BODY))
+    60	       </program>
+    61	       <input> XS </input>
+    62	       <threshold> T </threshold>
+    63	       <l> unbound => slot(VList(XS)) </l>
+    64	       <t> unbound => slot(VInt(T)) </t>
+    65	
+    66	  // Sequential statement execution.
+    67	  rule <k> exec(.Stmts) => .K ... </k>
+    68	  rule <k> exec(S:Stmt SS:Stmts) => S ~> exec(SS) ... </k>
+    69	
+    70	  // Expression evaluation and environment lookup.
+    71	  rule <k> eval(Bool(B)) => VBool(B) ... </k>
+    72	  rule <k> eval(Name("l")) => V ... </k>
+    73	       <l> slot(V) </l>
+    74	  rule <k> eval(Name("t")) => V ... </k>
+    75	       <t> slot(V) </t>
+    76	  rule <k> eval(Name("x")) => V ... </k>
+    77	       <x> slot(V) </x>
+    78	
+    79	  // The comparison shape used by the implementation, evaluated left-to-right.
+    80	  rule <k> eval(Compare(E1, CmpOp(">=", E2)))
+    81	        => eval(E1) ~> cmpRight(E2) ... </k>
+    82	  rule <k> V1:Value ~> cmpRight(E2)
+    83	        => eval(E2) ~> cmpValues(V1, ">=") ... </k>
+    84	  rule <k> VInt(I2) ~> cmpValues(VInt(I1), ">=")
+    85	        => VBool(I1 >=Int I2) ... </k>
+    86	
+    87	  // Conditional statements execute exactly one branch.
+    88	  rule <k> If(COND, THEN, ELSE)
+    89	        => eval(COND) ~> ifK(THEN, ELSE) ... </k>
+    90	  rule <k> VBool(true) ~> ifK(THEN, _ELSE)
+    91	        => exec(THEN) ... </k>
+    92	  rule <k> VBool(false) ~> ifK(_THEN, ELSE)
+    93	        => exec(ELSE) ... </k>
+    94	
+    95	  // For loops consume the iterable from left to right and bind the target.
+    96	  rule <k> For(TARGET, ITER, BODY)
+    97	        => eval(ITER) ~> forK(TARGET, BODY) ... </k>
+    98	  rule <k> VList(XS) ~> forK(TARGET, BODY)
+    99	        => loop(TARGET, XS, BODY) ... </k>
+   100	  rule <k> loop(_TARGET, nil, _BODY) => .K ... </k>
+   101	  rule <k> loop(Name("x"), cons(I, XS), BODY)
+   102	        => exec(BODY) ~> loop(Name("x"), XS, BODY) ... </k>
+   103	       <x> _ => slot(VInt(I)) </x>
+   104	
+   105	  // Return discards the rest of the current function computation.
+   106	  rule <k> Return(E) ~> _REST => eval(E) ~> returnK </k>
+   107	  rule <k> VBool(B) ~> returnK => .K </k>
+   108	       <result> noResult => result(B) </result>
+   109	endmodule
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Mathematical contract: every element is strictly below the threshold.
+     7	  syntax Bool ::= allBelow(IntSeq, Int) [function, total]
+     8	  rule allBelow(nil, _T) => true
+     9	  rule allBelow(cons(I, XS), T)
+    10	    => (I <Int T) andBool allBelow(XS, T)
+    11	
+    12	  // One canonical spelling of the exact translated solution, shared by claims.
+    13	  syntax Pgm ::= "solutionProgram" [macro]
+    14	  rule solutionProgram
+    15	    => Module(
+    16	         FuncDef("below_threshold", Params("l", "t"),
+    17	           For(Name("x"), Name("l"),
+    18	             If(Compare(Name("x"), CmpOp(">=", Name("t"))),
+    19	               Return(Bool(false)),
+    20	               .Stmts))
+    21	           Return(Bool(true))))
+    22	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Inductive loop invariant.  If the suffix XS remains to be scanned, the
+     7	  // eventual answer is exactly the mathematical predicate on that suffix.
+     8	  claim [loop-invariant]:
+     9	    <bt>
+    10	      <k>
+    11	        loop(Name("x"), XS:IntSeq,
+    12	          If(Compare(Name("x"), CmpOp(">=", Name("t"))),
+    13	            Return(Bool(false)),
+    14	            .Stmts))
+    15	        ~> exec(Return(Bool(true)) .Stmts)
+    16	        => .K
+    17	      </k>
+    18	      <program> solutionProgram </program>
+    19	      <input> INPUT:IntSeq </input>
+    20	      <threshold> T:Int </threshold>
+    21	      <l> slot(VList(INPUT)) </l>
+    22	      <t> slot(VInt(T)) </t>
+    23	      <x> _INITIAL_X:Slot => ?_FINAL_LOOP_X:Slot </x>
+    24	      <result> noResult => result(allBelow(XS, T)) </result>
+    25	    </bt>
+    26	
+    27	  claim [below-threshold-correct]:
+    28	    <bt>
+    29	      <k> boot => .K </k>
+    30	      <program> solutionProgram </program>
+    31	      <input> XS:IntSeq </input>
+    32	      <threshold> T:Int </threshold>
+    33	      <l> unbound => slot(VList(XS)) </l>
+    34	      <t> unbound => slot(VInt(T)) </t>
+    35	      <x> unbound => ?_FINAL_X:Slot </x>
+    36	      <result> noResult => result(allBelow(XS, T)) </result>
+    37	    </bt>
+    38	endmodule
+exit_status=0

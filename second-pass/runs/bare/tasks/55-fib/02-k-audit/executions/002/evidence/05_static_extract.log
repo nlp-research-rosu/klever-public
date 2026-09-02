@@ -1,0 +1,218 @@
+COMMAND: nl -ba candidate K sources
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports STRING-SYNTAX
+     4	
+     5	  syntax Program ::= "Module" "(" Stmts ")"
+     6	
+     7	  syntax Stmts ::= List{Stmt, ""}
+     8	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+     9	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    10	                | "Return" "(" Expr ")"
+    11	
+    12	  syntax Params ::= "Params" "(" String ")"
+    13	
+    14	  syntax Expr ::= "Int" "(" Int ")"
+    15	                | "Name" "(" String ")"
+    16	                | "BinOp" "(" String "," Expr "," Expr ")"
+    17	                | "Compare" "(" Expr "," CmpOp ")"
+    18	                | "Call" "(" Expr "," Expr ")"
+    19	
+    20	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    21	endmodule
+    22	
+    23	module SEMANTIC
+    24	  imports MPY-SYNTAX
+    25	  imports INT
+    26	  imports BOOL
+    27	  imports MAP
+    28	
+    29	  configuration
+    30	    <python>
+    31	      <k> $PGM:Program </k>
+    32	      <arg> $ARG:Int </arg>
+    33	      <env> .Map </env>
+    34	      <functions> .Map </functions>
+    35	    </python>
+    36	
+    37	  syntax Function ::= "function" "(" String "," Stmts ")"
+    38	
+    39	  syntax KItem ::= "exec" "(" Stmts ")"
+    40	                 | "topCall"
+    41	                 | "eval" "(" Expr ")"
+    42	                 | "evalRight" "(" String "," Expr ")"
+    43	                 | "applyBin" "(" String "," Int ")"
+    44	                 | "finishCompare" "(" String "," Expr ")"
+    45	                 | "applyCompare" "(" String "," Int ")"
+    46	                 | "prepareCall" "(" String ")"
+    47	                 | "invoke" "(" String "," Int ")"
+    48	                 | "functionEnd" "(" Map ")"
+    49	                 | "makeReturn"
+    50	                 | "returned" "(" Int ")"
+    51	
+    52	  rule <k> Module(SS) => exec(SS) ~> topCall ... </k>
+    53	
+    54	  rule exec(.Stmts) => .K
+    55	  rule exec(S:Stmt SS:Stmts) => S ~> exec(SS)
+    56	
+    57	  rule <k> FuncDef(F, Params(P), BODY) => .K ... </k>
+    58	       <functions> FS => (F |-> function(P, BODY)) FS </functions>
+    59	    requires notBool (F in_keys(FS))
+    60	
+    61	  rule <k> topCall => eval(Call(Name("fib"), Int(N))) ... </k>
+    62	       <arg> N </arg>
+    63	
+    64	  rule eval(Int(I)) => I
+    65	  rule <k> eval(Name(X)) => I ... </k>
+    66	       <env>... X |-> I:Int ...</env>
+    67	
+    68	  rule eval(BinOp(OP, LEFT, RIGHT))
+    69	    => eval(LEFT) ~> evalRight(OP, RIGHT)
+    70	  rule I:Int ~> evalRight(OP, RIGHT)
+    71	    => eval(RIGHT) ~> applyBin(OP, I)
+    72	  rule J:Int ~> applyBin("+", I) => I +Int J
+    73	  rule J:Int ~> applyBin("-", I) => I -Int J
+    74	
+    75	  rule eval(Compare(LEFT, CmpOp(OP, RIGHT)))
+    76	    => eval(LEFT) ~> finishCompare(OP, RIGHT)
+    77	  rule I:Int ~> finishCompare(OP, RIGHT)
+    78	    => eval(RIGHT) ~> applyCompare(OP, I)
+    79	  rule J:Int ~> applyCompare("<=", I) => I <=Int J
+    80	
+    81	  rule true  ~> finishIf(THEN, _ELSE) => exec(THEN)
+    82	  rule false ~> finishIf(_THEN, ELSE) => exec(ELSE)
+    83	  syntax KItem ::= "finishIf" "(" Stmts "," Stmts ")"
+    84	  rule If(TEST, THEN, ELSE) => eval(TEST) ~> finishIf(THEN, ELSE)
+    85	
+    86	  rule eval(Call(Name(F), ARG)) => eval(ARG) ~> prepareCall(F)
+    87	  rule I:Int ~> prepareCall(F) => invoke(F, I)
+    88	
+    89	  rule <k> invoke(F, I) => exec(BODY) ~> functionEnd(RHO) ... </k>
+    90	       <env> RHO => P |-> I </env>
+    91	       <functions>... F |-> function(P, BODY) ...</functions>
+    92	
+    93	  rule Return(E) => eval(E) ~> makeReturn
+    94	  rule I:Int ~> makeReturn => returned(I)
+    95	  rule returned(I) ~> exec(_SS) => returned(I)
+    96	  rule <k> returned(I) ~> functionEnd(RHO) => I ... </k>
+    97	       <env> _ => RHO </env>
+    98	endmodule
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  syntax Int ::= fibMath(Int) [function]
+     7	
+     8	  rule fibMath(N) => N
+     9	    requires 0 <=Int N andBool N <=Int 1
+    10	  rule fibMath(N) => fibMath(N -Int 1) +Int fibMath(N -Int 2)
+    11	    requires N >Int 1
+    12	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [fib-invoke]:
+     7	    <k> invoke("fib", N) ~> REST => fibMath(N) ~> REST </k>
+     8	    <arg> _A </arg>
+     9	    <env> _RHO </env>
+    10	    <functions>
+    11	      "fib" |-> function("n",
+    12	        If(Compare(Name("n"), CmpOp("<=", Int(1))),
+    13	          Return(Name("n")),
+    14	          .Stmts)
+    15	        Return(BinOp("+",
+    16	          Call(Name("fib"), BinOp("-", Name("n"), Int(1))),
+    17	          Call(Name("fib"), BinOp("-", Name("n"), Int(2))))))
+    18	    </functions>
+    19	    requires N >=Int 0
+    20	    [all-path]
+    21	
+    22	  claim [fib-module]:
+    23	    <k>
+    24	      Module(
+    25	        FuncDef("fib", Params("n"),
+    26	          If(Compare(Name("n"), CmpOp("<=", Int(1))),
+    27	            Return(Name("n")),
+    28	            .Stmts)
+    29	          Return(BinOp("+",
+    30	            Call(Name("fib"), BinOp("-", Name("n"), Int(1))),
+    31	            Call(Name("fib"), BinOp("-", Name("n"), Int(2)))))))
+    32	      => fibMath(N)
+    33	    </k>
+    34	    <arg> N </arg>
+    35	    <env> .Map </env>
+    36	    <functions>
+    37	      .Map
+    38	      => "fib" |-> function("n",
+    39	           If(Compare(Name("n"), CmpOp("<=", Int(1))),
+    40	             Return(Name("n")),
+    41	             .Stmts)
+    42	           Return(BinOp("+",
+    43	             Call(Name("fib"), BinOp("-", Name("n"), Int(1))),
+    44	             Call(Name("fib"), BinOp("-", Name("n"), Int(2))))))
+    45	    </functions>
+    46	    requires N >=Int 0
+    47	    [all-path]
+    48	endmodule
+COMMAND: rg declarations and rules
+/candidate/spec.k:1:requires "verification.k"
+/candidate/spec.k:4:  imports VERIFICATION
+/candidate/spec.k:6:  claim [fib-invoke]:
+/candidate/spec.k:19:    requires N >=Int 0
+/candidate/spec.k:22:  claim [fib-module]:
+/candidate/spec.k:46:    requires N >=Int 0
+/candidate/semantic.k:2:  imports INT-SYNTAX
+/candidate/semantic.k:3:  imports STRING-SYNTAX
+/candidate/semantic.k:5:  syntax Program ::= "Module" "(" Stmts ")"
+/candidate/semantic.k:7:  syntax Stmts ::= List{Stmt, ""}
+/candidate/semantic.k:8:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+/candidate/semantic.k:12:  syntax Params ::= "Params" "(" String ")"
+/candidate/semantic.k:14:  syntax Expr ::= "Int" "(" Int ")"
+/candidate/semantic.k:20:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+/candidate/semantic.k:24:  imports MPY-SYNTAX
+/candidate/semantic.k:25:  imports INT
+/candidate/semantic.k:26:  imports BOOL
+/candidate/semantic.k:27:  imports MAP
+/candidate/semantic.k:29:  configuration
+/candidate/semantic.k:37:  syntax Function ::= "function" "(" String "," Stmts ")"
+/candidate/semantic.k:39:  syntax KItem ::= "exec" "(" Stmts ")"
+/candidate/semantic.k:52:  rule <k> Module(SS) => exec(SS) ~> topCall ... </k>
+/candidate/semantic.k:54:  rule exec(.Stmts) => .K
+/candidate/semantic.k:55:  rule exec(S:Stmt SS:Stmts) => S ~> exec(SS)
+/candidate/semantic.k:57:  rule <k> FuncDef(F, Params(P), BODY) => .K ... </k>
+/candidate/semantic.k:59:    requires notBool (F in_keys(FS))
+/candidate/semantic.k:61:  rule <k> topCall => eval(Call(Name("fib"), Int(N))) ... </k>
+/candidate/semantic.k:64:  rule eval(Int(I)) => I
+/candidate/semantic.k:65:  rule <k> eval(Name(X)) => I ... </k>
+/candidate/semantic.k:68:  rule eval(BinOp(OP, LEFT, RIGHT))
+/candidate/semantic.k:70:  rule I:Int ~> evalRight(OP, RIGHT)
+/candidate/semantic.k:72:  rule J:Int ~> applyBin("+", I) => I +Int J
+/candidate/semantic.k:73:  rule J:Int ~> applyBin("-", I) => I -Int J
+/candidate/semantic.k:75:  rule eval(Compare(LEFT, CmpOp(OP, RIGHT)))
+/candidate/semantic.k:77:  rule I:Int ~> finishCompare(OP, RIGHT)
+/candidate/semantic.k:79:  rule J:Int ~> applyCompare("<=", I) => I <=Int J
+/candidate/semantic.k:81:  rule true  ~> finishIf(THEN, _ELSE) => exec(THEN)
+/candidate/semantic.k:82:  rule false ~> finishIf(_THEN, ELSE) => exec(ELSE)
+/candidate/semantic.k:83:  syntax KItem ::= "finishIf" "(" Stmts "," Stmts ")"
+/candidate/semantic.k:84:  rule If(TEST, THEN, ELSE) => eval(TEST) ~> finishIf(THEN, ELSE)
+/candidate/semantic.k:86:  rule eval(Call(Name(F), ARG)) => eval(ARG) ~> prepareCall(F)
+/candidate/semantic.k:87:  rule I:Int ~> prepareCall(F) => invoke(F, I)
+/candidate/semantic.k:89:  rule <k> invoke(F, I) => exec(BODY) ~> functionEnd(RHO) ... </k>
+/candidate/semantic.k:93:  rule Return(E) => eval(E) ~> makeReturn
+/candidate/semantic.k:94:  rule I:Int ~> makeReturn => returned(I)
+/candidate/semantic.k:95:  rule returned(I) ~> exec(_SS) => returned(I)
+/candidate/semantic.k:96:  rule <k> returned(I) ~> functionEnd(RHO) => I ... </k>
+/candidate/verification.k:1:requires "semantic.k"
+/candidate/verification.k:4:  imports SEMANTIC
+/candidate/verification.k:6:  syntax Int ::= fibMath(Int) [function]
+/candidate/verification.k:8:  rule fibMath(N) => N
+/candidate/verification.k:9:    requires 0 <=Int N andBool N <=Int 1
+/candidate/verification.k:10:  rule fibMath(N) => fibMath(N -Int 1) +Int fibMath(N -Int 2)
+/candidate/verification.k:11:    requires N >Int 1
+COMMAND: scan trust-sensitive attributes and markers
+ATTRIBUTE_SCAN_EXIT_STATUS=1 EXPECTED_1_FOR_NO_MATCH=true
+EXIT_STATUS=0
+SCRIPT_EXIT_STATUS=0

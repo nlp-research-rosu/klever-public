@@ -1,0 +1,400 @@
+Script started on 2026-07-23 11:23:37-05:00 [<not executed on terminal>]
+COMMAND: nl -ba semantic.k
+     1	module MPY-SYNTAX
+     2	  imports STRING-SYNTAX
+     3	  imports INT-SYNTAX
+     4	  imports BOOL-SYNTAX
+     5	
+     6	  syntax Module ::= "Module" "(" Stmts ")"
+     7	  syntax Params ::= "Params" "(" String ")"
+     8	  syntax Stmts  ::= List{Stmt, ""}
+     9	  syntax Exprs  ::= List{Expr, ","}
+    10	
+    11	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    12	                | "Assign" "(" Expr "," Expr ")"
+    13	                | "AugAssign" "(" Expr "," String "," Expr ")"
+    14	                | "For" "(" Expr "," Expr "," Stmts ")"
+    15	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    16	                | "Return" "(" Expr ")"
+    17	
+    18	  syntax Expr ::= "Name" "(" String ")"
+    19	                | "Int" "(" Int ")"
+    20	                | "Str" "(" String ")"
+    21	                | "Attribute" "(" Expr "," String ")"
+    22	                | "Call" "(" Expr "," Exprs ")"
+    23	endmodule
+    24	
+    25	module MPY
+    26	  imports MPY-SYNTAX
+    27	  imports STRING
+    28	  imports INT
+    29	  imports BOOL
+    30	
+    31	  // Values and the three locals needed by this translated program.
+    32	  syntax Value  ::= "vStr" "(" String ")"
+    33	                  | "vInt" "(" Int ")"
+    34	                  | "vBool" "(" Bool ")"
+    35	                  | "vList" "(" Values ")"
+    36	  syntax Values ::= "nil"
+    37	                  | "cons" "(" Value "," Values ")"
+    38	  syntax State  ::= "state" "(" String "," Int "," String ")"
+    39	
+    40	  syntax Outcome ::= "normal" "(" State ")"
+    41	                   | "returned" "(" Value ")"
+    42	
+    43	  configuration
+    44	    <k> start </k>
+    45	    <program> $PGM:Module </program>
+    46	    <input> $INPUT:String </input>
+    47	    <result> 0 </result>
+    48	
+    49	  syntax KItem ::= "start" | "done"
+    50	
+    51	  rule <k> start => done </k>
+    52	       <program> Module(FuncDef("is_bored", Params("S"), BODY)) </program>
+    53	       <input> INPUT </input>
+    54	       <result> _ => runFunction(BODY, INPUT) </result>
+    55	
+    56	  syntax Int ::= runFunction(Stmts, String) [function]
+    57	  rule runFunction(BODY, INPUT)
+    58	    => resultOf(evalStmts(BODY, state(INPUT, 0, "")))
+    59	
+    60	  syntax Int ::= resultOf(Outcome) [function]
+    61	  rule resultOf(returned(vInt(N))) => N
+    62	
+    63	  // Big-step statement semantics.
+    64	  syntax Outcome ::= evalStmts(Stmts, State) [function]
+    65	                   | evalStmt(Stmt, State) [function]
+    66	                   | evalRest(Outcome, Stmts) [function]
+    67	
+    68	  rule evalStmts(.Stmts, ST) => normal(ST)
+    69	  rule evalStmts(S:Stmt SS:Stmts, ST) => evalRest(evalStmt(S, ST), SS)
+    70	
+    71	  rule evalRest(returned(V), _) => returned(V)
+    72	  rule evalRest(normal(ST), SS) => evalStmts(SS, ST)
+    73	
+    74	  rule evalStmt(Assign(Name("count"), E), ST)
+    75	    => normal(setCount(ST, asInt(eval(E, ST))))
+    76	  rule evalStmt(AugAssign(Name("count"), "+", E), ST)
+    77	    => normal(setCount(ST, getCount(ST) +Int asInt(eval(E, ST))))
+    78	  rule evalStmt(For(Name("sentence"), E, BODY), ST)
+    79	    => evalFor(asValues(eval(E, ST)), BODY, ST)
+    80	  rule evalStmt(If(E, THEN, ELSE), ST)
+    81	    => evalBranch(asBool(eval(E, ST)), THEN, ELSE, ST)
+    82	  rule evalStmt(Return(E), ST) => returned(eval(E, ST))
+    83	
+    84	  syntax Outcome ::= evalBranch(Bool, Stmts, Stmts, State) [function]
+    85	  rule evalBranch(true, THEN, _, ST) => evalStmts(THEN, ST)
+    86	  rule evalBranch(false, _, ELSE, ST) => evalStmts(ELSE, ST)
+    87	
+    88	  syntax Outcome ::= evalFor(Values, Stmts, State) [function]
+    89	                   | evalForRest(Outcome, Values, Stmts) [function]
+    90	  rule evalFor(nil, _, ST) => normal(ST)
+    91	  rule evalFor(cons(vStr(S), REST), BODY, ST)
+    92	    => evalForRest(evalStmts(BODY, setSentence(ST, S)), REST, BODY)
+    93	  rule evalForRest(returned(V), _, _) => returned(V)
+    94	  rule evalForRest(normal(ST), REST, BODY) => evalFor(REST, BODY, ST)
+    95	
+    96	  // State access is deliberately explicit: no hidden host-language store.
+    97	  syntax Value ::= lookup(String, State) [function]
+    98	  rule lookup("S", state(S, _, _)) => vStr(S)
+    99	  rule lookup("count", state(_, N, _)) => vInt(N)
+   100	  rule lookup("sentence", state(_, _, S)) => vStr(S)
+   101	
+   102	  syntax State ::= setCount(State, Int) [function]
+   103	                 | setSentence(State, String) [function]
+   104	  rule setCount(state(S, _, SENT), N) => state(S, N, SENT)
+   105	  rule setSentence(state(S, N, _), SENT) => state(S, N, SENT)
+   106	
+   107	  syntax Int ::= getCount(State) [function]
+   108	  rule getCount(state(_, N, _)) => N
+   109	
+   110	  // Expression and method-call semantics for the accepted program subset.
+   111	  syntax Value ::= eval(Expr, State) [function]
+   112	                 | replaceValue(Value, Value, Value) [function]
+   113	                 | splitValue(Value, Value) [function]
+   114	                 | stripValue(Value) [function]
+   115	                 | startswithValue(Value, Value) [function]
+   116	  rule eval(Name(X), ST) => lookup(X, ST)
+   117	  rule eval(Int(N), _) => vInt(N)
+   118	  rule eval(Str(S), _) => vStr(S)
+   119	  rule eval(Call(Attribute(E, "replace"), A, B), ST)
+   120	    => replaceValue(eval(E, ST), eval(A, ST), eval(B, ST))
+   121	  rule eval(Call(Attribute(E, "split"), SEP), ST)
+   122	    => splitValue(eval(E, ST), eval(SEP, ST))
+   123	  rule eval(Call(Attribute(E, "strip"), .Exprs), ST)
+   124	    => stripValue(eval(E, ST))
+   125	  rule eval(Call(Attribute(E, "startswith"), PREFIX), ST)
+   126	    => startswithValue(eval(E, ST), eval(PREFIX, ST))
+   127	
+   128	  rule replaceValue(vStr(S), vStr(OLD), vStr(NEW))
+   129	    => vStr(replaceAll(S, OLD, NEW))
+   130	  rule splitValue(vStr(S), vStr(".")) => vList(splitDots(S))
+   131	  rule stripValue(vStr(S)) => vStr(strip(S))
+   132	  rule startswithValue(vStr(S), vStr(PREFIX)) => vBool(startsWith(S, PREFIX))
+   133	
+   134	  syntax Int ::= asInt(Value) [function]
+   135	  syntax Bool ::= asBool(Value) [function]
+   136	  syntax Values ::= asValues(Value) [function]
+   137	  rule asInt(vInt(N)) => N
+   138	  rule asBool(vBool(B)) => B
+   139	  rule asValues(vList(VS)) => VS
+   140	
+   141	  // Pure definitions of the three String methods used above.
+   142	  syntax Values ::= splitDots(String) [function]
+   143	                  | splitDotsAt(String, Int) [function]
+   144	  rule splitDots(S) => splitDotsAt(S, findString(S, ".", 0))
+   145	  rule splitDotsAt(S, -1) => cons(vStr(S), nil)
+   146	  rule splitDotsAt(S, I)
+   147	    => cons(vStr(substrString(S, 0, I)),
+   148	            splitDots(substrString(S, I +Int 1, lengthString(S))))
+   149	    requires I >=Int 0
+   150	
+   151	  syntax Bool ::= whiteSpace(String) [function]
+   152	  rule whiteSpace(" ")  => true
+   153	  rule whiteSpace("\t") => true
+   154	  rule whiteSpace("\n") => true
+   155	  rule whiteSpace("\r") => true
+   156	  rule whiteSpace("\f") => true
+   157	  rule whiteSpace("\u000b") => true
+   158	  rule whiteSpace("\u001c") => true
+   159	  rule whiteSpace("\u001d") => true
+   160	  rule whiteSpace("\u001e") => true
+   161	  rule whiteSpace("\u001f") => true
+   162	  rule whiteSpace("\u0085") => true
+   163	  rule whiteSpace("\u00a0") => true
+   164	  rule whiteSpace("\u1680") => true
+   165	  rule whiteSpace("\u2000") => true
+   166	  rule whiteSpace("\u2001") => true
+   167	  rule whiteSpace("\u2002") => true
+   168	  rule whiteSpace("\u2003") => true
+   169	  rule whiteSpace("\u2004") => true
+   170	  rule whiteSpace("\u2005") => true
+   171	  rule whiteSpace("\u2006") => true
+   172	  rule whiteSpace("\u2007") => true
+   173	  rule whiteSpace("\u2008") => true
+   174	  rule whiteSpace("\u2009") => true
+   175	  rule whiteSpace("\u200a") => true
+   176	  rule whiteSpace("\u2028") => true
+   177	  rule whiteSpace("\u2029") => true
+   178	  rule whiteSpace("\u202f") => true
+   179	  rule whiteSpace("\u205f") => true
+   180	  rule whiteSpace("\u3000") => true
+   181	  rule whiteSpace(_) => false [owise]
+   182	
+   183	  syntax String ::= strip(String) [function]
+   184	                  | stripLeft(String) [function]
+   185	                  | stripRight(String) [function]
+   186	  rule strip(S) => stripRight(stripLeft(S))
+   187	  rule stripLeft("") => ""
+   188	  rule stripLeft(S) => stripLeft(substrString(S, 1, lengthString(S)))
+   189	    requires whiteSpace(substrString(S, 0, 1))
+   190	  rule stripLeft(S) => S
+   191	    requires notBool whiteSpace(substrString(S, 0, 1))
+   192	  rule stripRight("") => ""
+   193	  rule stripRight(S) => stripRight(substrString(S, 0, lengthString(S) -Int 1))
+   194	    requires whiteSpace(substrString(S, lengthString(S) -Int 1, lengthString(S)))
+   195	  rule stripRight(S) => S
+   196	    requires notBool whiteSpace(substrString(S, lengthString(S) -Int 1, lengthString(S)))
+   197	
+   198	  syntax Bool ::= startsWith(String, String) [function]
+   199	  rule startsWith(S, PREFIX)
+   200	    => (lengthString(S) >=Int lengthString(PREFIX))
+   201	       andBool (substrString(S, 0, lengthString(PREFIX)) ==String PREFIX)
+   202	endmodule
+EXIT: 0
+COMMAND: nl -ba verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // A named copy of the exact constructor tree emitted in solution.mpy.
+     7	  // This lets each claim focus on inputs and outputs while still executing
+     8	  // the translated Python program through the semantics.
+     9	  syntax Module ::= "solutionModule" [function]
+    10	  rule solutionModule =>
+    11	    Module(
+    12	      FuncDef("is_bored", Params("S"),
+    13	        Assign(Name("count"), Int(0))
+    14	        For(Name("sentence"),
+    15	          Call(
+    16	            Attribute(
+    17	              Call(
+    18	                Attribute(
+    19	                  Call(Attribute(Name("S"), "replace"), Str("!"), Str(".")),
+    20	                  "replace"),
+    21	                Str("?"), Str(".")),
+    22	              "split"),
+    23	            Str(".")),
+    24	          If(
+    25	            Call(
+    26	              Attribute(
+    27	                Call(Attribute(Name("sentence"), "strip"), .Exprs),
+    28	                "startswith"),
+    29	              Str("I ")),
+    30	            AugAssign(Name("count"), "+", Int(1)),
+    31	            .Stmts))
+    32	        Return(Name("count"))))
+    33	
+    34	  // Contract-level model: normalize sentence delimiters, split into
+    35	  // sentences, trim Python whitespace, and count an initial word "I".
+    36	  syntax Int ::= boredSpec(String) [function]
+    37	               | countBored(Values) [function]
+    38	               | boolInt(Bool) [function]
+    39	  rule boredSpec(S) =>
+    40	    countBored(splitDots(replaceAll(replaceAll(S, "!", "."), "?", ".")))
+    41	  rule countBored(nil) => 0
+    42	  rule countBored(cons(vStr(S), REST))
+    43	    => boolInt(startsWith(strip(S), "I ")) +Int countBored(REST)
+    44	  rule boolInt(true) => 1
+    45	  rule boolInt(false) => 0
+    46	endmodule
+EXIT: 0
+COMMAND: source inventory counts
+semantic_rule_count=79
+verification_rule_count=6
+semantic_syntax_declaration_count=27
+verification_syntax_declaration_count=2
+function_attribute_count=31
+total_attribute_count=0
+functional_attribute_count=0
+simplification_attribute_count=0
+concrete_attribute_count=0
+owise_attribute_count=1
+explicit_priority_attribute_count=0
+EXIT: 0
+COMMAND: sed -n "1110,1148p;1718,1775p;1838,1870p" /usr/include/kframework/builtin/domains.md
+* IMPLIES two boolean values (i.e., `P impliesBool Q` is the same as
+  `notBool P orBool Q`)
+* Check equality of two boolean values.
+* Check inequality of two boolean values.
+
+Note that only `andThenBool` and `orElseBool` are short-circuiting. `andBool`
+and `orBool` may be short-circuited in concrete backends, but in symbolic
+backends, both arguments will be evaluated.
+
+```k
+  syntax Bool ::= "notBool" Bool          [function, total, symbol(notBool_), smt-hook(not), group(boolOperation), hook(BOOL.not)]
+                > Bool "andBool" Bool     [function, total, symbol(_andBool_), left, smt-hook(and), group(boolOperation), hook(BOOL.and)]
+                | Bool "andThenBool" Bool [function, total, symbol(_andThenBool_), left, smt-hook(and), group(boolOperation), hook(BOOL.andThen)]
+                | Bool "xorBool" Bool     [function, total, symbol(_xorBool_), left, smt-hook(xor), group(boolOperation), hook(BOOL.xor)]
+                | Bool "orBool" Bool      [function, total, symbol(_orBool_), left, smt-hook(or), group(boolOperation), hook(BOOL.or)]
+                | Bool "orElseBool" Bool  [function, total, symbol(_orElseBool_), left, smt-hook(or), group(boolOperation), hook(BOOL.orElse)]
+                | Bool "impliesBool" Bool [function, total, symbol(_impliesBool_), left, smt-hook(=>), group(boolOperation), hook(BOOL.implies)]
+                > left:
+                  Bool "==Bool" Bool      [function, total, symbol(_==Bool_), left, comm, smt-hook(=), hook(BOOL.eq)]
+                | Bool "=/=Bool" Bool     [function, total, symbol(_=/=Bool_), left, comm, smt-hook(distinct), hook(BOOL.ne)]
+```
+
+### Implementation of Booleans
+
+The remainder of this section consists of an implementation in K of the
+operations listed above.
+
+```k
+  rule notBool true => false
+  rule notBool false => true
+
+  rule true andBool B:Bool => B:Bool
+  rule B:Bool andBool true => B:Bool [simplification]
+  rule false andBool _:Bool => false
+  rule _:Bool andBool false => false [simplification]
+
+  rule true andThenBool K::Bool => K
+  rule K::Bool andThenBool true => K [simplification]
+  rule false andThenBool _ => false
+
+### String concatenation
+
+You can concatenate two strings in O(N) time. For successive concatenation
+operations, it may be better to use the `STRING-BUFFER` module.
+
+```k
+  syntax String ::= String "+String" String    [function, total, left, hook(STRING.concat)]
+```
+
+### String length
+
+You can get the length of a string in O(1) time.
+
+```k
+  syntax Int ::= lengthString ( String ) [function, total, hook(STRING.length)]
+```
+
+### Character and integer conversion
+
+You can convert between a character (as represented by a string containing
+a single code point) and an integer in O(1) time.
+
+```k
+  syntax String ::= chrChar ( Int )      [function, hook(STRING.chr)]
+  syntax Int ::= ordChar ( String )      [function, hook(STRING.ord)]
+```
+
+### String substring
+
+You can compute a substring of a string in O(N) time (where N is the
+length of the substring). There are two important facts to note:
+
+1.  the range generated includes the character at `startIndex` but excludes the
+    character at `endIndex`, i.e., the range is `[startIndex..endIndex)`.
+2.  this function is only defined on valid indices (i.e., it is defined when
+    `startIndex < endIndex` and `endIndex` is less than or equal to the string
+    length).
+
+```k
+  syntax String ::= substrString ( String , startIndex: Int , endIndex: Int ) [function, total, hook(STRING.substr)]
+```
+
+### String search
+
+You can find the first (respectively, last) occurrence of a substring, starting
+at a certain `index`, in another string in O(N*M) time.
+Returns `-1` if the substring is not found.
+
+```k
+  syntax Int ::= findString ( haystack: String , needle: String , index: Int )   [function, hook(STRING.find)]
+  syntax Int ::= rfindString ( haystack: String , needle: String , index: Int )  [function, hook(STRING.rfind)]
+```
+
+### String character search
+
+You can find the first (respectively, last) occurrence of one of the characters
+of the search string, starting at a certain `index`, in another string in
+```
+
+### String count and replace
+
+You can replace one, some, or all occurrences of a string within another
+string in O(N*M) time. The `replaceAll`, `replace`, and `replaceFirst` methods
+are identical, except `replaceFirst` replaces exactly one ocurrence of the
+string, the first occurrence. `replace` replaces the first `times` occurrences.
+And `replaceAll` replaces every occurrence.
+
+You can also count the number of times a string occurs within another string
+using `countAllOccurrences`.
+
+```k
+  syntax String ::= "replaceAll" "(" haystack: String "," needle: String "," replacement: String ")"      [function, total, hook(STRING.replaceAll)]
+  syntax String ::= "replace" "(" haystack: String "," needle: String "," replacement: String "," times: Int ")" [function, hook(STRING.replace)]
+  syntax String ::= "replaceFirst" "(" haystack: String "," needle: String "," replacement: String ")"    [function, total, hook(STRING.replaceFirst)]
+  syntax Int ::= "countAllOccurrences" "(" haystack: String "," needle: String ")"            [function, total, hook(STRING.countAllOccurrences)]
+```
+
+### String equality and lexicographic comparison
+
+You can compare whether two strings are equal or unequal, or whether one string
+is less than, less than or equal to, greater than, or greater than or equal to
+another according to the natural lexicographic ordering of strings.
+
+```k
+  syntax Bool ::= String "==String" String  [function, total, comm, hook(STRING.eq)]
+                | String "=/=String" String [function, total, comm, hook(STRING.ne)]
+  rule S1:String =/=String S2:String => notBool (S1 ==String S2)
+
+  syntax Bool ::= String  "<String" String [function, total, hook(STRING.lt)]
+                | String "<=String" String [function, total, hook(STRING.le)]
+EXIT: 0
+
+Script done on 2026-07-23 11:23:37-05:00 [COMMAND_EXIT_CODE="0"]

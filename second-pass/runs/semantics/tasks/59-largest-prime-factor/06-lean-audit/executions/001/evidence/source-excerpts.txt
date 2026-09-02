@@ -1,0 +1,647 @@
+--- frozen verification.k lines 1-129 ---
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Deallocating a fresh call frame restores the surrounding scope map. This
+     7	  // is the symbolic form of the concrete Map update simplification used by
+     8	  // MPY-FUNCTIONS.#pop.
+     9	  rule ((L:Int |-> _V:Scope) M:Map) [ L <- undef ] => M
+    10	    requires notBool (L in_keys(M))
+    11	    [simplification]
+    12	
+    13	  // The exact constructor term generated from solution.py, named so that the
+    14	  // proof claim can start from the same module that krun parses.
+    15	  syntax Module ::= "solutionModule" [macro]
+    16	  rule solutionModule
+    17	    => Module(
+    18	         FuncDef("largest_prime_factor", Params("n"),
+    19	           Assign(Name("factor"), Int(2))
+    20	           While(Compare(Name("n"), CmpOp(">", Name("factor"))),
+    21	             If(Compare(
+    22	               BinOp("%", Name("n"), Name("factor")),
+    23	               CmpOp("==", Int(0))),
+    24	               Assign(Name("n"),
+    25	                 BinOp("//", Name("n"), Name("factor"))),
+    26	               AugAssign(Name("factor"), "+", Int(1))))
+    27	           Return(Name("factor"))))
+    28	
+    29	  // Names for the loop fragments used by the circular loop claim.
+    30	  syntax Expr ::= "lpfCondition" [macro]
+    31	  rule lpfCondition
+    32	    => Compare(Name("n"), CmpOp(">", Name("factor")))
+    33	
+    34	  syntax Stmts ::= "lpfStep" [macro]
+    35	  rule lpfStep
+    36	    => If(Compare(
+    37	         BinOp("%", Name("n"), Name("factor")),
+    38	         CmpOp("==", Int(0))),
+    39	         Assign(Name("n"), BinOp("//", Name("n"), Name("factor"))),
+    40	         AugAssign(Name("factor"), "+", Int(1)))
+    41	
+    42	  // Independent mathematical recurrence for trial division. The loop proof
+    43	  // establishes that the Python execution refines this specification.
+    44	  syntax Int ::= lpfSpec(Int, Int) [function, total]
+    45	  rule lpfSpec(N:Int, F:Int) => F
+    46	    requires N <=Int F
+    47	  rule lpfSpec(N:Int, F:Int)
+    48	    => lpfSpec((N -Int pyMod(N, F)) /Int F, F)
+    49	    requires N >Int F andBool pyMod(N, F) ==Int 0
+    50	  rule lpfSpec(N:Int, F:Int) => lpfSpec(N, F +Int 1)
+    51	    requires N >Int F andBool pyMod(N, F) =/=Int 0
+    52	
+    53	  // Symbolic accelerator rules derived directly from the MPY rules. The
+    54	  // Haskell backend cannot cool a symbolic Int through generated strictness
+    55	  // freezers in this semantics, so these rules collapse only the exact
+    56	  // integer redexes used by this program. They preserve the reference
+    57	  // semantics' lookup, pyMod, floor-division, assignment, and return effects.
+    58	  rule <k>
+    59	         Compare(Name("n"), CmpOp(">", Name("factor")))
+    60	         => N >Int F
+    61	         ...
+    62	       </k>
+    63	       <env> L:Int </env>
+    64	       <scopes>
+    65	         ... L |-> scope(
+    66	           ("n" |-> N:Int) ("factor" |-> F:Int) _REST:Map,
+    67	           _P:Parent)
+    68	         ...
+    69	       </scopes>
+    70	       [priority(40)]
+    71	
+    72	  rule <k>
+    73	         Compare(
+    74	           BinOp("%", Name("n"), Name("factor")),
+    75	           CmpOp("==", Int(0)))
+    76	         => pyMod(N, F) ==Int 0
+    77	         ...
+    78	       </k>
+    79	       <env> L:Int </env>
+    80	       <scopes>
+    81	         ... L |-> scope(
+    82	           ("n" |-> N:Int) ("factor" |-> F:Int) _REST:Map,
+    83	           _P:Parent)
+    84	         ...
+    85	       </scopes>
+    86	       [priority(40)]
+    87	
+    88	  rule <k>
+    89	         Assign(Name("n"), BinOp("//", Name("n"), Name("factor")))
+    90	         => .K
+    91	         ...
+    92	       </k>
+    93	       <env> L:Int </env>
+    94	       <scopes>
+    95	         ... L |-> scope(
+    96	           ("n" |-> N:Int) ("factor" |-> F:Int) REST:Map
+    97	           => ("n" |-> ((N -Int pyMod(N, F)) /Int F))
+    98	              ("factor" |-> F) REST,
+    99	           _P:Parent)
+   100	         ...
+   101	       </scopes>
+   102	       [priority(40)]
+   103	
+   104	  rule <k>
+   105	         AugAssign(Name("factor"), "+", Int(1))
+   106	         => .K
+   107	         ...
+   108	       </k>
+   109	       <env> L:Int </env>
+   110	       <scopes>
+   111	         ... L |-> scope(
+   112	           ("n" |-> N:Int) ("factor" |-> F:Int) REST:Map
+   113	           => ("n" |-> N) ("factor" |-> (F +Int 1)) REST,
+   114	           _P:Parent)
+   115	         ...
+   116	       </scopes>
+   117	       [priority(40)]
+   118	
+   119	  rule <k> Return(Name("factor")) ~> _ => #pop </k>
+   120	       <env> L:Int </env>
+   121	       <scopes>
+   122	         ... L |-> scope(
+   123	           ("factor" |-> F:Int) _REST:Map,
+   124	           _P:Parent)
+   125	         ...
+   126	       </scopes>
+   127	       <ret> noRet => retV(F) </ret>
+   128	       [priority(40)]
+   129	endmodule
+--- frozen spec.k lines 1-75 ---
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Loop invariant/circularity: from any positive trial state, the operational
+     7	  // while loop returns exactly the value of the mathematical recurrence.
+     8	  claim [lpf-loop]:
+     9	    <k>
+    10	      #while(lpfCondition, lpfStep)
+    11	      ~> (Return(Name("factor")) .Stmts)
+    12	      ~> #endcall
+    13	      => lpfSpec(N, F) ~> CONT
+    14	    </k>
+    15	    <env> L => CALLER </env>
+    16	    <scopes>
+    17	      SC (L |-> scope(("n" |-> N) ("factor" |-> F), parent(0)))
+    18	      => SC
+    19	    </scopes>
+    20	    <scopeLoc> L +Int 1 => L </scopeLoc>
+    21	    <stack>
+    22	      ListItem(frame(CONT, CALLER, L)) REST
+    23	      => REST
+    24	    </stack>
+    25	    <ret> noRet </ret>
+    26	    requires N >Int 1
+    27	     andBool F >Int 1
+    28	     andBool L >=Int 1
+    29	     andBool notBool (L in_keys(SC))
+    30	    [circularity]
+    31	
+    32	  // Symbolic execution of the finite administrative prefix: loading the exact
+    33	  // generated module, resolving the function, binding n, initializing factor,
+    34	  // and reaching precisely the loop state covered by lpf-loop.
+    35	  claim [largest-prime-factor-entry]:
+    36	    <k>
+    37	      #loadAll(solutionModule)
+    38	      ~> Call(Name("largest_prime_factor"), Int(N))
+    39	      =>
+    40	      #while(lpfCondition, lpfStep)
+    41	      ~> (Return(Name("factor")) .Stmts)
+    42	      ~> #endcall
+    43	    </k>
+    44	    <env> 0 => 1 </env>
+    45	    <scopes>
+    46	      (0 |-> scope(.Map, parent(-1)))
+    47	      (-1 |-> builtinsScope)
+    48	      =>
+    49	      (0 |-> scope(
+    50	        "largest_prime_factor" |->
+    51	          closureVal(
+    52	            ("n", .ParamNames),
+    53	            Assign(Name("factor"), Int(2))
+    54	            While(lpfCondition, lpfStep)
+    55	            Return(Name("factor")),
+    56	            0),
+    57	        parent(-1)))
+    58	      (-1 |-> builtinsScope)
+    59	      (1 |-> scope(
+    60	        ("n" |-> N) ("factor" |-> 2),
+    61	        parent(0)))
+    62	    </scopes>
+    63	    <scopeLoc> 1 => 2 </scopeLoc>
+    64	    <heap> .Map </heap>
+    65	    <heapLoc> 0 </heapLoc>
+    66	    <stack>
+    67	      .List
+    68	      => ListItem(frame(.K, 0, 1))
+    69	    </stack>
+    70	    <ret> noRet </ret>
+    71	    <exc> NoExc </exc>
+    72	    <exit-code> 0 </exit-code>
+    73	    requires N >Int 1
+    74	
+    75	endmodule
+--- frozen solution.py ---
+     1	def largest_prime_factor(n: int):
+     2	    factor = 2
+     3	    while n > factor:
+     4	        if n % factor == 0:
+     5	            n = n // factor
+     6	        else:
+     7	            factor += 1
+     8	    return factor
+--- frozen core.k Scope declaration ---
+    25	  syntax Val      ::= Int
+    26	                    | Bool
+    27	                    | "noneV"
+    28	                    | Iterable
+    29	                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+    30	                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+    31	                    | closureVal(ParamNames, Stmts, Int)
+    32	                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+    33	                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+    34	                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+    35	
+    36	  syntax Parent   ::= "root" | parent(Int)
+    37	  syntax Scope    ::= scope(Map, Parent)
+    38	  syntax KResult  ::= Val
+    39	  syntax Expr     ::= Val   // cooling puts results back into expression holes
+    40	  syntax Vals     ::= List{Val, ","}
+    41	  syntax Exc      ::= "NoExc" | "AssertionError"
+    42	  syntax RetState ::= "noRet" | retV(Val)
+    43	
+    44	  // ==== configuration =======================================================
+    45	  // The builtins namespace is a real scope at reserved location -1 (the bottom of every
+    46	  // chain; scopeLoc only allocates >=1, so -1 never collides). The module scope (loc 0)
+    47	  // has it as parent, so an unbound name resolves there last — exactly LEGB. `int`/`str`
+    48	  // resolve to their type objects; any local/global binding shadows them via normal lookup.
+    49	  configuration
+    50	    <k>       #loadAll($PGM:Module) </k>
+    51	    <env>     0 </env>
+    52	    <scopes>   0     |-> scope(.Map, parent(-1))
+    53	              -1    |-> builtinsScope </scopes>
+    54	    <scopeLoc> 1 </scopeLoc>
+    55	    <heap>    .Map </heap>
+    56	    <heapLoc> 0 </heapLoc>
+    57	    <stack>   .List </stack>
+    58	    <ret>     noRet </ret>
+    59	    <exc>     NoExc </exc>
+    60	    <exit-code exit=""> 0 </exit-code>
+--- frozen functions.k frame pop ---
+    77	  // ==== return / pop the frame (the returned expr evaluates by strictness) ==
+    78	  rule <k> Return(V:Val) ~> _ => #pop </k>
+    79	       <ret> noRet => retV(V) </ret>
+    80	  rule <k> #endcall => #pop ... </k>
+    81	       <ret> noRet => retV(noneV) </ret>
+    82	  // pop: restore env, DEALLOCATE the callee frame, and wind scopeLoc back (LIFO allocation
+    83	  // makes the saved loc the callee frame's own loc). Sound because no closureVal outlives its
+    84	  // defining frame (frontend subset: no returned/stored closures; module defs live in loc 0).
+    85	  rule <k> #pop => V ~> CONT </k>
+    86	       <ret>   retV(V) => noRet </ret>
+    87	       <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack>
+    88	       <env>   L:Int => CALLERL </env>
+    89	       <scopes> SC:Map => SC [ L <- undef ] </scopes>
+    90	       <scopeLoc> _ => SAVEDL </scopeLoc>
+    91	endmodule
+--- K 7.1.293 builtin Map declarations and simplifications ---
+   210	
+   211	```k
+   212	module MAP
+   213	  imports private BOOL-SYNTAX
+   214	  imports private INT-SYNTAX
+   215	  imports private LIST
+   216	  imports private SET
+   217	
+   218	  syntax Map [hook(MAP.Map)]
+   219	```
+   220	
+   221	### Map concatenation
+   222	
+   223	The `Map` sort represents a generalized associative array. Each key can be
+   224	paired with an arbitrary value, and can be used to reference its associated
+   225	value. Multiple bindings for the same key are not allowed.
+   226	
+   227	You can construct a new Map consisting of key/value pairs of two Maps. The
+   228	result is `#False` if the maps have keys in common (in particular, this will
+   229	yield an exception during concrete execution). This operation is O(N*log(M))
+   230	where N is the size of the smaller map, when it appears on the right hand side.
+   231	When it appears on the left hand side and all variables are bound, it is
+   232	O(N*log(M)) where M is the size of the map it is matching and N is the number
+   233	of elements being matched. When it appears on the left hand side containing
+   234	variables not bound elsewhere in the term, it is O(N^K) where N is the size of
+   235	the map it is matching and K is the number of unbound keys being matched. In
+   236	other words, one unbound variable is linear, two is quadratic, three is cubic,
+   237	etc.
+   238	
+   239	```k
+   240	  syntax Map ::= Map Map                        [left, function, hook(MAP.concat), symbol(_Map_), assoc, comm, unit(.Map), element(_|->_), index(0), format(%1%n%2)]
+   241	```
+   242	
+   243	### Map unit
+   244	
+   245	The map with zero elements is represented by `.Map`.
+   246	
+   247	```k
+   248	  syntax Map ::= ".Map"                         [function, total, hook(MAP.unit), symbol(.Map)]
+   249	```
+   250	
+   251	### Map elements
+   252	
+   253	An element of a `Map` is constructed via the `|->` operator. The key is on the
+   254	left and the value is on the right.
+   255	
+   256	```k
+   257	  syntax Map ::= KItem "|->" KItem                      [function, total, hook(MAP.element), symbol(_|->_), injective]
+   258	
+   259	  syntax priority _|->_ > _Map_ .Map
+   260	  syntax non-assoc _|->_
+   261	```
+   262	
+   263	### Map lookup
+   264	
+   265	You can look up the value associated with the key of a map in O(log(N)) time.
+   266	Note that the base of the logarithm is a relatively high number and thus the
+   267	time is effectively constant. The value is `#False` if the key is not in the
+   268	map (in particular, this will yield an exception during concrete execution).
+   269	
+   270	```k
+   271	  syntax KItem ::= Map "[" KItem "]"                    [function, hook(MAP.lookup), symbol(Map:lookup)]
+   272	```
+   273	
+   274	### Map lookup with default
+   275	
+   276	You can also look up the value associated with the key of a map using a
+   277	total function that assigns a specific default value if the key is not present
+   278	in the map. This operation is also O(log(N)), or effectively constant.
+   279	
+   280	```k
+   281	  syntax KItem ::= Map "[" KItem "]" "orDefault" KItem      [function, total, hook(MAP.lookupOrDefault), symbol(Map:lookupOrDefault)]
+   282	```
+   283	
+   284	### Map update
+   285	
+   286	You can insert a key/value pair into a map in O(log(N)) time, or effectively
+   287	constant.
+   288	
+   289	```k
+   290	  syntax Map ::= Map "[" key: KItem "<-" value: KItem "]"           [function, total, symbol(Map:update), hook(MAP.update), prefer]
+   291	```
+   292	
+   293	### Map delete
+   294	
+   295	You can remove a key/value pair from a map via its key in O(log(N)) time, or
+   296	effectively constant.
+   297	
+   298	```k
+   299	  syntax Map ::= Map "[" KItem "<-" "undef" "]"     [function, total, hook(MAP.remove), symbol(_[_<-undef])]
+   300	```
+   301	
+   302	### Map difference
+   303	
+   304	You can remove the key/value pairs in a map that are present in another map in
+   305	O(N*log(M)) time (where M is the size of the first map and N is the size of the
+   306	second), or effectively linear. Note that only keys whose value is the same
+   307	in both maps are removed. To remove all the keys in one map from another map,
+   308	you can say `removeAll(M1, keys(M2))`.
+   309	
+   310	```k
+   311	  syntax Map ::= Map "-Map" Map                 [function, total, hook(MAP.difference)]
+   312	```
+   313	
+   314	### Multiple map update
+   315	
+   316	You can update a map by adding all the key/value pairs in the second map in
+   317	O(N*log(M)) time (where M is the size of the first map and N is the size of the
+   318	second map), or effectively linear. If any keys are present in both maps, the
+   319	value from the second map overwrites the value in the first. This function is
+   320	total, which is distinct from map concatenation, a partial function only
+   321	defined on maps with disjoint keys.
+   322	
+   323	```k
+   324	  syntax Map ::= updateMap(Map, Map)            [function, total, hook(MAP.updateAll)]
+   325	```
+   326	
+   327	### Multiple map removal
+   328	
+   329	You can remove a `Set` of keys from a map in O(N*log(M)) time (where M is the
+   330	size of the `Map` and `N` is the size of the `Set`), or effectively linear.
+   331	
+   332	```k
+   333	  syntax Map ::= removeAll(Map, Set)            [function, total, hook(MAP.removeAll)]
+   334	```
+   335	
+   336	### Map keys (as `Set`)
+   337	
+   338	You can get a `Set` of all the keys in a Map in O(N) time.
+   339	
+   340	```k
+   341	  syntax Set ::= keys(Map)                      [function, total, hook(MAP.keys)]
+   342	```
+   343	
+   344	### Map keys (as `List`)
+   345	
+   346	You can get a `List` of all the keys in a Map in O(N) time.
+   347	
+   348	```k
+   349	  syntax List ::= "keys_list" "(" Map ")"       [function, hook(MAP.keys_list)]
+   350	```
+   351	
+   352	### Map key membership
+   353	
+   354	You can check whether a key is present in a map in O(1) time.
+   355	
+   356	```k
+   357	  syntax Bool ::= KItem "in_keys" "(" Map ")"       [function, total, hook(MAP.in_keys)]
+   358	```
+   359	
+   360	### Map values (as `List`)
+   361	
+   362	You can get a `List` of all the values in a map in O(N) time.
+   363	
+   364	```k
+   365	  syntax List ::= values(Map)                   [function, hook(MAP.values)]
+   366	```
+   367	
+   368	### Map size
+   369	
+   370	You can get the number of key/value pairs in a map in O(1) time.
+   371	
+   372	```k
+   373	  syntax Int ::= size(Map)                      [function, total, hook(MAP.size), symbol(sizeMap)]
+   374	```
+   375	
+   376	### Map inclusion
+   377	
+   378	You can determine whether a `Map` is a strict subset of another `Map` in O(N)
+   379	time (where N is the size of the first map). Only keys that are bound to the
+   380	same value are considered equal.
+   381	
+   382	```k
+   383	  syntax Bool ::= Map "<=Map" Map               [function, total, hook(MAP.inclusion)]
+   384	```
+   385	
+   386	### Map choice
+   387	
+   388	You can get an arbitrarily chosen key of a `Map` in O(1) time. The same key
+   389	will always be returned for the same map, but no guarantee is given that two
+   390	different maps will return the same element, even if they are similar.
+   391	
+   392	```k
+   393	  syntax KItem ::= choice(Map)                      [function, hook(MAP.choice), symbol(Map:choice)]
+   394	```
+   395	
+   396	### Implementation of Maps
+   397	
+   398	The remainder of this section contains lemmas used by the Java and Haskell
+   399	backend to simplify expressions of sort `Map`. They do not affect the semantics
+   400	of maps, merely describing additional rules that the backend can use to
+   401	simplify terms.
+   402	
+   403	```k
+   404	endmodule
+   405	
+   406	module MAP-KORE-SYMBOLIC [symbolic,haskell]
+   407	  imports MAP
+   408	  imports private K-EQUAL
+   409	  imports private BOOL
+   410	
+   411	  rule #Ceil(@M:Map [@K:KItem]) => {(@K in_keys(@M)) #Equals true} #And #Ceil(@M) #And #Ceil(@K) [simplification]
+   412	
+   413	  // Symbolic update
+   414	
+   415	  // Adding the definedness condition `notBool (K in_keys(M))` in the ensures clause of the following rule would be redundant
+   416	  // because K also appears in the rhs, preserving the case when it's #Bottom.
+   417	  rule (K |-> _ M:Map) [ K <- V ] => (K |-> V M) [simplification]
+   418	  rule M:Map [ K <- V ] => (K |-> V M) requires notBool (K in_keys(M)) [simplification]
+   419	  rule M:Map [ K <- _ ] [ K <- V ] => M [ K <- V ] [simplification]
+   420	  // Adding the definedness condition `notBool (K1 in_keys(M))` in the ensures clause of the following rule would be redundant
+   421	  // because K1 also appears in the rhs, preserving the case when it's #Bottom.
+   422	  rule (K1 |-> V1 M:Map) [ K2 <- V2 ] => (K1 |-> V1 (M [ K2 <- V2 ])) requires K1 =/=K K2 [simplification]
+   423	
+   424	  // Symbolic remove
+   425	  rule (K |-> _ M:Map) [ K <- undef ] => M ensures notBool (K in_keys(M)) [simplification]
+   426	  rule M:Map [ K <- undef ] => M requires notBool (K in_keys(M)) [simplification]
+   427	  // Adding the definedness condition `notBool (K1 in_keys(M))` in the ensures clause of the following rule would be redundant
+   428	  // because K1 also appears in the rhs, preserving the case when it's #Bottom.
+   429	  rule (K1 |-> V1 M:Map) [ K2 <- undef ] => (K1 |-> V1 (M [ K2 <- undef ])) requires K1 =/=K K2 [simplification]
+   430	
+   431	  // Symbolic lookup
+   432	  rule (K  |->  V M:Map) [ K ]  => V ensures notBool (K in_keys(M)) [simplification]
+   433	  rule (K1 |-> _V M:Map) [ K2 ] => M [K2] requires K1 =/=K K2 ensures notBool (K1 in_keys(M)) [simplification]
+   434	  rule (_MAP:Map [ K  <-  V1 ]) [ K ]  => V1 [simplification]
+   435	  rule ( MAP:Map [ K1 <- _V1 ]) [ K2 ] => MAP [ K2 ] requires K1 =/=K K2 [simplification]
+   436	
+   437	  rule (K  |->  V M:Map) [  K ] orDefault _ => V ensures notBool (K in_keys(M)) [simplification]
+   438	  rule (K1 |-> _V M:Map) [ K2 ] orDefault D => M [K2] orDefault D requires K1 =/=K K2 ensures notBool (K1 in_keys(M)) [simplification]
+   439	  rule (_MAP:Map [ K  <-  V1 ]) [ K ] orDefault _ => V1 [simplification]
+   440	  rule ( MAP:Map [ K1 <- _V1 ]) [ K2 ] orDefault D => MAP [ K2 ] orDefault D requires K1 =/=K K2 [simplification]
+   441	  rule .Map [ _ ] orDefault D => D [simplification]
+   442	
+   443	  // Symbolic in_keys
+   444	  rule K in_keys(_M [ K <- undef ]) => false [simplification]
+   445	  rule K in_keys(_M [ K <- _ ]) => true [simplification]
+   446	  rule K1 in_keys(M [ K2 <- _ ]) => true requires K1 ==K K2 orBool K1 in_keys(M) [simplification]
+   447	  rule K1 in_keys(M [ K2 <- _ ]) => K1 in_keys(M) requires K1 =/=K K2 [simplification]
+   448	
+   449	  rule {false #Equals @Key in_keys(.Map)} => #Ceil(@Key) [simplification]
+   450	  rule {@Key in_keys(.Map) #Equals false} => #Ceil(@Key) [simplification]
+   451	  rule {false #Equals @Key in_keys(Key' |-> Val @M)} => #Ceil(@Key) #And #Ceil(Key' |-> Val @M) #And #Not({@Key #Equals Key'}) #And {false #Equals @Key in_keys(@M)} [simplification]
+   452	  rule {@Key in_keys(Key' |-> Val @M) #Equals false} => #Ceil(@Key) #And #Ceil(Key' |-> Val @M) #And #Not({@Key #Equals Key'}) #And {@Key in_keys(@M) #Equals false} [simplification]
+   453	
+   454	/*
+   455	// The rule below is automatically generated by the frontend for every sort
+   456	// hooked to MAP.Map. It is left here to serve as documentation.
+   457	
+   458	  rule #Ceil(@M:Map (@K:KItem |-> @V:KItem)) => {(@K in_keys(@M)) #Equals false} #And #Ceil(@M) #And #Ceil(@K) #And #Ceil(@V)
+   459	    [simplification]
+   460	*/
+   461	endmodule
+   462	
+   463	module MAP-SYMBOLIC
+   464	  imports MAP-KORE-SYMBOLIC
+   465	endmodule
+   466	```
+   467	
+   468	Range Maps
+   469	----
+   470	
+--- generated empty SortScope ---
+     1	import Klean59LargestPrimeFactor.Prelude
+     2	
+     3	inductive SortExc : Type where
+     4	  | «AssertionError_MPY-CORE_Exc» : SortExc
+     5	  | «NoExc_MPY-CORE_Exc» : SortExc
+     6	
+     7	inductive SortScope : Type
+     8	
+     9	structure SortExcCell : Type where
+    10	  val : SortExc
+    11	
+    12	structure SortEnvCell : Type where
+    13	  val : SortInt
+    14	
+--- generated target ---
+     1	import Klean59LargestPrimeFactor.Inj
+     2	
+     3	/- K trust-boundary goals. The second-pass agent must replace every
+     4	   writable opaque stub with an honest definition and prove this
+     5	   immutable proposition in the separate Proof.lean workspace. -/
+     6	
+     7	namespace Klean59LargestPrimeFactor.Lemmas
+     8	
+     9	def targetStatement
+    10	    (_Map_ : SortMap → SortMap → SortMap)
+    11	    («_in_keys(_)_MAP_Bool_KItem_Map» : SortKItem → SortMap → SortBool)
+    12	    («_[_<-undef]» : SortMap → SortKItem → SortMap)
+    13	    («_|->_» : SortKItem → SortKItem → SortMap)
+    14	    (notBool_ : SortBool → SortBool)
+    15	    : Prop :=
+    16	    (∀ (L : SortInt) (M : SortMap) (_V : SortScope) (h : notBool_ («_in_keys(_)_MAP_Bool_KItem_Map» (SortKItem.inj_SortInt L) M) = true), («_[_<-undef]» (_Map_ («_|->_» (SortKItem.inj_SortInt L) (SortKItem.inj_SortScope _V)) M) (SortKItem.inj_SortInt L) : SortMap) = (M : SortMap))
+    17	
+    18	end Klean59LargestPrimeFactor.Lemmas
+--- candidate Proof.lean ---
+     1	import Klean59LargestPrimeFactor.Lemmas
+     2	
+     3	namespace Proof
+     4	
+     5	private noncomputable def sameKItem (x y : SortKItem) : Bool := by
+     6	  classical
+     7	  exact decide (x = y)
+     8	
+     9	private noncomputable def containsKey
+    10	    (key : SortKItem) : List (SortKItem × SortKItem) → Bool
+    11	  | [] => false
+    12	  | (entryKey, _) :: rest =>
+    13	      sameKItem entryKey key || containsKey key rest
+    14	
+    15	private noncomputable def deleteKey
+    16	    (key : SortKItem) : List (SortKItem × SortKItem) →
+    17	      List (SortKItem × SortKItem)
+    18	  | [] => []
+    19	  | entry :: rest =>
+    20	      if sameKItem entry.1 key then
+    21	        deleteKey key rest
+    22	      else
+    23	        entry :: deleteKey key rest
+    24	
+    25	private theorem sameKItem_self (key : SortKItem) :
+    26	    sameKItem key key = true := by
+    27	  classical
+    28	  simp [sameKItem]
+    29	
+    30	private theorem deleteKey_of_not_contains (key : SortKItem) :
+    31	    ∀ entries : List (SortKItem × SortKItem),
+    32	      containsKey key entries = false →
+    33	      deleteKey key entries = entries := by
+    34	  intro entries
+    35	  induction entries with
+    36	  | nil =>
+    37	      intro _
+    38	      rfl
+    39	  | cons entry rest ih =>
+    40	      intro h
+    41	      have hBoth :
+    42	          sameKItem entry.1 key = false ∧
+    43	            containsKey key rest = false := by
+    44	        simpa [containsKey] using h
+    45	      have hEntry := hBoth.1
+    46	      have hRest := hBoth.2
+    47	      simp [deleteKey, hEntry, ih hRest]
+    48	
+    49	/- KORE symbol: Lbl'Unds'Map'Unds'; frozen source obligations: rule-fa3b6a435d659d4827ca8eeba38ca4416c9da4fd5da5bac92820eb663e7ddd84. Replace this stub with its honest total meaning from the frozen K semantics. -/
+    50	def _Map_ (left right : SortMap) : SortMap :=
+    51	  ⟨left.coll ++ right.coll⟩
+    52	/- KORE symbol: Lbl'Unds'in'Unds'keys'LParUndsRParUnds'MAP'Unds'Bool'Unds'KItem'Unds'Map; frozen source obligations: rule-fa3b6a435d659d4827ca8eeba38ca4416c9da4fd5da5bac92820eb663e7ddd84. Replace this stub with its honest total meaning from the frozen K semantics. -/
+    53	noncomputable def «_in_keys(_)_MAP_Bool_KItem_Map»
+    54	    (key : SortKItem) (map : SortMap) : SortBool :=
+    55	  containsKey key map.coll
+    56	/- KORE symbol: Lbl'UndsLSqBUnds-LT-'-undef'RSqB'; frozen source obligations: rule-fa3b6a435d659d4827ca8eeba38ca4416c9da4fd5da5bac92820eb663e7ddd84. Replace this stub with its honest total meaning from the frozen K semantics. -/
+    57	noncomputable def «_[_<-undef]»
+    58	    (map : SortMap) (key : SortKItem) : SortMap :=
+    59	  ⟨deleteKey key map.coll⟩
+    60	/- KORE symbol: Lbl'UndsPipe'-'-GT-Unds'; frozen source obligations: rule-fa3b6a435d659d4827ca8eeba38ca4416c9da4fd5da5bac92820eb663e7ddd84. Replace this stub with its honest total meaning from the frozen K semantics. -/
+    61	def «_|->_» (key value : SortKItem) : SortMap :=
+    62	  ⟨[(key, value)]⟩
+    63	/- KORE symbol: LblnotBool'Unds'; frozen source obligations: rule-fa3b6a435d659d4827ca8eeba38ca4416c9da4fd5da5bac92820eb663e7ddd84. Replace this stub with its honest total meaning from the frozen K semantics. -/
+    64	def notBool_ (value : SortBool) : SortBool :=
+    65	  !value
+    66	
+    67	theorem final :
+    68	    Klean59LargestPrimeFactor.Lemmas.targetStatement _Map_ «_in_keys(_)_MAP_Bool_KItem_Map» «_[_<-undef]» «_|->_» notBool_ := by
+    69	  intro L M _V h
+    70	  let key := SortKItem.inj_SortInt L
+    71	  have hAbsent : containsKey key M.coll = false := by
+    72	    simpa [notBool_, «_in_keys(_)_MAP_Bool_KItem_Map», key] using h
+    73	  cases M with
+    74	  | mk entries =>
+    75	      apply congrArg SortMap.mk
+    76	      change
+    77	        deleteKey key
+    78	          ((key, SortKItem.inj_SortScope _V) :: entries) = entries
+    79	      rw [deleteKey, sameKItem_self]
+    80	      exact deleteKey_of_not_contains key entries hAbsent
+    81	
+    82	end Proof

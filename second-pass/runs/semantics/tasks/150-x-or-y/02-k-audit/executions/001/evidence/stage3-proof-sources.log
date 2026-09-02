@@ -1,0 +1,265 @@
+WORKDIR: /tmp/audit-work/reconstruction
+COMMAND: bash -lc set\ -o\ pipefail\;\ for\ file\ in\ spec.k\ verification.k\ prove.sh\ concrete_tests.py\ concrete_tests.mpy\;\ do\ printf\ \"=====\ %s\ =====\\n\"\ \"\$file\"\;\ nl\ -ba\ \"\$file\"\;\ done
+EXIT_STATUS: 0
+OUTPUT_LINES: 261
+===== spec.k =====
+     1	requires "verification.k"
+     2	
+     3	module X-OR-Y-LOOP-SPEC
+     4	  imports X-OR-Y-VERIFICATION
+     5	
+     6	  // Inductive loop invariant.  The recursive non-divisor case advances both
+     7	  // the Python range iterator and primeSelect, allowing this claim to close
+     8	  // by circularity.
+     9	  claim
+    10	    <k>
+    11	      #loop(rangeObj(D:Int, N:Int, 1), Name("divisor"), xOrYLoopBody)
+    12	      ~> (Return(Name("x")) .Stmts)
+    13	      ~> #endcall
+    14	      => #pop
+    15	    </k>
+    16	    <env> 1 </env>
+    17	    <scopes>
+    18	      -1 |-> BS:Scope
+    19	      0 |-> scope(.Map, parent(-1))
+    20	      1 |-> scope(
+    21	        "divisor" |-> (OLD:Int => scanLast(N, D, OLD))
+    22	        "n" |-> N:Int
+    23	        "x" |-> X:Val
+    24	        "y" |-> Y:Val,
+    25	        parent(0))
+    26	    </scopes>
+    27	    <scopeLoc> 2 </scopeLoc>
+    28	    <heap> .Map </heap>
+    29	    <heapLoc> 0 </heapLoc>
+    30	    <stack> ListItem(frame(.K, 0, 1)) </stack>
+    31	    <ret> noRet => retV(primeSelect(N, D, X:Val, Y:Val)) </ret>
+    32	    <exc> NoExc </exc>
+    33	    <exit-code> 0 </exit-code>
+    34	    requires N >=Int 2
+    35	      andBool D >=Int 2
+    36	    [label(loop_correct)]
+    37	endmodule
+    38	
+    39	module X-OR-Y-MAIN-SPEC
+    40	  imports X-OR-Y-SUMMARY
+    41	
+    42	  // Universal functional correctness for every integer n and arbitrary
+    43	  // Python values x and y, from the reference semantics' initial state.
+    44	  claim
+    45	    <k> #xOrY(N:Int, X:Val, Y:Val) => primeSelect(N, 2, X, Y) </k>
+    46	    <env> 0 </env>
+    47	    <scopes>
+    48	      0 |-> scope(.Map, parent(-1))
+    49	      -1 |-> builtinsScope
+    50	    </scopes>
+    51	    <scopeLoc> 1 </scopeLoc>
+    52	    <heap> .Map </heap>
+    53	    <heapLoc> 0 </heapLoc>
+    54	    <stack> .List </stack>
+    55	    <ret> noRet </ret>
+    56	    <exc> NoExc </exc>
+    57	    <exit-code> 0 </exit-code>
+    58	    [label(main_correct)]
+    59	endmodule
+===== verification.k =====
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module X-OR-Y-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // The translated body of solution.py, named here so the claims remain
+     7	  // readable.  These are syntax macros, not additional execution semantics.
+     8	  syntax Stmts ::= "xOrYLoopBody" [macro]
+     9	  rule xOrYLoopBody
+    10	    => If(
+    11	         Compare(BinOp("%", Name("n"), Name("divisor")),
+    12	                 CmpOp("==", Int(0))),
+    13	         Return(Name("y")),
+    14	         .Stmts)
+    15	
+    16	  syntax Stmts ::= "xOrYBody" [macro]
+    17	  rule xOrYBody
+    18	    => If(Compare(Name("n"), CmpOp("<", Int(2))),
+    19	          Return(Name("y")),
+    20	          .Stmts)
+    21	       For(Name("divisor"), Call(Name("range"), (Int(2), Name("n"))),
+    22	           xOrYLoopBody)
+    23	       Return(Name("x"))
+    24	
+    25	  // A call of the actual translated function body in a clean module frame.
+    26	  syntax KItem ::= "#xOrY" "(" Int "," Val "," Val ")" [macro]
+    27	  rule #xOrY(N:Int, X:Val, Y:Val)
+    28	    => Call(closureVal(("n", "x", "y"), xOrYBody, 0), (N, X, Y))
+    29	
+    30	  // Mathematical trial-division specification.  primeSelect(N,D,X,Y) is X
+    31	  // exactly when N >= 2 and none of D,D+1,...,N-1 divides N; otherwise it is Y.
+    32	  // In particular primeSelect(N,2,X,Y) is the contract of x_or_y.
+    33	  syntax Val ::= primeSelect(Int, Int, Val, Val) [function]
+    34	
+    35	  rule primeSelect(N:Int, D:Int, X:Val, Y:Val) => Y
+    36	    requires D >=Int 2 andBool N <Int 2
+    37	
+    38	  rule primeSelect(N:Int, D:Int, X:Val, Y:Val) => X
+    39	    requires D >=Int 2 andBool N >=Int 2 andBool D >=Int N
+    40	
+    41	  rule primeSelect(N:Int, D:Int, X:Val, Y:Val) => Y
+    42	    requires D >=Int 2 andBool N >=Int 2 andBool D <Int N
+    43	      andBool pyMod(N, D) ==Int 0
+    44	
+    45	  rule primeSelect(N:Int, D:Int, X:Val, Y:Val)
+    46	    => primeSelect(N, D +Int 1, X, Y)
+    47	    requires D >=Int 2 andBool N >=Int 2 andBool D <Int N
+    48	      andBool pyMod(N, D) =/=Int 0
+    49	
+    50	  // The corresponding final value of the Python local `divisor`.  Tracking
+    51	  // this small piece of mutable frame state makes the loop invariant exact.
+    52	  syntax Int ::= scanLast(Int, Int, Int) [function]
+    53	
+    54	  rule scanLast(N:Int, D:Int, OLD:Int) => OLD
+    55	    requires N >=Int 2 andBool D >=Int 2 andBool D >=Int N
+    56	
+    57	  rule scanLast(N:Int, D:Int, OLD:Int) => D
+    58	    requires N >=Int 2 andBool D >=Int 2 andBool D <Int N
+    59	      andBool pyMod(N, D) ==Int 0
+    60	
+    61	  rule scanLast(N:Int, D:Int, OLD:Int)
+    62	    => scanLast(N, D +Int 1, D)
+    63	    requires N >=Int 2 andBool D >=Int 2 andBool D <Int N
+    64	      andBool pyMod(N, D) =/=Int 0
+    65	endmodule
+    66	
+    67	// Modular proof layer.  The rule below is byte-for-byte the reachability
+    68	// summary proved as loop_correct in X-OR-Y-LOOP-SPEC.  It is kept out of the
+    69	// base module used for that proof, then imported only for the top-level proof.
+    70	module X-OR-Y-SUMMARY
+    71	  imports X-OR-Y-VERIFICATION
+    72	
+    73	  rule
+    74	    <k>
+    75	      #loop(rangeObj(D:Int, N:Int, 1), Name("divisor"), xOrYLoopBody)
+    76	      ~> (Return(Name("x")) .Stmts)
+    77	      ~> #endcall
+    78	      => #pop
+    79	    </k>
+    80	    <env> 1 </env>
+    81	    <scopes>
+    82	      -1 |-> BS:Scope
+    83	      0 |-> scope(.Map, parent(-1))
+    84	      1 |-> scope(
+    85	        "divisor" |-> (OLD:Int => scanLast(N, D, OLD))
+    86	        "n" |-> N:Int
+    87	        "x" |-> X:Val
+    88	        "y" |-> Y:Val,
+    89	        parent(0))
+    90	    </scopes>
+    91	    <scopeLoc> 2 </scopeLoc>
+    92	    <heap> .Map </heap>
+    93	    <heapLoc> 0 </heapLoc>
+    94	    <stack> ListItem(frame(.K, 0, 1)) </stack>
+    95	    <ret> noRet => retV(primeSelect(N, D, X:Val, Y:Val)) </ret>
+    96	    <exc> NoExc </exc>
+    97	    <exit-code> 0 </exit-code>
+    98	    requires N >=Int 2
+    99	      andBool D >=Int 2
+   100	    [priority(40)]
+   101	endmodule
+===== prove.sh =====
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	# Translate the submitted implementation, and ensure the concrete smoke
+     5	# program embeds that implementation verbatim.
+     6	python3 py2mpy.py solution.py > solution.mpy
+     7	head -n 7 concrete_tests.py | cmp - solution.py
+     8	python3 py2mpy.py concrete_tests.py > concrete_tests.mpy
+     9	
+    10	# Concrete execution under the required LLVM definition.  A failed assertion
+    11	# sets the MPY exit code and makes krun exit nonzero.
+    12	kompile reference-semantics/semantics.k \
+    13	  --backend llvm \
+    14	  --main-module MPY-KRUN \
+    15	  --syntax-module MPY-SYNTAX \
+    16	  --output-definition runtime-kompiled
+    17	krun concrete_tests.mpy --definition runtime-kompiled
+    18	
+    19	# Prove the inductive loop summary using only the supplied MPY semantics.
+    20	kompile verification.k \
+    21	  --backend haskell \
+    22	  --main-module X-OR-Y-VERIFICATION \
+    23	  --syntax-module X-OR-Y-VERIFICATION \
+    24	  --output-definition verification-kompiled
+    25	kprove spec.k \
+    26	  --definition verification-kompiled \
+    27	  --spec-module X-OR-Y-LOOP-SPEC \
+    28	  --claims loop_correct
+    29	
+    30	# Import the now-proved summary as a modular proof rule, then prove the
+    31	# universal function contract.
+    32	kompile verification.k \
+    33	  --backend haskell \
+    34	  --main-module X-OR-Y-SUMMARY \
+    35	  --syntax-module X-OR-Y-SUMMARY \
+    36	  --output-definition summary-kompiled
+    37	kprove spec.k \
+    38	  --definition summary-kompiled \
+    39	  --spec-module X-OR-Y-MAIN-SPEC \
+    40	  --claims main_correct
+===== concrete_tests.py =====
+     1	def x_or_y(n, x, y):
+     2	    if n < 2:
+     3	        return y
+     4	    for divisor in range(2, n):
+     5	        if n % divisor == 0:
+     6	            return y
+     7	    return x
+     8	
+     9	
+    10	assert x_or_y(7, 34, 12) == 34
+    11	assert x_or_y(15, 8, 5) == 5
+    12	assert x_or_y(1, 7, 9) == 9
+    13	assert x_or_y(2, 11, 13) == 11
+    14	assert x_or_y(0, 4, 6) == 6
+    15	assert x_or_y(97, -2, 10) == -2
+    16	assert x_or_y(49, 3, 4) == 4
+===== concrete_tests.mpy =====
+     1	Module(
+     2	  FuncDef("x_or_y", Params("n", "x", "y"),
+     3	    If(Compare(Name("n"), CmpOp("<", Int(2))),
+     4	      Return(Name("y")),
+     5	      )
+     6	    For(Name("divisor"), Call(Name("range"), Int(2), Name("n")),
+     7	      If(Compare(
+     8	        BinOp("%", Name("n"), Name("divisor")),
+     9	        CmpOp("==", Int(0))),
+    10	        Return(Name("y")),
+    11	        ))
+    12	    Return(Name("x")))
+    13	  Assert(
+    14	    Compare(
+    15	      Call(Name("x_or_y"), Int(7), Int(34), Int(12)),
+    16	      CmpOp("==", Int(34))))
+    17	  Assert(
+    18	    Compare(
+    19	      Call(Name("x_or_y"), Int(15), Int(8), Int(5)),
+    20	      CmpOp("==", Int(5))))
+    21	  Assert(
+    22	    Compare(
+    23	      Call(Name("x_or_y"), Int(1), Int(7), Int(9)),
+    24	      CmpOp("==", Int(9))))
+    25	  Assert(
+    26	    Compare(
+    27	      Call(Name("x_or_y"), Int(2), Int(11), Int(13)),
+    28	      CmpOp("==", Int(11))))
+    29	  Assert(
+    30	    Compare(
+    31	      Call(Name("x_or_y"), Int(0), Int(4), Int(6)),
+    32	      CmpOp("==", Int(6))))
+    33	  Assert(
+    34	    Compare(
+    35	      Call(Name("x_or_y"), Int(97), UnaryOp("-", Int(2)), Int(10)),
+    36	      CmpOp("==", UnaryOp("-", Int(2)))))
+    37	  Assert(
+    38	    Compare(
+    39	      Call(Name("x_or_y"), Int(49), Int(3), Int(4)),
+    40	      CmpOp("==", Int(4)))))

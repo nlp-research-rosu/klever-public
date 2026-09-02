@@ -1,0 +1,235 @@
+Script started on 2026-07-26 06:37:53-05:00 [<not executed on terminal>]
+SOURCE semantic.k with line numbers
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports STRING-SYNTAX
+     4	
+     5	  // The constructor grammar needed by the translated solution.  These are
+     6	  // syntax trees, not built-in K computations.
+     7	  syntax Pgm ::= "Module" "(" Function ")" [symbol(moduleAst)]
+     8	  syntax Function ::= "FuncDef" "(" String "," Params "," Stmt ")" [symbol(funcDefAst)]
+     9	  syntax Params ::= "Params" "(" String ")" [symbol(paramsAst)]
+    10	  syntax Stmt ::= "Return" "(" Expr ")" [symbol(returnAst)]
+    11	
+    12	  syntax Expr ::= "Name" "(" String ")" [symbol(nameAst)]
+    13	                | "Int" "(" Int ")" [symbol(intAst)]
+    14	                | "ListComp" "(" Expr "," CompFor ")" [symbol(listCompAst)]
+    15	                | "Compare" "(" Expr "," CmpOp ")" [symbol(compareAst)]
+    16	  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Expr ")" [symbol(compForAst)]
+    17	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")" [symbol(cmpOpAst)]
+    18	
+    19	  // A free, inductive representation of Python lists of mathematical ints.
+    20	  syntax PyList ::= "nil" [symbol(nil), constructor]
+    21	                  | "cons" "(" Int "," PyList ")" [symbol(cons), constructor]
+    22	endmodule
+    23	
+    24	module SEMANTIC
+    25	  imports MPY-SYNTAX
+    26	  imports MAP
+    27	  imports INT
+    28	
+    29	  configuration
+    30	    <py>
+    31	      <k> $PGM:Pgm </k>
+    32	      <input> $INPUT:PyList </input>
+    33	    </py>
+    34	
+    35	  // Function entry binds the sole formal argument to the external input.
+    36	  syntax KItem ::= "eval" "(" Expr "," Map ")" [symbol(eval)]
+    37	  rule <k> Module(FuncDef("get_positive", Params(P), Return(E)))
+    38	         => eval(E, P |-> L) ... </k>
+    39	       <input> L </input>
+    40	
+    41	  // Typed projection from the untyped payload of a K Map.
+    42	  syntax PyList ::= "asList" "(" KItem ")" [function, symbol(asList)]
+    43	  rule asList(L:PyList) => L
+    44	
+    45	  // A one-generator comprehension evaluates its iterable in the environment.
+    46	  // Reusing X in all three positions enforces Python's bound-name relationship.
+    47	  rule <k> eval(
+    48	              ListComp(Name(X),
+    49	                CompFor(Name(X), Name(P),
+    50	                  Compare(Name(X), CmpOp(">", Int(N))))),
+    51	              RHO)
+    52	         => filterGt(asList(RHO [ P ]), N) ... </k>
+    53	
+    54	  // Mathematical meaning of stable filtering: preserve order and duplicates,
+    55	  // retaining an element exactly when the comparison is true.
+    56	  syntax PyList ::= "filterGt" "(" PyList "," Int ")" [function, symbol(filterGt)]
+    57	  rule filterGt(nil, _N) => nil
+    58	  rule filterGt(cons(I, IS), N) => cons(I, filterGt(IS, N))
+    59	    requires I >Int N
+    60	  rule filterGt(cons(I, IS), N) => filterGt(IS, N)
+    61	    requires I <=Int N
+    62	endmodule
+SOURCE verification.k with line numbers
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // Symbolic boundary obligations run the actual translated program.  The
+     7	  // tail stays arbitrary, so these claims cover every possible first step.
+     8	  claim <py>
+     9	          <k> Module(
+    10	                FuncDef("get_positive", Params("l"),
+    11	                  Return(
+    12	                    ListComp(Name("x"),
+    13	                      CompFor(Name("x"), Name("l"),
+    14	                        Compare(Name("x"), CmpOp(">", Int(0))))))))
+    15	            => cons(I, filterGt(REST, 0)) </k>
+    16	          <input> cons(I, REST) </input>
+    17	        </py>
+    18	    requires I >Int 0
+    19	
+    20	  claim <py>
+    21	          <k> Module(
+    22	                FuncDef("get_positive", Params("l"),
+    23	                  Return(
+    24	                    ListComp(Name("x"),
+    25	                      CompFor(Name("x"), Name("l"),
+    26	                        Compare(Name("x"), CmpOp(">", Int(0))))))))
+    27	            => filterGt(REST, 0) </k>
+    28	          <input> cons(I, REST) </input>
+    29	        </py>
+    30	    requires I <=Int 0
+    31	
+    32	  claim <py>
+    33	          <k> Module(
+    34	                FuncDef("get_positive", Params("l"),
+    35	                  Return(
+    36	                    ListComp(Name("x"),
+    37	                      CompFor(Name("x"), Name("l"),
+    38	                        Compare(Name("x"), CmpOp(">", Int(0))))))))
+    39	            => nil </k>
+    40	          <input> nil </input>
+    41	        </py>
+    42	endmodule
+SOURCE spec.k with line numbers
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Universal functional-correctness summary: execution of the translated
+     7	  // program returns the stable strict-positive projection for every input.
+     8	  claim <py>
+     9	          <k> Module(
+    10	                FuncDef("get_positive", Params("l"),
+    11	                  Return(
+    12	                    ListComp(Name("x"),
+    13	                      CompFor(Name("x"), Name("l"),
+    14	                        Compare(Name("x"), CmpOp(">", Int(0))))))))
+    15	            => filterGt(INPUT, 0) </k>
+    16	          <input> INPUT:PyList </input>
+    17	        </py>
+    18	
+    19	  // The two examples from prompt.py, plus empty and all-nonpositive edges.
+    20	  claim <py>
+    21	          <k> Module(
+    22	                FuncDef("get_positive", Params("l"),
+    23	                  Return(
+    24	                    ListComp(Name("x"),
+    25	                      CompFor(Name("x"), Name("l"),
+    26	                        Compare(Name("x"), CmpOp(">", Int(0))))))))
+    27	            => cons(2, cons(5, cons(6, nil))) </k>
+    28	          <input> cons(-1, cons(2, cons(-4, cons(5, cons(6, nil))))) </input>
+    29	        </py>
+    30	
+    31	  claim <py>
+    32	          <k> Module(
+    33	                FuncDef("get_positive", Params("l"),
+    34	                  Return(
+    35	                    ListComp(Name("x"),
+    36	                      CompFor(Name("x"), Name("l"),
+    37	                        Compare(Name("x"), CmpOp(">", Int(0))))))))
+    38	            => cons(5, cons(3, cons(2, cons(3, cons(9, cons(123, cons(1, nil))))))) </k>
+    39	          <input> cons(5, cons(3, cons(-5, cons(2, cons(-3, cons(3, cons(9, cons(0, cons(123, cons(1, cons(-10, nil))))))))))) </input>
+    40	        </py>
+    41	
+    42	  claim <py>
+    43	          <k> Module(
+    44	                FuncDef("get_positive", Params("l"),
+    45	                  Return(
+    46	                    ListComp(Name("x"),
+    47	                      CompFor(Name("x"), Name("l"),
+    48	                        Compare(Name("x"), CmpOp(">", Int(0))))))))
+    49	            => nil </k>
+    50	          <input> nil </input>
+    51	        </py>
+    52	
+    53	  claim <py>
+    54	          <k> Module(
+    55	                FuncDef("get_positive", Params("l"),
+    56	                  Return(
+    57	                    ListComp(Name("x"),
+    58	                      CompFor(Name("x"), Name("l"),
+    59	                        Compare(Name("x"), CmpOp(">", Int(0))))))))
+    60	            => nil </k>
+    61	          <input> cons(0, cons(-1, cons(-2, nil))) </input>
+    62	        </py>
+    63	endmodule
+LEXICAL declaration inventory
+/tmp/audit-work/30-get-positive/candidate-src/spec.k
+1:requires "verification.k"
+3:module SPEC
+4:  imports VERIFICATION
+8:  claim <py>
+20:  claim <py>
+31:  claim <py>
+42:  claim <py>
+53:  claim <py>
+
+/tmp/audit-work/30-get-positive/candidate-src/verification.k
+1:requires "semantic.k"
+3:module VERIFICATION
+4:  imports SEMANTIC
+8:  claim <py>
+18:    requires I >Int 0
+20:  claim <py>
+30:    requires I <=Int 0
+32:  claim <py>
+
+/tmp/audit-work/30-get-positive/candidate-src/semantic.k
+1:module MPY-SYNTAX
+2:  imports INT-SYNTAX
+3:  imports STRING-SYNTAX
+7:  syntax Pgm ::= "Module" "(" Function ")" [symbol(moduleAst)]
+8:  syntax Function ::= "FuncDef" "(" String "," Params "," Stmt ")" [symbol(funcDefAst)]
+9:  syntax Params ::= "Params" "(" String ")" [symbol(paramsAst)]
+10:  syntax Stmt ::= "Return" "(" Expr ")" [symbol(returnAst)]
+12:  syntax Expr ::= "Name" "(" String ")" [symbol(nameAst)]
+13:                | "Int" "(" Int ")" [symbol(intAst)]
+14:                | "ListComp" "(" Expr "," CompFor ")" [symbol(listCompAst)]
+15:                | "Compare" "(" Expr "," CmpOp ")" [symbol(compareAst)]
+16:  syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Expr ")" [symbol(compForAst)]
+17:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")" [symbol(cmpOpAst)]
+20:  syntax PyList ::= "nil" [symbol(nil), constructor]
+21:                  | "cons" "(" Int "," PyList ")" [symbol(cons), constructor]
+24:module SEMANTIC
+25:  imports MPY-SYNTAX
+26:  imports MAP
+27:  imports INT
+29:  configuration
+36:  syntax KItem ::= "eval" "(" Expr "," Map ")" [symbol(eval)]
+37:  rule <k> Module(FuncDef("get_positive", Params(P), Return(E)))
+42:  syntax PyList ::= "asList" "(" KItem ")" [function, symbol(asList)]
+43:  rule asList(L:PyList) => L
+47:  rule <k> eval(
+56:  syntax PyList ::= "filterGt" "(" PyList "," Int ")" [function, symbol(filterGt)]
+57:  rule filterGt(nil, _N) => nil
+58:  rule filterGt(cons(I, IS), N) => cons(I, filterGt(IS, N))
+59:    requires I >Int N
+60:  rule filterGt(cons(I, IS), N) => filterGt(IS, N)
+61:    requires I <=Int N
+CANONICAL verification simplification-rule inventory
+{
+  "inventory_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "rules": [],
+  "schema_version": 1,
+  "verification_file": "verification.k",
+  "verification_module": "VERIFICATION",
+  "verification_sha256": "035ddb54ec6bcf153de12b054fcd2fabb8e3edd4f333138421970d4590020894"
+}
+
+Script done on 2026-07-26 06:37:53-05:00 [COMMAND_EXIT_CODE="0"]

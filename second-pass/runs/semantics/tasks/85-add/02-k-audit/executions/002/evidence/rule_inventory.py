@@ -1,0 +1,192 @@
+#!/usr/bin/env python3
+"""Build a source-complete K declaration/rule inventory for the audit."""
+
+from __future__ import annotations
+
+from collections import Counter
+import hashlib
+from pathlib import Path
+import re
+
+
+WORK = Path("/tmp/audit-work/85-add")
+SOURCES = [
+    WORK / "reference-semantics/semantics.k",
+    *sorted((WORK / "reference-semantics/semantics").glob("*.k")),
+    WORK / "verification.k",
+    WORK / "spec.k",
+]
+START = re.compile(r"^\s*(configuration|syntax|context|rule|claim)\b")
+ATTRIBUTE_PATTERNS = {
+    "function": re.compile(r"\bfunction\b"),
+    "total": re.compile(r"\btotal\b"),
+    "functional": re.compile(r"\bfunctional\b"),
+    "symbol": re.compile(r"\bsymbol(?:\([^]]*\))?"),
+    "no-evaluators": re.compile(r"\bno-evaluators\b"),
+    "macro-rec": re.compile(r"\bmacro-rec\b"),
+    "macro": re.compile(r"\bmacro\b(?!-rec)"),
+    "priority": re.compile(r"priority\(\d+\)"),
+    "simplification": re.compile(r"\bsimplification\b"),
+    "concrete": re.compile(r"\bconcrete\b"),
+    "owise": re.compile(r"\bowise\b"),
+    "strict": re.compile(r"(?<!seq)strict(?:\([^]]*\))?"),
+    "seqstrict": re.compile(r"seqstrict(?:\([^]]*\))?"),
+}
+
+# Lines used by the submitted term, entry claim, loop invariant, or result
+# summary.  Other supplied rules are constructor/guard-disjoint from this proof
+# and are inventoried as off-path fixed-semantics declarations.
+ON_PATH: dict[str, list[tuple[int, int]]] = {
+    "semantics/syntax.k": [(9, 61)],
+    "semantics/core.k": [
+        (13, 60),
+        (123, 127),
+        (129, 181),
+        (183, 219),
+    ],
+    "semantics/iter.k": [(8, 8)],
+    "semantics/operators.k": [(10, 17)],
+    "semantics/int.k": [(9, 9), (15, 15), (19, 20), (26, 26)],
+    "semantics/bool.k": [(8, 8)],
+    "semantics/str.k": [(13, 17)],
+    "semantics/tuple.k": [(31, 41)],
+    "semantics/controls.k": [
+        (9, 31),
+        (48, 54),
+        (65, 74),
+    ],
+    "semantics/functions.k": [(8, 16), (62, 90)],
+    "semantics/call.k": [(19, 21), (69, 74)],
+    "verification.k": [(9, 75)],
+    "spec.k": [(6, 50)],
+}
+
+
+def rel(path: Path) -> str:
+    if path == WORK / "verification.k" or path == WORK / "spec.k":
+        return path.name
+    return str(path.relative_to(WORK / "reference-semantics"))
+
+
+def overlaps(path: str, start: int, end: int) -> bool:
+    return any(start <= high and end >= low for low, high in ON_PATH.get(path, []))
+
+
+rows: list[dict[str, object]] = []
+for source in SOURCES:
+    lines = source.read_text().splitlines()
+    starts = [i for i, line in enumerate(lines) if START.match(line)]
+    for position, index in enumerate(starts):
+        next_index = starts[position + 1] if position + 1 < len(starts) else len(lines)
+        # Trim comments/blank lines that introduce the following section.
+        end_index = next_index
+        while end_index > index + 1 and (
+            not lines[end_index - 1].strip()
+            or lines[end_index - 1].lstrip().startswith("//")
+        ):
+            end_index -= 1
+        block = "\n".join(lines[index:end_index]).strip()
+        match = START.match(lines[index])
+        assert match is not None
+        kind = match.group(1)
+        attrs: list[str] = []
+        for attribute, pattern in ATTRIBUTE_PATTERNS.items():
+            matches = pattern.findall(block)
+            if not matches:
+                continue
+            if attribute == "priority":
+                attrs.extend(matches)
+            else:
+                attrs.append(attribute)
+        attrs = sorted(set(attrs))
+        source_rel = rel(source)
+        start_line = index + 1
+        end_line = max(start_line, end_index)
+        if source_rel in {"verification.k", "spec.k"}:
+            origin = "candidate-local"
+        else:
+            origin = "supplied-fixed"
+        path_status = "on-proof-path" if overlaps(source_rel, start_line, end_line) else "off-proof-path"
+        if origin == "supplied-fixed":
+            decision = (
+                "accepted fixed semantics; manually reviewed on used path"
+                if path_status == "on-proof-path"
+                else "accepted fixed semantics; constructor/guard-disjoint from submitted proof"
+            )
+        elif source_rel == "spec.k":
+            decision = "target reachability claim; reviewed for satisfiability and result constraint"
+        else:
+            decision = "candidate proof extension; individually classified in REVIEW.md"
+        rows.append(
+            {
+                "source": source_rel,
+                "start": start_line,
+                "end": end_line,
+                "kind": kind,
+                "attrs": ",".join(attrs) if attrs else "-",
+                "origin": origin,
+                "path": path_status,
+                "decision": decision,
+                "block": block,
+            }
+        )
+
+print("# Exhaustive K source inventory")
+print()
+print("Generated by `python3 /audit-output/evidence/rule_inventory.py`.")
+print(
+    "Each row is a top-level `configuration`, `syntax`, `context`, `rule`, or "
+    "`claim` block from every supplied K source plus `verification.k` and `spec.k`."
+)
+print()
+print("## Source hashes")
+print()
+for source in SOURCES:
+    print(f"- `{rel(source)}`: `{hashlib.sha256(source.read_bytes()).hexdigest()}`")
+print()
+print("## Counts")
+print()
+print(f"- Inventory entries: {len(rows)}")
+for kind, count in sorted(Counter(str(row["kind"]) for row in rows).items()):
+    print(f"- `{kind}`: {count}")
+for attribute in [
+    "function",
+    "total",
+    "functional",
+    "symbol",
+    "no-evaluators",
+    "macro",
+    "macro-rec",
+    "simplification",
+    "concrete",
+    "owise",
+]:
+    count = sum(
+        attribute in str(row["attrs"]).split(",")
+        for row in rows
+    )
+    print(f"- attribute `{attribute}`: {count}")
+priority_count = sum("priority(" in str(row["attrs"]) for row in rows)
+print(f"- priority rules: {priority_count}")
+print()
+print("## Inventory")
+print()
+print("| ID | Source | Kind | Attributes | Origin/path | Review decision | Complete source block |")
+print("|---:|---|---|---|---|---|---|")
+for number, row in enumerate(rows, 1):
+    source_location = f"{row['source']}:{row['start']}"
+    if row["end"] != row["start"]:
+        source_location += f"-{row['end']}"
+    block = (
+        str(row["block"])
+        .replace("&", "&amp;")
+        .replace("|", "&#124;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\n", "<br>")
+    )
+    print(
+        f"| {number} | `{source_location}` | `{row['kind']}` | "
+        f"`{row['attrs']}` | {row['origin']}; {row['path']} | "
+        f"{row['decision']} | `{block}` |"
+    )

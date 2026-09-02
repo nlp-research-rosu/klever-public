@@ -1,0 +1,373 @@
+$ rg -n "binding_sha256|expected_target_definition|def target_statement|statement_sha256|definition_sha256" /reference/tools/klean_export.py
+1605:def target_statement(generated: Path) -> dict[str, Any] | None:
+1647:        binding_sha256 = parameter.get("binding_sha256")
+1669:        expected_binding_sha256 = sha256_text(
+1672:        if binding_sha256 != expected_binding_sha256:
+1676:            {**binding, "binding_sha256": binding_sha256}
+1684:        "statement_sha256": sha256_text(statement),
+1685:        "definition_sha256": sha256_text(definition),
+1690:def expected_target_definition(obligation_map: dict[str, Any]) -> str | None:
+$ sed -n relevant target/binding ranges
+    ]
+    if not present:
+        return function_text, ()
+
+    for signature in present:
+        if function_text.count(signature) != 1:
+            raise KleanExportError(
+                f"generated collection hook is not unique: {signature}"
+            )
+    first = min(present, key=function_text.index)
+    repaired = function_text.replace(
+        first,
+        _COLLECTION_HOOK_HELPERS.rstrip()
+        + "\n\n"
+        + _COLLECTION_HOOK_MODELS[first],
+        1,
+    )
+    for signature in present:
+        if signature == first:
+            continue
+        repaired = repaired.replace(
+            signature, _COLLECTION_HOOK_MODELS[signature], 1
+        )
+
+    present_set = set(present)
+    names = tuple(
+        name
+        for name in _COLLECTION_HOOK_NAME_ORDER
+        if signature_of[name] in present_set
+    )
+    return repaired, names
+
+
+_CORE_OPERATIONAL_HOOK_MODELS = {
+    (
+        "axiom «_%Int_» (x0 : SortInt) (x1 : SortInt) "
+        ": Option SortInt"
+    ): (
+        "noncomputable def «_%Int_» "
+        "(x0 : SortInt) (x1 : SortInt) : Option SortInt :=\n"
+        "  if x1 = 0 then none else some (Int.tmod x0 x1)"
+    ),
+    "axiom append (x0 : SortK) (x1 : SortK) : Option SortK": (
+        "noncomputable def append : SortK → SortK → Option SortK\n"
+        "  | SortK.dotk, rest => some rest\n"
+        "  | SortK.kseq item tail, rest => do\n"
+        "      let modeledRest ← append tail rest\n"
+        "      return SortK.kseq item modeledRest"
+    ),
+    (
+        "axiom «_==K_» (x0 : SortK) (x1 : SortK) "
+        ": Option SortBool"
+    ): (
+        "noncomputable local instance : DecidableEq SortK :=\n"
+        "  Classical.typeDecidableEq SortK\n"
+        "noncomputable def «_==K_» "
+        "(x0 : SortK) (x1 : SortK) : Option SortBool :=\n"
+        "  some (decide (x0 = x1))"
+    ),
+}
+
+
+# Canonical order of the modeled operational-hook identities in the manifests.
+_CORE_OPERATIONAL_HOOK_NAME_ORDER = ("_%Int_", "append", "_==K_")
+
+
+def model_core_operational_hooks(
+    function_text: str,
+) -> tuple[str, tuple[str, ...]]:
+    """Replace exact K integer remainder and K-sequence append axioms.
+
+    pyk emits an axiom only for the operational hooks a definition references,
+    so either hook may appear alone.  Every registered operational hook that is
+    present is replaced by its exact model; absent registrations are skipped.
+    Completeness is not required — the ``_assert_no_unmodeled_hook_axioms`` net
+    fails closed on any operational hook we leave unmodeled.
+    """
+
+    signature_of = {
+        _hook_axiom_symbol(signature): signature
+        for signature in _CORE_OPERATIONAL_HOOK_MODELS
+    }
+    if set(_CORE_OPERATIONAL_HOOK_NAME_ORDER) != set(signature_of):
+        raise KleanExportError(
+            "core operational-hook registry is inconsistent"
+        )
+
+    present = [
+        signature_of[name]
+        for name in _CORE_OPERATIONAL_HOOK_NAME_ORDER
+        if signature_of[name] in function_text
+    ]
+    if not present:
+        return function_text, ()
+
+    repaired = function_text
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        return result.returncode, result.stdout
+    except subprocess.TimeoutExpired:
+        return 124, f"TIMEOUT after {timeout}s"
+
+
+def _trust_inventory(
+    package: Path,
+    *,
+    axiomatized: set[str],
+    noncomputable_repair: bool,
+    modeled_collection_hooks: tuple[str, ...] = (),
+    modeled_operational_hooks: tuple[str, ...] = (),
+    modeled_recursive_functions: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    axioms: set[str] = set()
+    allowlist: dict[str, dict[str, str]] = {}
+    noncomputable: set[str] = set()
+    designated_sorries = 0
+    other_sorries = 0
+    for _relative, kind, path in _tree_entries(package):
+        if kind != "file" or path.suffix != ".lean":
+            continue
+        text = path.read_text()
+        for declaration in lean_trust_declarations(path):
+            name = declaration["name"]
+            declaration_name = declaration["declaration_name"]
+            kind = declaration["kind"]
+            if kind == "axiom":
+                axioms.add(name)
+            allowlist[name] = {
+                "name": name,
+                "declaration_name": declaration_name,
+                "kind": kind,
+                "type": declaration["type"],
+                "source": path.relative_to(package).as_posix(),
+                "line": declaration["line"],
+                "reason": (
+                    "deterministic Klean definition repair"
+                    if declaration_name in axiomatized
+                    else (
+                        "Klean-generated opaque definition"
+                        if kind == "opaque"
+                        else "Klean-generated trust boundary"
+                    )
+                ),
+            }
+        noncomputable.update(_NONCOMPUTABLE_RE.findall(text))
+        count = len(re.findall(r"\bsorry\b", text))
+        if path.name == "Lemmas.lean":
+            designated_sorries += count
+        else:
+            other_sorries += count
+    return {
+        "axioms": sorted(axioms),
+        "automatic_axiomatization": sorted(axiomatized),
+        "modeled_collection_hooks": list(modeled_collection_hooks),
+        "modeled_operational_hooks": list(modeled_operational_hooks),
+        "modeled_recursive_functions": list(modeled_recursive_functions),
+        "noncomputable_definitions": sorted(noncomputable),
+        "automatic_noncomputable_repair": noncomputable_repair,
+        "designated_sorries": designated_sorries,
+        "other_sorries": other_sorries,
+        "allowlist": [allowlist[name] for name in sorted(allowlist)],
+    }
+
+
+def target_statement(generated: Path) -> dict[str, Any] | None:
+    obligation_map = _regular_json(generated / "obligation-map.json")
+    obligations = obligation_map.get("obligations")
+    parameters = obligation_map.get("trust_parameters")
+    if not isinstance(obligations, list) or not isinstance(parameters, list):
+        raise KleanExportError("generated obligation map is malformed")
+    candidates: list[tuple[Path, str]] = []
+    raw_count = 0
+    for relative, kind, path in _tree_entries(generated):
+        if kind != "file" or path.suffix != ".lean":
+            continue
+        text = path.read_text()
+        raw_count += len(
+            re.findall(r"(?m)^\s*def\s+targetStatement\b", text)
+        )
+        for match in re.finditer(
+            r"(?ms)^\s*def\s+targetStatement\b.*?"
+            r"(?=^\s*end\s+\S+\s*$)",
+            text,
+        ):
+            candidates.append((path, match.group(0).strip()))
+    if not obligations:
+        if raw_count != 0:
+            raise KleanExportError(
+                "zero obligations must not generate a target proposition"
+            )
+        return None
+    if raw_count != 1 or len(candidates) != 1:
+        raise KleanExportError(
+            "generated project must contain exactly one target proposition; "
+            f"found {raw_count}"
+        )
+    path, definition = candidates[0]
+    names: list[str] = []
+    normalized_parameters: list[dict[str, Any]] = []
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanExportError("target parameter is malformed")
+        name = parameter.get("name")
+        lean_type = parameter.get("type")
+        kore_symbol = parameter.get("kore_symbol")
+        source_rule_ids = parameter.get("source_rule_ids")
+        binding_sha256 = parameter.get("binding_sha256")
+        if not isinstance(name, str) or not name:
+            raise KleanExportError("target parameter name is malformed")
+        if not isinstance(lean_type, str) or not lean_type:
+            raise KleanExportError("target parameter type is malformed")
+        if not isinstance(kore_symbol, str) or not kore_symbol:
+            raise KleanExportError("target KORE symbol binding is malformed")
+        if (
+            not isinstance(source_rule_ids, list)
+        "other_sorries": other_sorries,
+        "allowlist": [allowlist[name] for name in sorted(allowlist)],
+    }
+
+
+def target_statement(generated: Path) -> dict[str, Any] | None:
+    obligation_map = _regular_json(generated / "obligation-map.json")
+    obligations = obligation_map.get("obligations")
+    parameters = obligation_map.get("trust_parameters")
+    if not isinstance(obligations, list) or not isinstance(parameters, list):
+        raise KleanExportError("generated obligation map is malformed")
+    candidates: list[tuple[Path, str]] = []
+    raw_count = 0
+    for relative, kind, path in _tree_entries(generated):
+        if kind != "file" or path.suffix != ".lean":
+            continue
+        text = path.read_text()
+        raw_count += len(
+            re.findall(r"(?m)^\s*def\s+targetStatement\b", text)
+        )
+        for match in re.finditer(
+            r"(?ms)^\s*def\s+targetStatement\b.*?"
+            r"(?=^\s*end\s+\S+\s*$)",
+            text,
+        ):
+            candidates.append((path, match.group(0).strip()))
+    if not obligations:
+        if raw_count != 0:
+            raise KleanExportError(
+                "zero obligations must not generate a target proposition"
+            )
+        return None
+    if raw_count != 1 or len(candidates) != 1:
+        raise KleanExportError(
+            "generated project must contain exactly one target proposition; "
+            f"found {raw_count}"
+        )
+    path, definition = candidates[0]
+    names: list[str] = []
+    normalized_parameters: list[dict[str, Any]] = []
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanExportError("target parameter is malformed")
+        name = parameter.get("name")
+        lean_type = parameter.get("type")
+        kore_symbol = parameter.get("kore_symbol")
+        source_rule_ids = parameter.get("source_rule_ids")
+        binding_sha256 = parameter.get("binding_sha256")
+        if not isinstance(name, str) or not name:
+            raise KleanExportError("target parameter name is malformed")
+        if not isinstance(lean_type, str) or not lean_type:
+            raise KleanExportError("target parameter type is malformed")
+        if not isinstance(kore_symbol, str) or not kore_symbol:
+            raise KleanExportError("target KORE symbol binding is malformed")
+        if (
+            not isinstance(source_rule_ids, list)
+            or not source_rule_ids
+            or not all(
+                isinstance(source_rule_id, str) and source_rule_id
+                for source_rule_id in source_rule_ids
+            )
+        ):
+            raise KleanExportError("target source-rule binding is malformed")
+        binding = {
+            "kore_symbol": kore_symbol,
+            "name": name,
+            "type": lean_type,
+            "source_rule_ids": source_rule_ids,
+        }
+        expected_binding_sha256 = sha256_text(
+            json.dumps(binding, sort_keys=True, separators=(",", ":"))
+        )
+        if binding_sha256 != expected_binding_sha256:
+            raise KleanExportError("target parameter binding hash changed")
+        names.append(name)
+        normalized_parameters.append(
+            {**binding, "binding_sha256": binding_sha256}
+        )
+    declaration = f"{path.parent.name}.Lemmas.targetStatement"
+    statement = " ".join((declaration, *names))
+    return {
+        "declaration": declaration,
+        "file": path.relative_to(generated).as_posix(),
+        "statement": statement,
+        "statement_sha256": sha256_text(statement),
+        "definition_sha256": sha256_text(definition),
+        "parameters": normalized_parameters,
+    }
+
+
+def expected_target_definition(obligation_map: dict[str, Any]) -> str | None:
+    obligations = obligation_map.get("obligations")
+    parameters = obligation_map.get("trust_parameters")
+    if not isinstance(obligations, list) or not isinstance(parameters, list):
+        raise KleanExportError("generated obligation map is malformed")
+    if not obligations:
+        return None
+    lines = ["def targetStatement"]
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanExportError("target parameter is malformed")
+        name = parameter.get("name")
+        lean_type = parameter.get("type")
+        if not isinstance(name, str) or not isinstance(lean_type, str):
+            raise KleanExportError("target parameter is malformed")
+        lines.append(f"    ({name} : {lean_type})")
+    conjuncts: list[str] = []
+    for obligation in obligations:
+        if not isinstance(obligation, dict):
+            raise KleanExportError("generated obligation is malformed")
+        conjunct = obligation.get("lean_conjunct")
+        if not isinstance(conjunct, str) or not conjunct:
+            raise KleanExportError("generated Lean conjunct is malformed")
+        conjuncts.append(f"({conjunct})")
+    lines.extend(("    : Prop :=", "    " + "\n    ∧ ".join(conjuncts)))
+    return "\n".join(lines)
+
+
+def _write_json(path: Path, document: dict[str, Any]) -> None:
+    path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+
+
+def _domain_source_rules(
+    validated: dict[str, Any],
+    discovery_manifest_sha256: str,
+) -> list[dict[str, Any]]:
+    inventory_sha256 = validated["inventory_sha256"]
+    return [
+        {
+            **rule,
+            "inventory_sha256": inventory_sha256,
+            "discovery_manifest_sha256": discovery_manifest_sha256,
+        }
+        for rule in validated["domain_lemmas"]
+    ]
+
+
+def _klean_source_rules(
+    domain_rules: list[dict[str, Any]],
+    line_offset: int,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "source_rule_id": rule["source_rule_id"],
+            "start_line": rule["start_line"] + line_offset,
+            "end_line": rule["end_line"] + line_offset,

@@ -1,0 +1,580 @@
+$ relevant deterministic producer code
+/reference/generation-tools/klean.py:596:        source_rules = document["source_rules"]
+/reference/generation-tools/klean.py:599:    if not isinstance(source_rules, list):
+/reference/generation-tools/klean.py:602:    for item in source_rules:
+/reference/generation-tools/klean.py:720:    # trust obligations, so it does not assume those equations.
+/reference/generation-tools/klean.py:829:    source_rules = list(eligible_by_line.values())
+/reference/generation-tools/klean.py:942:    expected_ids = [str(item["source_rule_id"]) for item in source_rules]
+/reference/generation-tools/klean.py:945:            "source trust rules and generated Lean obligations are not bijective"
+/reference/generation-tools/klean.py:1045:                "source_rules": source_rules,
+/reference/generation-tools/klean.py:1046:                "obligations": mappings,
+/reference/generation-tools/klean_export.py:1451:def target_statement(generated: Path) -> dict[str, Any] | None:
+/reference/generation-tools/klean_export.py:1453:    obligations = obligation_map.get("obligations")
+/reference/generation-tools/klean_export.py:1455:    if not isinstance(obligations, list) or not isinstance(parameters, list):
+/reference/generation-tools/klean_export.py:1472:    if not obligations:
+/reference/generation-tools/klean_export.py:1475:                "zero obligations must not generate a target proposition"
+/reference/generation-tools/klean_export.py:1536:def expected_target_definition(obligation_map: dict[str, Any]) -> str | None:
+/reference/generation-tools/klean_export.py:1537:    obligations = obligation_map.get("obligations")
+/reference/generation-tools/klean_export.py:1539:    if not isinstance(obligations, list) or not isinstance(parameters, list):
+/reference/generation-tools/klean_export.py:1541:    if not obligations:
+/reference/generation-tools/klean_export.py:1553:    for obligation in obligations:
+/reference/generation-tools/klean_export.py:1568:def _domain_source_rules(
+/reference/generation-tools/klean_export.py:1583:def _klean_source_rules(
+/reference/generation-tools/klean_export.py:1606:    obligations = document.get("obligations")
+/reference/generation-tools/klean_export.py:1608:    if not isinstance(obligations, list) or not isinstance(parameters, list):
+/reference/generation-tools/klean_export.py:1615:        for obligation in obligations
+/reference/generation-tools/klean_export.py:1619:            "validated DOMAIN_LEMMA records and generated obligations "
+/reference/generation-tools/klean_export.py:1624:        obligations, domain_rules, klean_rules, strict=True
+/reference/generation-tools/klean_export.py:1650:        "source_rules": domain_rules,
+/reference/generation-tools/klean_export.py:1651:        "obligations": enriched,
+/reference/generation-tools/klean_export.py:1724:    domain_rules = _domain_source_rules(
+/reference/generation-tools/klean_export.py:1742:    source_rules = _klean_source_rules(domain_rules, 0)
+/reference/generation-tools/klean_export.py:1764:                {"schema_version": 1, "source_rules": source_rules},
+/reference/generation-tools/klean_export.py:1816:                package, domain_rules, source_rules
+/reference/generation-tools/klean_export.py:1941:                "source_rules": domain_rules,
+/reference/generation-tools/klean_export.py:1943:            obligations = obligation_map.get("obligations")
+/reference/generation-tools/klean_export.py:1944:            if not isinstance(obligations, list):
+/reference/generation-tools/klean_export.py:1945:                raise KleanExportError("generated obligations are malformed")
+/reference/generation-tools/klean_export.py:1962:                "obligation_count": len(obligations),
+/reference/generation-tools/klean_export.py:1979:                    "OK" if obligations else "KLEAN_NO_OBLIGATIONS"
+/reference/generation-tools/klean_export.py:1990:                "obligation_count": len(obligations),
+$ numbered domain/target functions
+        if name in reached_modules:
+            continue
+        reached_modules.add(name)
+        definition = modules.get(name)
+        if definition is None:
+            continue
+        path, imports = definition
+        if path not in reached_files:
+            pending_files.append(path)
+        pending_modules.extend(imports)
+
+    explicit_syntax_modules = [
+        command.syntax_module
+        for command in commands
+        if command.syntax_module in reached_modules
+    ]
+    haskell_syntax_modules = [
+        command.syntax_module
+        for command in commands
+        if command.backend == "haskell"
+        and command.syntax_module in reached_modules
+    ]
+    syntax_modules = sorted(
+        name
+        for name in reached_modules
+        if name.endswith("-SYNTAX") and name in modules
+    )
+    preferred = (
+        verification_module.removesuffix("-VERIFICATION") + "-SYNTAX"
+    )
+    if haskell_syntax_modules:
+        syntax_module = haskell_syntax_modules[-1]
+    elif explicit_syntax_modules:
+        syntax_module = explicit_syntax_modules[-1]
+    elif preferred in syntax_modules:
+        syntax_module = preferred
+    elif len(syntax_modules) == 1:
+        syntax_module = syntax_modules[0]
+    elif not syntax_modules:
+        raise KleanExportError(
+            f"no reachable -SYNTAX module for {verification_module}"
+        )
+    else:
+        raise KleanExportError(
+            "multiple reachable -SYNTAX modules: "
+            + ", ".join(syntax_modules)
+        )
+    required_by: dict[Path, set[Path]] = {
+        path: set() for path in reached_files
+    }
+    for parent in reached_files:
+        for dependency in file_requires.get(parent, ()):
+            if dependency in reached_files:
+                required_by[dependency].add(parent)
+    entry_files = tuple(
+        sorted(
+            (
+                path
+                for path in reached_files
+                if not required_by[path]
+            ),
+            key=str,
+        )
+    )
+    if not entry_files:
+        entry_files = (verification_file,)
+    return DefinitionResolution(
+        verification_file=verification_file,
+        verification_module=verification_module,
+        syntax_module=syntax_module,
+        required_files=tuple(sorted(reached_files, key=str)),
+        entry_files=entry_files,
+    )
+
+
+def stage_definition_driver(
+    scratch: Path,
+    workspace: Path,
+    resolution: DefinitionResolution,
+    transformed_verification: str,
+    export_module_text: str,
+) -> Path:
+    """Mirror the frozen K closure and require each root exactly once."""
+
+    scratch = Path(scratch)
+    workspace = Path(workspace).resolve()
+    source_root = scratch / "definition-source"
+    source_root.mkdir()
+    staged: dict[Path, Path] = {}
+    for source in resolution.required_files:
+        relative = source.relative_to(workspace)
+        destination = source_root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        staged[source] = destination
+    staged_verification = staged.get(resolution.verification_file)
+    if staged_verification is None:
+        raise KleanExportError("definition closure omitted verification.k")
+    staged_verification.write_text(transformed_verification)
+    entry_files: list[Path] = []
+    for source in resolution.entry_files:
+        entry = staged.get(source)
+        if entry is None:
+            raise KleanExportError("definition entry file is outside closure")
+        entry_files.append(entry)
+    driver = scratch / "export.k"
+            "_in_keys(_)_MAP_Bool_KItem_Map",
+            "_[_<-undef]",
+            "Map:lookup",
+            "Map:update",
+        ),
+    ),
+)
+
+# Canonical order of the modeled-hook identities recorded in the manifests.
+_COLLECTION_HOOK_NAME_ORDER = (
+    ".List",
+    ".Map",
+    "ListItem",
+    "Map:lookup",
+    "Map:update",
+    "_List_",
+    "_Map_",
+    "_in_keys(_)_MAP_Bool_KItem_Map",
+    "_[_<-undef]",
+    "_|->_",
+)
+
+
+def _collection_hook_symbol(signature: str) -> str:
+    """Recover the K symbol a registered hook axiom declares."""
+
+    body = signature[len("axiom ") :].lstrip()
+    if body.startswith("«"):
+        return body[1 : body.index("»")]
+    return body.split(None, 1)[0]
+
+
+def model_collection_hooks(
+    function_text: str,
+) -> tuple[str, tuple[str, ...]]:
+    """Replace Klean's unconstrained List/Map hook axioms with K models.
+
+    The pyk exporter emits an axiom only for the collection hooks a definition
+    references, so the registered families appear independently.  Every
+    registered hook belongs to exactly one family, and every member of a family
+    that appears must appear in full; a partially emitted family means the
+    exporter produced a collection theory we do not fully model, so export
+    fails closed instead of leaving an unconstrained collection axiom behind.
+    """
+
+    signature_of = {
+        _collection_hook_symbol(signature): signature
+        for signature in _COLLECTION_HOOK_MODELS
+    }
+    covered = {
+        name
+        for _family, members in _COLLECTION_HOOK_FAMILIES
+        for name in members
+    }
+    if covered != set(signature_of) or set(
+        _COLLECTION_HOOK_NAME_ORDER
+    ) != set(signature_of):
+        raise KleanExportError(
+            "collection-hook family registry is inconsistent"
+        )
+
+    modeled_signatures: list[str] = []
+    for family, members in _COLLECTION_HOOK_FAMILIES:
+        present = [
+            name for name in members if signature_of[name] in function_text
+        ]
+        if not present:
+            continue
+        missing = [
+            name
+            for name in members
+            if signature_of[name] not in function_text
+        ]
+        if missing:
+            raise KleanExportError(
+                f"generated collection-hook family '{family}' is incomplete: "
+                + ", ".join(sorted(signature_of[name] for name in missing))
+            )
+        modeled_signatures.extend(signature_of[name] for name in members)
+    if not modeled_signatures:
+        return function_text, ()
+
+    for signature in modeled_signatures:
+        if function_text.count(signature) != 1:
+            raise KleanExportError(
+                f"generated collection hook is not unique: {signature}"
+            )
+    first = min(modeled_signatures, key=function_text.index)
+    repaired = function_text.replace(
+        first,
+        _COLLECTION_HOOK_HELPERS.rstrip()
+        + "\n\n"
+        + _COLLECTION_HOOK_MODELS[first],
+        1,
+    )
+    for signature in modeled_signatures:
+        if signature == first:
+            continue
+        repaired = repaired.replace(
+            signature, _COLLECTION_HOOK_MODELS[signature], 1
+        )
+
+    modeled = {
+        _collection_hook_symbol(signature)
+        for signature in modeled_signatures
+    }
+    names = tuple(
+        name for name in _COLLECTION_HOOK_NAME_ORDER if name in modeled
+    )
+    return repaired, names
+
+
+_CORE_OPERATIONAL_HOOK_MODELS = {
+    (
+        "axiom «_%Int_» (x0 : SortInt) (x1 : SortInt) "
+        ": Option SortInt"
+        "buildIS(_,_,_,_)_MPY-SUBSCRIPT_IntSeq_IntSeq_Int_Int_Int",
+    )
+
+
+def needs_noncomputable(build_output: str) -> bool:
+    return (
+        "consider marking definition as 'noncomputable'" in build_output
+        or "not supported by code generator" in build_output
+        or "has no executable code" in build_output
+    )
+
+
+def mark_all_noncomputable(function_text: str) -> str:
+    return re.sub(
+        r"(?m)^(\s*)def ", r"\1noncomputable def ", function_text
+    )
+
+
+def _patch_lake_build_directory(package: Path) -> None:
+    lakefile = package / "lakefile.toml"
+    if not lakefile.is_file() or lakefile.is_symlink():
+        raise KleanExportError("generated package is missing regular lakefile.toml")
+    text = lakefile.read_text()
+    build_setting = 'buildDir = "/tmp/klean-generated-build"\n'
+    stack_setting = (
+        'moreLeanArgs = ["-D maxRecDepth=100000", "-s", "65536"]\n'
+    )
+    if build_setting in text and stack_setting in text:
+        return
+    setting = ""
+    if build_setting not in text:
+        setting += build_setting
+    if stack_setting not in text:
+        setting += stack_setting
+    marker = "[[lean_lib]]"
+    if marker in text:
+        text = text.replace(marker, setting + "\n" + marker, 1)
+    else:
+        text = text.rstrip() + "\n" + setting
+    lakefile.write_text(text)
+
+
+def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+    if not root.is_dir() or root.is_symlink():
+        raise KleanExportError(f"tree root must be a real directory: {root}")
+    entries: list[tuple[str, str, Path]] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        for child in os.scandir(directory):
+            path = Path(child.path)
+            mode = child.stat(follow_symlinks=False).st_mode
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise KleanExportError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    return sorted(entries)
+
+
+def tree_digest(root: Path) -> str:
+    digest = hashlib.sha256()
+    for relative, kind, path in _tree_entries(Path(root)):
+        digest.update(relative.encode() + b"\0" + kind.encode() + b"\0")
+        if kind == "file":
+            digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def _regular_json(path: Path) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise KleanExportError(f"required JSON is not a regular file: {path}")
+    try:
+        document = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise KleanExportError(f"malformed JSON: {path}") from error
+    if not isinstance(document, dict):
+        raise KleanExportError(f"JSON must be an object: {path}")
+    return document
+
+
+def _run_command(
+    command: list[str] | str,
+    *,
+    cwd: Path | None,
+    timeout: int,
+    env: dict[str, str],
+    shell: bool = False,
+) -> tuple[int, str]:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            timeout=timeout,
+            shell=shell,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        return result.returncode, result.stdout
+    except subprocess.TimeoutExpired:
+        return 124, f"TIMEOUT after {timeout}s"
+
+
+def _trust_inventory(
+    package: Path,
+    *,
+    axiomatized: set[str],
+    noncomputable_repair: bool,
+    modeled_collection_hooks: tuple[str, ...] = (),
+    modeled_operational_hooks: tuple[str, ...] = (),
+    modeled_recursive_functions: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    axioms: set[str] = set()
+    allowlist: dict[str, dict[str, str]] = {}
+    noncomputable: set[str] = set()
+    designated_sorries = 0
+    other_sorries = 0
+    for _relative, kind, path in _tree_entries(package):
+        if kind != "file" or path.suffix != ".lean":
+            continue
+        text = path.read_text()
+        for declaration in lean_trust_declarations(path):
+            name = declaration["name"]
+            declaration_name = declaration["declaration_name"]
+            kind = declaration["kind"]
+            if kind == "axiom":
+                axioms.add(name)
+            allowlist[name] = {
+                "name": name,
+        raise KleanExportError("generated obligation map is malformed")
+    if not obligations:
+        return None
+    lines = ["def targetStatement"]
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            raise KleanExportError("target parameter is malformed")
+        name = parameter.get("name")
+        lean_type = parameter.get("type")
+        if not isinstance(name, str) or not isinstance(lean_type, str):
+            raise KleanExportError("target parameter is malformed")
+        lines.append(f"    ({name} : {lean_type})")
+    conjuncts: list[str] = []
+    for obligation in obligations:
+        if not isinstance(obligation, dict):
+            raise KleanExportError("generated obligation is malformed")
+        conjunct = obligation.get("lean_conjunct")
+        if not isinstance(conjunct, str) or not conjunct:
+            raise KleanExportError("generated Lean conjunct is malformed")
+        conjuncts.append(f"({conjunct})")
+    lines.extend(("    : Prop :=", "    " + "\n    ∧ ".join(conjuncts)))
+    return "\n".join(lines)
+
+
+def _write_json(path: Path, document: dict[str, Any]) -> None:
+    path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+
+
+def _domain_source_rules(
+    validated: dict[str, Any],
+    discovery_manifest_sha256: str,
+) -> list[dict[str, Any]]:
+    inventory_sha256 = validated["inventory_sha256"]
+    return [
+        {
+            **rule,
+            "inventory_sha256": inventory_sha256,
+            "discovery_manifest_sha256": discovery_manifest_sha256,
+        }
+        for rule in validated["domain_lemmas"]
+    ]
+
+
+def _klean_source_rules(
+    domain_rules: list[dict[str, Any]],
+    line_offset: int,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "source_rule_id": rule["source_rule_id"],
+            "start_line": rule["start_line"] + line_offset,
+            "end_line": rule["end_line"] + line_offset,
+            "normalized_sha256": rule["normalized_sha256"],
+            "classification": "TRUST_OBLIGATION",
+        }
+        for rule in domain_rules
+    ]
+
+
+def _bind_obligation_provenance(
+    package: Path,
+    domain_rules: list[dict[str, Any]],
+    klean_rules: list[dict[str, Any]],
+) -> dict[str, Any]:
+    path = package / "obligation-map.json"
+    document = _regular_json(path)
+    obligations = document.get("obligations")
+    parameters = document.get("trust_parameters")
+    if not isinstance(obligations, list) or not isinstance(parameters, list):
+        raise KleanExportError("generated obligation map is malformed")
+    expected_ids = [rule["source_rule_id"] for rule in domain_rules]
+    observed_ids = [
+        obligation.get("source_rule_id")
+        if isinstance(obligation, dict)
+        else None
+        for obligation in obligations
+    ]
+    if observed_ids != expected_ids:
+        raise KleanExportError(
+            "validated DOMAIN_LEMMA records and generated obligations "
+            "are not bijective"
+        )
+    enriched: list[dict[str, Any]] = []
+    for obligation, rule, klean_rule in zip(
+        obligations, domain_rules, klean_rules, strict=True
+    ):
+        if obligation.get("source_span") != {
+            "start_line": klean_rule["start_line"],
+            "end_line": klean_rule["end_line"],
+        }:
+            raise KleanExportError(
+                "generated obligation source span differs from Stage 1"
+            )
+        enriched.append(
+            {
+                **obligation,
+                "source_span": {
+                    "start_line": rule["start_line"],
+                    "end_line": rule["end_line"],
+                },
+                "normalized_sha256": rule["normalized_sha256"],
+                "inventory_sha256": rule["inventory_sha256"],
+                "discovery_manifest_sha256": rule[
+                    "discovery_manifest_sha256"
+                ],
+            }
+        )
+    document = {
+        **document,
+        "schema_version": 3,
+        "source_rules": domain_rules,
+        "obligations": enriched,
+    }
+    _write_json(path, document)
+    return document
+
+$ generated obligation and target-bearing source files
+     1	{
+     2	  "obligations": [],
+     3	  "schema_version": 3,
+     4	  "source_rules": [],
+     5	  "trust_parameters": []
+     6	}
+     1	import Klean136LargestSmallestIntegers.Inj
+     2	
+     3	/- K trust-boundary goals. The second-pass agent must replace every
+     4	   writable opaque stub with an honest definition and prove this
+     5	   immutable proposition in the separate Proof.lean workspace. -/
+     6	
+     7	namespace Klean136LargestSmallestIntegers.Lemmas
+     8	
+     9	end Klean136LargestSmallestIntegers.Lemmas
+     1	import Klean136LargestSmallestIntegers.Rewrite
+     2	import Klean136LargestSmallestIntegers.Lemmas
+$ independent generated-source scan for targets/proof holes/trust declarations
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:63:  axiom unitAx       : List (K × V)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:64:  axiom consAx       : K → V → List (K × V) → List (K × V)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:65:  axiom lookupAx     : List (K × V) → K → Option V
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:66:  axiom lookupAx?    : List (K × V) → K → V -- lookup with default
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:67:  axiom updateAx     : K → V → List (K × V) → List (K × V)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:68:  axiom deleteAx     : List (K × V) → K → List (K × V)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:69:  axiom concatAx     : List (K × V) → List (K × V) → Option (List (K × V))
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:70:  axiom differenceAx : List (K × V) → List (K × V) → List (K × V)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:71:  axiom updateMapAx  : List (K × V) → List (K × V) → List (K × V)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:72:  axiom removeAllAx  : List (K × V) → List K → List (K × V)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:73:  axiom keysAx       : List (K × V) → List K
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:74:  axiom in_keysAx    : List (K × V) → K → Bool
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:75:  axiom valuesAx     : List (K × V) → List V
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:76:  axiom sizeAx       : List (K × V) → Nat
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:77:  axiom includesAx   : List (K × V) → List (K × V) → Bool -- map inclusion
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:78:  axiom choiceAx     : List (K × V) → K -- arbitrary key from a map
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:79:  -- axiom nodupAx      : forall m, List.Nodup (keysAx K V m)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:80:  axiom splitAx      : List (K × V) → List K → Option (List V × List (K × V))
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:125:  axiom unitAx         : List T
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:126:  axiom concatAx       : List T → List T → Option (List T)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:127:  axiom elementAx      : T → List T
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:128:  axiom unionAx        : List T → List T → List T
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:129:  axiom intersectionAx : List T → List T → List T
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:130:  axiom differenceAx   : List T → List T → List T
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:131:  axiom inSetAx        : T → List T → Bool
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:132:  axiom inclusionAx    : List T → List T → Bool
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:133:  axiom sizeAx         : List T → Int
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:134:  axiom choiceAx       : List T → T
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:135:  axiom splitAx        : List T → List T → Option (List T)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:182:  axiom unitAx      : List T
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:183:  axiom concatAx    : List T → List T → Option (List T)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:184:  axiom elementAx   : T → List T
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:185:  axiom pushAx      : T → List T → List T
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:186:  axiom getAx       : Int → List T → Option T
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:187:  axiom updteAx     : Int → T → List T → Option (List T)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:188:  axiom makeAx      : Int → T → Option (List T)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:189:  axiom updateAllAx : List T → Int → List T → Option (List T)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:190:  axiom fillAx      : List T → Int → T → Option (List T)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:191:  axiom rangeAx     : List T → Int → Int → Option (List T)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:192:  axiom inListAx    : T → List T → Bool
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:193:  axiom sizeAx      : List T → Int
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Prelude.lean:194:  axiom splitAx     : List T → Nat → Nat → Option (List T × List T × List T)
+/reference/klean-generation/generated/Klean136LargestSmallestIntegers/Lemmas.lean:4:   writable opaque stub with an honest definition and prove this
+$ Stage 5 candidate absence
+ls: cannot access '/candidate': No such file or directory
+find: ‘/candidate’: No such file or directory

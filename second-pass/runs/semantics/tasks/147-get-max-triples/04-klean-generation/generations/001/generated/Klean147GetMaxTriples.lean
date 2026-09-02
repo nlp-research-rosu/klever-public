@@ -1,0 +1,2 @@
+import Klean147GetMaxTriples.Rewrite
+import Klean147GetMaxTriples.Lemmas

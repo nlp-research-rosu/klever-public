@@ -1,0 +1,368 @@
+$ sed -n 1,320p /audit-entrypoint.sh
+#!/usr/bin/env bash
+# Run one independent Codex audit session. The supervisor profile and spool
+# stay outside the workspace-write roots passed to Codex, so model-generated
+# commands cannot write those supervisor paths. The reviewer still controls the
+# semantic content it emits to its own outputs.
+set -uo pipefail
+
+MODEL="gpt-5.6-sol"
+EFFORT="xhigh"
+TIMEOUT_S="3600"
+HARNESS_ERROR_RC=70
+FROZEN_TOOLCHAIN_CHECK="${FROZEN_TOOLCHAIN_CHECK:-/usr/local/bin/assert-frozen-toolchain}"
+"$FROZEN_TOOLCHAIN_CHECK" agent || exit "$HARNESS_ERROR_RC"
+
+AUTH_FILE="${AUDIT_AUTH_FILE:-/auth/auth.json}"
+KIT_SKILLS_DIR="${AUDIT_KIT_SKILLS_DIR:-/kit-skills}"
+PROMPT_FILE="${AUDIT_PROMPT_FILE:-/audit-prompt.md}"
+OUTPUT_DIR="${AUDIT_OUTPUT_DIR:-/audit-output}"
+WORK_DIR="${AUDIT_WORK_DIR:-/tmp/audit-work}"
+SUPERVISOR_PARENT="${AUDIT_SUPERVISOR_PARENT:-$HOME}"
+CGROUP_ROOT="${AUDIT_CGROUP_ROOT:-/sys/fs/cgroup}"
+
+SUPERVISOR_DIR=""
+MODEL_PGID=""
+HARNESS_EXIT_CODE=0
+
+error() {
+  printf 'audit harness error: %s\n' "$*" >&2
+}
+
+is_real_regular_file() {
+  [[ -f "$1" && ! -L "$1" ]]
+}
+
+is_real_directory() {
+  [[ -d "$1" && ! -L "$1" ]]
+}
+
+terminate_model_group() {
+  local pgid="$1"
+  if [[ "$pgid" =~ ^[0-9]+$ ]] && kill -0 -- "-$pgid" 2>/dev/null; then
+    kill -TERM -- "-$pgid" 2>/dev/null || true
+    kill -KILL -- "-$pgid" 2>/dev/null || true
+  fi
+}
+
+cleanup() {
+  if [[ -n "$MODEL_PGID" ]]; then
+    terminate_model_group "$MODEL_PGID"
+    MODEL_PGID=""
+  fi
+  if [[
+    -n "$SUPERVISOR_DIR"
+    && "$SUPERVISOR_DIR" == "$SUPERVISOR_PARENT"/.audit-supervisor.*
+    && -d "$SUPERVISOR_DIR"
+    && ! -L "$SUPERVISOR_DIR"
+  ]]; then
+    rm -rf -- "$SUPERVISOR_DIR"
+  fi
+}
+
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+setup_error() {
+  error "$*"
+  exit "$HARNESS_ERROR_RC"
+}
+
+mark_harness_error() {
+  error "$*"
+  HARNESS_EXIT_CODE="$HARNESS_ERROR_RC"
+}
+
+prepare_destination() {
+  local destination="$1" label="$2"
+  if [[ -L "$destination" || -f "$destination" ]]; then
+    if ! rm -f -- "$destination"; then
+      error "cannot remove existing $label destination: $destination"
+      return 1
+    fi
+  elif [[ -e "$destination" ]]; then
+    error "$label destination is a directory or unsupported node: $destination"
+    return 1
+  fi
+}
+
+publish_regular_file() {
+  local source="$1" destination="$2" label="$3"
+  local temporary=""
+  if ! is_real_regular_file "$source"; then
+    error "$label source is missing, linked, or not a regular file: $source"
+    return 1
+  fi
+  if ! temporary="$(mktemp "$OUTPUT_DIR/.${destination##*/}.XXXXXX")"; then
+    error "cannot stage $label in $OUTPUT_DIR"
+    return 1
+  fi
+  if ! cp -- "$source" "$temporary"; then
+    error "cannot copy $label into its publication stage"
+    rm -f -- "$temporary"
+    return 1
+  fi
+  if ! is_real_regular_file "$temporary"; then
+    error "$label publication stage is not a real regular file"
+    rm -f -- "$temporary"
+    return 1
+  fi
+  if ! prepare_destination "$destination" "$label"; then
+    rm -f -- "$temporary"
+    return 1
+  fi
+  if ! mv -fT -- "$temporary" "$destination"; then
+    error "cannot atomically publish $label to $destination"
+    rm -f -- "$temporary"
+    return 1
+  fi
+}
+
+validate_trace_tree() {
+  local source="$1"
+  if ! is_real_directory "$source"; then
+    error "Codex trace source is missing, linked, or not a directory: $source"
+    return 1
+  fi
+  python3 - "$source" <<'PY'
+import os
+import stat
+import sys
+
+root = os.fsencode(sys.argv[1])
+pending = [root]
+while pending:
+    directory = pending.pop()
+    try:
+        entries = list(os.scandir(directory))
+    except OSError as error:
+        print(f"cannot scan Codex trace tree: {error}", file=sys.stderr)
+        raise SystemExit(1)
+    for entry in entries:
+        try:
+            mode = entry.stat(follow_symlinks=False).st_mode
+        except OSError as error:
+            print(f"cannot stat Codex trace entry: {error}", file=sys.stderr)
+            raise SystemExit(1)
+        if stat.S_ISDIR(mode):
+            pending.append(entry.path)
+        elif not stat.S_ISREG(mode):
+            print(
+                f"Codex trace contains a linked or unsupported entry: "
+                f"{os.fsdecode(entry.path)}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+PY
+}
+
+publish_trace_tree() {
+  local source="$1" destination="$2"
+  local temporary=""
+  if ! validate_trace_tree "$source"; then
+    return 1
+  fi
+  if ! temporary="$(mktemp -d "$OUTPUT_DIR/.codex-trace.XXXXXX")"; then
+    error "cannot stage Codex trace in $OUTPUT_DIR"
+    return 1
+  fi
+  if ! cp -R -- "$source/." "$temporary/"; then
+    error "cannot copy Codex trace into its publication stage"
+    rm -rf -- "$temporary"
+    return 1
+  fi
+  if ! validate_trace_tree "$temporary"; then
+    error "staged Codex trace failed regular-file validation"
+    rm -rf -- "$temporary"
+    return 1
+  fi
+  if ! prepare_destination "$destination" "Codex trace"; then
+    rm -rf -- "$temporary"
+    return 1
+  fi
+  if ! mv -fT -- "$temporary" "$destination"; then
+    error "cannot atomically publish Codex trace to $destination"
+    rm -rf -- "$temporary"
+    return 1
+  fi
+}
+
+: "${AUDIT_PROBLEM_ID:?AUDIT_PROBLEM_ID is required}"
+: "${AUDIT_CONDITION:?AUDIT_CONDITION is required}"
+: "${AUDIT_SEMANTICS_MODE:?AUDIT_SEMANTICS_MODE is required}"
+
+is_real_regular_file "$AUTH_FILE" \
+  || setup_error "auth source is missing, linked, or not a regular file: $AUTH_FILE"
+is_real_regular_file "$PROMPT_FILE" \
+  || setup_error "prompt source is missing, linked, or not a regular file: $PROMPT_FILE"
+is_real_directory "$KIT_SKILLS_DIR" \
+  || setup_error "Kit source is missing, linked, or not a directory: $KIT_SKILLS_DIR"
+is_real_directory "$OUTPUT_DIR" \
+  || setup_error "audit output is missing, linked, or not a directory: $OUTPUT_DIR"
+[[ -w "$OUTPUT_DIR" && -x "$OUTPUT_DIR" ]] \
+  || setup_error "audit output is not writable: $OUTPUT_DIR"
+is_real_directory "$SUPERVISOR_PARENT" \
+  || setup_error "supervisor parent is missing, linked, or not a directory: $SUPERVISOR_PARENT"
+
+if [[ "${AUDIT_PROBE_ONLY:-0}" == 1 ]]; then
+  python3 - <<'PY'
+import json
+from importlib.metadata import version
+from pathlib import Path
+import subprocess
+
+audit_input = json.loads(Path("/audit-input.json").read_text(encoding="utf-8"))
+layout = audit_input["record_layout"]
+
+print("OBSERVED AUDIT TOOLCHAIN")
+for command in ("codex", "kompile", "kprove", "krun"):
+    result = subprocess.run(
+        [command, "--version"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    print(f"{command}: {result.stdout.strip()}")
+print(f"K source: {Path('/opt/runtimeverification-k/.source-commit').read_text().strip()}")
+print(f"pyk/Klean: {version('kframework')}")
+result = subprocess.run(
+    ["lean", "--version"],
+    check=True,
+    capture_output=True,
+    text=True,
+)
+print(f"Lean: {result.stdout.strip()}")
+
+required_files = [
+    "/audit-input.json",
+    "/audit-campaign-lock.json",
+    "/audit-prompt.md",
+    "/audit-entrypoint.sh",
+    "/auth/auth.json",
+    "/reference/canonical.py",
+    "/reference/prompt.py",
+    "/reference/py2mpy.py",
+    "/generation-evidence/invocation.json",
+    "/generation-evidence/metrics.json",
+    "/generation-evidence/codex-output.log",
+    "/generation-evidence/codex-last.txt",
+    "/generation-evidence/prompt.txt",
+    "/run.json",
+    "/task.json",
+    "/generation-result.json",
+]
+if layout == "pipeline-v3":
+    required_files.extend(
+        (
+            "/generation-evidence/runtime-metrics.json",
+            "/generation-evidence/usage.json",
+        )
+    )
+
+required_directories = [
+    "/candidate",
+    "/generation-evidence",
+    "/generation-evidence/codex-trace",
+    "/kit-skills",
+]
+if audit_input["mount_reference_semantics"]:
+    required_directories.append("/reference/reference-semantics")
+
+print(f"REQUIRED AUDIT INPUTS ({layout})")
+for value in required_files:
+    path = Path(value)
+    if not path.is_file() or path.is_symlink():
+        raise SystemExit(f"MISSING file {value}")
+    print(f"OK file {value}")
+for value in required_directories:
+    path = Path(value)
+    if not path.is_dir() or path.is_symlink():
+        raise SystemExit(f"MISSING directory {value}")
+    print(f"OK directory {value}")
+
+print("READ-ONLY MOUNTS")
+mounts = [
+    "/candidate",
+    "/generation-evidence",
+    "/run.json",
+    "/task.json",
+    "/generation-result.json",
+    "/audit-input.json",
+    "/audit-campaign-lock.json",
+    "/reference/canonical.py",
+    "/reference/prompt.py",
+    "/reference/py2mpy.py",
+    "/kit-skills",
+    "/audit-prompt.md",
+    "/audit-entrypoint.sh",
+    "/auth/auth.json",
+]
+if audit_input["mount_reference_semantics"]:
+    mounts.append("/reference/reference-semantics")
+for value in mounts:
+    result = subprocess.run(
+        ["findmnt", "-T", value, "-n", "-o", "OPTIONS"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    options = result.stdout.strip()
+    if "ro" not in options.split(","):
+        raise SystemExit(f"WRITABLE mount {value}: {options}")
+    print(f"OK readonly {value} options={options}")
+
+campaign = json.loads(
+    Path("/audit-campaign-lock.json").read_text(encoding="utf-8")
+)
+print("AUDIT CAMPAIGN LOCK")
+for key in (
+    "campaign_id",
+EXIT entrypoint: 0
+$ rg tree_sha256 /audit-entrypoint.sh /usr/local/bin /opt 2>/dev/null
+/opt/humaneval/tools/klean_final_gate.py:186:            "k_workspace_sha256": pipeline_contract.sha256_tree(
+/opt/humaneval/tools/klean_final_gate.py:189:            "stage1_export_sha256": klean_export.tree_digest(
+/opt/humaneval/tools/klean_final_gate.py:196:                pipeline_contract.sha256_tree(generation)
+/opt/humaneval/tools/klean_final_gate.py:198:            "lean_workspace_sha256": (
+/opt/humaneval/tools/klean_final_gate.py:199:                pipeline_contract.sha256_tree(candidate)
+/opt/humaneval/tools/klean_final_gate.py:340:            "generation_sha256": klean_export.tree_digest(generation),
+/opt/humaneval/tools/klean_final_gate.py:360:        if pipeline_contract.sha256_tree(project) != before_hashes[
+/opt/humaneval/tools/klean_final_gate.py:361:            "lean_workspace_sha256"
+/opt/humaneval/tools/klean_final_gate.py:408:            after_hashes.get("lean_workspace_sha256")
+/opt/humaneval/tools/klean_final_gate.py:409:            != before_hashes.get("lean_workspace_sha256")
+/opt/humaneval/tools/klean_final_gate.py:441:        "generation_sha256": klean_export.tree_digest(generation),
+/opt/humaneval/tools/klean_final_gate.py:442:        "candidate_sha256": klean_export.tree_digest(candidate),
+/opt/humaneval/tools/klean_export.py:1036:                "stage1_workspace_sha256": before_hash,
+/opt/humaneval/tools/klean_export.py:1071:                "generated_tree_sha256": tree_digest(generated),
+/opt/humaneval/tools/klean_export.py:1078:                    "stage1_workspace_sha256": before_hash,
+/opt/humaneval/tools/klean_export.py:1092:                "generated_tree_sha256": generator_manifest[
+/opt/humaneval/tools/klean_export.py:1093:                    "generated_tree_sha256"
+/opt/humaneval/tools/klean_preflight.py:41:    stage1_workspace_sha256: str
+/opt/humaneval/tools/klean_preflight.py:43:    generated_tree_sha256: str
+/opt/humaneval/tools/klean_preflight.py:72:            stage1_workspace_sha256=klean_export.tree_digest(
+/opt/humaneval/tools/klean_preflight.py:78:            generated_tree_sha256=klean_export.tree_digest(generated),
+/opt/humaneval/tools/klean_preflight.py:96:    if current.stage1_workspace_sha256 != (
+/opt/humaneval/tools/klean_preflight.py:97:        expected.stage1_workspace_sha256
+/opt/humaneval/tools/klean_preflight.py:108:    if current.generated_tree_sha256 != expected.generated_tree_sha256:
+/opt/humaneval/tools/klean_preflight.py:429:    input_hash = snapshot.stage1_workspace_sha256
+/opt/humaneval/tools/klean_preflight.py:431:    generated_hash = snapshot.generated_tree_sha256
+/opt/humaneval/tools/klean_preflight.py:439:    if input_manifest.get("stage1_workspace_sha256") != input_hash:
+/opt/humaneval/tools/klean_preflight.py:448:    if generator_manifest.get("generated_tree_sha256") != generated_hash:
+/opt/humaneval/tools/klean_preflight.py:455:    if provenance.get("stage1_workspace_sha256") != input_hash:
+/opt/humaneval/tools/klean_preflight.py:546:        "generated_tree_sha256": generated_hash,
+/opt/humaneval/tools/klean_preflight.py:587:        "stage1_workspace_sha256": input_hash,
+/opt/humaneval/tools/klean_preflight.py:589:        "generated_tree_sha256": generated_hash,
+/opt/humaneval/tools/klean_preflight.py:628:            "stage1_workspace_sha256": stage1_hash,
+/opt/humaneval/tools/pipeline_contract.py:190:def sha256_tree(root: Path) -> str:
+/opt/humaneval/tools/pipeline_contract.py:429:        sha256_tree(semantics)
+/opt/humaneval/tools/pipeline_contract.py:449:                    sha256_tree(semantics) if semantics is not None else None
+/opt/humaneval/tools/pipeline_contract.py:502:        task_manifest["inputs"]["reference_semantics_sha256"] = input_document[
+/opt/humaneval/tools/pipeline_contract.py:926:            "workspace_sha256": sha256_tree(stage_root / "workspace"),
+/opt/humaneval/tools/pipeline_contract.py:1002:    current_workspace = sha256_tree(stage_root / "workspace")
+/opt/humaneval/tools/pipeline_contract.py:1010:            inputs.get("workspace_sha256")
+/opt/humaneval/tools/pipeline_contract.py:1015:            outputs.get("workspace_sha256")
+/opt/humaneval/tools/pipeline_contract.py:1132:        "inputs": {"workspace_sha256": current_workspace},
+/opt/humaneval/tools/pipeline_contract.py:1181:        "workspace_sha256": sha256_tree(workspace),
+/opt/humaneval/tools/pipeline_contract.py:1721:    candidate_sha256 = sha256_tree(candidate)
+EXIT rg: 0

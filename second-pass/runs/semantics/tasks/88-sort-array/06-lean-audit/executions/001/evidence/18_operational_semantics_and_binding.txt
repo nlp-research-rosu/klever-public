@@ -1,0 +1,238 @@
+Script started on 2026-07-28 18:08:22-05:00 [<not executed on terminal>]
+FROZEN VERIFICATION SNOC AND DOMAIN RULES
+    37	  // Symbolic integer lists used by the quantified middle segment in spec.k.
+    38	  syntax ValSeq ::= intsVS(IntSeq) [function, total]
+    39	  rule intsVS(.IntSeq) => .ValSeq
+    40	  rule intsVS(iCons(I:Int, IS:IntSeq)) => vCons(I, intsVS(IS))
+    41	
+    42	  syntax Bool ::= nonNegativeIS(IntSeq) [function, total]
+    43	  rule nonNegativeIS(.IntSeq) => true
+    44	  rule nonNegativeIS(iCons(I:Int, IS:IntSeq))
+    45	    => I >=Int 0 andBool nonNegativeIS(IS)
+    46	
+    47	  // snocVS(M, L) is M followed by L.  The final rule is a derived
+    48	  // negative-index lemma.  It prevents the symbolic rewriter from unfolding
+    49	  // an arbitrary-length middle segment merely to establish Python's a[-1].
+    50	  syntax ValSeq ::= snocVS(ValSeq, Val)
+    51	  rule snocVS(.ValSeq, V:Val) => vCons(V, .ValSeq)
+    52	  rule snocVS(vCons(H:Val, T:ValSeq), V:Val)
+    53	    => vCons(H, snocVS(T, V))
+    54	
+    55	  rule <k>
+    56	         Subscript(
+    57	           list(vCons(_F:Int, snocVS(_M:ValSeq, L:Int))),
+    58	           UnaryOp("-", Int(1)))
+    59	         => L
+    60	         ...
+    61	       </k>
+    62	       [priority(40)]
+    63	endmodule
+
+FROZEN CORE LENGTH RULES
+   217	  syntax ValSeq ::= vals2valSeq(Vals) [function, total]
+   218	  rule vals2valSeq(.Vals)            => .ValSeq
+   219	  rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))
+   220	
+   221	  // ==== shared sequence length (len / summaries across many modules) ========
+   222	  // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)
+   223	  syntax Int ::= vsLen(ValSeq) [function, total]
+   224	  rule vsLen(.ValSeq)                => 0
+   225	  rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)
+   226	
+   227	  syntax Int ::= isLen(IntSeq) [function, total]
+   228	  rule isLen(.IntSeq)                => 0
+   229	  rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)
+
+FROZEN SUBSCRIPT RULES
+     6	  // ==== positional access + negative-index normalization (used only here) ===
+     7	  // valSeqAt is [total]: in-bounds vCons access reduces as usual; on an OPAQUE sequence (e.g.
+     8	  // a trusted sort's sortVS(VS)) or OOB it stays an abstract total value — so indexing the
+     9	  // opaque sorted list is DEFINED (no undischarged #Ceil), matching the old semantics' total
+    10	  // atK. K trusts the [total] annotation; valid programs index in-bounds.
+    11	  syntax Val ::= valSeqAt(ValSeq, Int) [function, total]
+    12	  rule valSeqAt(vCons(V:Val, _:ValSeq), 0)     => V
+    13	  rule valSeqAt(vCons(_:Val, S:ValSeq), I:Int) => valSeqAt(S, I -Int 1)
+    14	       requires I >Int 0
+    15	
+    16	  syntax Int ::= intSeqAt(IntSeq, Int) [function]
+    17	  rule intSeqAt(iCons(C:Int, _:IntSeq), 0)     => C
+    18	  rule intSeqAt(iCons(_:Int, S:IntSeq), I:Int) => intSeqAt(S, I -Int 1)
+    19	       requires I >Int 0
+    20	
+    21	  syntax Int ::= normIdx(Int, Int) [function, total]
+    22	  rule normIdx(I:Int, LEN:Int) => I +Int LEN requires I  <Int 0
+    23	  rule normIdx(I:Int, _:Int)   => I          requires I >=Int 0
+    24	
+    25	  // ==== Subscript: indexing obj[i] (list / tuple / str) =====================
+    26	  // contexts (not strict attrs): the Index slot's Slice alternative must never heat
+    27	  context Subscript(HOLE, _)
+    28	  context Subscript(_:Val, HOLE:Expr)
+    29	
+    30	  // heap-object deref (covers both the index and slice forms via the Index slot)
+    31	  rule <k> Subscript(ref(H:Int), IX:Index) => Subscript(V, IX) ... </k>
+    32	       <heap> ... H |-> V:Val ... </heap>
+    33	       [priority(40)]
+    34	
+    35	  rule <k> Subscript(OBJ:Val, I:Int) => applyIndex(OBJ, I) ... </k>
+    36	
+    37	  syntax Val ::= applyIndex(Val, Int) [function]
+    38	  rule applyIndex(list(VS:ValSeq),  I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+    39	  rule applyIndex(tuple(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))
+    40	  rule applyIndex(str(IS:IntSeq),   I:Int)
+    41	    => str(iCons(intSeqAt(IS, normIdx(I, isLen(IS))), .IntSeq))
+    42	
+
+FROZEN UNARY/INDEX EXECUTION RULES
+     1	// reference/src/semantics/operators.k — MPY-OPERATORS
+     2	// The operator DISPATCH layer: operands evaluate by strictness (heat/cool over KResult=Val),
+     3	// the cooled node hands to applyUn/applyBin/applyCmp (declared in core.k; each domain file
+     4	// owns its cases — bool.k, int.k, float.k, str.k, list.k, tuple.k, set.k, dict.k).
+     5	
+     6	module MPY-OPERATORS
+     7	  imports MPY-CORE
+     8	  imports MPY-ITER
+     9	
+    10	  rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>
+    11	
+    12	  rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+    13	
+     1	// reference/src/semantics/int.k — MPY-INT
+     2	// Int cases of the operator dispatch; Python // and % are floored (pyMod).
+     3	
+     4	module MPY-INT
+     5	  imports MPY-CORE
+     6	
+     7	  rule applyUn("-", I:Int) => 0 -Int I
+     8	
+     9	  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    10	  // Bool participates in int arithmetic (x += (a == b))
+    11	  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+
+CANDIDATE BINDING AND FINAL USE
+     6	/- KORE symbol: LblsnocVS'LParUndsCommUndsRParUnds'VERIFICATION'Unds'ValSeq'Unds'ValSeq'Unds'Val; frozen source obligations: rule-ab4b49bc5cb4d2f873e2b399b9cb8d81a81689b74a6ddc22dfb813e2f897e479. Replace this stub with its honest total meaning from the frozen K semantics. -/
+     7	def «snocVS(_,_)_VERIFICATION_ValSeq_ValSeq_Val» : SortValSeq → SortVal → SortValSeq
+     8	  | .«.ValSeq_MPY-CORE_ValSeq», value =>
+     9	      .«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» value .«.ValSeq_MPY-CORE_ValSeq»
+    10	  | .«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» head tail, value =>
+    11	      .«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq»
+    12	        head
+    13	        («snocVS(_,_)_VERIFICATION_ValSeq_ValSeq_Val» tail value)
+    14	
+   118	theorem applyIndex_list_cons_snoc_last
+   119	    (first last : SortInt) (middle : SortValSeq) :
+   120	    «applyIndex(_,_)_MPY-SUBSCRIPT_Val_Val_Int»
+   121	        (SortVal.inj_SortIterable
+   122	          (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq»
+   123	            (SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq»
+   124	              (SortVal.inj_SortInt first)
+   125	              («snocVS(_,_)_VERIFICATION_ValSeq_ValSeq_Val»
+   126	                middle (SortVal.inj_SortInt last)))))
+   127	        (-1)
+   128	      = some (SortVal.inj_SortInt last) := by
+   129	  simp [
+   130	    «applyIndex(_,_)_MPY-SUBSCRIPT_Val_Val_Int», _77afc7e, _ae682a5,
+   131	    _dff41b0, retr, vsLen_eq_length,
+   132	    «normIdx(_,_)_MPY-SUBSCRIPT_Int_Int_Int», _6e2ceae, _92d2fec,
+   133	    valSeqLength, valSeqLength_snoc,
+   134	    «_<Int_», «_>=Int_», «_+Int_»,
+   135	    guard, Option.orElse]
+   136	  have index_eq :
+   137	      (-1 : Int) + ((valSeqLength middle : Int) + 1 + 1) =
+   138	        (valSeqLength middle : Int) + 1 := by
+   139	    omega
+   140	  have hlast :=
+   141	    valSeqAt_cons_snoc_last
+   142	      (SortVal.inj_SortInt first)
+   143	      (SortVal.inj_SortInt last)
+   144	      middle
+   145	  rw [index_eq]
+   146	  exact hlast
+   147	
+   148	theorem final :
+   148	theorem final :
+   149	    Klean88SortArray.Lemmas.targetStatement «snocVS(_,_)_VERIFICATION_ValSeq_ValSeq_Val» := by
+   149	    Klean88SortArray.Lemmas.targetStatement «snocVS(_,_)_VERIFICATION_ValSeq_ValSeq_Val» := by
+   150	  unfold Klean88SortArray.Lemmas.targetStatement
+   151	  intro _Gen9 _Gen8 _Gen7 _Gen6 _Gen5 _Gen4 _Gen3 _Gen2 _Gen1 _Gen0
+   152	    _DotVar1 KleanDef0 _F L _M h
+   153	  cases h
+   154	  let object : SortVal :=
+   155	    SortVal.inj_SortIterable
+   156	      (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq»
+   157	        (SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq»
+   158	          (SortVal.inj_SortInt _F)
+   159	          («snocVS(_,_)_VERIFICATION_ValSeq_ValSeq_Val»
+   160	            _M (SortVal.inj_SortInt L))))
+   161	  let oneExpr : SortExpr := SortExpr.«Int(_)_MPY-SYNTAX_Expr_Int» 1
+   162	  let negExpr : SortExpr :=
+   163	    SortExpr.«UnaryOp(_,_)_MPY-SYNTAX_Expr_String_Expr» "-" oneExpr
+   164	  apply Rewrites.tran
+   165	  · exact Rewrites._06d3a17
+   166	      (HOLE := negExpr)
+   167	      (_Gen0 := object)
+   168	      (_Val0 := false) (_Val1 := true) (_Val2 := true)
+   169	      (by
+   170	        simp [
+   171	          negExpr, isKResult, _f4c2469, _afefecb, inj, retr,
+   172	          Option.orElse])
+   173	      (by simp [notBool_, _17ebc68, _53fc758, Option.orElse])
+   174	      (by simp [_andBool_, _5b9db8d, _61fbef3, Option.orElse])
+   175	      rfl
+   176	  · apply Rewrites.tran
+   177	    · exact Rewrites.«MPY_SYNTAX_UnaryOp(_,_)_MPY_SYNTAX_Expr_String_Expr2_heat»
+   178	        (HOLE := oneExpr) (K0 := "-")
+   179	        (_Val0 := false) (_Val1 := true) (_Val2 := true)
+   180	        (by
+   181	          simp [
+   182	            oneExpr, isKResult, _f4c2469, _afefecb, inj, retr,
+   183	            Option.orElse])
+   184	        (by simp [notBool_, _17ebc68, _53fc758, Option.orElse])
+   185	        (by simp [_andBool_, _5b9db8d, _61fbef3, Option.orElse])
+   186	        rfl
+   187	    · apply Rewrites.tran
+   188	      · exact Rewrites._665cd53 (I := 1)
+   189	      · apply Rewrites.tran
+   190	        · exact
+   191	            Rewrites.«MPY_SYNTAX_UnaryOp(_,_)_MPY_SYNTAX_Expr_String_Expr2_cool»
+   192	              (HOLE := SortExpr.inj_SortInt 1) (K0 := "-")
+   193	              (_Val0 := true) (_Val1 := true)
+   194	              (by
+   195	                simp [
+   196	                  isKResult, _f4c2469, _afefecb, inj, retr,
+   197	                  Option.orElse])
+   198	              (by simp [_andBool_, _5b9db8d, _61fbef3, Option.orElse])
+   199	              rfl
+   200	        · apply Rewrites.tran
+   201	          · exact Rewrites._4aae5e8
+   202	              (OP := "-")
+   203	              (V := SortVal.inj_SortInt 1)
+   204	              (_Val0 := SortVal.inj_SortInt (-1))
+   205	              (by
+   206	                simp [
+   207	                  «applyUn(_,_)_MPY-CORE_Val_String_Val», _30ee06e,
+   208	                  _69b3bda, _b48e091, «_-Int_», inj,
+   209	                  Option.bind, Option.orElse]
+   210	                change SortVal.inj_SortInt (-1) = SortVal.inj_SortInt (-1)
+   211	                rfl)
+   212	          · apply Rewrites.tran
+   213	            · exact Rewrites._6105b33
+   214	                (HOLE := SortExpr.inj_SortInt (-1))
+   215	                (_Gen0 := object)
+   216	                (_Val0 := true) (_Val1 := true)
+   217	                (by
+   218	                  simp [
+   219	                    isKResult, _f4c2469, _afefecb, inj, retr,
+   220	                    Option.orElse])
+   221	                (by simp [_andBool_, _5b9db8d, _61fbef3, Option.orElse])
+   222	                rfl
+   223	            · exact Rewrites._f3fd256
+   224	                (I := -1)
+   225	                (OBJ := object)
+   226	                (_Val0 := SortVal.inj_SortInt L)
+   227	                (by
+   228	                  simpa [object] using
+   229	                    applyIndex_list_cons_snoc_last _F L _M)
+   230	
+   231	end Proof
+
+Script done on 2026-07-28 18:08:22-05:00 [COMMAND_EXIT_CODE="0"]

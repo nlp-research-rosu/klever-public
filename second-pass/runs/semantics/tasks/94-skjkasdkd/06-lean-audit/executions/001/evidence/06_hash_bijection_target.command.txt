@@ -1,0 +1,225 @@
+PYTHONPATH=/reference python3 - <<'PY'
+import hashlib
+import json
+import re
+from pathlib import Path
+
+from tools.k_rule_inventory import inventory_verification
+from tools.klean_export import (
+    expected_target_definition,
+    lean_trust_declarations,
+    sha256_text,
+    target_statement,
+    tree_digest,
+)
+from tools.lemma_discovery_contract import validate_trust_boundary
+from tools.pipeline_contract import sha256_file, sha256_tree
+
+audit_input = json.loads(Path("/audit-input.json").read_text())["resolution"]
+workspace = Path("/reference/k-proof")
+discovery_path = Path("/reference/lemma-discovery.json")
+generation = Path("/reference/klean-generation")
+generated = generation / "generated"
+candidate = Path("/candidate")
+base = Path("/tmp/audit-work/94-skjkasdkd-stage6-proof/Base")
+
+discovery = json.loads(discovery_path.read_text())
+input_manifest = json.loads((generation / "input-manifest.json").read_text())
+generator_manifest = json.loads((generation / "generator-manifest.json").read_text())
+export_result = json.loads((generation / "export-result.json").read_text())
+obligation_map = json.loads((generated / "obligation-map.json").read_text())
+inventory = inventory_verification(workspace)
+validated = validate_trust_boundary(workspace, discovery_path)
+
+actual_pipeline_hashes = {
+    "k_workspace_sha256": sha256_tree(workspace),
+    "k_audit_sha256": sha256_tree(Path("/reference/k-audit")),
+    "klean_generation_sha256": sha256_tree(generation),
+    "lean_workspace_sha256": sha256_tree(candidate),
+    "generation_producer_sources_sha256": sha256_tree(
+        Path("/reference/generation-tools")
+    ),
+}
+expected_pipeline_hashes = {
+    key: audit_input["hashes"][key] for key in actual_pipeline_hashes
+}
+
+actual_stage1_source_hashes = {
+    path.relative_to(workspace).as_posix(): sha256_file(path)
+    for path in sorted(workspace.rglob("*"))
+    if path.is_file() and not path.is_symlink()
+}
+
+domain_ids = [
+    entry["source_rule_id"] for entry in validated["domain_lemmas"]
+]
+source_rule_ids = [
+    entry["source_rule_id"] for entry in obligation_map["source_rules"]
+]
+obligation_ids = [
+    entry["source_rule_id"] for entry in obligation_map["obligations"]
+]
+obligation_checks = []
+canonical_by_id = {
+    entry["source_rule_id"]: entry for entry in inventory["rules"]
+}
+for source_rule, obligation in zip(
+    obligation_map["source_rules"],
+    obligation_map["obligations"],
+    strict=True,
+):
+    canonical = canonical_by_id[source_rule["source_rule_id"]]
+    obligation_checks.append({
+        "source_rule_id": source_rule["source_rule_id"],
+        "source_span_matches": obligation["source_span"] == {
+            "start_line": canonical["start_line"],
+            "end_line": canonical["end_line"],
+        },
+        "normalized_hash_matches": (
+            obligation["normalized_sha256"]
+            == source_rule["normalized_sha256"]
+            == canonical["normalized_sha256"]
+        ),
+        "inventory_hash_matches": (
+            obligation["inventory_sha256"]
+            == source_rule["inventory_sha256"]
+            == inventory["inventory_sha256"]
+        ),
+        "discovery_hash_matches": (
+            obligation["discovery_manifest_sha256"]
+            == source_rule["discovery_manifest_sha256"]
+            == hashlib.sha256(discovery_path.read_bytes()).hexdigest()
+        ),
+        "lean_conjunct_hash_matches": (
+            obligation["lean_conjunct_sha256"]
+            == sha256_text(obligation["lean_conjunct"])
+        ),
+    })
+
+classification_groups_match_input_manifest = {
+    "definitions": input_manifest["definitions"] == validated["definitions"],
+    "operational_rules": (
+        input_manifest["operational_rules"] == validated["operational_rules"]
+    ),
+    "proved_derived_lemmas": (
+        input_manifest["proved_derived_lemmas"]
+        == validated["proved_derived_lemmas"]
+    ),
+    "domain_source_rules": (
+        input_manifest["source_rules"] == obligation_map["source_rules"]
+    ),
+}
+
+actual_target = target_statement(generated)
+base_target = target_statement(base)
+expected_definition = expected_target_definition(obligation_map)
+candidate_text = (candidate / "Proof.lean").read_text()
+forbidden = {
+    token: [
+        line_number
+        for line_number, line in enumerate(candidate_text.splitlines(), 1)
+        if re.search(rf"\b{token}\b", line)
+    ]
+    for token in ("sorry", "admit", "unsafe")
+}
+candidate_target_declarations = [
+    line_number
+    for line_number, line in enumerate(candidate_text.splitlines(), 1)
+    if re.search(r"^\s*(?:def|theorem|opaque|axiom)\s+targetStatement\b", line)
+]
+
+result = {
+    "recorded_tree_hashes": {
+        "actual": actual_pipeline_hashes,
+        "expected": expected_pipeline_hashes,
+        "all_match": actual_pipeline_hashes == expected_pipeline_hashes,
+    },
+    "stage1_export_tree_sha256": tree_digest(workspace),
+    "stage1_export_tree_matches_audit_input": (
+        tree_digest(workspace)
+        == audit_input["hashes"]["stage1_export_sha256"]
+    ),
+    "generated_tree_sha256": tree_digest(generated),
+    "generated_tree_matches_every_record": all(
+        tree_digest(generated) == value
+        for value in (
+            audit_input["hashes"]["generated_tree_sha256"],
+            input_manifest["frozen_input_sha256"]
+            and generator_manifest["generated_tree_sha256"],
+            export_result["generated_tree_sha256"],
+        )
+    ),
+    "base_tree_sha256_after_build": tree_digest(base),
+    "base_is_exact_generated_tree_after_build": (
+        tree_digest(base) == tree_digest(generated)
+    ),
+    "discovery_manifest_sha256": hashlib.sha256(
+        discovery_path.read_bytes()
+    ).hexdigest(),
+    "discovery_hash_matches_audit_input": (
+        hashlib.sha256(discovery_path.read_bytes()).hexdigest()
+        == audit_input["hashes"]["discovery_manifest_sha256"]
+    ),
+    "stage1_source_hash_count": len(actual_stage1_source_hashes),
+    "stage1_source_hashes_match_audit_input": (
+        actual_stage1_source_hashes == audit_input["stage1_source_hashes"]
+    ),
+    "verification_sha256": sha256_file(workspace / "verification.k"),
+    "verification_hash_matches_input_manifest": (
+        sha256_file(workspace / "verification.k")
+        == input_manifest["verification_sha256"]
+    ),
+    "classification_groups_match_input_manifest": (
+        classification_groups_match_input_manifest
+    ),
+    "obligation_bijection": {
+        "domain_ids": domain_ids,
+        "source_rule_ids": source_rule_ids,
+        "obligation_ids": obligation_ids,
+        "same_order": domain_ids == source_rule_ids == obligation_ids,
+        "all_unique": (
+            len(set(domain_ids))
+            == len(domain_ids)
+            == len(set(source_rule_ids))
+            == len(source_rule_ids)
+            == len(set(obligation_ids))
+            == len(obligation_ids)
+        ),
+        "per_obligation": obligation_checks,
+        "obligation_map_sha256": sha256_file(
+            generated / "obligation-map.json"
+        ),
+        "obligation_map_hash_matches_generator_manifest": (
+            sha256_file(generated / "obligation-map.json")
+            == generator_manifest["obligation_map_sha256"]
+        ),
+    },
+    "target_identity": {
+        "actual_target": actual_target,
+        "base_target_after_build": base_target,
+        "generator_manifest_target": generator_manifest["target"],
+        "audit_input_target": audit_input["target"],
+        "audit_input_preflight_target": audit_input["stage4_preflight"]["target"],
+        "all_target_records_equal": (
+            actual_target
+            == base_target
+            == generator_manifest["target"]
+            == audit_input["target"]
+            == audit_input["stage4_preflight"]["target"]
+        ),
+        "expected_definition_sha256": sha256_text(expected_definition),
+        "expected_definition_hash_matches_target": (
+            sha256_text(expected_definition)
+            == generator_manifest["target"]["definition_sha256"]
+        ),
+    },
+    "candidate_policy": {
+        "forbidden_token_lines": forbidden,
+        "new_axiom_or_opaque_declarations": lean_trust_declarations(
+            candidate / "Proof.lean"
+        ),
+        "candidate_target_statement_declarations": candidate_target_declarations,
+    },
+}
+print(json.dumps(result, indent=2, sort_keys=True))
+PY

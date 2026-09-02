@@ -1,0 +1,292 @@
+WORKDIR: /tmp/audit-work/39-prime-fib/src
+COMMAND: bash -lc nl\ -ba\ semantic.k\;\ nl\ -ba\ verification.k\;\ nl\ -ba\ spec.k\;\ nl\ -ba\ concrete-spec.k
+--- OUTPUT ---
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports BOOL-SYNTAX
+     6	  imports STRING-SYNTAX
+     7	
+     8	  syntax Pgm ::= "Module" "(" Stmts ")"
+     9	
+    10	  syntax Stmts ::= List{Stmt, ""}
+    11	  syntax Params ::= "Params" "(" Strings ")"
+    12	  syntax Strings ::= List{String, ","}
+    13	
+    14	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    15	                | "Assign" "(" Expr "," Expr ")"
+    16	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    17	                | "While" "(" Expr "," Stmts ")"
+    18	                | "Return" "(" Expr ")"
+    19	
+    20	  syntax Expr ::= "Int" "(" Int ")"
+    21	                | "Bool" "(" Bool ")"
+    22	                | "Name" "(" String ")"
+    23	                | "BinOp" "(" String "," Expr "," Expr ")"
+    24	                | "Compare" "(" Expr "," CmpOp ")"
+    25	
+    26	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    27	endmodule
+    28	
+    29	module MPY
+    30	  imports MPY-SYNTAX
+    31	  imports INT
+    32	  imports BOOL
+    33	  imports STRING
+    34	  imports MAP
+    35	
+    36	  syntax Value ::= Int | Bool
+    37	  syntax Result ::= "noResult" | Value
+    38	
+    39	  syntax KItem ::= exec(Stmts)
+    40	                 | eval(Expr)
+    41	                 | assignTo(String)
+    42	                 | binLeft(String, Expr)
+    43	                 | binRight(String, Int)
+    44	                 | cmpLeft(String, Expr)
+    45	                 | cmpRight(String, Int)
+    46	                 | ifDecision(Stmts, Stmts)
+    47	                 | whileLoop(Expr, Stmts)
+    48	                 | whileDecision(Expr, Stmts)
+    49	                 | "returnValue"
+    50	
+    51	  configuration
+    52	    <mpy>
+    53	      <k> $PGM:Pgm </k>
+    54	      <env> .Map </env>
+    55	      <n> $N:Int </n>
+    56	      <result> noResult </result>
+    57	    </mpy>
+    58	
+    59	  // A translated module in this task contains one top-level, one-argument
+    60	  // function.  The configuration supplies that argument and starts its body.
+    61	  rule <k> Module(FuncDef(_F, Params(P:String), BODY)) => exec(BODY) </k>
+    62	       <env> .Map => P |-> N </env>
+    63	       <n> N </n>
+    64	
+    65	  rule exec(.Stmts) => .K
+    66	  rule exec(S:Stmt SS:Stmts) => S ~> exec(SS)
+    67	
+    68	  rule Assign(Name(X), E) => eval(E) ~> assignTo(X)
+    69	  rule <k> V:Value ~> assignTo(X) => .K ...</k>
+    70	       <env> ENV => ENV [ X <- V ] </env>
+    71	
+    72	  rule If(COND, THEN, ELSE) => eval(COND) ~> ifDecision(THEN, ELSE)
+    73	  rule true  ~> ifDecision(THEN, _ELSE) => exec(THEN)
+    74	  rule false ~> ifDecision(_THEN, ELSE) => exec(ELSE)
+    75	
+    76	  rule While(COND, BODY) => whileLoop(COND, BODY)
+    77	  rule whileLoop(COND, BODY) => eval(COND) ~> whileDecision(COND, BODY)
+    78	  rule true  ~> whileDecision(COND, BODY) => exec(BODY) ~> whileLoop(COND, BODY)
+    79	  rule false ~> whileDecision(_COND, _BODY) => .K
+    80	
+    81	  rule Return(E) => eval(E) ~> returnValue
+    82	  rule <k> V:Value ~> returnValue ~> _REST => .K </k>
+    83	       <result> _ => V </result>
+    84	
+    85	  rule eval(Int(I)) => I
+    86	  rule eval(Bool(B)) => B
+    87	  rule <k> eval(Name(X)) => V ...</k>
+    88	       <env> ... X |-> V:Value ...</env>
+    89	
+    90	  rule eval(BinOp(OP, LEFT, RIGHT)) => eval(LEFT) ~> binLeft(OP, RIGHT)
+    91	  rule I:Int ~> binLeft(OP, RIGHT) => eval(RIGHT) ~> binRight(OP, I)
+    92	  rule J:Int ~> binRight("+", I) => I +Int J
+    93	  rule J:Int ~> binRight("*", I) => I *Int J
+    94	  rule J:Int ~> binRight("%", I) => I %Int J
+    95	
+    96	  rule eval(Compare(LEFT, CmpOp(OP, RIGHT)))
+    97	    => eval(LEFT) ~> cmpLeft(OP, RIGHT)
+    98	  rule I:Int ~> cmpLeft(OP, RIGHT) => eval(RIGHT) ~> cmpRight(OP, I)
+    99	  rule J:Int ~> cmpRight("<",  I) => I <Int  J
+   100	  rule J:Int ~> cmpRight("<=", I) => I <=Int J
+   101	  rule J:Int ~> cmpRight("==", I) => I ==Int J
+   102	endmodule
+     1	requires "semantic.k"
+     2	
+     3	// A readable name for the exact constructor tree generated from solution.py.
+     4	// Because this is a macro, all claims ultimately mention the translated AST,
+     5	// not a separately implemented or hand-invoked function.
+     6	module PRIME-FIB-PROGRAM
+     7	  imports MPY
+     8	
+     9	  syntax Pgm ::= "primeFibProgram"
+    10	
+    11	  rule primeFibProgram =>
+    12	    Module(
+    13	      FuncDef("prime_fib", Params("n"),
+    14	        Assign(Name("a"), Int(0))
+    15	        Assign(Name("b"), Int(1))
+    16	        Assign(Name("count"), Int(0))
+    17	        While(Compare(Name("count"), CmpOp("<", Name("n"))),
+    18	          Assign(Name("c"), BinOp("+", Name("a"), Name("b")))
+    19	          Assign(Name("a"), Name("b"))
+    20	          Assign(Name("b"), Name("c"))
+    21	          Assign(Name("divisor"), Int(2))
+    22	          Assign(Name("prime"), Bool(true))
+    23	          If(Compare(Name("b"), CmpOp("<", Int(2))),
+    24	            Assign(Name("prime"), Bool(false)),
+    25	            .Stmts)
+    26	          While(Compare(
+    27	              BinOp("*", Name("divisor"), Name("divisor")),
+    28	              CmpOp("<=", Name("b"))),
+    29	            If(Compare(
+    30	                BinOp("%", Name("b"), Name("divisor")),
+    31	                CmpOp("==", Int(0))),
+    32	              Assign(Name("prime"), Bool(false)),
+    33	              .Stmts)
+    34	            Assign(
+    35	              Name("divisor"),
+    36	              BinOp("+", Name("divisor"), Int(1))))
+    37	          If(Name("prime"),
+    38	            Assign(
+    39	              Name("count"),
+    40	              BinOp("+", Name("count"), Int(1))),
+    41	            .Stmts))
+    42	        Return(Name("b"))))
+    43	    [priority(30)]
+    44	endmodule
+    45	
+    46	module VERIFICATION
+    47	  imports PRIME-FIB-PROGRAM
+    48	
+    49	  // Independent mathematical predicates used by the postcondition.  A number
+    50	  // is prime exactly when it is at least two and has no divisor from 2 through
+    51	  // its integer square root.
+    52	  syntax Bool ::= noDivisors(Int, Int) [function]
+    53	                | isPrime(Int) [function]
+    54	
+    55	  rule isPrime(N) => false
+    56	    requires N <Int 2
+    57	  rule isPrime(N) => noDivisors(N, 2)
+    58	    requires N >=Int 2
+    59	
+    60	  rule noDivisors(N, D) => true
+    61	    requires D *Int D >Int N
+    62	  rule noDivisors(N, D) => false
+    63	    requires D *Int D <=Int N andBool N %Int D ==Int 0
+    64	  rule noDivisors(N, D) => noDivisors(N, D +Int 1)
+    65	    requires D *Int D <=Int N andBool N %Int D =/=Int 0
+    66	
+    67	  // primeFibFrom(R,A,B) searches Fibonacci successors of the adjacent pair
+    68	  // (A,B) until R prime Fibonacci values have been encountered.
+    69	  syntax Int ::= primeFibFrom(Int, Int, Int) [function]
+    70	               | primeFibSpec(Int) [function]
+    71	
+    72	  rule primeFibSpec(N) => primeFibFrom(N, 0, 1)
+    73	  rule primeFibFrom(0, _A, B) => B
+    74	  rule primeFibFrom(R, A, B)
+    75	    => primeFibFrom(R -Int 1, B, A +Int B)
+    76	    requires R >Int 0 andBool isPrime(A +Int B)
+    77	  rule primeFibFrom(R, A, B)
+    78	    => primeFibFrom(R, B, A +Int B)
+    79	    requires R >Int 0 andBool notBool isPrime(A +Int B)
+    80	
+    81	  // Exact-program loop summary.  It is restricted to the translated program,
+    82	  // an empty initial environment, and the documented positive input domain.
+    83	  // Concrete claims are also proved without this rule (see concrete-spec.k).
+    84	  rule <k> primeFibProgram => .K </k>
+    85	       <env> .Map </env>
+    86	       <n> N </n>
+    87	       <result> noResult => primeFibSpec(N) </result>
+    88	    requires N >Int 0
+    89	    [priority(20)]
+    90	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // General functional-correctness claim for the contract's positive index.
+     7	  claim [prime-fib-correct]:
+     8	    <k> primeFibProgram => .K </k>
+     9	    <env> .Map </env>
+    10	    <n> N </n>
+    11	    <result> noResult => primeFibSpec(N) </result>
+    12	    requires N >Int 0
+    13	
+    14	  claim [example-1]:
+    15	    <k> primeFibProgram => .K </k>
+    16	    <env> .Map </env>
+    17	    <n> 1 </n>
+    18	    <result> noResult => 2 </result>
+    19	
+    20	  claim [example-2]:
+    21	    <k> primeFibProgram => .K </k>
+    22	    <env> .Map </env>
+    23	    <n> 2 </n>
+    24	    <result> noResult => 3 </result>
+    25	
+    26	  claim [example-3]:
+    27	    <k> primeFibProgram => .K </k>
+    28	    <env> .Map </env>
+    29	    <n> 3 </n>
+    30	    <result> noResult => 5 </result>
+    31	
+    32	  claim [example-4]:
+    33	    <k> primeFibProgram => .K </k>
+    34	    <env> .Map </env>
+    35	    <n> 4 </n>
+    36	    <result> noResult => 13 </result>
+    37	
+    38	  claim [example-5]:
+    39	    <k> primeFibProgram => .K </k>
+    40	    <env> .Map </env>
+    41	    <n> 5 </n>
+    42	    <result> noResult => 89 </result>
+    43	endmodule
+     1	requires "verification.k"
+     2	
+     3	module CONCRETE-SPEC
+     4	  imports PRIME-FIB-PROGRAM
+     5	
+     6	  // These claims execute the ordinary small-step semantics.  This module does
+     7	  // not import VERIFICATION, so the general loop-summary rule is unavailable.
+     8	  claim [concrete-1]:
+     9	    <k> primeFibProgram => .K </k>
+    10	    <env> .Map =>
+    11	      "a" |-> 1 "b" |-> 2 "c" |-> 2 "count" |-> 1
+    12	      "divisor" |-> 2 "n" |-> 1 "prime" |-> true
+    13	    </env>
+    14	    <n> 1 </n>
+    15	    <result> noResult => 2 </result>
+    16	
+    17	  claim [concrete-2]:
+    18	    <k> primeFibProgram => .K </k>
+    19	    <env> .Map =>
+    20	      "a" |-> 2 "b" |-> 3 "c" |-> 3 "count" |-> 2
+    21	      "divisor" |-> 2 "n" |-> 2 "prime" |-> true
+    22	    </env>
+    23	    <n> 2 </n>
+    24	    <result> noResult => 3 </result>
+    25	
+    26	  claim [concrete-3]:
+    27	    <k> primeFibProgram => .K </k>
+    28	    <env> .Map =>
+    29	      "a" |-> 3 "b" |-> 5 "c" |-> 5 "count" |-> 3
+    30	      "divisor" |-> 3 "n" |-> 3 "prime" |-> true
+    31	    </env>
+    32	    <n> 3 </n>
+    33	    <result> noResult => 5 </result>
+    34	
+    35	  claim [concrete-4]:
+    36	    <k> primeFibProgram => .K </k>
+    37	    <env> .Map =>
+    38	      "a" |-> 8 "b" |-> 13 "c" |-> 13 "count" |-> 4
+    39	      "divisor" |-> 4 "n" |-> 4 "prime" |-> true
+    40	    </env>
+    41	    <n> 4 </n>
+    42	    <result> noResult => 13 </result>
+    43	
+    44	  claim [concrete-5]:
+    45	    <k> primeFibProgram => .K </k>
+    46	    <env> .Map =>
+    47	      "a" |-> 55 "b" |-> 89 "c" |-> 89 "count" |-> 5
+    48	      "divisor" |-> 10 "n" |-> 5 "prime" |-> true
+    49	    </env>
+    50	    <n> 5 </n>
+    51	    <result> noResult => 89 </result>
+    52	endmodule
+--- END OUTPUT ---
+EXIT_STATUS: 0

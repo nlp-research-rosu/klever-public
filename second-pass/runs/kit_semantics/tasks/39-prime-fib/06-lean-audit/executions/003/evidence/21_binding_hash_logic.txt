@@ -1,0 +1,153 @@
+            source_marker,
+            source_rule_inventory,
+        )
+    if needs_operational_rewrites:
+        observed = {
+            rewrite.uid
+            for rewrite in definition.rewrites
+            if rewrite.uid in trust_rewrite_uids
+        }
+        if observed != trust_rewrite_uids:
+            raise RuntimeError(
+                "Klean rewrite model is missing a selected trust rule"
+            )
+        definition = definition.let(
+            rewrites=tuple(
+                rewrite
+                for rewrite in definition.rewrites
+                if rewrite.uid not in trust_rewrite_uids
+            )
+        )
+    elif namespace.rules:
+        substrings = tuple(namespace.rules)
+        rewrites = tuple(
+            rewrite
+            for rewrite in definition.rewrites
+            if rewrite.label
+            and any(value in rewrite.label for value in substrings)
+        )
+        definition = definition.let(rewrites=rewrites)
+    if lemma_symbols or lemma_sorts:
+        definition = _widen_projection(
+            definition, lemma_symbols, lemma_sorts
+        )
+    else:
+        definition = definition.project_to_rewrites()
+    result_directory = generate(
+        defn=definition,
+        output_dir=output_directory,
+        context={
+            "package_name": namespace.package_name,
+            "library_name": namespace.library_name,
+        },
+        config={
+            "derive_beq": namespace.derive_beq,
+            "derive_decidableeq": namespace.derive_decidableeq,
+        },
+    )
+    make_generated_tree_owner_writable(result_directory)
+    from pyk.klean.k2lean4 import _symbol_ident
+
+    reserved_identifiers = _definition_reserved_identifiers(
+        definition, _symbol_ident
+    )
+    _quote_generated_tree(result_directory, reserved_identifiers)
+    _patch_prelude(result_directory, namespace.library_name)
+    if emit_lemmas:
+        count = emit_lemmas_or_raise(
+            lambda: _emit_lemmas(
+                namespace.definition_dir,
+                result_directory,
+                namespace.library_name,
+                tuple(summary_functions),
+                source_marker,
+                source_rule_inventory,
+            )
+        )
+        print(f"lemmas: {count}", file=sys.stderr)
+    print(result_directory)
+
+
+if __name__ == "__main__":
+    main()
+            (start_line, proposition, source_rule, rule_symbols)
+        )
+
+    propositions.sort(key=lambda item: item[0])
+    seen_ids = [
+        str(source_rule["source_rule_id"])
+        for _line, _proposition, source_rule, _symbols in propositions
+    ]
+    expected_ids = [str(item["source_rule_id"]) for item in source_rules]
+    if seen_ids != expected_ids:
+        raise RuntimeError(
+            "source trust rules and generated Lean obligations are not bijective"
+        )
+
+    parameters: list[dict[str, str]] = []
+    polymorphic_definitions: dict[str, str] = {}
+    for symbol in sorted(used_symbols):
+        if symbol == "inj" or symbol not in full_definition.symbols:
+            continue
+        declaration = full_definition.symbols[symbol]
+        if "function" not in declaration.attrs_by_key:
+            continue
+        # Sort-polymorphic hooks (for example K ``ite``) cannot carry a
+        # monomorphic opaque binding; model them with an honest total Lean
+        # definition instead and skip the opaque parameter.
+        definition_line = _polymorphic_lemma_hook_definition(
+            declaration, symbol, _symbol_ident, SortApp
+        )
+        if definition_line is not None:
+            polymorphic_definitions[_symbol_ident(symbol)] = definition_line
+            continue
+        parameter_sorts = list(_param_sorts(declaration))
+        lean_type = (
+            " → ".join(parameter_sorts + [declaration.sort.name])
+            if parameter_sorts
+            else declaration.sort.name
+        )
+        lean_type = quote_reserved_lean_identifiers(
+            lean_type, reserved_identifiers
+        )
+        name = _quoted_identifier(_symbol_ident(symbol))
+        binding = {
+            "kore_symbol": symbol,
+            "name": name,
+            "type": lean_type,
+            "source_rule_ids": [
+                str(source_rule["source_rule_id"])
+                for _line, _proposition, source_rule, symbols in propositions
+                if symbol in symbols
+            ],
+        }
+        binding["binding_sha256"] = hashlib.sha256(
+            json.dumps(
+                binding, sort_keys=True, separators=(",", ":")
+            ).encode()
+        ).hexdigest()
+        parameters.append(binding)
+
+    namespace = f"{library_name}.Lemmas"
+    lines = [
+        f"import {library_name}.Inj",
+        *(
+            [f"import {library_name}.Rewrite"]
+            if any(
+                "Rewrites " in proposition
+                for _line, proposition, _source_rule, _symbols
+                in propositions
+            )
+            else []
+        ),
+        "",
+        "/- K trust-boundary goals. The second-pass agent must replace every",
+        "   writable opaque stub with an honest definition and prove this",
+        "   immutable proposition in the separate Proof.lean workspace. -/",
+        "",
+        f"namespace {namespace}",
+        "",
+    ]
+    if propositions and polymorphic_definitions:
+        # Honest total models for sort-polymorphic hooks the propositions apply
+        # (for example K ``ite`` rendered as ``kite``); emitted ahead of the

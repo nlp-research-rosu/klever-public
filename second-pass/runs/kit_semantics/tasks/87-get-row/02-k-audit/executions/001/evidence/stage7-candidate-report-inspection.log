@@ -1,0 +1,342 @@
+COMMAND: bash -lc nl\ -ba\ /candidate/PROOF.md\ \|\ sed\ -n\ \"1\,360p\"\;\ echo\ CANDIDATE_DIFFERENTIAL\;\ nl\ -ba\ /candidate/differential_test.py\ \|\ sed\ -n\ \"1\,260p\"
+     1	VALIDATED
+     2	
+     3	## What is proven
+     4	
+     5	Under the supplied MPY semantics, for every finite unboxed list whose elements
+     6	are unboxed row lists and every integer `x`, the exact `get_row` body:
+     7	
+     8	1. scans rows and columns from left to right;
+     9	2. appends exactly the coordinates whose element is K-equal to `x`;
+    10	3. applies the supplied opaque stable keyed-sort primitive first with key
+    11	   `-column` and then with key `row`; and
+    12	4. returns the reference allocated for the second sort.
+    13	
+    14	For the prompt's integer domain, `value in (x,)` is equivalent to
+    15	`value == x`. Subject to the named `sortKeyVS` contract below, the two stable
+    16	sorts give ascending row order and descending column order within each row.
+    17	
+    18	This is a partial-correctness result. Termination is not a theorem of the
+    19	reachability claims.
+    20	
+    21	## Formal claim
+    22	
+    23	`SPEC.get-row` starts from an exact module binding:
+    24	
+    25	- `_column_desc` is bound to its exact function body;
+    26	- `_row_asc` is bound to its exact function body;
+    27	- `get_row` is bound to `GETROWBODY`, a macro expansion matching
+    28	  `solution.mpy`;
+    29	- the argument is `list(RS)` and `listRows(RS)` is required; and
+    30	- `x` has sort `Int`.
+    31	
+    32	It proves return value `ref(2)`, final `heapLoc` 3, and these three allocations:
+    33	
+    34	```text
+    35	0 |-> list(rowsAppend(.ValSeq, RS, X, 0))
+    36	1 |-> list(sortKeyVS(rowsAppend(.ValSeq, RS, X, 0), COLUMNCLOSURE))
+    37	2 |-> list(sortKeyVS(
+    38	              sortKeyVS(rowsAppend(.ValSeq, RS, X, 0), COLUMNCLOSURE),
+    39	              ROWCLOSURE))
+    40	```
+    41	
+    42	The supporting claims are `SPEC.inner-loop`, `SPEC.outer-loop`,
+    43	`SPEC.column-key`, and `SPEC.row-key`.
+    44	
+    45	## Proof-extension inventory
+    46	
+    47	### Definitional summaries
+    48	
+    49	| Extension | Domain and equations | Role, context, state, and justification | Dependents and validation |
+    50	|---|---|---|---|
+    51	| `rowContents(Val)` | Total: `list(VS) => VS`; every non-list value gives `.ValSeq` by the disjoint `owise` equation. | Pure value projection. It does not rewrite program execution or access cells. | `listRows`, the `For` bridge, `rowsAppend`; equation coverage and overlap audited. |
+    52	| `listRows(ValSeq)` | Total structural recursion: empty is true; a head `V` is accepted exactly when `V ==K list(rowContents(V))`, followed by the recursive tail check. | Formal input-shape predicate. It reads no operational state and affects only theorem applicability. | `SPEC.outer-loop`, `SPEC.get-row`; witnesses `.ValSeq` and `vCons(list(vCons(5,.ValSeq)),.ValSeq)` satisfy it. |
+    53	| `advanceIndex(Int, ValSeq)` | Total: empty returns the accumulator; a cons increments once and recurses on the tail. | Solver-friendly exact count of loop iterations. No execution is replaced. | Both loop claims; structurally descending and exhaustive. |
+    54	| `scanAppend(ValSeq, ValSeq, Int, Int, Int)` | Total: empty returns the accumulator. A cons either appends `(row,column)` or does not, under the disjoint guards `V ==K X` and `notBool (V ==K X)`, then recurses on the tail. | Exact mathematical name for the inner loop's heap value. The two recursive equations are also marked `[simplification]`; the attribute adds no equation beyond the guarded definitions. | Inner/outer/entry claims. Coverage is base plus cons, guards are complements, recursion descends, and the body mutation is rejected. |
+    55	| `rowsAppend(ValSeq, ValSeq, Int, Int)` | Empty returns the accumulator. A cons equation applies under `V ==K list(rowContents(V))`, scans that row, and recurses on the tail. It is intentionally partial outside `listRows`. | Exact mathematical name for the nested scan. Its `[simplification]` attribute repeats the same truthful guarded equation. No execution is replaced. | Outer/entry claims; the formal preconditions cover every use. |
+    56	
+    57	`INNERBODY`, `OUTERBODY`, `GETROWBODY`, `COLUMNCLOSURE`, and `ROWCLOSURE`
+    58	are compile-time macros. They expand to source constructors and do not remain
+    59	as runtime rewrites.
+    60	
+    61	### Operational bridge
+    62	
+    63	The only proof-local execution rewrite is:
+    64	
+    65	```k
+    66	rule <k> For(T:Expr, V:Val, B:Stmts)
+    67	      => #loop(list(rowContents(V)), T, B) ... </k>
+    68	     requires V ==K list(rowContents(V))
+    69	     [priority(40)]
+    70	```
+    71	
+    72	- Class: operational bridge (one composed `For` setup step).
+    73	- Complete matched context: `For(T,V,B)` at the head of `<k>`, arbitrary
+    74	  continuation admitted by `...`, and every other configuration cell framed.
+    75	- Justification scope: `SHAPE-CONNECTION-SPEC.for-list-shape` has the same
+    76	  arbitrary target, body, continuation, and framed cells, with the same guard.
+    77	  Its definition imports `ROW-MODEL` and fixed `MPY`, not `VERIFICATION`, so it
+    78	  does not import the bridge.
+    79	- Context containment: the bridge domain is identical to the connection
+    80	  theorem domain.
+    81	- State footprint: reads only the `<k>` redex and the pure `rowContents`
+    82	  equation; writes only the redex. Environment, scopes, heap, allocator,
+    83	  stack, return, exception, exit code, and continuation are preserved.
+    84	- Binding/evaluation/control: `V` is already a value, as required by the fixed
+    85	  strict `For` rule. The target and body are unchanged, and no return,
+    86	  exception, loop control, or continuation is discarded.
+    87	- Value influence: none; the guard proves `V` and
+    88	  `list(rowContents(V))` are the same K value.
+    89	- Connection evidence:
+    90	  `kprove shape-connection-spec.k ...` prints `#Top` and exits 0.
+    91	- Sensitivity evidence: changing the destination to drop the sole element in
+    92	  `shape-connection-bad-spec.k` produces `WarnStuckClaimState` and exits 1.
+    93	
+    94	### Auxiliary reachability claims
+    95	
+    96	- `SPEC.inner-loop` is the inner-loop circularity. It executes the exact
+    97	  membership test, append call, and column increment. It updates only
+    98	  `column_index`, `value`, and the output heap object as stated.
+    99	- `SPEC.outer-loop` is the outer-loop circularity. It executes the exact row
+   100	  binding, resets, inner loop, and row increment. It depends on
+   101	  `SPEC.inner-loop`.
+   102	- `SPEC.column-key` executes the exact `_column_desc` binding/body and proves
+   103	  result `0 -Int CI`.
+   104	- `SPEC.row-key` executes the exact `_row_asc` binding/body and proves result
+   105	  `RI`.
+   106	
+   107	All accept only contexts their claims state; no auxiliary claim is converted
+   108	into an ordinary execution rule.
+   109	
+   110	## Exact commands and actual results
+   111	
+   112	The authoritative command sequence is `./prove.sh`; its full captured output
+   113	is in `prove.log`.
+   114	
+   115	```bash
+   116	python3 py2mpy.py solution.py > solution.mpy
+   117	python3 py2mpy.py smoke.py > smoke.mpy
+   118	python3 -m py_compile solution.py smoke.py differential_test.py
+   119	python3 smoke.py
+   120	python3 differential_test.py
+   121	```
+   122	
+   123	Actual differential output, exit 0:
+   124	
+   125	```text
+   126	differential: 196923 exhaustive small cases + 2000 seeded larger cases; mismatches=0
+   127	```
+   128	
+   129	```bash
+   130	kompile reference-semantics/semantics.k \
+   131	  --backend llvm \
+   132	  --main-module MPY-KRUN \
+   133	  --syntax-module MPY-SYNTAX \
+   134	  --output-definition runtime-kompiled
+   135	krun smoke.mpy --definition runtime-kompiled > krun-smoke.out
+   136	```
+   137	
+   138	Both commands exited 0. `krun-smoke.out` has final `<k> .K </k>`,
+   139	`<exc> NoExc </exc>`, and exit code 0 for the three prompt examples.
+   140	
+   141	```bash
+   142	kompile --backend haskell shape-connection.k \
+   143	  --main-module SHAPE-CONNECTION \
+   144	  --syntax-module ROW-MODEL-SYNTAX \
+   145	  --output-definition shape-connection-kompiled
+   146	kprove shape-connection-spec.k \
+   147	  --definition shape-connection-kompiled \
+   148	  --spec-module SHAPE-CONNECTION-SPEC
+   149	```
+   150	
+   151	Actual proof output: `#Top`; exit 0.
+   152	
+   153	```bash
+   154	kompile --backend haskell verification.k \
+   155	  --main-module VERIFICATION \
+   156	  --syntax-module VERIFICATION-SYNTAX \
+   157	  --output-definition verification-kompiled
+   158	kprove spec.k \
+   159	  --definition verification-kompiled \
+   160	  --spec-module SPEC
+   161	```
+   162	
+   163	Actual target-proof output: `#Top`; exit 0. This single command proves all five
+   164	claims in `SPEC`.
+   165	
+   166	The compiler emitted only warnings originating from the supplied semantics
+   167	(unused `As`/`Bs` variables and LLVM non-exhaustive-match warnings), not errors.
+   168	
+   169	### Negative probes
+   170	
+   171	Each command below exited 1 with `WarnStuckClaimState`; `prove.sh` recognized
+   172	each as an expected failure and itself exited 0.
+   173	
+   174	```bash
+   175	kprove spec-vacuity.k \
+   176	  --definition verification-kompiled \
+   177	  --spec-module SPEC-VACUITY
+   178	```
+   179	
+   180	The residual returns `ref(2)`, rejecting the false requested `ref(99)`.
+   181	
+   182	```bash
+   183	kprove spec-body-mutation.k \
+   184	  --definition mutation-kompiled \
+   185	  --spec-module SPEC-BODY-MUTATION
+   186	```
+   187	
+   188	The mutated body suppresses coordinate appends. On `[[5]], 5`, its residual
+   189	heap contains an empty scanned list, rejecting the required `[(0,0)]`.
+   190	
+   191	```bash
+   192	kprove shape-connection-bad-spec.k \
+   193	  --definition shape-connection-kompiled \
+   194	  --spec-module SHAPE-CONNECTION-BAD-SPEC
+   195	```
+   196	
+   197	The false bridge mutation drops the value `7`; the residual visibly proceeds
+   198	to bind and execute that element, so the mutation is rejected.
+   199	
+   200	## Gate results
+   201	
+   202	### Gate A — PASS
+   203	
+   204	- A1: the exact `get_row` and key bodies are present in the invocation
+   205	  configuration. Program-defined loop code executes. Both key functions have
+   206	  bridge-free exact execution claims. The append-suppression mutation fails.
+   207	- A2: the sole operational bridge preserves every non-`<k>` cell and the
+   208	  continuation; the target claim explicitly checks allocations, heap contents,
+   209	  return value, frame restoration, exception state, and exit code.
+   210	- A3: the bridge applies only after the iterable is a value, preserves target,
+   211	  body, and continuation, and has a bridge-free theorem over its complete
+   212	  context. The incorrect-result mutation fails.
+   213	- A4: all total equations have exhaustive, disjoint cases; recursive equations
+   214	  descend; partial `rowsAppend` is guarded by `listRows` at every use.
+   215	- A5: `RS = .ValSeq, X = 1` is a realizable witness. The wrong-return mutation
+   216	  is rejected with actual result `ref(2)`.
+   217	
+   218	### Gate B — PASS
+   219	
+   220	- B1: the prompt domain (finite ragged lists of integers and integer `x`) is
+   221	  included. The formal representation uses the supplied semantics' supported
+   222	  unboxed read-only list values; inputs are not mutated. Inner elements are
+   223	  actually allowed to be arbitrary `Val`, which is broader than the prompt.
+   224	- B2: K `Int` and CPython integers are both unbounded in the relevant sense.
+   225	  The theorem excludes malformed non-list rows, exceptions outside the
+   226	  supplied subset, alias-sensitive inputs, and termination.
+   227	- B3: `rowsAppend` is formally connected to the executed scan. The final
+   228	  ordering interpretation is conditional on the named stable `sortKeyVS`
+   229	  contract and is independently tested.
+   230	- B4: the implementation matches the prompt examples and the independent
+   231	  oracle over every tested case.
+   232	
+   233	### Gate C — PASS
+   234	
+   235	Every proof-local extension and unproved boundary is listed here. All cited
+   236	artifacts exist, exact commands are in `prove.sh`, actual outputs are retained
+   237	in `prove.log`/`krun-smoke.out`, and mutation and differential scopes are
+   238	stated. Finite evidence is reported only as evidence, not as a universal proof
+   239	of sorting.
+   240	
+   241	## Trust boundary
+   242	
+   243	The value-affecting external boundary is the supplied
+   244	`sortKeyVS(ValSeq, Val)` primitive in
+   245	`reference-semantics/semantics/sort.k`. Symbolic MPY intentionally leaves it
+   246	opaque; `MPY-CONCRETE` executes stable key calls and insertion sorting for
+   247	LLVM. `SPEC.get-row` depends on it only by returning the raw nested
+   248	`sortKeyVS` term. Interpreting that term as correctly stable-sorted is
+   249	conditional on the supplied contract.
+   250	
+   251	`sortKeyVS` affects the returned list value and order, but not the proved scan,
+   252	allocation count, frame/control behavior, or the independently proved key
+   253	values. The K toolchain and the supplied reference semantics are also trusted
+   254	as the fixed verification base.
+   255	
+   256	## Empirically supported facts
+   257	
+   258	- `differential_test.py` uses an independent descending-index oracle. It checks
+   259	  all 196,923 matrices with 0–3 rows, row lengths 0–3, values and targets in
+   260	  `{-1,0,1}`, plus 2,000 seeded matrices with up to 10 rows, row lengths up to
+   261	  12, and values/targets in `[-20,20]`. Mismatches: 0.
+   262	- Native CPython executes the three prompt examples successfully.
+   263	- LLVM MPY executes the same three examples through the real concrete keyed
+   264	  sorter and reaches `.K`, `NoExc`, exit code 0.
+   265	- The body, false-return, and bridge-result mutations all fail as intended.
+   266	
+   267	These finite results support implementation intent and the concrete sorter;
+   268	they do not prove the opaque sorter universally.
+   269	
+   270	## Excluded behavior
+   271	
+   272	- Termination/liveness is not proved.
+   273	- Inputs with a non-list row or a non-integer target are outside the prompt
+   274	  theorem.
+   275	- Heap aliases, mutation of input rows during iteration, Python exceptions
+   276	  outside the supplied subset, and behaviors absent from the reference
+   277	  semantics are excluded.
+   278	- The universal stable-sorting property of `sortKeyVS` is trusted, not proved
+   279	  in K here.
+   280	
+   281	The runner result is `KPROVE_PASSED` because every required positive proof
+   282	command printed `#Top` and exited 0. That execution marker is reported
+   283	separately from this `VALIDATED` proof-quality headline.
+CANDIDATE_DIFFERENTIAL
+     1	from itertools import product
+     2	from random import Random
+     3	
+     4	from solution import get_row
+     5	
+     6	
+     7	def oracle(lst, x):
+     8	    result = []
+     9	    for row_index, row in enumerate(lst):
+    10	        for column_index in range(len(row) - 1, -1, -1):
+    11	            if row[column_index] == x:
+    12	                result.append((row_index, column_index))
+    13	    return result
+    14	
+    15	
+    16	def check_case(lst, x):
+    17	    actual = get_row(lst, x)
+    18	    expected = oracle(lst, x)
+    19	    if actual != expected:
+    20	        raise AssertionError(
+    21	            f"mismatch for lst={lst!r}, x={x!r}: "
+    22	            f"actual={actual!r}, expected={expected!r}"
+    23	        )
+    24	
+    25	
+    26	def main():
+    27	    values = (-1, 0, 1)
+    28	    rows = [[]]
+    29	    for length in range(1, 4):
+    30	        rows.extend([list(items) for items in product(values, repeat=length)])
+    31	
+    32	    exhaustive = 0
+    33	    for row_count in range(4):
+    34	        for matrix_rows in product(rows, repeat=row_count):
+    35	            matrix = [row[:] for row in matrix_rows]
+    36	            for x in values:
+    37	                check_case(matrix, x)
+    38	                exhaustive += 1
+    39	
+    40	    rng = Random(20260725)
+    41	    random_cases = 2000
+    42	    for _ in range(random_cases):
+    43	        matrix = [
+    44	            [rng.randint(-20, 20) for _ in range(rng.randint(0, 12))]
+    45	            for _ in range(rng.randint(0, 10))
+    46	        ]
+    47	        check_case(matrix, rng.randint(-20, 20))
+    48	
+    49	    print(
+    50	        f"differential: {exhaustive} exhaustive small cases + "
+    51	        f"{random_cases} seeded larger cases; mismatches=0"
+    52	    )
+    53	
+    54	
+    55	if __name__ == "__main__":
+    56	    main()
+EXIT STATUS: 0

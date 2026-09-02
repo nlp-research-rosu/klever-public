@@ -1,0 +1,457 @@
+# Independent adversarial audit — 73-smallest-change
+
+The candidate contains a legitimate, full-domain partial-correctness proof of
+the submitted program under the supplied MPY semantics. Fresh reconstruction,
+program-term pinning, bridge-free connection proofs, and non-vacuity checks all
+passed. I assign `CONCERNS / LEGIT`, rather than `PASS / LEGIT`, because the K
+postcondition is the recursively defined mirrored-pair count; the final step
+from that summary to the natural-language *minimum number of changes* is a
+correct but informal mathematical argument, not a K theorem. This is a
+non-fatal intent/trust-boundary limitation, not a program or proof
+unsoundness.
+
+All candidate prose, logs, traces, and compiled definitions were treated only
+as untrusted claims. Every executed artifact was copied or newly authored
+under `/tmp/audit-work` and rebuilt from source. Reviewer scripts, test specs,
+and bounded logs are in `/audit-output/evidence/`.
+
+## 1. Input and provenance integrity
+
+### Declared layout and mode
+
+`/audit-input.json` declares:
+
+- problem `73-smallest-change`;
+- condition `kit-semantics`;
+- semantics mode `SUPPLIED_SEMANTICS`;
+- record layout `pipeline-v3`;
+- the mounted paths used in this audit.
+
+The supplied-mode boundary is internally consistent:
+`/reference/reference-semantics` exists. There is no rendered-mode
+contradiction and therefore no audit-infrastructure breach.
+
+I read the required pipeline-v3 records:
+
+- `/run.json`
+- `/task.json`
+- `/generation-result.json`
+- `/generation-evidence/invocation.json`
+- `/generation-evidence/metrics.json`
+- `/generation-evidence/runtime-metrics.json`
+- `/generation-evidence/usage.json`
+- `/generation-evidence/codex-last.txt`
+- `/generation-evidence/codex-output.log`
+- `/generation-evidence/prompt.txt`
+- the JSONL trace under `/generation-evidence/codex-trace/`
+
+Those records report a successful generation, but that status was not used as
+proof evidence. The structured trace consists of one file and 1,348 valid
+JSONL records, with no malformed record; its last event is `task_complete`.
+The generation output and trace were also searched for the exact build/proof
+claims later reconstructed independently.
+
+### Hashes, lock, types, and symlinks
+
+The reviewer-authored check is
+`/audit-output/evidence/integrity_check.py`; its exact run and output are in
+`01-integrity.log`. It established:
+
+- the `audit_campaign` block in `/audit-input.json` equals
+  `/audit-campaign-lock.json`;
+- the lock file SHA-256 is
+  `ad5dfcc006af70c4d0d2c6641f0878a6c54a266e9ad2b54cd225b2381a78d745`;
+- `/audit-prompt.md` hashes to the lock's
+  `999526823ad89bcd9b6e77db8f5f1189f629c86c9ecb308094b84c7161c04e5a`;
+- every individually recorded mounted-file hash matches, including the run,
+  task, stage result, invocation, metrics, runtime metrics, usage, prompt,
+  final message, output log, and the sole trace JSONL file;
+- the core fields of the audit manifest, run, task, invocation, stage result,
+  metrics, and usage records are mutually consistent;
+- every required candidate artifact is a readable regular file, not a
+  symlink;
+- the complete candidate tree contains no symlinks.
+
+The candidate prompt and translator are byte-identical to the trusted mounts.
+The candidate and trusted supplied-semantics trees have identical entry names,
+entry types, and file bytes, with no additional, missing, mistyped, changed,
+or linked entries. An independent JSON manifest of each tree has SHA-256
+`85a1de65369a9671b8623414a1fce750c09bc24023f8bffc7c9cd7a7824128a6`.
+The launcher separately records the same composite supplied-tree digest,
+`1de6d5f51876cf9d0f4449a78f077f8b127a14add0504d5060da680fc5a443de`,
+for both trees. Recursive type-and-byte identity is stronger than relying on
+either composite digest alone.
+
+No provenance artifact required for `pipeline-v3` is absent or unreadable.
+
+## 2. Program fidelity and candidate-versus-canonical checks
+
+### Source contract
+
+The trusted prompt asks for `smallest_change(arr)` on an array of integers.
+One change may replace one element with any value. The result must be the
+minimum number of changed positions needed to make the array palindromic.
+
+For each mirrored pair `(i, n-1-i)`, an equal pair needs no change and an
+unequal pair needs at least one change. Different mirrored pairs are disjoint.
+Changing one member of every unequal pair reaches a palindrome. Therefore the
+answer is exactly the number of unequal mirrored pairs for
+`0 <= i < floor(n/2)`.
+
+The trusted canonical function uses a `for` loop over that left half. The
+candidate uses an equivalent `while` loop with `i` starting at zero, increments
+the counter for an unequal pair, increments `i` by one, and returns the
+counter. It does not mutate `arr`.
+
+### Trusted translation
+
+`/audit-output/evidence/regenerate_solution.py` ran:
+
+```text
+python3 /reference/py2mpy.py /candidate/solution.py
+```
+
+and wrote the generated bytes only to
+`/tmp/audit-work/regenerated-solution.mpy`. The translator exited zero and the
+627 regenerated bytes are byte-identical to `/candidate/solution.mpy`.
+See `02-regeneration.log`.
+
+### Independent differential test
+
+`/audit-output/evidence/differential_test.py` independently imports
+`/reference/canonical.py::smallest_change` and
+`/candidate/solution.py::smallest_change`. It covers:
+
+- all three documented examples;
+- empty, singleton, equal and unequal length-two lists;
+- odd/even palindrome and non-palindrome branch boundaries;
+- very large positive and negative Python integers;
+- every list of lengths 0 through 8 over `(-2, 0, 3)`;
+- 2,000 deterministic random lists of lengths 0 through 64.
+
+The exact command and output are in `02-differential.log`: 11,854 cases, zero
+mismatches, exit zero. This is finite fidelity evidence, not a substitute for
+the K proof.
+
+An additional independent natural-language-contract oracle in
+`contract_oracle_test.py` exhaustively enumerates every same-length palindrome
+over `(-2, 0, 3)` for all 9,841 input lists of lengths 0 through 8. It found
+zero mismatches (`07-contract-oracle.log`). Restricting targets to that
+alphabet does not change the optimum: each unequal pair can optimally copy
+one of its two existing endpoint values.
+
+## 3. Clean proof reconstruction
+
+Candidate-produced `*-kompiled` directories, caches, proof logs, and
+`PROOF.md` were not used. The relevant source files were copied to
+`/tmp/audit-work/candidate-src`, while `reference-semantics/`, `py2mpy.py`,
+`prompt.py`, and `canonical.py` came from the trusted mounts.
+
+The live toolchain is K `v7.1.293`. Fresh commands and results were:
+
+| Purpose | Exact command (also preserved as the first line of the cited log) | Result |
+|---|---|---|
+| Concrete definition | `timeout 600 kompile --backend llvm reference-semantics/semantics.k --main-module MPY-KRUN --syntax-module MPY-SYNTAX --output-definition runtime-audit-kompiled` | exit 0, `03-llvm-kompile.log` |
+| Concrete smoke execution | `timeout 120 krun smoke.mpy --definition runtime-audit-kompiled` | `.K`, normal cells, exit-code 0; command exit 0, `03-krun-smoke.log` |
+| Fixed branch definition | `timeout 600 kompile --backend haskell branch-connection.k --main-module BRANCH-CONNECTION --syntax-module MPY-SYNTAX --output-definition branch-audit-kompiled` | exit 0, `03-branch-kompile.log` |
+| Branch claims | `timeout 300 kprove branch-connection-spec.k --definition branch-audit-kompiled --spec-module BRANCH-CONNECTION-SPEC --claims BRANCH-CONNECTION-SPEC.<label>` | each of the four labels exited 0 and printed `#Top`; `03-branch-*.log` |
+| Loop-connection definition | `timeout 600 kompile --backend haskell loop-connection.k --main-module LOOP-CONNECTION --syntax-module MPY-SYNTAX --output-definition loop-audit-kompiled` | exit 0, `03-loop-kompile.log` |
+| Loop connection | `timeout 300 kprove loop-connection-spec.k --definition loop-audit-kompiled --spec-module LOOP-CONNECTION-SPEC --claims LOOP-CONNECTION-SPEC.loop-connection` | exit 0 and `#Top`, `03-loop-connection-proof.log` |
+| Target definition | `timeout 600 kompile --backend haskell verification.k --main-module VERIFICATION --syntax-module MPY-SYNTAX --output-definition verification-audit-kompiled` | exit 0, `03-verification-kompile.log` |
+| Loop target claim | `timeout 300 kprove spec.k --definition verification-audit-kompiled --spec-module SPEC --claims SPEC.loop-invariant` | exit 0 and `#Top`, `03-target-loop-invariant.log` |
+| Whole-program target | `timeout 300 kprove spec.k --definition verification-audit-kompiled --spec-module SPEC --claims SPEC.smallest-change` | exit 0 and `#Top`, `03-target-smallest-change.log` |
+
+All seven positive claims were run individually:
+
+- `BRANCH-CONNECTION-SPEC.branch-true`
+- `BRANCH-CONNECTION-SPEC.branch-false`
+- `BRANCH-CONNECTION-SPEC.count-branch-true`
+- `BRANCH-CONNECTION-SPEC.count-branch-false`
+- `LOOP-CONNECTION-SPEC.loop-connection`
+- `SPEC.loop-invariant`
+- `SPEC.smallest-change`
+
+Compiler output contains only warnings, chiefly unused variables and
+pre-existing non-exhaustive-match warnings in the supplied semantics. No
+positive claim timed out, crashed, exited nonzero, or omitted `#Top`.
+
+## 4. Adequacy and real-program pinning
+
+### Claims in plain language
+
+The four branch claims say:
+
+- when Boolean `B` is true, fixed `#branch(B,T,E)` continues with `T`;
+- when `B` is false, it continues with `E`;
+- for the exact true branch in this program, `changes += 1` increments an
+  integer counter by one and preserves the arbitrary continuation and other
+  scope entries;
+- for the false branch, the counter is unchanged and the arbitrary
+  continuation is preserved.
+
+The loop-connection claim starts at the exact function frame, exact submitted
+loop condition/body, exact `Return(changes) ~> #endcall` suffix, and normal
+empty heap/control state. For every finite integer sequence `VS`, integer
+counter `C`, and integer `I >= 0`, executing the remainder of the loop and
+return reaches:
+
+```text
+C + mismatchCount(VS, I, halfLen(VS))
+```
+
+with the callee frame removed, environment restored, stack popped, and every
+other named cell in the claimed normal state.
+
+`SPEC.loop-invariant` states the same full loop transition as a target
+circularity. `SPEC.smallest-change` starts from module loading, resolves the
+actual `smallest_change` binding, calls it on arbitrary `list(VS)`, and
+constrains the returned K value to:
+
+```text
+mismatchCount(VS, 0, halfLen(VS))
+```
+
+under exactly `allInts(VS)`. The destination is a value, not an existential or
+free RHS variable, and the claim specifies normal return, no exception, empty
+stack, unchanged empty heap, and exit code zero.
+
+### Mechanical program-term identity
+
+`claim-program.mpy` contains `Module(smallestDef)`. With the fresh verification
+definition, these commands parsed and macro-expanded both terms:
+
+```text
+kast solution.mpy --definition verification-audit-kompiled \
+  --module VERIFICATION --sort Module --expand-macros --output kore
+kast /audit-output/evidence/claim-program.mpy \
+  --definition verification-audit-kompiled \
+  --module VERIFICATION --sort Module --expand-macros --output kore
+```
+
+Both expanded KORE files hash to
+`969856309c0b00a4ef20ee2f8c0f537e20b0ed034e16af3338ada1312648841c`
+and `cmp` exits zero. See `04-kast-submitted.log`,
+`04-kast-claim.log`, and `04-expanded-term-cmp.log`. Combined with trusted
+byte regeneration, this is constructor-level identity between the submitted
+program and the function definition loaded by the entry claim.
+
+### Satisfiable preconditions and concrete substitution
+
+The sequence `vCons(1, vCons(2, .ValSeq))` satisfies `allInts`. The exact loop
+state with that sequence, `C = 0`, and `I = 0` also satisfies the loop
+precondition. Reviewer-authored `ground-check.k` proves:
+
+- `allInts([1,2])` reduces to true;
+- the claimed summary reduces to 1;
+- the full whole-program ground instance reaches 1;
+- the full loop-state ground instance reaches 1.
+
+All four selected claims print `#Top` and exit zero in
+`04-ground-*.log`. `ground_python.py` shows the trusted canonical and candidate
+Python functions both return 1 for the same input (`04-ground-python.log`).
+Thus every entry precondition has a concrete witness and the symbolic result
+agrees after substitution.
+
+## 5. Rule-by-rule static soundness review
+
+### Exhaustive inventory
+
+`k_inventory.py` scanned every `.k` file in the trusted supplied-semantics tree
+and every proof-local module contributing declarations or claims. The
+line-addressed inventory is `rule-inventory.md`:
+
+- 31 files;
+- 957 records;
+- 235 syntax declarations;
+- 709 rules;
+- 5 contexts;
+- 1 configuration;
+- 7 claims.
+
+The inventory records every `function`, `total`, macro, `concrete`,
+`simplification`, `owise`, strictness, priority, and named-symbol attribute.
+This includes the supplied semantics' opaque/concrete float symbols,
+`sortVS`/`sortKeyVS`, and `md5hexCodes`. None of those opaque symbols occurs in
+the submitted program, its active control path, or its postcondition.
+
+Records 1–928 are the fixed supplied semantics. Because the candidate tree is
+recursively identical to the trusted tree, they are the selected semantics
+level rather than candidate-added axioms. I reviewed every record for possible
+overlap with the submitted AST and proof summaries. Records whose LHS
+constructors never occur on the program/proof path are inactive here. The
+active rules and their interactions are mapped below.
+
+### Construct-to-semantics map
+
+| Submitted construct | Declaration and operative fixed rules | Audit |
+|---|---|---|
+| `Module`, `FuncDef`, `Params`, statement sequence | `syntax.k:53-61`, `core.k:124-127`, `functions.k:14-16` | Loads the exact constructor body and binds a closure in module scope 0. |
+| `Call(Name("smallest_change"), list(VS))` | `core.k:130-154,183-191`; `call.k:19-21,69-74`; `functions.k:63-66` | Name lookup selects the real module binding; callee then argument evaluation is left-to-right; a fresh function frame is pushed and `arr` is bound to the supplied list value. |
+| `Assign(changes,0)`, `Assign(i,0)` | `syntax.k:41`; `core.k:194`; `controls.k:9-11` | Evaluates integer RHSs and writes only the current scope. |
+| `While` | `syntax.k:46`; `controls.k:65-82,85` | Re-evaluates the condition each iteration, executes the body only for a truthy guard, and re-enters through `#loopLbl`. |
+| `len(arr)` | `core.k:130-154,183-191`; `call.k:19-21,31`; `builtins.k:17-26` | `len` is resolved through the actual `-1` builtins scope; `seqLen(list(VS))` is exactly `vsLen(VS)`. No textual-name interception is used. |
+| `len(arr) // 2` | `syntax.k:15`; `operators.k:12`; `int.k:15-20` | Operands are evaluated by `seqstrict`; divisor 2 is nonzero; MPY floor division equals mathematical floor for nonnegative `vsLen`. |
+| `i < ...` and element `!=` | `syntax.k:30-32`; `operators.k:15-17`; `int.k:22-27` | Contexts enforce left then right evaluation; integer comparisons determine exact Booleans. |
+| `arr[i]`, `arr[len(arr)-i-1]` | `syntax.k:22,38`; `subscript.k:27-40`; `core.k:223-225`; `int.k:13` | The list object and index evaluate in order; `applyIndex` normalizes the nonnegative indices and uses structural `valSeqAt`. Under `0 <= i < floor(n/2)`, both indices are in `0..n-1`. |
+| `If` | `syntax.k:49`; `controls.k:51-54` | The computed comparison Boolean selects exactly one body. |
+| `changes += 1`, `i += 1` | `syntax.k:44`; `controls.k:20-23`; `int.k:9` | Reads and updates existing integer bindings only; addition is mathematical integer addition. |
+| `Return(changes)` | `syntax.k:50`; `functions.k:78-90` | Sets the return value, pops the exact frame, restores caller environment, removes the callee scope, and resumes the saved continuation. |
+| Configuration/state | `core.k:44-60` | The claims pin every cell used by the call/return path: K, environment, scopes, scope allocator, heap, heap allocator, stack, return state, exception, and exit code. |
+
+The input is the unboxed read-only `list(VS)` form allowed by the supplied
+semantics, so the heap remains empty. The program performs no allocation,
+mutation of `arr`, import, output, exception, or external call. Priority-40
+fixed rules for heap references and closure cells cannot match this state.
+
+### Proof-local declarations and rules
+
+Inventory records 929–950 cover every proof-local declaration/rule:
+
+| Exact local extension(s) | Class and complete-domain decision |
+|---|---|
+| `smallestLoopBody` syntax and expansion rule | Definitional macro. It is byte/constructor identical to statements 4–7 of regenerated `solution.mpy`; no execution is replaced after macro expansion. |
+| `smallestBody` syntax and expansion rule | Definitional macro. It is exactly the complete submitted function body. |
+| `smallestDef` syntax and expansion rule | Definitional macro. It is exactly `FuncDef("smallest_change", Params("arr"), smallestBody)`. |
+| `fixedBuiltins` syntax and expansion rule | Definitional macro. It lists exactly the same 23 unique key/value bindings and root parent as fixed `builtinsScope`. No candidate-specific binding is introduced. |
+| `allInts` declaration plus empty/cons equations | Total structural predicate. The two `ValSeq` constructors are disjoint and exhaustive; recursion strictly decreases the tail. It is true exactly when every `Val` is an MPY `Int`. |
+| `halfLen` declaration and simplification equation | Total definitional summary. `vsLen(VS) >= 0`; the normalized parity term is 0 or 1; subtracting it and dividing by 2 gives `floor(vsLen/2)`. The equation is universal and has no overlap. |
+| guarded comparison `#Ceil` simplification | Derived definedness lemma, not a comparison oracle. `allInts(VS)` and `0 <= I < halfLen(VS)` imply `n >= 2`, `I < n`, and `0 <= n-I-1 < n`; structural access yields two Ints and fixed `applyCmp("!=",Int,Int)` is defined. It never selects true or false. |
+| branch/AugAssign operational rule | Operational bridge. Its complete match is an already-computed `B:Bool`, exact `changes += 1` true body, empty false body, environment 1, an exact local binding fragment, arbitrary residual scope map, and arbitrary K suffix. It changes only integer `changes` by `1` iff `B`; all other cells are framed. Both Boolean partitions have fixed-semantics connection claims. |
+| `pairDiff` declaration and equation | Definitional summary. It uses the fixed `applyCmp("!=")` result and maps true/false to 1/0; it does not introduce a fresh or opaque result. On theorem uses, both indices are in bounds. |
+| `mismatchCount` declaration and two equations | Definitional summary. Guards `I >= STOP` and `I < STOP` are disjoint and exhaustive over Int. The recursive case raises `I` by one, decreasing nonnegative `STOP-I` on all theorem uses. It is deliberately not declared `total`; no out-of-domain value is fabricated. |
+| integer-addition reassociation simplification | Derived mathematical lemma. `(A+B)+C = A+(B+C)` for K mathematical Int; the orientation right-associates and does not create a rewrite cycle. |
+| exact initial-loop rule in `verification.k` | Operational bridge. It accepts only `changes=0`, `i=0`, arbitrary all-Int `VS`, the exact submitted loop body, exact `Return(changes) ~> #endcall` suffix, exact function binding, empty heap, normal control cells, and exact stack frame with continuation `.K`. It writes the same environment/scope/allocator/stack transition as fixed return and yields the connected summary. Priority 40 preempts fixed `#while` only on this narrow state. |
+
+There are no proof-local opaque or unconstrained symbols. `pairDiff` and
+`mismatchCount` have result-determining equations; `halfLen` and `allInts` are
+total with exhaustive equations. Function guards do not overlap with
+inconsistent right-hand sides.
+
+### Operational connection and sensitivity
+
+The branch definition imports only fixed MPY semantics. All four branch
+connection claims close without the branch bridge. The true/false claims
+partition all `Bool` values, and the counter claims cover the bridge's exact
+state update. Reviewer-authored fixed and bridge-enabled tests then place the
+observable continuation `Assign(i,99)` immediately after the bridged region.
+Both versions reach the same counter and `i=99` states for true and false.
+See `branch-fixed-context.k`, `branch-bridge-context.k`, and
+`05-branch-{fixed,bridge}-*.log`.
+
+The loop connection definition imports `VERIFICATION-BASE` (including the
+already connected branch bridge) but does not import `verification.k` or its
+loop bridge. Its universal claim matches the loop bridge's complete context
+and is stronger in `C` and `I` than the actual bridge. It closes under actual
+loop execution and circularity.
+
+`loop-bridge-context.k` inserts `Assign(changes,99)` between the loop and
+return. Under the bridge-enabled definition, the loop bridge cannot match this
+changed suffix; fixed execution proceeds and returns 99. The claim closes
+(`05-loop-bridge-context.log`), confirming context containment rather than
+continuation discard.
+
+A freshly rebuilt body mutation advances `i` by 2 in the program term actually
+executed by the loop claim. The definition builds successfully, but the
+connection proof exits 1 with `WarnStuckClaimState` and an `I +Int 2` residual
+instead of the required `I +Int 1` remainder
+(`05-body-mutation-kompile.log`, `05-body-mutation-proof.log`). The theorem is
+therefore body-sensitive.
+
+### Static conclusion
+
+No candidate-added rule is unsound on its full match domain. Consequently
+there is no claimed unsound rule for which a false-conclusion witness is
+required. The only selected-semantics abstraction relevant to this program is
+the supplied `[total]` treatment of `valSeqAt` outside structurally reducible
+cases. The theorem's proved bounds keep every actual access in bounds, so no
+under-specified out-of-bounds value can affect a branch or result.
+
+## 6. Fresh non-vacuity test
+
+The candidate's `spec-vacuity.k` was not reused. The reviewer-authored
+`fresh-vacuity.k` uses the satisfiable integer-list input `[1,2]` and changes
+the required result from the correct 1 to the fresh false value 2.
+
+First, this exact command built/translated the mutated claim successfully:
+
+```text
+timeout 300 kprove /audit-output/evidence/fresh-vacuity.k \
+  --definition verification-audit-kompiled \
+  --spec-module FRESH-VACUITY \
+  --claims FRESH-VACUITY.wrong-two --dry-run
+```
+
+It exited zero (`06-fresh-vacuity-build.log`). The same command without
+`--dry-run` exited 1. Its residual contains:
+
+```text
+WarnStuckClaimState
+<k>
+  1 ~> .K
+</k>
+```
+
+Thus the failure is the intended unmet result obligation, not a parse error,
+missing import, timeout, unrelated crash, or unreachable mutation.
+`check_expected_failure.py` independently validates the nonzero exit and
+residual (`06-fresh-vacuity-proof.log`,
+`06-fresh-vacuity-validation.log`).
+
+## 7. Proven versus assumed accounting
+
+### What the successful K proof establishes
+
+Under the supplied MPY semantics, for every arbitrary finite `ValSeq` whose
+elements are MPY Int values, if execution of the exact trusted-regenerated
+submitted module's real `smallest_change` binding terminates, its stated normal
+final configuration has result:
+
+```text
+mismatchCount(VS, 0, halfLen(VS))
+```
+
+The loop connection establishes the corresponding partial-correctness summary
+from every exact loop-head state with arbitrary integer `C`, arbitrary integer
+`I >= 0`, and the exact return/call continuation. The result is constrained, the
+precondition is satisfiable, and a false result is rejected.
+
+The domain is not bounded by examples, length, integer magnitude, or loop
+unrolling. Empty, singleton, odd, and even sequences are included. Restricting
+elements to MPY Int is the supplied semantics' direct representation of the
+prompt's integer-list contract, not a material domain narrowing.
+
+### Trust ledger
+
+| Boundary | Dependents | Assessment |
+|---|---|---|
+| Trusted supplied MPY source semantics | Every execution and connection claim | Acceptable benchmark boundary. Candidate copy is recursively identical. Only the actually used subset is needed; used operations have the control/state behavior reviewed above. |
+| K parser, kompiler, Haskell backend, LLVM backend, and `kprove` v7.1.293 | Build, execution, and reachability results | Necessary formal-tool trust boundary. Independent fresh builds and two backends reduce stale-artifact risk but do not verify the toolchain itself. |
+| K built-in mathematical Int, Bool, Map, List, equality, and arithmetic hooks | Counters, indices, maps, guards, summaries | Ordinary low-level trust. No candidate oracle is hidden behind these hooks. |
+| Proof-local macros and equations | Target and connection claims | Audited above. They are transparent, guarded, terminating on uses, and non-opaque. |
+| Branch operational bridge | Loop connection and target proof | Acceptable: complete fixed-semantics connection claims cover both Boolean outcomes and arbitrary suffixes; observable-suffix tests agree. |
+| Loop operational bridge | Whole-program target | Acceptable: a loop-bridge-free universal loop claim covers a stronger initial domain and the exact complete continuation/state; changed-suffix and changed-body checks are discriminating. |
+| Mathematical statement that unequal disjoint mirrored pairs equal the minimum number of changes | Translation from the K summary to the prompt's word “minimum” | Correct and elementary, with a lower-bound plus construction argument and 9,841 brute-force oracle checks. It is nevertheless informal rather than a machine-checked K theorem; this is the reason for `CONCERNS`. |
+| Differential and brute-force tests | Python fidelity and summary-to-intent support | Finite empirical evidence only. They do not replace the universal K execution proof or formally prove the minimum-change theorem. |
+
+The supplied semantics also contains opaque float, sorting, and MD5 boundaries,
+but no term involving them is reachable from this program or appears in a
+proof summary. They have no dependent claim here.
+
+### Decision
+
+Gate A (real-program soundness) passes: fresh positive proofs close; program
+identity, state footprints, binding, evaluation order, control, totality,
+overlap, body sensitivity, context sensitivity, and non-vacuity all check out.
+
+Gate B (intent adequacy) covers the full material HumanEval domain: arbitrary
+finite integer lists and the exact returned mismatch count. There is no
+fixed-size or finite-unrolling restriction.
+
+The remaining limitation is non-fatal: equivalence between the formally
+proved mismatch count and the human-facing minimum-change objective is supplied
+by an informal mathematical argument plus finite independent oracle evidence,
+not by an additional K claim. Per the benchmark decision boundary, that
+supports `CONCERNS / LEGIT`, not `FAIL / NOT_LEGIT`.
+
+VERDICT: CONCERNS
+LEGITIMACY: LEGIT

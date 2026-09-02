@@ -1,0 +1,1 @@
+test -s REVIEW.md && test "$(tail -n 2 REVIEW.md | sed -n "1p")" = "VERDICT: CONCERNS" && test "$(tail -n 1 REVIEW.md)" = "LEGITIMACY: LEGIT" && test "$(rg -c "^## [1-7]\\." REVIEW.md)" = "7" && test "$(rg -c "^VERDICT:" REVIEW.md)" = "1" && test "$(rg -c "^LEGITIMACY:" REVIEW.md)" = "1"

@@ -1,0 +1,455 @@
+Script started on 2026-07-31 07:56:20-05:00 [<not executed on terminal>]
+VERIFICATION
+     1	requires "proof-theory.k"
+     2	
+     3	module VERIFICATION
+     4	  imports PROOF-THEORY
+     5	
+     6	  // Definitional AST aliases used by the invariant.  They expand to the
+     7	  // literal translated loop body and return expression.
+     8	  syntax Stmts ::= checkDictLoopBody() [function, total]
+     9	  rule checkDictLoopBody()
+    10	    => Assign(Name("seen_key"), Bool(true))
+    11	       Assign(
+    12	         Name("is_string"),
+    13	         BoolOp(
+    14	           "and",
+    15	           BoolOp("or", Name("all_lower"), Name("all_upper")),
+    16	           Call(Name("isinstance"), Name("key"), Name("str"))))
+    17	       Assign(
+    18	         Name("all_lower"),
+    19	         BoolOp(
+    20	           "and",
+    21	           Name("all_lower"),
+    22	           Name("is_string"),
+    23	           Call(Attribute(Name("key"), "islower"), .Exprs)))
+    24	       Assign(
+    25	         Name("all_upper"),
+    26	         BoolOp(
+    27	           "and",
+    28	           Name("all_upper"),
+    29	           Name("is_string"),
+    30	           Call(Attribute(Name("key"), "isupper"), .Exprs)))
+    31	
+    32	  syntax Expr ::= checkDictReturn() [function, total]
+    33	  rule checkDictReturn()
+    34	    => BoolOp(
+    35	         "and",
+    36	         Name("seen_key"),
+    37	         BoolOp("or", Name("all_lower"), Name("all_upper")))
+    38	
+    39	  syntax Stmts ::= checkDictBody() [function, total]
+    40	  rule checkDictBody()
+    41	    => Assign(Name("all_lower"), Bool(true))
+    42	       Assign(Name("all_upper"), Bool(true))
+    43	       Assign(Name("seen_key"), Bool(false))
+    44	       Assign(Name("key"), NoneVal)
+    45	       Assign(Name("is_string"), Bool(false))
+    46	       For(
+    47	         Name("key"),
+    48	         Call(Attribute(Name("dict"), "keys"), .Exprs),
+    49	         checkDictLoopBody())
+    50	       Return(checkDictReturn())
+    51	
+    52	  // isStringKey's true domain is exactly str(CS); connection-spec.k proves
+    53	  // the frozen method result for every CS and arbitrary continuation.
+    54	  rule applyMethod(V:Val, "islower", .Vals)
+    55	    => lowerKeyCodes(stringCodes(V))
+    56	    requires isStringKey(V) andBool notBool isRefV(V)
+    57	    [simplification]
+    58	  rule applyMethod(V:Val, "isupper", .Vals)
+    59	    => upperKeyCodes(stringCodes(V))
+    60	    requires isStringKey(V) andBool notBool isRefV(V)
+    61	    [simplification]
+    62	
+    63	  // The frozen builtin produces isStrV(V).  This bridge replaces it with the
+    64	  // exhaustively defined twin only after normal lookup and argument evaluation.
+    65	  // Reference arguments remain on the frozen heap-dereference path.
+    66	  rule <k> #applyK(
+    67	              toCall(builtinV("isinstance")),
+    68	              (V:Val, typeV("str"), .Vals))
+    69	        => isStringKey(V) ... </k>
+    70	    requires notBool isRefV(V)
+    71	    [priority(40)]
+    72	endmodule
+PROOF_THEORY
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module PROOF-THEORY
+     4	  imports MPY
+     5	
+     6	  // Attribute-complete twin of the frozen isStrV discriminator.  The two
+     7	  // equations are exhaustive over Val and exactly duplicate its constructor
+     8	  // and owise cases; unlike isStrV, this declaration tells the backend it may
+     9	  // soundly split a symbolic result.
+    10	  syntax Bool ::= isStringKey(Val) [function, total]
+    11	  rule isStringKey(str(_:IntSeq)) => true
+    12	  rule isStringKey(_:Val) => false [owise]
+    13	
+    14	  // Derived equation between the frozen partial declaration and the
+    15	  // attribute-complete twin.  Both sides have the same exhaustive equations.
+    16	  rule isStrV(V:Val) => isStringKey(V) [simplification]
+    17	
+    18	  // Observed only when isStringKey(V) is true.  On that complete domain V is
+    19	  // str(CS), so the constructor equation uniquely determines the codes.
+    20	  syntax IntSeq ::= stringCodes(Val)
+    21	                    [function, total, symbol(stringCodes), no-evaluators]
+    22	  rule stringCodes(str(CS:IntSeq)) => CS [simplification]
+    23	
+    24	  syntax Bool ::= lowerKeyCodes(IntSeq) [function, total]
+    25	                | upperKeyCodes(IntSeq) [function, total]
+    26	
+    27	  rule lowerKeyCodes(CS:IntSeq)
+    28	    => hasLower(CS) andBool notBool hasUpper(CS)
+    29	  rule upperKeyCodes(CS:IntSeq)
+    30	    => hasUpper(CS) andBool notBool hasLower(CS)
+    31	
+    32	  syntax Bool ::= lowerKey(Val) [function, total]
+    33	                | upperKey(Val) [function, total]
+    34	
+    35	  rule lowerKey(V:Val) => lowerKeyCodes(stringCodes(V))
+    36	    requires isStringKey(V)
+    37	    [simplification]
+    38	  rule lowerKey(V:Val) => false
+    39	    requires notBool isStringKey(V)
+    40	    [simplification]
+    41	
+    42	  rule upperKey(V:Val) => upperKeyCodes(stringCodes(V))
+    43	    requires isStringKey(V)
+    44	    [simplification]
+    45	  rule upperKey(V:Val) => false
+    46	    requires notBool isStringKey(V)
+    47	    [simplification]
+    48	
+    49	  syntax Bool ::= foldLowerKeys(Bool, ValSeq) [function, total]
+    50	                | foldUpperKeys(Bool, ValSeq) [function, total]
+    51	                | allLowerKeys(ValSeq)        [function, total]
+    52	                | allUpperKeys(ValSeq)        [function, total]
+    53	                | hasAnyKey(ValSeq)           [function, total]
+    54	
+    55	  rule foldLowerKeys(AL:Bool, .ValSeq) => AL
+    56	  rule foldLowerKeys(AL:Bool, vCons(V:Val, REST:ValSeq))
+    57	    => foldLowerKeys(AL andBool lowerKey(V), REST)
+    58	
+    59	  rule foldUpperKeys(AU:Bool, .ValSeq) => AU
+    60	  rule foldUpperKeys(AU:Bool, vCons(V:Val, REST:ValSeq))
+    61	    => foldUpperKeys(AU andBool upperKey(V), REST)
+    62	
+    63	  rule allLowerKeys(KS:ValSeq) => foldLowerKeys(true, KS)
+    64	  rule allUpperKeys(KS:ValSeq) => foldUpperKeys(true, KS)
+    65	
+    66	  rule hasAnyKey(.ValSeq) => false
+    67	  rule hasAnyKey(vCons(_:Val, _:ValSeq)) => true
+    68	
+    69	  syntax Bool ::= checkCaseSummary(Bool, Bool, Bool, ValSeq)
+    70	                  [function, total]
+    71	  rule checkCaseSummary(AL:Bool, AU:Bool, SEEN:Bool, KS:ValSeq)
+    72	    => (SEEN orBool hasAnyKey(KS))
+    73	       andBool
+    74	       (foldLowerKeys(AL, KS) orBool foldUpperKeys(AU, KS))
+    75	endmodule
+CONNECTION
+     1	requires "proof-theory.k"
+     2	
+     3	// Deliberately bridge-free: this imports the frozen semantics and the shared
+     4	// exhaustive mathematical theory, but none of VERIFICATION's dispatch rules.
+     5	module CONNECTION
+     6	  imports PROOF-THEORY
+     7	endmodule
+CONNECTION_SPEC
+     1	requires "connection.k"
+     2	
+     3	module CONNECTION-SPEC
+     4	  imports CONNECTION
+     5	
+     6	  // Complete fixed-semantics result of the exact isinstance call site for an
+     7	  // arbitrary value and arbitrary following computation.
+     8	  claim [isinstance]:
+     9	    <k>
+    10	      #applyK(
+    11	        toCall(builtinV("isinstance")),
+    12	        (V:Val, typeV("str"), .Vals))
+    13	      ~> CONT:K
+    14	      =>
+    15	      isStringKey(V) ~> CONT
+    16	    </k>
+    17	    requires notBool isRefV(V)
+    18	
+    19	  // Direct evidence that, after the discriminator narrows the true case to
+    20	  // the Str constructor, both frozen method rules retain arbitrary suffixes.
+    21	  claim [islower]:
+    22	    <k>
+    23	      #applyK(
+    24	        toCall(boundMethodV(str(CS:IntSeq), "islower")),
+    25	        .Vals)
+    26	      ~> CONT:K
+    27	      =>
+    28	      (hasLower(CS) andBool notBool hasUpper(CS)) ~> CONT
+    29	    </k>
+    30	
+    31	  claim [isupper]:
+    32	    <k>
+    33	      #applyK(
+    34	        toCall(boundMethodV(str(CS:IntSeq), "isupper")),
+    35	        .Vals)
+    36	      ~> CONT:K
+    37	      =>
+    38	      (hasUpper(CS) andBool notBool hasLower(CS)) ~> CONT
+    39	    </k>
+    40	endmodule
+PROVE_SH
+     1	#!/usr/bin/env bash
+     2	set -eu
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py smoke.py > smoke.mpy
+     6	
+     7	kompile reference-semantics/semantics.k \
+     8	  --backend llvm \
+     9	  --main-module MPY-KRUN \
+    10	  --syntax-module MPY-SYNTAX \
+    11	  --output-definition runtime-kompiled
+    12	
+    13	proof_run_dir=$(mktemp -d)
+    14	krun smoke.mpy --definition runtime-kompiled \
+    15	  | tee "$proof_run_dir/fixed.out"
+    16	
+    17	python3 test_solution.py
+    18	
+    19	kompile --backend haskell verification.k \
+    20	  --main-module VERIFICATION \
+    21	  --syntax-module MPY-SYNTAX \
+    22	  --output-definition verification-kompiled
+    23	
+    24	krun smoke.mpy --definition verification-kompiled \
+    25	  | tee "$proof_run_dir/extended.out"
+    26	diff -u "$proof_run_dir/fixed.out" "$proof_run_dir/extended.out"
+    27	
+    28	kompile --backend haskell connection.k \
+    29	  --main-module CONNECTION \
+    30	  --syntax-module MPY-SYNTAX \
+    31	  --output-definition connection-kompiled
+    32	
+    33	kprove connection-spec.k \
+    34	  --definition connection-kompiled \
+    35	  --spec-module CONNECTION-SPEC
+    36	
+    37	kprove spec.k \
+    38	  --definition verification-kompiled \
+    39	  --spec-module SPEC \
+    40	  --claims SPEC.loop
+    41	
+    42	kprove spec.k \
+    43	  --definition verification-kompiled \
+    44	  --spec-module SPEC \
+    45	  --claims SPEC.loop,SPEC.target \
+    46	  --trusted SPEC.loop
+    47	
+    48	if kprove spec-vacuity.k \
+    49	     --definition verification-kompiled \
+    50	     --spec-module SPEC-VACUITY; then
+    51	  echo "ERROR: false-postcondition mutation unexpectedly proved"
+    52	  exit 1
+    53	else
+    54	  echo "EXPECTED FAILURE: empty dictionary actually returned false"
+    55	fi
+SPEC
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // A coinductive invariant over arbitrary current accumulator values.  The
+     7	  // folds carry symbolic islower/isupper results across the next loop cutpoint
+     8	  // instead of attempting a second, unrelated induction over string codes.
+     9	  claim [loop]:
+    10	    <k>
+    11	      #loop(list(KS:ValSeq), Name("key"), checkDictLoopBody())
+    12	      ~> Return(checkDictReturn()) .Stmts ~> #endcall
+    13	      =>
+    14	      Return(checkDictReturn()) .Stmts ~> #endcall
+    15	    </k>
+    16	    <env> L:Int </env>
+    17	    <scopes>
+    18	      0 |-> scope("check_dict_case" |-> FUNCTION:Val, parent(-1))
+    19	      -1 |-> builtinsScope
+    20	      L |-> scope(
+    21	        "dict" |-> DICT:Val
+    22	        "all_lower" |-> (AL:Bool => foldLowerKeys(AL, KS))
+    23	        "all_upper" |-> (AU:Bool => foldUpperKeys(AU, KS))
+    24	        "seen_key" |-> (SEEN:Bool => SEEN orBool hasAnyKey(KS))
+    25	        "key" |-> (_OLDKEY:Val => ?FINALKEY:Val)
+    26	        "is_string" |-> (_OLDISSTRING:Bool => ?FINALISSTRING:Bool),
+    27	        parent(0))
+    28	    </scopes>
+    29	    requires L >=Int 1
+    30	     andBool notBool hasRefVS(KS)
+    31	
+    32	  // Full entry-point theorem.  The actual translated body is loaded, looked
+    33	  // up by its public name, called with an arbitrary symbolic dictV, and its
+    34	  // return is assigned to result.
+    35	  claim [target]:
+    36	    <k>
+    37	      #loadAll(Module(
+    38	        FuncDef("check_dict_case", Params("dict"),
+    39	          Assign(Name("all_lower"), Bool(true))
+    40	          Assign(Name("all_upper"), Bool(true))
+    41	          Assign(Name("seen_key"), Bool(false))
+    42	          Assign(Name("key"), NoneVal)
+    43	          Assign(Name("is_string"), Bool(false))
+    44	          For(Name("key"), Call(Attribute(Name("dict"), "keys"), .Exprs),
+    45	            Assign(Name("seen_key"), Bool(true))
+    46	            Assign(
+    47	              Name("is_string"),
+    48	              BoolOp(
+    49	                "and",
+    50	                BoolOp("or", Name("all_lower"), Name("all_upper")),
+    51	                Call(Name("isinstance"), Name("key"), Name("str"))))
+    52	            Assign(
+    53	              Name("all_lower"),
+    54	              BoolOp(
+    55	                "and",
+    56	                Name("all_lower"),
+    57	                Name("is_string"),
+    58	                Call(Attribute(Name("key"), "islower"), .Exprs)))
+    59	            Assign(
+    60	              Name("all_upper"),
+    61	              BoolOp(
+    62	                "and",
+    63	                Name("all_upper"),
+    64	                Name("is_string"),
+    65	                Call(Attribute(Name("key"), "isupper"), .Exprs))))
+    66	          Return(
+    67	            BoolOp(
+    68	              "and",
+    69	              Name("seen_key"),
+    70	              BoolOp("or", Name("all_lower"), Name("all_upper")))))
+    71	        Assign(
+    72	          Name("result"),
+    73	          Call(
+    74	            Name("check_dict_case"),
+    75	            dictV(KS:ValSeq, VALUES:ValSeq)))))
+    76	      =>
+    77	      .K
+    78	    </k>
+    79	    <env> 0 </env>
+    80	    <scopes>
+    81	      ( 0 |-> scope(.Map, parent(-1))
+    82	        -1 |-> builtinsScope)
+    83	      =>
+    84	      ( 0 |-> scope(
+    85	          "check_dict_case" |->
+    86	            closureVal(
+    87	              ("dict", .ParamNames),
+    88	              Assign(Name("all_lower"), Bool(true))
+    89	              Assign(Name("all_upper"), Bool(true))
+    90	              Assign(Name("seen_key"), Bool(false))
+    91	              Assign(Name("key"), NoneVal)
+    92	              Assign(Name("is_string"), Bool(false))
+    93	              For(Name("key"), Call(Attribute(Name("dict"), "keys"), .Exprs),
+    94	                Assign(Name("seen_key"), Bool(true))
+    95	                Assign(
+    96	                  Name("is_string"),
+    97	                  BoolOp(
+    98	                    "and",
+    99	                    BoolOp("or", Name("all_lower"), Name("all_upper")),
+   100	                    Call(Name("isinstance"), Name("key"), Name("str"))))
+   101	                Assign(
+   102	                  Name("all_lower"),
+   103	                  BoolOp(
+   104	                    "and",
+   105	                    Name("all_lower"),
+   106	                    Name("is_string"),
+   107	                    Call(Attribute(Name("key"), "islower"), .Exprs)))
+   108	                Assign(
+   109	                  Name("all_upper"),
+   110	                  BoolOp(
+   111	                    "and",
+   112	                    Name("all_upper"),
+   113	                    Name("is_string"),
+   114	                    Call(Attribute(Name("key"), "isupper"), .Exprs))))
+   115	              Return(
+   116	                BoolOp(
+   117	                  "and",
+   118	                  Name("seen_key"),
+   119	                  BoolOp("or", Name("all_lower"), Name("all_upper")))),
+   120	              0)
+   121	          "result" |-> checkCaseSummary(true, true, false, KS),
+   122	          parent(-1))
+   123	        -1 |-> builtinsScope)
+   124	    </scopes>
+   125	    <scopeLoc> 1 </scopeLoc>
+   126	    <heap> .Map => 0 |-> list(KS) </heap>
+   127	    <heapLoc> 0 => 1 </heapLoc>
+   128	    <stack> .List </stack>
+   129	    <ret> noRet </ret>
+   130	    <exc> NoExc </exc>
+   131	    <exit-code> 0 </exit-code>
+   132	    requires notBool hasRefVS(KS)
+   133	endmodule
+SOLUTION
+     1	def check_dict_case(dict):
+     2	    all_lower = True
+     3	    all_upper = True
+     4	    seen_key = False
+     5	    key = None
+     6	    is_string = False
+     7	
+     8	    for key in dict.keys():
+     9	        seen_key = True
+    10	        is_string = (all_lower or all_upper) and isinstance(key, str)
+    11	        all_lower = all_lower and is_string and key.islower()
+    12	        all_upper = all_upper and is_string and key.isupper()
+    13	
+    14	    return seen_key and (all_lower or all_upper)
+TRANSLATION
+     1	Module(
+     2	  FuncDef("check_dict_case", Params("dict"),
+     3	    Assign(Name("all_lower"), Bool(true))
+     4	    Assign(Name("all_upper"), Bool(true))
+     5	    Assign(Name("seen_key"), Bool(false))
+     6	    Assign(Name("key"), NoneVal)
+     7	    Assign(Name("is_string"), Bool(false))
+     8	    For(Name("key"), Call(Attribute(Name("dict"), "keys"), ),
+     9	      Assign(Name("seen_key"), Bool(true))
+    10	      Assign(
+    11	        Name("is_string"),
+    12	        BoolOp(
+    13	          "and",
+    14	          BoolOp("or", Name("all_lower"), Name("all_upper")),
+    15	          Call(Name("isinstance"), Name("key"), Name("str"))))
+    16	      Assign(
+    17	        Name("all_lower"),
+    18	        BoolOp(
+    19	          "and",
+    20	          Name("all_lower"),
+    21	          Name("is_string"),
+    22	          Call(Attribute(Name("key"), "islower"), )))
+    23	      Assign(
+    24	        Name("all_upper"),
+    25	        BoolOp(
+    26	          "and",
+    27	          Name("all_upper"),
+    28	          Name("is_string"),
+    29	          Call(Attribute(Name("key"), "isupper"), ))))
+    30	    Return(
+    31	      BoolOp(
+    32	        "and",
+    33	        Name("seen_key"),
+    34	        BoolOp("or", Name("all_lower"), Name("all_upper"))))))
+PROMPT
+     1	
+     2	def check_dict_case(dict):
+     3	    """
+     4	    Given a dictionary, return True if all keys are strings in lower 
+     5	    case or all keys are strings in upper case, else return False.
+     6	    The function should return False is the given dictionary is empty.
+     7	    Examples:
+     8	    check_dict_case({"a":"apple", "b":"banana"}) should return True.
+     9	    check_dict_case({"a":"apple", "A":"banana", "B":"banana"}) should return False.
+    10	    check_dict_case({"a":"apple", 8:"banana", "a":"apple"}) should return False.
+    11	    check_dict_case({"Name":"John", "Age":"36", "City":"Houston"}) should return False.
+    12	    check_dict_case({"STATE":"NC", "ZIP":"12345" }) should return True.
+    13	    """
+
+Script done on 2026-07-31 07:56:20-05:00 [COMMAND_EXIT_CODE="0"]

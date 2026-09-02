@@ -1,0 +1,150 @@
+Script started on 2026-07-30 22:46:59-05:00 [<not executed on terminal>]
+prove.sh:
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py smoke.py > smoke.mpy
+     6	
+     7	kompile reference-semantics/semantics.k \
+     8	  --backend llvm \
+     9	  --main-module MPY-KRUN \
+    10	  --syntax-module MPY-SYNTAX \
+    11	  --output-definition runtime-kompiled
+    12	
+    13	krun smoke.mpy --definition runtime-kompiled
+    14	python3 differential_test.py
+    15	
+    16	kompile --backend haskell bind-base.k \
+    17	  --main-module BIND-BASE \
+    18	  --syntax-module BIND-BASE \
+    19	  --output-definition bind-kompiled
+    20	kprove bind-spec.k \
+    21	  --definition bind-kompiled \
+    22	  --spec-module BIND-SPEC
+    23	
+    24	kompile --backend haskell loop-base.k \
+    25	  --main-module LOOP-BASE \
+    26	  --syntax-module LOOP-BASE \
+    27	  --output-definition loop-kompiled
+    28	kprove loop-spec.k \
+    29	  --definition loop-kompiled \
+    30	  --spec-module LOOP-SPEC
+    31	
+    32	kompile --backend haskell verification.k \
+    33	  --main-module VERIFICATION \
+    34	  --syntax-module VERIFICATION \
+    35	  --output-definition verification-kompiled
+    36	kprove spec.k \
+    37	  --definition verification-kompiled \
+    38	  --spec-module SPEC
+    39	
+    40	if kprove loop-body-mutation.k \
+    41	     --definition loop-kompiled \
+    42	     --spec-module LOOP-BODY-MUTATION; then
+    43	  echo "ERROR: loop-body mutation unexpectedly proved" >&2
+    44	  exit 1
+    45	else
+    46	  echo "EXPECTED FAILURE: loop-body mutation was rejected"
+    47	fi
+    48	
+    49	if kprove spec-vacuity.k \
+    50	     --definition verification-kompiled \
+    51	     --spec-module SPEC-VACUITY; then
+    52	  echo "ERROR: false-result mutation unexpectedly proved" >&2
+    53	  exit 1
+    54	else
+    55	  echo "EXPECTED FAILURE: false-result mutation was rejected"
+    56	fi
+bind-base.k:
+     1	requires "verification.k"
+     2	
+     3	module BIND-BASE
+     4	  imports VERIFICATION-SUMMARIES
+     5	endmodule
+bind-spec.k:
+     1	requires "bind-base.k"
+     2	
+     3	module BIND-SPEC
+     4	  imports BIND-BASE
+     5	
+     6	  claim [bind-int-name]:
+     7	    <k>
+     8	      #bindTgt(Name(X:String), I:Int) ~> CONT:K
+     9	      =>
+    10	      CONT
+    11	    </k>
+    12	    <env> L:Int </env>
+    13	    <scopes>
+    14	      ... L |-> scope(M:Map => M [ X <- I ], P:Parent) ...
+    15	    </scopes>
+    16	    requires notBool ("$cells" in_keys(M))
+    17	endmodule
+loop-base.k:
+     1	requires "verification.k"
+     2	
+     3	module LOOP-BASE
+     4	  imports VERIFICATION-CORE
+     5	endmodule
+loop-spec.k:
+     1	requires "loop-base.k"
+     2	
+     3	module LOOP-SPEC
+     4	  imports LOOP-BASE
+     5	
+     6	  claim [rolling-loop-connection]:
+     7	    <k>
+     8	      #loop(
+     9	        list(IS:ValSeq),
+    10	        Name("number"),
+    11	        If(
+    12	          Compare(Name("number"), CmpOp(">", Name("current"))),
+    13	          Assign(Name("current"), Name("number")) .Stmts,
+    14	          .Stmts)
+    15	        Expr(Call(
+    16	          Attribute(Name("result"), "append"),
+    17	          (Name("current"), .Exprs))) .Stmts)
+    18	      ~> .Stmts
+    19	      ~> Return(Name("result")) .Stmts
+    20	      ~> #endcall
+    21	      =>
+    22	      .Stmts
+    23	      ~> Return(Name("result")) .Stmts
+    24	      ~> #endcall
+    25	    </k>
+    26	    <env> 1 </env>
+    27	    <scopes>
+    28	      0 |-> scope(MODULE:Map, parent(-1))
+    29	      1 |-> scope(
+    30	        "current" |-> (M:Int => foldMax(M, IS))
+    31	        "number"  |-> (D:Int => lastOr(D, IS))
+    32	        "numbers" |-> list(ORIGINAL:ValSeq)
+    33	        "result"  |-> ref(0),
+    34	        parent(0))
+    35	      -1 |-> BUILTINS:Scope
+    36	    </scopes>
+    37	    <scopeLoc> 2 </scopeLoc>
+    38	    <heap>
+    39	      0 |-> list(A:ValSeq => rollAcc(A, M, IS))
+    40	    </heap>
+    41	    <heapLoc> 1 </heapLoc>
+    42	    <stack>
+    43	      ListItem(frame(.K, 0, 1))
+    44	    </stack>
+    45	    <ret> noRet </ret>
+    46	    <exc> NoExc </exc>
+    47	    <exit-code> 0 </exit-code>
+    48	    requires allInts(IS)
+    49	endmodule
+proof-run selected events:
+163:#Top
+232:#Top
+337:#Top
+408:kore-exec: [1866913] Warning (WarnStuckClaimState):
+533:[Error] Prover: backend terminated because the configuration cannot be
+535:EXPECTED FAILURE: loop-body mutation was rejected
+536:kore-exec: [1351381] Warning (WarnStuckClaimState):
+647:[Error] Prover: backend terminated because the configuration cannot be
+649:EXPECTED FAILURE: false-result mutation was rejected
+
+Script done on 2026-07-30 22:46:59-05:00 [COMMAND_EXIT_CODE="0"]

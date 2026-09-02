@@ -1,0 +1,2 @@
+import Klean10MakePalindrome.Rewrite
+import Klean10MakePalindrome.Lemmas

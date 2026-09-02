@@ -1,0 +1,7714 @@
+# Exhaustive K declaration and rule inventory
+
+This inventory is reviewer-generated from the clean scratch sources. The supplied tree was independently byte-compared with the trusted mount.
+
+## `semantics.k`
+
+Records: 0
+
+## `semantics/assert.k`
+
+Records: 3
+
+### `semantics/assert.k:6` — rule 1
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Assert(V:Val) => .K ... </k> requires truthy(V)`
+
+### `semantics/assert.k:8` — rule 2
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Assert(V:Val) ~> _ => .K </k> <exc> NoExc => AssertionError </exc> <exit-code> _ => 1 </exit-code> requires notBool truthy(V)`
+
+### `semantics/assert.k:13` — rule 3
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Assert(ref(H:Int)) => Assert(V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## `semantics/bool.k`
+
+Records: 14
+
+### `semantics/bool.k:8` — rule 1
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyUn("not", V:Val) => notBool truthy(V)`
+
+### `semantics/bool.k:10` — rule 2
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("==", B1:Bool, B2:Bool) => B1 ==Bool B2`
+
+### `semantics/bool.k:11` — rule 3
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("!=", B1:Bool, B2:Bool) => B1 =/=Bool B2 // ==== BoolOp: short-circuit, value-returning and / or ===================== // the node is its own accumulator: heat the HEAD element only, then either return it // (short-circuit) or drop it and continue`
+
+### `semantics/bool.k:16` — context 4
+
+- Class: `evaluation-context`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `context BoolOp(_, (HOLE:Expr, _:Exprs))`
+
+### `semantics/bool.k:17` — rule 5
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> BoolOp(_:String, (V:Val, .Exprs)) => V ... </k>`
+
+### `semantics/bool.k:18` — rule 6
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> BoolOp("and", (V:Val, A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k> requires truthy(V)`
+
+### `semantics/bool.k:20` — rule 7
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> BoolOp("and", (V:Val, _:Expr, _:Exprs)) => V ... </k> requires notBool truthy(V)`
+
+### `semantics/bool.k:22` — rule 8
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> BoolOp("or", (V:Val, _:Expr, _:Exprs)) => V ... </k> requires truthy(V)`
+
+### `semantics/bool.k:24` — rule 9
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> BoolOp("or", (V:Val, A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k> requires notBool truthy(V) // ==== heap-object head: decide truthiness THROUGH the heap, never rewrite the // operand — and/or return the OBJECT itself (Python identity), not its structure`
+
+### `semantics/bool.k:29` — rule 10
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> BoolOp(_:String, (ref(H:Int), .Exprs)) => ref(H) ... </k> [priority(40)]`
+
+### `semantics/bool.k:31` — rule 11
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> BoolOp("and", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires truthy(V) [priority(40)]`
+
+### `semantics/bool.k:35` — rule 12
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> BoolOp("and", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool truthy(V) [priority(40)]`
+
+### `semantics/bool.k:39` — rule 13
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> BoolOp("or", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k> <heap> ... H |-> V:Val ... </heap> requires truthy(V) [priority(40)]`
+
+### `semantics/bool.k:43` — rule 14
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> BoolOp("or", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool truthy(V) [priority(40)]`
+
+## `semantics/builtins.k`
+
+Records: 175
+
+### `semantics/builtins.k:17` — syntax 1
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Val ::= applyBuiltin(String, Vals) [function] // ==== len(obj) — O(1) per kind ============================================`
+
+### `semantics/builtins.k:20` — syntax 2
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Int ::= seqLen(Val) [function]`
+
+### `semantics/builtins.k:21` — rule 3
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyBuiltin("len", OBJ:Val, .Vals) => seqLen(OBJ)`
+
+### `semantics/builtins.k:22` — rule 4
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule seqLen(list(VS:ValSeq)) => vsLen(VS)`
+
+### `semantics/builtins.k:23` — rule 5
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule seqLen(tuple(VS:ValSeq)) => vsLen(VS)`
+
+### `semantics/builtins.k:24` — rule 6
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule seqLen(str(IS:IntSeq)) => isLen(IS)`
+
+### `semantics/builtins.k:25` — rule 7
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule seqLen(setV(DS:IntSeq)) => isLen(DS)`
+
+### `semantics/builtins.k:26` — rule 8
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule seqLen(rangeObj(LO:Int, HI:Int, ST:Int)) => rangeLen(LO, HI, ST) // ==== list(seq) — materialize a list/tuple into a list (e.g. list(d.keys())) == // Minimal: the "copy a sequence" case (list of a list is itself; list of a tuple keeps order). // list() of other iterables (str/range/set/zip) is added via the iterator fold when needed. // (k-cell — list() constructs a NEW object)`
+
+### `semantics/builtins.k:32` — rule 9
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(builtinV("list")), (list(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>`
+
+### `semantics/builtins.k:33` — rule 10
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(builtinV("list")), (tuple(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>`
+
+### `semantics/builtins.k:34` — rule 11
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(builtinV("list")), .Vals) => #alloc(list(.ValSeq)) ... </k>`
+
+### `semantics/builtins.k:35` — rule 12
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(builtinV("list")), (str(CS:IntSeq), .Vals)) => #alloc(list(charsOf(CS))) ... </k>`
+
+### `semantics/builtins.k:36` — syntax 13
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= charsOf(IntSeq) [function, total]`
+
+### `semantics/builtins.k:37` — rule 14
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule charsOf(.IntSeq) => .ValSeq`
+
+### `semantics/builtins.k:38` — rule 15
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule charsOf(iCons(C:Int, R:IntSeq)) => vCons(str(iCons(C, .IntSeq)), charsOf(R)) // ==== set(str) — distinct character codes =================================`
+
+### `semantics/builtins.k:41` — rule 16
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("set", str(CS:IntSeq), .Vals) => setV(dedupCodes(CS)) // ==== abs(int) ============================================================`
+
+### `semantics/builtins.k:44` — rule 17
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("abs", I:Int, .Vals) => absInt(I) // ==== sum(iterable) — one #iterNext fold; intOf = int value of an int/bool ==`
+
+### `semantics/builtins.k:47` — syntax 18
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #sumAcc(Iterable, Int) | #sumCont(Int)`
+
+### `semantics/builtins.k:48` — rule 19
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #sumAcc(IT:Iterable, ACC:Int) => #iterNext(IT) ~> #sumCont(ACC) ... </k>`
+
+### `semantics/builtins.k:49` — rule 20
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterDone ~> #sumCont(ACC:Int) => ACC ... </k>`
+
+### `semantics/builtins.k:50` — rule 21
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int) => #sumAcc(R, ACC +Int intOf(V)) ... </k> requires isInt(V) orBool isBool(V)`
+
+### `semantics/builtins.k:54` — syntax 22
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= intOf(Val) [function]`
+
+### `semantics/builtins.k:55` — rule 23
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule intOf(I:Int) => I`
+
+### `semantics/builtins.k:56` — rule 24
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule intOf(B:Bool) => #if B #then 1 #else 0 #fi // ==== all / any (short-circuiting #iterNext folds) ========================`
+
+### `semantics/builtins.k:59` — syntax 25
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #allAcc(Iterable) | "#allCont"`
+
+### `semantics/builtins.k:60` — rule 26
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #allAcc(IT:Iterable) => #iterNext(IT) ~> #allCont ... </k>`
+
+### `semantics/builtins.k:61` — rule 27
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterDone ~> #allCont => true ... </k>`
+
+### `semantics/builtins.k:62` — rule 28
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, R:Iterable) ~> #allCont => #allAcc(R) ... </k> requires truthy(V)`
+
+### `semantics/builtins.k:64` — rule 29
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, _:Iterable) ~> #allCont => false ... </k> requires notBool truthy(V)`
+
+### `semantics/builtins.k:67` — syntax 30
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #anyAcc(Iterable) | "#anyCont"`
+
+### `semantics/builtins.k:68` — rule 31
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #anyAcc(IT:Iterable) => #iterNext(IT) ~> #anyCont ... </k>`
+
+### `semantics/builtins.k:69` — rule 32
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterDone ~> #anyCont => false ... </k>`
+
+### `semantics/builtins.k:70` — rule 33
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, _:Iterable) ~> #anyCont => true ... </k> requires truthy(V)`
+
+### `semantics/builtins.k:72` — rule 34
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, R:Iterable) ~> #anyCont => #anyAcc(R) ... </k> requires notBool truthy(V) // ==== max / min over an iterable (#iterNext folds; first element seeds) ====`
+
+### `semantics/builtins.k:76` — syntax 35
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #maxAcc0(Iterable) | "#maxCont0" | #maxAcc(Iterable, Int) | #maxCont(Int)`
+
+### `semantics/builtins.k:77` — rule 36
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #maxAcc0(IT:Iterable) => #iterNext(IT) ~> #maxCont0 ... </k>`
+
+### `semantics/builtins.k:78` — rule 37
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAcc(R, {V}:>Int) ... </k> requires isInt(V)`
+
+### `semantics/builtins.k:80` — rule 38
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #maxAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #maxCont(M) ... </k>`
+
+### `semantics/builtins.k:81` — rule 39
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterDone ~> #maxCont(M:Int) => M ... </k>`
+
+### `semantics/builtins.k:82` — rule 40
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont(M:Int) => #maxAcc(R, maxInt(M, {V}:>Int)) ... </k> requires isInt(V)`
+
+### `semantics/builtins.k:86` — syntax 41
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #minAcc0(Iterable) | "#minCont0" | #minAcc(Iterable, Int) | #minCont(Int)`
+
+### `semantics/builtins.k:87` — rule 42
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #minAcc0(IT:Iterable) => #iterNext(IT) ~> #minCont0 ... </k>`
+
+### `semantics/builtins.k:88` — rule 43
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAcc(R, {V}:>Int) ... </k> requires isInt(V)`
+
+### `semantics/builtins.k:90` — rule 44
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #minAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #minCont(M) ... </k>`
+
+### `semantics/builtins.k:91` — rule 45
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterDone ~> #minCont(M:Int) => M ... </k>`
+
+### `semantics/builtins.k:92` — rule 46
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont(M:Int) => #minAcc(R, minInt(M, {V}:>Int)) ... </k> requires isInt(V) // ==== variadic max / min (a Vals fold) ====================================`
+
+### `semantics/builtins.k:97` — syntax 47
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= maxVals(Int, Vals) [function]`
+
+### `semantics/builtins.k:98` — rule 48
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("max", I:Int, REST:Vals) => maxVals(I, REST)`
+
+### `semantics/builtins.k:99` — rule 49
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule maxVals(M:Int, .Vals) => M`
+
+### `semantics/builtins.k:100` — rule 50
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule maxVals(M:Int, (I:Int, R:Vals)) => maxVals(maxInt(M, I), R)`
+
+### `semantics/builtins.k:102` — syntax 51
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= minVals(Int, Vals) [function]`
+
+### `semantics/builtins.k:103` — rule 52
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("min", I:Int, REST:Vals) => minVals(I, REST)`
+
+### `semantics/builtins.k:104` — rule 53
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule minVals(M:Int, .Vals) => M`
+
+### `semantics/builtins.k:105` — rule 54
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule minVals(M:Int, (I:Int, R:Vals)) => minVals(minInt(M, I), R) // ==== bin(n) — "0b" + binary digit codes (promoted from 103's defined fold) ==`
+
+### `semantics/builtins.k:108` — rule 55
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(48, iCons(98, binCodes(N)))) requires N >=Int 0 // negative operand: the '-' sign prefixes the magnitude's digits`
+
+### `semantics/builtins.k:111` — rule 56
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(45, iCons(48, iCons(98, binCodes(0 -Int N))))) requires N <Int 0`
+
+### `semantics/builtins.k:114` — syntax 57
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= binCodes(Int) [function, total]`
+
+### `semantics/builtins.k:115` — rule 58
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule binCodes(0) => iCons(48, .IntSeq)`
+
+### `semantics/builtins.k:116` — rule 59
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule binCodes(N:Int) => binAcc(N, .IntSeq) requires N >Int 0`
+
+### `semantics/builtins.k:117` — syntax 60
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= binAcc(Int, IntSeq) [function, total]`
+
+### `semantics/builtins.k:118` — rule 61
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule binAcc(0, ACC:IntSeq) => ACC`
+
+### `semantics/builtins.k:119` — rule 62
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule binAcc(N:Int, ACC:IntSeq) => binAcc((N -Int pyMod(N, 2)) /Int 2, iCons(48 +Int pyMod(N, 2), ACC)) requires N >Int 0 // ==== enumerate(xs) — pairs (i, v); materialized eagerly over a list =========`
+
+### `semantics/builtins.k:124` — rule 63
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(builtinV("enumerate")), (list(VS:ValSeq), .Vals)) => #alloc(list(enumVS(VS, 0))) ... </k>`
+
+### `semantics/builtins.k:126` — syntax 64
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= enumVS(ValSeq, Int) [function, total]`
+
+### `semantics/builtins.k:127` — rule 65
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule enumVS(.ValSeq, _:Int) => .ValSeq`
+
+### `semantics/builtins.k:128` — rule 66
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule enumVS(vCons(V:Val, R:ValSeq), I:Int) => vCons(tuple(vCons(I, vCons(V, .ValSeq))), enumVS(R, I +Int 1)) // ==== map(str, xs) — eager (only the str case is in the subset) =============`
+
+### `semantics/builtins.k:132` — rule 67
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(builtinV("map")), (typeV("str"), list(VS:ValSeq), .Vals)) => #alloc(list(mapStrVS(VS))) ... </k>`
+
+### `semantics/builtins.k:134` — syntax 68
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= mapStrVS(ValSeq) [function, total]`
+
+### `semantics/builtins.k:135` — rule 69
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule mapStrVS(.ValSeq) => .ValSeq`
+
+### `semantics/builtins.k:136` — rule 70
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))`
+
+### `semantics/builtins.k:137` — rule 71
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule mapStrVS(vCons(str(CS:IntSeq), R:ValSeq)) => vCons(str(CS), mapStrVS(R)) // ==== int(x) identities (int(round(x)) composes through) ====================`
+
+### `semantics/builtins.k:140` — rule 72
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("int", I:Int, .Vals) => I // ==== ord / chr ===========================================================`
+
+### `semantics/builtins.k:143` — rule 73
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("ord", str(iCons(C:Int, .IntSeq)), .Vals) => C`
+
+### `semantics/builtins.k:144` — rule 74
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("chr", I:Int, .Vals) => str(iCons(I, .IntSeq)) requires 0 <=Int I andBool I <Int 128 // ==== str(int) / str(str) =================================================`
+
+### `semantics/builtins.k:148` — rule 75
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("str", I:Int, .Vals) => str(strToCodes(Int2String(I)))`
+
+### `semantics/builtins.k:149` — rule 76
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("str", str(CS:IntSeq), .Vals) => str(CS) // ==== int(str) — a single digit char ('0'..'9', code 48..57) to its value =====`
+
+### `semantics/builtins.k:152` — rule 77
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("int", str(iCons(C:Int, .IntSeq)), .Vals) => C -Int 48 requires 48 <=Int C andBool C <=Int 57 // ==== int(str) — a multi-digit non-negative numeral (Horner fold; the single-char rule covers len 1)`
+
+### `semantics/builtins.k:156` — rule 78
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("int", str(CS:IntSeq), .Vals) => intDigAcc(CS, 0) requires isLen(CS) >=Int 2`
+
+### `semantics/builtins.k:158` — syntax 79
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= intDigAcc(IntSeq, Int) [function, total]`
+
+### `semantics/builtins.k:159` — rule 80
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule intDigAcc(.IntSeq, ACC:Int) => ACC`
+
+### `semantics/builtins.k:160` — rule 81
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule intDigAcc(iCons(C:Int, R:IntSeq), ACC:Int) => intDigAcc(R, (ACC *Int 10) +Int (C -Int 48)) // ==== zip(a, b) — parallel iterable of pairs, truncating to the shorter =====`
+
+### `semantics/builtins.k:163` — rule 82
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("zip", list(A:ValSeq), list(B:ValSeq), .Vals) => zipObj(A, B)`
+
+### `semantics/builtins.k:164` — rule 83
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("zip", str(A:IntSeq), str(B:IntSeq), .Vals) => zipObjS(A, B) // zip's iterator-protocol cases (zip is created here, so its #iterNext lives here)`
+
+### `semantics/builtins.k:167` — rule 84
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterNext(zipObj(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq))) => #iterYield(tuple(vCons(A, vCons(B, .ValSeq))), zipObj(As, Bs)) ... </k>`
+
+### `semantics/builtins.k:169` — rule 85
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterNext(zipObj(.ValSeq, _:ValSeq)) => #iterDone ... </k>`
+
+### `semantics/builtins.k:170` — rule 86
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterNext(zipObj(vCons(_:Val, _:ValSeq), .ValSeq)) => #iterDone ... </k>`
+
+### `semantics/builtins.k:171` — rule 87
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterNext(zipObjS(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq))) => #iterYield(tuple(vCons(str(iCons(A, .IntSeq)), vCons(str(iCons(B, .IntSeq)), .ValSeq))), zipObjS(As, Bs)) ... </k>`
+
+### `semantics/builtins.k:173` — rule 88
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterNext(zipObjS(.IntSeq, _:IntSeq)) => #iterDone ... </k>`
+
+### `semantics/builtins.k:174` — rule 89
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterNext(zipObjS(iCons(_:Int, _:IntSeq), .IntSeq)) => #iterDone ... </k> // ==== range(stop) / range(start, stop) / range(start, stop, step) =========`
+
+### `semantics/builtins.k:177` — rule 90
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyBuiltin("range", I:Int, .Vals) => rangeObj(0, I, 1)`
+
+### `semantics/builtins.k:178` — rule 91
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyBuiltin("range", A:Int, B:Int, .Vals) => rangeObj(A, B, 1)`
+
+### `semantics/builtins.k:179` — rule 92
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyBuiltin("range", A:Int, B:Int, S:Int, .Vals) => rangeObj(A, B, S) requires S =/=Int 0 // ==== eval(str) — arithmetic expressions (ints, + - * // **, spaces) ======== // Python precedence: ** right-assoc, then * //, then + -. Promoted from 160's // trusted pass evaluator, now DEFINED in the reference and driven by a // code-level tokenizer. Reduces on concrete strings (krun); a symbolic // argument leaves the call unevaluated for problem-level folds.`
+
+### `semantics/builtins.k:187` — rule 93
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("eval", str(CS:IntSeq), .Vals) => evalArith(CS)`
+
+### `semantics/builtins.k:188` — syntax 94
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= evalArith(IntSeq) [function]`
+
+### `semantics/builtins.k:189` — rule 95
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule evalArith(CS:IntSeq) => firstNdE(passAddE(passMulE(passPowE(tokOps(CS), tokNds(CS)))))`
+
+### `semantics/builtins.k:192` — syntax 96
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax OpSeq ::= ".OpSeq" | oCons(String, OpSeq)`
+
+### `semantics/builtins.k:194` — syntax 97
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= evDigit(Int) [function, total]`
+
+### `semantics/builtins.k:195` — rule 98
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule evDigit(C:Int) => C >=Int 48 andBool C <=Int 57`
+
+### `semantics/builtins.k:196` — syntax 99
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= evHead42(IntSeq) [function, total]`
+
+### `semantics/builtins.k:197` — rule 100
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule evHead42(iCons(42, _:IntSeq)) => true`
+
+### `semantics/builtins.k:198` — rule 101
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule evHead42(_:IntSeq) => false [owise]`
+
+### `semantics/builtins.k:199` — syntax 102
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= evHead47(IntSeq) [function, total]`
+
+### `semantics/builtins.k:200` — rule 103
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule evHead47(iCons(47, _:IntSeq)) => true`
+
+### `semantics/builtins.k:201` — rule 104
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule evHead47(_:IntSeq) => false [owise]`
+
+### `semantics/builtins.k:203` — syntax 105
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax OpSeq ::= tokOps(IntSeq) [function, total]`
+
+### `semantics/builtins.k:204` — rule 106
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokOps(.IntSeq) => .OpSeq`
+
+### `semantics/builtins.k:205` — rule 107
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokOps(iCons(32, R:IntSeq)) => tokOps(R)`
+
+### `semantics/builtins.k:206` — rule 108
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokOps(iCons(C:Int, R:IntSeq)) => tokOps(R) requires evDigit(C)`
+
+### `semantics/builtins.k:207` — rule 109
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokOps(iCons(42, iCons(42, R:IntSeq))) => oCons("**", tokOps(R))`
+
+### `semantics/builtins.k:208` — rule 110
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokOps(iCons(42, R:IntSeq)) => oCons("*", tokOps(R)) requires notBool evHead42(R)`
+
+### `semantics/builtins.k:209` — rule 111
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokOps(iCons(47, iCons(47, R:IntSeq))) => oCons("//", tokOps(R))`
+
+### `semantics/builtins.k:210` — rule 112
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokOps(iCons(47, R:IntSeq)) => oCons("/", tokOps(R)) requires notBool evHead47(R)`
+
+### `semantics/builtins.k:211` — rule 113
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokOps(iCons(43, R:IntSeq)) => oCons("+", tokOps(R))`
+
+### `semantics/builtins.k:212` — rule 114
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokOps(iCons(45, R:IntSeq)) => oCons("-", tokOps(R))`
+
+### `semantics/builtins.k:214` — syntax 115
+
+- Class: `function-declaration`
+- Attributes: `function, total, function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= tokNds(IntSeq) [function, total] | tokNdAcc(Int, IntSeq) [function, total]`
+
+### `semantics/builtins.k:216` — rule 116
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokNds(.IntSeq) => .IntSeq`
+
+### `semantics/builtins.k:217` — rule 117
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokNds(iCons(32, R:IntSeq)) => tokNds(R)`
+
+### `semantics/builtins.k:218` — rule 118
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokNds(iCons(C:Int, R:IntSeq)) => tokNdAcc(C -Int 48, R) requires evDigit(C)`
+
+### `semantics/builtins.k:219` — rule 119
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokNds(iCons(C:Int, R:IntSeq)) => tokNds(R) requires notBool evDigit(C) andBool C =/=Int 32`
+
+### `semantics/builtins.k:221` — rule 120
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokNdAcc(A:Int, iCons(C:Int, R:IntSeq)) => tokNdAcc(A *Int 10 +Int (C -Int 48), R) requires evDigit(C)`
+
+### `semantics/builtins.k:223` — rule 121
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule tokNdAcc(A:Int, S:IntSeq) => iCons(A, tokNds(S)) [owise]`
+
+### `semantics/builtins.k:225` — syntax 122
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax EvPair ::= evp(OpSeq, IntSeq)`
+
+### `semantics/builtins.k:226` — syntax 123
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= firstNdE(EvPair) [function, total]`
+
+### `semantics/builtins.k:227` — rule 124
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule firstNdE(evp(_:OpSeq, iCons(N:Int, _:IntSeq))) => N`
+
+### `semantics/builtins.k:228` — rule 125
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule firstNdE(_:EvPair) => 0 [owise]`
+
+### `semantics/builtins.k:230` — syntax 126
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= applyOpE(String, Int, Int) [function, total]`
+
+### `semantics/builtins.k:231` — rule 127
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyOpE("+", A:Int, B:Int) => A +Int B`
+
+### `semantics/builtins.k:232` — rule 128
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyOpE("-", A:Int, B:Int) => A -Int B`
+
+### `semantics/builtins.k:233` — rule 129
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyOpE("*", A:Int, B:Int) => A *Int B`
+
+### `semantics/builtins.k:234` — rule 130
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyOpE("//", A:Int, B:Int) => A divInt B`
+
+### `semantics/builtins.k:235` — rule 131
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyOpE("**", A:Int, B:Int) => A ^Int B`
+
+### `semantics/builtins.k:236` — rule 132
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyOpE(_:String, A:Int, _:Int) => A [owise]`
+
+### `semantics/builtins.k:238` — syntax 133
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax EvPair ::= passPowE(OpSeq, IntSeq) [function, total]`
+
+### `semantics/builtins.k:239` — rule 134
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule passPowE(.OpSeq, NDS:IntSeq) => evp(.OpSeq, NDS)`
+
+### `semantics/builtins.k:240` — rule 135
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule passPowE(oCons("**", OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCombE(N, passPowE(OPS, NDS))`
+
+### `semantics/builtins.k:241` — rule 136
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule passPowE(oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCarryE(O, N, passPowE(OPS, NDS)) requires O =/=String "**"`
+
+### `semantics/builtins.k:243` — rule 137
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule passPowE(_:OpSeq, .IntSeq) => evp(.OpSeq, .IntSeq) [owise]`
+
+### `semantics/builtins.k:244` — syntax 138
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax EvPair ::= powCombE(Int, EvPair) [function, total]`
+
+### `semantics/builtins.k:245` — rule 139
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule powCombE(N:Int, evp(OPS:OpSeq, iCons(M:Int, REST:IntSeq))) => evp(OPS, iCons(N ^Int M, REST))`
+
+### `semantics/builtins.k:246` — rule 140
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule powCombE(N:Int, evp(OPS:OpSeq, .IntSeq)) => evp(OPS, iCons(N, .IntSeq))`
+
+### `semantics/builtins.k:247` — syntax 141
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax EvPair ::= powCarryE(String, Int, EvPair) [function, total]`
+
+### `semantics/builtins.k:248` — rule 142
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule powCarryE(O:String, N:Int, evp(OPS:OpSeq, NDS:IntSeq)) => evp(oCons(O, OPS), iCons(N, NDS))`
+
+### `semantics/builtins.k:250` — syntax 143
+
+- Class: `function-declaration`
+- Attributes: `function, total, function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax EvPair ::= passMulE(EvPair) [function, total] | passAddE(EvPair) [function, total]`
+
+### `semantics/builtins.k:251` — rule 144
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule passMulE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("mul", N0, OPS, NDS, .OpSeq, .IntSeq)`
+
+### `semantics/builtins.k:252` — rule 145
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule passMulE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)`
+
+### `semantics/builtins.k:253` — rule 146
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule passAddE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("add", N0, OPS, NDS, .OpSeq, .IntSeq)`
+
+### `semantics/builtins.k:254` — rule 147
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule passAddE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)`
+
+### `semantics/builtins.k:255` — syntax 148
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax EvPair ::= passLGoE(String, Int, OpSeq, IntSeq, OpSeq, IntSeq) [function, total]`
+
+### `semantics/builtins.k:256` — rule 149
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule passLGoE(_:String, CUR:Int, .OpSeq, _:IntSeq, OO:OpSeq, ON:IntSeq) => evp(OO, appendIE(ON, CUR))`
+
+### `semantics/builtins.k:257` — rule 150
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq) => passLGoE(L, applyOpE(O, CUR, N), OPS, NDS, OO, ON) requires inLevelE(L, O)`
+
+### `semantics/builtins.k:260` — rule 151
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq) => passLGoE(L, N, OPS, NDS, appendOpE(OO, O), appendIE(ON, CUR)) requires notBool inLevelE(L, O)`
+
+### `semantics/builtins.k:263` — rule 152
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule passLGoE(_:String, CUR:Int, oCons(_:String, _:OpSeq), .IntSeq, OO:OpSeq, ON:IntSeq) => evp(OO, appendIE(ON, CUR)) [owise]`
+
+### `semantics/builtins.k:265` — syntax 153
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= inLevelE(String, String) [function, total]`
+
+### `semantics/builtins.k:266` — rule 154
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule inLevelE("mul", O:String) => O ==String "*" orBool O ==String "//" orBool O ==String "/"`
+
+### `semantics/builtins.k:267` — rule 155
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule inLevelE("add", O:String) => O ==String "+" orBool O ==String "-"`
+
+### `semantics/builtins.k:268` — rule 156
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule inLevelE(_:String, _:String) => false [owise]`
+
+### `semantics/builtins.k:269` — syntax 157
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax OpSeq ::= appendOpE(OpSeq, String) [function, total]`
+
+### `semantics/builtins.k:270` — rule 158
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule appendOpE(.OpSeq, O:String) => oCons(O, .OpSeq)`
+
+### `semantics/builtins.k:271` — rule 159
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule appendOpE(oCons(H:String, T:OpSeq), O:String) => oCons(H, appendOpE(T, O))`
+
+### `semantics/builtins.k:272` — syntax 160
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= appendIE(IntSeq, Int) [function, total]`
+
+### `semantics/builtins.k:273` — rule 161
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule appendIE(.IntSeq, N:Int) => iCons(N, .IntSeq)`
+
+### `semantics/builtins.k:274` — rule 162
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule appendIE(iCons(H:Int, T:IntSeq), N:Int) => iCons(H, appendIE(T, N)) // ==== hashlib.md5(S).hexdigest() — a trusted opaque digest ================== // The md5 value itself is a named shared trust (sortVS-style, no concrete // twin); proofs use the length/hex-charset lemmas (lemmas/builtins.k).`
+
+### `semantics/builtins.k:279` — syntax 163
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= "#md5"`
+
+### `semantics/builtins.k:280` — rule 164
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Call(Attribute(Name("hashlib"), "md5"), (E:Expr, .Exprs)) => E ~> #md5 ... </k> [priority(40)]`
+
+### `semantics/builtins.k:282` — rule 165
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> str(CS:IntSeq) ~> #md5 => md5Obj(CS) ... </k>`
+
+### `semantics/builtins.k:283` — syntax 166
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Val ::= md5Obj(IntSeq)`
+
+### `semantics/builtins.k:284` — rule 167
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(md5Obj(CS:IntSeq), "hexdigest", .Vals) => str(md5hexCodes(CS))`
+
+### `semantics/builtins.k:285` — syntax 168
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(md5hexCodes), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= md5hexCodes(IntSeq) [function, total, symbol(md5hexCodes), no-evaluators] // ==== isinstance(V, int|str) — an ordinary 2-arg builtin =================== // The type argument (int/str) is an ordinary name that resolves via the builtins frame to // typeV (see core.k's config); no Call-level special case. isIntV/isStrV mirror the old // owise-on-Val test (concrete-sort args decide; a symbolic Val stays owise, as before).`
+
+### `semantics/builtins.k:291` — rule 169
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("isinstance", V:Val, typeV("int"), .Vals) => isIntV(V)`
+
+### `semantics/builtins.k:292` — rule 170
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("isinstance", V:Val, typeV("str"), .Vals) => isStrV(V)`
+
+### `semantics/builtins.k:293` — syntax 171
+
+- Class: `function-declaration`
+- Attributes: `function, function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= isIntV(Val) [function] | isStrV(Val) [function]`
+
+### `semantics/builtins.k:294` — rule 172
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule isIntV(_:Int) => true`
+
+### `semantics/builtins.k:295` — rule 173
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule isIntV(_:Val) => false [owise]`
+
+### `semantics/builtins.k:296` — rule 174
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule isStrV(str(_:IntSeq)) => true`
+
+### `semantics/builtins.k:297` — rule 175
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule isStrV(_:Val) => false [owise]`
+
+## `semantics/call.k`
+
+Records: 24
+
+### `semantics/call.k:16` — rule 1
+
+- Class: `operational-rule`
+- Attributes: `owise`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> Attribute(V:Val, M:String) => boundMethodV(V, M) ... </k> // evaluate callee, then args ([owise]: problem-local Call interceptions beat this)`
+
+### `semantics/call.k:19` — syntax 2
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax KItem ::= #callee(Exprs)`
+
+### `semantics/call.k:20` — rule 3
+
+- Class: `operational-rule`
+- Attributes: `owise`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]`
+
+### `semantics/call.k:21` — rule 4
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k> // ==== dispatch on the callee value ========================================`
+
+### `semantics/call.k:24` — rule 5
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>`
+
+### `semantics/call.k:26` — rule 6
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>`
+
+### `semantics/call.k:27` — rule 7
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ) ... </k>`
+
+### `semantics/call.k:28` — rule 8
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ) ... </k>`
+
+### `semantics/call.k:29` — rule 9
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ) ... </k>`
+
+### `semantics/call.k:30` — rule 10
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ) ... </k>`
+
+### `semantics/call.k:31` — rule 11
+
+- Class: `operational-rule`
+- Attributes: `owise`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]`
+
+### `semantics/call.k:32` — rule 12
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(typeV(T:String)), ACC:Vals) => applyBuiltin(T, ACC) ... </k> // ==== heap-object arguments/receivers ===================================== // Builtins and type calls READ structure — deref the first two arg positions // (covers len/sum/all/any/max/min/sorted/list/set + zip's pair). Mutating list // methods take the ref itself; every other method receiver is deref'd.`
+
+### `semantics/call.k:38` — rule 13
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toCall(builtinV(BN:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(builtinV(BN)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+### `semantics/call.k:42` — rule 14
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toCall(builtinV(BN:String)), (A:Val, ref(H:Int), REST:Vals)) => #applyK(toCall(builtinV(BN)), (A, V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(A) [priority(40)]`
+
+### `semantics/call.k:47` — rule 15
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toCall(typeV(T:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(typeV(T)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+### `semantics/call.k:52` — syntax 16
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Bool ::= isMutMethod(String) [function, total]`
+
+### `semantics/call.k:53` — rule 17
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule isMutMethod(M:String) => M ==String "append" orBool M ==String "sort" orBool M ==String "extend" orBool M ==String "insert" orBool M ==String "pop" orBool M ==String "remove"`
+
+### `semantics/call.k:56` — rule 18
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), M:String)), ACC:Vals) => #applyK(toCall(boundMethodV(V, M)), ACC) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isMutMethod(M) [priority(40)] // non-mutating methods READ their heap-object arguments too (join's list); // mutators keep refs (append of a list into a list-of-lists stays aliased)`
+
+### `semantics/call.k:63` — rule 19
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(boundMethodV(OBJ, M)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isMutMethod(M) andBool notBool isRefV(OBJ) [priority(40)]`
+
+### `semantics/call.k:69` — rule 20
+
+- Class: `operational-rule`
+- Attributes: `NEWL <- scope(.Map, parent(DEFL))`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT => #bindP(PNS, ACC) ~> BODY ~> #endcall </k> <env> CALLERL:Int => NEWL </env> <scopes> STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes> <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc> <stack> .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack> // annotated closure: the frame starts with the captured freevar cells, its // parent is the module scope (all enclosing-local reads go through cells), // and the cellvars' fresh cells allocate before params bind (a cellvar param // then writes through its cell in #bindP).`
+
+### `semantics/call.k:80` — rule 21
+
+- Class: `operational-rule`
+- Attributes: `NEWL <- scope(CM [ "$cells" <- cellsMark(CVS)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(closureValC(PNS:ParamNames, CVS:ParamNames, BODY:Stmts, CM:Map)), ACC:Vals) ~> CONT => #allocCells(CVS) ~> #bindP(PNS, ACC) ~> BODY ~> #endcall </k> <env> CALLERL:Int => NEWL </env> <scopes> STORE:Map => STORE [ NEWL <- scope(CM [ "$cells" <- cellsMark(CVS) ], parent(0)) ] </scopes> <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc> <stack> .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>`
+
+### `semantics/call.k:87` — syntax 22
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #allocCells(ParamNames)`
+
+### `semantics/call.k:88` — rule 23
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #allocCells(.ParamNames) => .K ... </k>`
+
+### `semantics/call.k:89` — rule 24
+
+- Class: `operational-rule`
+- Attributes: `CV <- cellRef(N)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #allocCells((CV:String, R:ParamNames)) => #allocCells(R) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ CV <- cellRef(N) ], _) ... </scopes> <heap> H:Map => (N |-> cellV(noneV)) H </heap> <heapLoc> N:Int => N +Int 1 </heapLoc> requires notBool N in_keys(H)`
+
+## `semantics/comprehension.k`
+
+Records: 10
+
+### `semantics/comprehension.k:11` — rule 1
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule ListComp(ELT:Expr, Gs:CompFors) => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)`
+
+### `semantics/comprehension.k:12` — rule 2
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule GenExp(ELT:Expr, Gs:CompFors) => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)`
+
+### `semantics/comprehension.k:14` — syntax 3
+
+- Class: `macro-declaration`
+- Attributes: `macro`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Stmts ::= compBody(CompFors, Expr) [macro]`
+
+### `semantics/comprehension.k:15` — rule 4
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule compBody(Gs:CompFors, ELT:Expr) => Assign(Name("$acc"), ListExpr(.Exprs)) compNest(Gs, ELT) Return(Name("$acc"))`
+
+### `semantics/comprehension.k:18` — syntax 5
+
+- Class: `macro-declaration`
+- Attributes: `macro-rec`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Stmt ::= compNest(CompFors, Expr) [macro-rec]`
+
+### `semantics/comprehension.k:19` — rule 6
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule compNest(.CompFors, ELT:Expr) => Assign(Name("$acc"), BinOp("+", Name("$acc"), ListExpr(ELT)))`
+
+### `semantics/comprehension.k:21` — rule 7
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule compNest((CompFor(T:Expr, ITER:Expr, Fs:Exprs) GRest:CompFors), ELT:Expr) => For(T, ITER, If(compGuard(Fs), compNest(GRest, ELT), .Stmts))`
+
+### `semantics/comprehension.k:24` — syntax 8
+
+- Class: `macro-declaration`
+- Attributes: `macro`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Expr ::= compGuard(Exprs) [macro]`
+
+### `semantics/comprehension.k:25` — rule 9
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule compGuard(.Exprs) => Bool(true)`
+
+### `semantics/comprehension.k:26` — rule 10
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule compGuard((F:Expr, Fs:Exprs)) => BoolOp("and", (F, Fs))`
+
+## `semantics/concrete.k`
+
+Records: 21
+
+### `semantics/concrete.k:13` — rule 1
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Compare(list(A:ValSeq), CmpOp("==", list(B:ValSeq))) => deepEqVS(A, B, HP) ... </k> <heap> HP:Map </heap> requires hasRefVS(A) orBool hasRefVS(B)`
+
+### `semantics/concrete.k:16` — rule 2
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Compare(list(A:ValSeq), CmpOp("!=", list(B:ValSeq))) => notBool deepEqVS(A, B, HP) ... </k> <heap> HP:Map </heap> requires hasRefVS(A) orBool hasRefVS(B) // ==== keyed sort, concrete leg ============================================ // Computes each key by a REAL call through the uniform #callee machinery // (closures, len, type objects all work), stable-inserts on the key, and // allocates the result. priority(40) beats sort.k's opaque rules, so krun // runs this and proofs (which never see MPY-CONCRETE) keep sortKeyVS.`
+
+### `semantics/concrete.k:25` — syntax 3
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Val ::= kvP(Val, Val)`
+
+### `semantics/concrete.k:26` — syntax 4
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #ksort(ValSeq, Val, ValSeq, Bool) | #ksIns(Val, ValSeq, Val, ValSeq, Bool)`
+
+### `semantics/concrete.k:28` — rule 5
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals)) => #ksort(VS, KV, .ValSeq, false) ... </k> [priority(40)]`
+
+### `semantics/concrete.k:31` — rule 6
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals)) => #ksort(VS, KV, .ValSeq, RB) ... </k> [priority(40)]`
+
+### `semantics/concrete.k:34` — rule 7
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #ksort(.ValSeq, _:Val, ACC:ValSeq, RB:Bool) => #alloc(list(condRev(unpairVS(ACC), RB))) ... </k>`
+
+### `semantics/concrete.k:36` — rule 8
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #ksort(vCons(V:Val, R:ValSeq), KV:Val, ACC:ValSeq, RB:Bool) => KV ~> #callee((V, .Exprs)) ~> #ksIns(V, R, KV, ACC, RB) ... </k>`
+
+### `semantics/concrete.k:38` — rule 9
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> K:Val ~> #ksIns(V:Val, R:ValSeq, KV:Val, ACC:ValSeq, RB:Bool) => #ksort(R, KV, insPair(ACC, K, V), RB) ... </k> requires notBool isKwV(K)`
+
+### `semantics/concrete.k:42` — syntax 10
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= insPair(ValSeq, Val, Val) [function]`
+
+### `semantics/concrete.k:43` — rule 11
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule insPair(.ValSeq, K:Val, V:Val) => vCons(kvP(K, V), .ValSeq)`
+
+### `semantics/concrete.k:44` — rule 12
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val) => vCons(kvP(K, V), vCons(kvP(K2, V2), R)) requires kLt(K, K2)`
+
+### `semantics/concrete.k:47` — rule 13
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val) => vCons(kvP(K2, V2), insPair(R, K, V)) requires notBool kLt(K, K2)`
+
+### `semantics/concrete.k:51` — syntax 14
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= kLt(Val, Val) [function]`
+
+### `semantics/concrete.k:52` — rule 15
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule kLt(I1:Int, I2:Int) => I1 <Int I2`
+
+### `semantics/concrete.k:53` — rule 16
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule kLt(F1:Float, F2:Float) => F1 <Float F2`
+
+### `semantics/concrete.k:54` — rule 17
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule kLt(str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)`
+
+### `semantics/concrete.k:56` — syntax 18
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= unpairVS(ValSeq) [function, total]`
+
+### `semantics/concrete.k:57` — rule 19
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule unpairVS(.ValSeq) => .ValSeq`
+
+### `semantics/concrete.k:58` — rule 20
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule unpairVS(vCons(kvP(_:Val, V:Val), R:ValSeq)) => vCons(V, unpairVS(R))`
+
+### `semantics/concrete.k:59` — rule 21
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule unpairVS(vCons(V:Val, R:ValSeq)) => vCons(V, unpairVS(R)) [owise]`
+
+## `semantics/controls.k`
+
+Records: 37
+
+### `semantics/controls.k:9` — rule 1
+
+- Class: `operational-rule`
+- Attributes: `X <- V`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> Assign(Name(X:String), V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>`
+
+### `semantics/controls.k:12` — rule 2
+
+- Class: `operational-rule`
+- Attributes: `X, "$cells", X, priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool X in_keys(M) andBool isCellRef({M[X]}:>Val) [priority(40)]`
+
+### `semantics/controls.k:20` — rule 3
+
+- Class: `operational-rule`
+- Attributes: `X <- applyBin(OP, {M[X, ..`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes> requires X in_keys(M) // 'lst += [..]' where lst is a heap ref: the generic rule leaves applyBin(OP, ref, V) — but the // ref-deref preemption is BinOp-level (operators.k), so applyBin never derefs and it sticks. Route // the ref case through BinOp so the deref + list-concat + #alloc path fires (result is a fresh ref).`
+
+### `semantics/controls.k:27` — rule 4
+
+- Class: `operational-rule`
+- Attributes: `X, priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires X in_keys(M) andBool isRefV({M[X]}:>Val) [priority(40)] // ==== import trivia: 'from math import floor, ceil' binds the supported // names as builtins in the current scope; every other import is a no-op`
+
+### `semantics/controls.k:35` — rule 5
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> ImportFrom("math", NS:ParamNames) => #bindImports(NS) ... </k>`
+
+### `semantics/controls.k:36` — rule 6
+
+- Class: `operational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> ImportFrom(_:String, _:ParamNames) => .K ... </k> [owise]`
+
+### `semantics/controls.k:37` — syntax 7
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #bindImports(ParamNames)`
+
+### `semantics/controls.k:38` — rule 8
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #bindImports(.ParamNames) => .K ... </k>`
+
+### `semantics/controls.k:39` — rule 9
+
+- Class: `operational-rule`
+- Attributes: `N <- builtinV(N)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ N <- builtinV(N) ], _) ... </scopes> requires N ==String "floor" orBool N ==String "ceil"`
+
+### `semantics/controls.k:43` — rule 10
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k> requires notBool (N ==String "floor" orBool N ==String "ceil") // ==== Expr statement: evaluate for effect, discard the value =============== // (bare calls — mutator methods, docstrings; the WP0 statement-trivia rung)`
+
+### `semantics/controls.k:48` — rule 11
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> Expr(_:Val) => .K ... </k> // ==== If (condition evaluated by strictness) ==============================`
+
+### `semantics/controls.k:51` — syntax 12
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax KItem ::= #branch(Bool, Stmts, Stmts)`
+
+### `semantics/controls.k:52` — rule 13
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>`
+
+### `semantics/controls.k:53` — rule 14
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #branch(true, T:Stmts, _:Stmts) => T ... </k>`
+
+### `semantics/controls.k:54` — rule 15
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k> // ==== IfExp: ternary T if C else E ========================================`
+
+### `semantics/controls.k:57` — rule 16
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k> requires truthy(V)`
+
+### `semantics/controls.k:59` — rule 17
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k> requires notBool truthy(V) // ==== For: one loop, in-cell continuation, over #iterNext ================= // (the iterable is evaluated once, by strictness; the protocol stays rewrites — // circularities anchor on #loop and narrowing substitutes the structure)`
+
+### `semantics/controls.k:65` — syntax 18
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts) | #while(Expr, Stmts) | #whileCond(Expr, Stmts) | #loopLbl(K) | "#cont" | "#brk"`
+
+### `semantics/controls.k:69` — rule 19
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>`
+
+### `semantics/controls.k:71` — rule 20
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>`
+
+### `semantics/controls.k:72` — rule 21
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>`
+
+### `semantics/controls.k:73` — rule 22
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts) => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k> // ==== While ==============================================================`
+
+### `semantics/controls.k:77` — rule 23
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>`
+
+### `semantics/controls.k:78` — rule 24
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>`
+
+### `semantics/controls.k:79` — rule 25
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k> requires truthy(V)`
+
+### `semantics/controls.k:81` — rule 26
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k> requires notBool truthy(V) // ==== loop control (break / continue) =====================================`
+
+### `semantics/controls.k:85` — rule 27
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #loopLbl(NEXT:K) => NEXT ... </k>`
+
+### `semantics/controls.k:86` — rule 28
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Continue => #cont ... </k>`
+
+### `semantics/controls.k:87` — rule 29
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Break => #brk ... </k>`
+
+### `semantics/controls.k:88` — rule 30
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>`
+
+### `semantics/controls.k:89` — rule 31
+
+- Class: `operational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]`
+
+### `semantics/controls.k:90` — rule 32
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>`
+
+### `semantics/controls.k:91` — rule 33
+
+- Class: `operational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #brk ~> (_:KItem => .K) ... </k> [owise] // ==== heap-object deref at the truthiness/iteration consumers ============== // (priority(40) preempts the generic Val rules so truthy/#loop never see a ref)`
+
+### `semantics/controls.k:95` — rule 34
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+### `semantics/controls.k:98` — rule 35
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+### `semantics/controls.k:101` — rule 36
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)] // For derefs its iterable ONCE at loop start (iteration is over the snapshot; // mutating the iterated list inside its own loop is outside the subset)`
+
+### `semantics/controls.k:106` — rule 37
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## `semantics/core.k`
+
+Records: 84
+
+### `semantics/core.k:13` — syntax 1
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)`
+
+### `semantics/core.k:14` — syntax 2
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)`
+
+### `semantics/core.k:15` — syntax 3
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Str ::= str(IntSeq) // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)`
+
+### `semantics/core.k:18` — syntax 4
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Iterable ::= list(ValSeq) | tuple(ValSeq) | Str | rangeObj(Int, Int, Int) | zipObj(ValSeq, ValSeq) | zipObjS(IntSeq, IntSeq)`
+
+### `semantics/core.k:25` — syntax 5
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Val ::= Int | Bool | "noneV" | Iterable | ref(Int) // a heap object: <heap> holds its list(VS) | cellRef(Int) // a closure cell: <heap> holds cellV(V) | closureVal(ParamNames, Stmts, Int) | typeV(String) // a type object (int/str), resolved from the builtins frame | builtinV(String) // a builtin function, resolved like any name (LEGB fallthrough) | boundMethodV(Val, String) // a cooled Attribute: obj.method`
+
+### `semantics/core.k:36` — syntax 6
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Parent ::= "root" | parent(Int)`
+
+### `semantics/core.k:37` — syntax 7
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Scope ::= scope(Map, Parent)`
+
+### `semantics/core.k:38` — syntax 8
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KResult ::= Val`
+
+### `semantics/core.k:39` — syntax 9
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Expr ::= Val // cooling puts results back into expression holes`
+
+### `semantics/core.k:40` — syntax 10
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Vals ::= List{Val, ","}`
+
+### `semantics/core.k:41` — syntax 11
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Exc ::= "NoExc" | "AssertionError"`
+
+### `semantics/core.k:42` — syntax 12
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax RetState ::= "noRet" | retV(Val) // ==== configuration ======================================================= // The builtins namespace is a real scope at reserved location -1 (the bottom of every // chain; scopeLoc only allocates >=1, so -1 never collides). The module scope (loc 0) // has it as parent, so an unbound name resolves there last — exactly LEGB. 'int'/'str' // resolve to their type objects; any local/global binding shadows them via normal lookup.`
+
+### `semantics/core.k:49` — configuration 13
+
+- Class: `configuration`
+- Attributes: `N <- _`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `configuration <k> #loadAll($PGM:Module) </k> <env> 0 </env> <scopes> 0 |-> scope(.Map, parent(-1)) -1 |-> builtinsScope </scopes> <scopeLoc> 1 </scopeLoc> <heap> .Map </heap> <heapLoc> 0 </heapLoc> <stack> .List </stack> <ret> noRet </ret> <exc> NoExc </exc> <exit-code exit=""> 0 </exit-code> // ==== heap allocation (constructed lists become objects) ================== // Cons-form emission with a freshness guard (the heap-list-probe discipline: // an update-form H[N <- _] never re-normalizes symbolically). heapLoc is // monotonic — it does NOT wind back at #pop: returned lists escape by ref. // A bare list(VS) Val stays legal (read-only inputs in claims flow unboxed); // only CONSTRUCTORS in program syntax allocate.`
+
+### `semantics/core.k:68` — syntax 14
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Bool ::= isRefV(Val) [function, total]`
+
+### `semantics/core.k:69` — rule 15
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule isRefV(ref(_:Int)) => true`
+
+### `semantics/core.k:70` — rule 16
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule isRefV(_:Val) => false [owise] // closure cells (Python-faithful capture): the heap holds cellV(V); a // cellRef surfacing as the k-redex reads through (lookup is the only use — // cellRefs never escape to user-visible values)`
+
+### `semantics/core.k:75` — syntax 17
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax HeapVal ::= cellV(Val)`
+
+### `semantics/core.k:76` — syntax 18
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= isCellRef(Val) [function, total]`
+
+### `semantics/core.k:77` — rule 19
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule isCellRef(cellRef(_:Int)) => true`
+
+### `semantics/core.k:78` — rule 20
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule isCellRef(_:Val) => false [owise] // k-top deref for cell-bound reads surfacing INSIDE the annotated frame // (AugAssign's in-place read and friends). The "$cells" guard keeps this // DECIDABLY inapplicable in plain frames — an unguarded rule lets the // prover narrow abstract k-top values into cellRef junk (probed on // 26-remove-duplicates). Cross-frame reads (a comprehension closure // reading the enclosing function's cellvar) deref inside #look instead.`
+
+### `semantics/core.k:85` — rule 21
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> cellRef(H:Int) => V ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> <heap> ... H |-> cellV(V:Val) ... </heap> requires "$cells" in_keys(M) [priority(40)] // write through a cell (Assign / #bindP / #bindTgt dispatch here on // cell-bound names) // a keyword argument cools to a TAGGED value (consumed by kw-aware builtins)`
+
+### `semantics/core.k:95` — syntax 22
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Val ::= kwV(String, Val)`
+
+### `semantics/core.k:96` — syntax 23
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax KItem ::= #kwTag(String)`
+
+### `semantics/core.k:97` — rule 24
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>`
+
+### `semantics/core.k:98` — rule 25
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k> requires notBool isKwV(V)`
+
+### `semantics/core.k:100` — syntax 26
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Bool ::= isKwV(Val) [function, total]`
+
+### `semantics/core.k:101` — rule 27
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule isKwV(kwV(_:String, _:Val)) => true`
+
+### `semantics/core.k:102` — rule 28
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule isKwV(_:Val) => false [owise] // the frame marker carries the CONCRETE cellvar list, so cell-write dispatch // decides by pnMember even over an abstract frame rest (no prover branching)`
+
+### `semantics/core.k:106` — syntax 29
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Val ::= cellsMark(ParamNames)`
+
+### `semantics/core.k:107` — syntax 30
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax ParamNames ::= cellsOf(Val) [function]`
+
+### `semantics/core.k:108` — rule 31
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule cellsOf(cellsMark(CVS:ParamNames)) => CVS`
+
+### `semantics/core.k:109` — syntax 32
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Bool ::= pnMember(String, ParamNames) [function, total]`
+
+### `semantics/core.k:110` — rule 33
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule pnMember(_:String, .ParamNames) => false`
+
+### `semantics/core.k:111` — rule 34
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)`
+
+### `semantics/core.k:113` — syntax 35
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax KItem ::= #cellW(Val, Val)`
+
+### `semantics/core.k:114` — rule 36
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k> <heap> ... H |-> cellV(_:Val => V) ... </heap>`
+
+### `semantics/core.k:117` — syntax 37
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax KItem ::= #alloc(Val)`
+
+### `semantics/core.k:118` — rule 38
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #alloc(V:Val) => ref(N) ... </k> <heap> H:Map => (N |-> V) H </heap> <heapLoc> N:Int => N +Int 1 </heapLoc> requires notBool N in_keys(H) // ==== module load + statement sequencing ==================================`
+
+### `semantics/core.k:124` — syntax 39
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax KItem ::= #loadAll(Module)`
+
+### `semantics/core.k:125` — rule 40
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>`
+
+### `semantics/core.k:126` — rule 41
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>`
+
+### `semantics/core.k:127` — rule 42
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> .Stmts => .K ... </k> // ==== Name lookup (walk the scope chain; builtins live in the -1 scope) ====`
+
+### `semantics/core.k:130` — syntax 43
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax KItem ::= #look(String, Int)`
+
+### `semantics/core.k:131` — rule 44
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>`
+
+### `semantics/core.k:132` — rule 45
+
+- Class: `operational-rule`
+- Attributes: `X`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k> <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes> requires X in_keys(M) // a SYNTACTICALLY cell-bound name reads through the heap cell AT THE // LOOKUP (higher priority beats the plain return above on concrete cell // bindings; abstract claim values take the plain rule unchanged) — this // covers cross-frame cell reads (a comprehension closure reading the // enclosing function's cellvar) without a narrowing-prone k-top redex // guarded on the FOUND frame's DECLARED cellvars (pnMember over the // cellsMark): decidable for every concrete frame pin — plain frames and // non-cell names prune outright, so an abstract looked-up value never // drags a narrowing cellV heap match along (probed on 5-intersperse and // Q4's abstract 'numbers' in the annotated frame)`
+
+### `semantics/core.k:145` — rule 46
+
+- Class: `operational-rule`
+- Attributes: `"$cells", X, priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #look(X:String, L:Int) => V ... </k> <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes> <heap> ... H |-> cellV(V:Val) ... </heap> requires X in_keys(M) andBool "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool {M[X]}:>Val ==K cellRef(H) [priority(40)]`
+
+### `semantics/core.k:152` — rule 47
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #look(X:String, L:Int) => #look(X, P) ... </k> <scopes> ... L |-> scope(M:Map, parent(P:Int)) ... </scopes> requires notBool (X in_keys(M)) // the ONE predefined builtins scope (the -1 frame; claims write '-1 |-> builtinsScope')`
+
+### `semantics/core.k:157` — syntax 48
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Scope ::= "builtinsScope" [function, total]`
+
+### `semantics/core.k:158` — rule 49
+
+- Class: `equational-rule`
+- Attributes: `"len"    <- builtinV("len"), "set"    <- builtinV("set"), "sum"    <- builtinV("sum"), "abs"    <- builtinV("abs"), "min"    <- builtinV("min"), "max"    <- builtinV("max"), "ord"    <- builtinV("ord"), "chr"    <- builtinV("chr"), "range"  <- builtinV("range"), "all"    <- builtinV("all"), "any"    <- builtinV("any"), "zip"    <- builtinV("zip"), "isinstance" <- builtinV("isinstance"), "sorted" <- builtinV("sorted"), "list"   <- builtinV("list"), "round"  <- builtinV("round"), "bin"    <- builtinV("bin"), "enumerate" <- builtinV("enumerate"), "map"    <- builtinV("map"), "eval"   <- builtinV("eval"), "int"    <- typeV("int"), "str"    <- typeV("str"), "float"  <- typeV("float")`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule builtinsScope => scope(.Map [ "len" <- builtinV("len") ] [ "set" <- builtinV("set") ] [ "sum" <- builtinV("sum") ] [ "abs" <- builtinV("abs") ] [ "min" <- builtinV("min") ] [ "max" <- builtinV("max") ] [ "ord" <- builtinV("ord") ] [ "chr" <- builtinV("chr") ] [ "range" <- builtinV("range") ] [ "all" <- builtinV("all") ] [ "any" <- builtinV("any") ] [ "zip" <- builtinV("zip") ] [ "isinstance" <- builtinV("isinstance") ] [ "sorted" <- builtinV("sorted") ] [ "list" <- builtinV("list") ] [ "round" <- builtinV("round") ] [ "bin" <- builtinV("bin") ] [ "enumerate" <- builtinV("enumerate") ] [ "map" <- builtinV("map") ] [ "eval" <- builtinV("eval") ] [ "int" <- typeV("int") ] [ "str" <- typeV("str") ] [ "float" <- typeV("float") ], root) // ==== argument/element evaluation: ONE left-to-right loop, tagged by destination == // (list/tuple literals and calls all use it; modules extend ApplyK with their tags)`
+
+### `semantics/core.k:185` — syntax 50
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax ApplyK ::= toCall(Val)`
+
+### `semantics/core.k:186` — syntax 51
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax KItem ::= #evalArgs(Exprs, Vals, ApplyK) | #evalArgCont(Exprs, Vals, ApplyK) | #applyK(ApplyK, Vals)`
+
+### `semantics/core.k:189` — rule 52
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>`
+
+### `semantics/core.k:190` — rule 53
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>`
+
+### `semantics/core.k:191` — rule 54
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k> // ==== Int / Bool / None literals ==========================================`
+
+### `semantics/core.k:194` — rule 55
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> Int(I:Int) => I ... </k>`
+
+### `semantics/core.k:195` — rule 56
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> Bool(B:Bool) => B ... </k>`
+
+### `semantics/core.k:196` — rule 57
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> NoneVal => noneV ... </k> // ==== truthy (If, Assert, BoolOp, IfExp, not, While) ======================`
+
+### `semantics/core.k:199` — syntax 58
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Bool ::= truthy(Val) [function]`
+
+### `semantics/core.k:200` — rule 59
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule truthy(B:Bool) => B`
+
+### `semantics/core.k:201` — rule 60
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule truthy(noneV) => false`
+
+### `semantics/core.k:202` — rule 61
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule truthy(I:Int) => I =/=Int 0`
+
+### `semantics/core.k:203` — rule 62
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule truthy(str(S:IntSeq)) => notBool (S ==K .IntSeq)`
+
+### `semantics/core.k:204` — rule 63
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule truthy(list(V:ValSeq)) => notBool (V ==K .ValSeq)`
+
+### `semantics/core.k:205` — rule 64
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq) // ==== extensible operator dispatch (cases added by the construct modules) ==`
+
+### `semantics/core.k:208` — syntax 65
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Val ::= applyUn(String, Val) [function]`
+
+### `semantics/core.k:209` — syntax 66
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Val ::= applyBin(String, Val, Val) [function]`
+
+### `semantics/core.k:210` — syntax 67
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Bool ::= applyCmp(String, Val, Val) [function] // ==== shared list helpers =================================================`
+
+### `semantics/core.k:213` — syntax 68
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Vals ::= appendVal(Vals, Val) [function, total]`
+
+### `semantics/core.k:214` — rule 69
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule appendVal(.Vals, V:Val) => V , .Vals`
+
+### `semantics/core.k:215` — rule 70
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule appendVal((V0:Val, VS:Vals), V:Val) => V0 , appendVal(VS, V)`
+
+### `semantics/core.k:217` — syntax 71
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax ValSeq ::= vals2valSeq(Vals) [function, total]`
+
+### `semantics/core.k:218` — rule 72
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule vals2valSeq(.Vals) => .ValSeq`
+
+### `semantics/core.k:219` — rule 73
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS)) // ==== shared sequence length (len / summaries across many modules) ======== // (positional access valSeqAt/intSeqAt + normIdx live in subscript.k)`
+
+### `semantics/core.k:223` — syntax 74
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Int ::= vsLen(ValSeq) [function, total]`
+
+### `semantics/core.k:224` — rule 75
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule vsLen(.ValSeq) => 0`
+
+### `semantics/core.k:225` — rule 76
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)`
+
+### `semantics/core.k:227` — syntax 77
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= isLen(IntSeq) [function, total]`
+
+### `semantics/core.k:228` — rule 78
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule isLen(.IntSeq) => 0`
+
+### `semantics/core.k:229` — rule 79
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S) // in-bounds positional write (list subscript-assign); OOB leaves the seq unchanged // (valid programs write in-bounds — mirrors valSeqAt's total-but-underspecified stance)`
+
+### `semantics/core.k:233` — syntax 80
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]`
+
+### `semantics/core.k:234` — rule 81
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule setVSAt(.ValSeq, _:Int, _:Val) => .ValSeq`
+
+### `semantics/core.k:235` — rule 82
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val) => vCons(V, S)`
+
+### `semantics/core.k:236` — rule 83
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V)) requires I >Int 0`
+
+### `semantics/core.k:238` — rule 84
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule setVSAt(VS:ValSeq, I:Int, _:Val) => VS requires I <Int 0`
+
+## `semantics/dict.k`
+
+Records: 40
+
+### `semantics/dict.k:20` — syntax 1
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Val ::= dictV(ValSeq, ValSeq) // ==== DictExpr: {k: v, ...} literal. Eval each key then value, left to right, insert-with-dedup.`
+
+### `semantics/dict.k:23` — syntax 2
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #dictAcc(Entries, ValSeq, ValSeq) | #dictKey(Expr, Entries, ValSeq, ValSeq) | #dictVal(Val, Entries, ValSeq, ValSeq)`
+
+### `semantics/dict.k:26` — rule 3
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> DictExpr(ES:Entries) => #dictAcc(ES, .ValSeq, .ValSeq) ... </k>`
+
+### `semantics/dict.k:27` — rule 4
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #dictAcc(.Entries, KS:ValSeq, VS:ValSeq) => dictV(KS, VS) ... </k>`
+
+### `semantics/dict.k:28` — rule 5
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #dictAcc((Entry(K:Expr, V:Expr), REST:Entries), KS:ValSeq, VS:ValSeq) => K ~> #dictKey(V, REST, KS, VS) ... </k>`
+
+### `semantics/dict.k:30` — rule 6
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> KV:Val ~> #dictKey(V:Expr, REST:Entries, KS:ValSeq, VS:ValSeq) => V ~> #dictVal(KV, REST, KS, VS) ... </k>`
+
+### `semantics/dict.k:32` — rule 7
+
+- Class: `operational-rule`
+- Attributes: `total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> VV:Val ~> #dictVal(KV:Val, REST:Entries, KS:ValSeq, VS:ValSeq) => #dictAcc(REST, dPutK(KS, KV), dPutV(KS, VS, KV, VV)) ... </k> // insert-with-dedup helpers (concrete Val key equality via ==K). [total] so buildFold over a dict is // total (its #Ceil is #Top) — needed when a symbolic proof carries a built dict as a config value.`
+
+### `semantics/dict.k:37` — syntax 8
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= dHasKey(ValSeq, Val) [function, total]`
+
+### `semantics/dict.k:38` — rule 9
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dHasKey(.ValSeq, _:Val) => false`
+
+### `semantics/dict.k:39` — rule 10
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dHasKey(vCons(A:Val, _:ValSeq), K:Val) => true requires A ==K K`
+
+### `semantics/dict.k:40` — rule 11
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dHasKey(vCons(A:Val, R:ValSeq), K:Val) => dHasKey(R, K) requires notBool (A ==K K) // dPutK: KS unchanged if K already present, else append K (keep-first-position).`
+
+### `semantics/dict.k:43` — syntax 12
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= dPutK(ValSeq, Val) [function, total]`
+
+### `semantics/dict.k:44` — rule 13
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dPutK(KS:ValSeq, K:Val) => KS requires dHasKey(KS, K)`
+
+### `semantics/dict.k:45` — rule 14
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dPutK(KS:ValSeq, K:Val) => valSeqConcat(KS, vCons(K, .ValSeq)) requires notBool dHasKey(KS, K) // dPutV: parallel to KS — set the value at K's position if present, else append V at the end. The // [owise] catch-all covers the degenerate mismatched-length case (never reached for a well-formed dict).`
+
+### `semantics/dict.k:49` — syntax 15
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= dPutV(ValSeq, ValSeq, Val, Val) [function, total]`
+
+### `semantics/dict.k:50` — rule 16
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dPutV(vCons(A:Val, _:ValSeq), vCons(_:Val, VR:ValSeq), K:Val, V:Val) => vCons(V, VR) requires A ==K K`
+
+### `semantics/dict.k:52` — rule 17
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dPutV(vCons(A:Val, KR:ValSeq), vCons(B:Val, VR:ValSeq), K:Val, V:Val) => vCons(B, dPutV(KR, VR, K, V)) requires notBool (A ==K K)`
+
+### `semantics/dict.k:54` — rule 18
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dPutV(_KS:ValSeq, VS:ValSeq, _K:Val, V:Val) => valSeqConcat(VS, vCons(V, .ValSeq)) [owise] // ==== dict methods ======================================================== // d.keys() -> a FRESH list object of the ordered keys (k-cell: it allocates).`
+
+### `semantics/dict.k:58` — rule 19
+
+- Class: `operational-rule`
+- Attributes: `priority(40), k`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(boundMethodV(dictV(KS:ValSeq, _:ValSeq), "keys")), .Vals) => #alloc(list(KS)) ... </k> [priority(40)] // ==== dict subscript READ: d[k] (assoc lookup; KeyError is out of subset) ==`
+
+### `semantics/dict.k:63` — rule 20
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyIndexD(dictV(KS:ValSeq, VS:ValSeq), K:Val) => dGet(KS, VS, K)`
+
+### `semantics/dict.k:64` — syntax 21
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Val ::= applyIndexD(Val, Val) [function]`
+
+### `semantics/dict.k:65` — rule 22
+
+- Class: `operational-rule`
+- Attributes: `priority(45), k`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Subscript(dictV(KS:ValSeq, VS:ValSeq), K:Val) => applyIndexD(dictV(KS, VS), K) ... </k> [priority(45)] // ==== dict subscript-assign: d[k] = v (insert/update in place) ============= // Only for a LOCAL dict variable X (the current scope holds it). Reuses dPutK/dPutV.`
+
+### `semantics/dict.k:70` — syntax 23
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Val ::= dictSet(Val, Val, Val) [function]`
+
+### `semantics/dict.k:71` — rule 24
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dictSet(dictV(KS:ValSeq, VS:ValSeq), K:Val, V:Val) => dictV(dPutK(KS, K), dPutV(KS, VS, K, V)) // RHS evaluates first (Assign strictness), then the key. Dispatch on the scope // value: a bare dict updates in the scope (dicts stay values); a ref (a heap // list — or a heap dict later) writes the heap in place.`
+
+### `semantics/dict.k:76` — syntax 25
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #dsetK(String, Val)`
+
+### `semantics/dict.k:77` — rule 26
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Assign(Subscript(Name(X:String), K:Expr), VV:Val) => K ~> #dsetK(X, VV) ... </k>`
+
+### `semantics/dict.k:78` — rule 27
+
+- Class: `operational-rule`
+- Attributes: `X <- dictSet({M[X, X`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- dictSet({M[X]}:>Val, KV, VV) ], _) ... </scopes> requires X in_keys(M) andBool notBool isRefV({M[X]}:>Val)`
+
+### `semantics/dict.k:82` — rule 28
+
+- Class: `operational-rule`
+- Attributes: `X, X`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => #dsetV({M[X]}:>Val, KV, VV) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires X in_keys(M) andBool isRefV({M[X]}:>Val)`
+
+### `semantics/dict.k:86` — syntax 29
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #dsetV(Val, Val, Val)`
+
+### `semantics/dict.k:87` — rule 30
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #dsetV(ref(H:Int), I:Int, VV:Val) => .K ... </k> <heap> ... H |-> list(VS:ValSeq => setVSAt(VS, normIdxD(I, vsLen(VS)), VV)) ... </heap> // negative-index normalization local to the write (subscript.k's is not imported here)`
+
+### `semantics/dict.k:90` — syntax 31
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= normIdxD(Int, Int) [function, total]`
+
+### `semantics/dict.k:91` — rule 32
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule normIdxD(I:Int, LEN:Int) => I +Int LEN requires I <Int 0`
+
+### `semantics/dict.k:92` — rule 33
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule normIdxD(I:Int, _:Int) => I requires I >=Int 0 // ==== dict == (order-insensitive: same size + same key->value pairs) =======`
+
+### `semantics/dict.k:95` — rule 34
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("==", dictV(KS1:ValSeq, VS1:ValSeq), dictV(KS2:ValSeq, VS2:ValSeq)) => (vsLen(KS1) ==Int vsLen(KS2)) andBool dSubset(KS1, VS1, KS2, VS2)`
+
+### `semantics/dict.k:97` — syntax 35
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= dSubset(ValSeq, ValSeq, ValSeq, ValSeq) [function]`
+
+### `semantics/dict.k:98` — rule 36
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dSubset(.ValSeq, .ValSeq, _:ValSeq, _:ValSeq) => true`
+
+### `semantics/dict.k:99` — rule 37
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dSubset(vCons(K:Val, KR:ValSeq), vCons(V:Val, VR:ValSeq), KS2:ValSeq, VS2:ValSeq) => dHasKey(KS2, K) andBool (dGet(KS2, VS2, K) ==K V) andBool dSubset(KR, VR, KS2, VS2)`
+
+### `semantics/dict.k:101` — syntax 38
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Val ::= dGet(ValSeq, ValSeq, Val) [function]`
+
+### `semantics/dict.k:102` — rule 39
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dGet(vCons(A:Val, _:ValSeq), vCons(B:Val, _:ValSeq), K:Val) => B requires A ==K K`
+
+### `semantics/dict.k:103` — rule 40
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dGet(vCons(A:Val, KR:ValSeq), vCons(_:Val, VR:ValSeq), K:Val) => dGet(KR, VR, K) requires notBool (A ==K K)`
+
+## `semantics/float.k`
+
+Records: 155
+
+### `semantics/float.k:20` — syntax 1
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Val ::= Float`
+
+### `semantics/float.k:21` — rule 2
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Float(F:Float) => F ... </k> // Int / float true division. OPAQUE for kprove (no-evaluators); concrete for krun.`
+
+### `semantics/float.k:24` — syntax 3
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(intFloatDiv), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= intFloatDiv(Int, Float) [function, total, symbol(intFloatDiv), no-evaluators]`
+
+### `semantics/float.k:25` — rule 4
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule intFloatDiv(I:Int, F:Float) => Int2Float(I, 53, 11) /Float F [concrete]`
+
+### `semantics/float.k:27` — rule 5
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("/", I:Int, F:Float) => intFloatDiv(I, F) // Int / Int true division (Python: always a float). OPAQUE for kprove; concrete for krun.`
+
+### `semantics/float.k:30` — syntax 6
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(divII), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= divII(Int, Int) [function, total, symbol(divII), no-evaluators]`
+
+### `semantics/float.k:31` — rule 7
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule divII(I1:Int, I2:Int) => Int2Float(I1, 53, 11) /Float Int2Float(I2, 53, 11) [concrete]`
+
+### `semantics/float.k:32` — rule 8
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("/", I1:Int, I2:Int) => divII(I1, I2) // float % float (e.g. 'number % 1.0' = the fractional part). OPAQUE for kprove, concrete for // krun. Python's float '%' is floor-based: a % b = a - floor(a/b)*b (K's %Float is IEEE // remainder, which differs — 3.5 %Float 1.0 = -0.5 vs Python 0.5 — so it is NOT used).`
+
+### `semantics/float.k:37` — syntax 9
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(floatMod), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= floatMod(Float, Float) [function, total, symbol(floatMod), no-evaluators]`
+
+### `semantics/float.k:38` — rule 10
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule floatMod(F1:Float, F2:Float) => F1 -Float (floorFloat(F1 /Float F2) *Float F2) [concrete]`
+
+### `semantics/float.k:39` — rule 11
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("%", F1:Float, F2:Float) => floatMod(F1, F2) // float equality — for concrete krun asserts (e.g. 'area == 7.5'); the FLOAT.eq hook is fine on // concrete floats. kprove proofs return floats structurally and do not compare them.`
+
+### `semantics/float.k:43` — rule 12
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2`
+
+### `semantics/float.k:44` — rule 13
+
+- Class: `equational-rule`
+- Attributes: `no-evaluators, concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2) // float '<' and abs — OPAQUE for kprove ([no-evaluators], so a SYMBOLIC float compare stays an // uninterpreted Bool a proof case-splits on — a SINGLE compare per branch, not a nonlinear cascade), // [concrete] for krun. Additive, sort-disjoint from the Int rules. (has_close_elements: the pairwise // 'abs(a-b) < t' proximity test.)`
+
+### `semantics/float.k:50` — syntax 14
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(floatLt), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= floatLt(Float, Float) [function, total, symbol(floatLt), no-evaluators]`
+
+### `semantics/float.k:51` — rule 15
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule floatLt(F1:Float, F2:Float) => F1 <Float F2 [concrete]`
+
+### `semantics/float.k:52` — rule 16
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("<", F1:Float, F2:Float) => floatLt(F1, F2)`
+
+### `semantics/float.k:54` — syntax 17
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(absF), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= absF(Float) [function, total, symbol(absF), no-evaluators]`
+
+### `semantics/float.k:55` — rule 18
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule absF(F:Float) => absFloat(F) [concrete]`
+
+### `semantics/float.k:56` — rule 19
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("abs", F:Float, .Vals) => absF(F) // ==== math.ceil =========================================================== // 'import X' is a no-op (we intercept the specific math functions syntactically; 'math' itself is // never bound as a value).`
+
+### `semantics/float.k:61` — rule 20
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Import(_:String) => .K ... </k> // math.ceil(x): ceiling to an int. Intercepted at the Call BEFORE 'math' is looked up (higher // priority than the generic Attribute/method dispatch in call.k).`
+
+### `semantics/float.k:65` — syntax 21
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= "#mathCeil"`
+
+### `semantics/float.k:66` — rule 22
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Call(Attribute(Name("math"), "ceil"), (E:Expr, .Exprs)) => E ~> #mathCeil ... </k> [priority(40)]`
+
+### `semantics/float.k:67` — rule 23
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> V:Val ~> #mathCeil => ceilF(V) ... </k> // math.floor(x) — same interception shape as math.ceil`
+
+### `semantics/float.k:70` — syntax 24
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= "#mathFloor"`
+
+### `semantics/float.k:71` — rule 25
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Call(Attribute(Name("math"), "floor"), (E:Expr, .Exprs)) => E ~> #mathFloor ... </k> [priority(40)]`
+
+### `semantics/float.k:72` — rule 26
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> V:Val ~> #mathFloor => floorFI(V) ... </k>`
+
+### `semantics/float.k:73` — syntax 27
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(floorFI)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]`
+
+### `semantics/float.k:74` — rule 28
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule floorFI(I:Int) => I [concrete]`
+
+### `semantics/float.k:75` — rule 29
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule floorFI(F:Float) => Float2Int(floorFloat(F)) [concrete] // bare floor/ceil (bound by 'from math import floor, ceil')`
+
+### `semantics/float.k:78` — rule 30
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("floor", V:Val, .Vals) => floorFI(V)`
+
+### `semantics/float.k:79` — rule 31
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("ceil", V:Val, .Vals) => ceilF(V) // math.pow(x, y) — a two-arg interception onto powF (ints promote)`
+
+### `semantics/float.k:82` — syntax 32
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #mathPow1(Expr) | #mathPow2(Val)`
+
+### `semantics/float.k:83` — rule 33
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Call(Attribute(Name("math"), "pow"), (E1:Expr, E2:Expr, .Exprs)) => E1 ~> #mathPow1(E2) ... </k> [priority(40)]`
+
+### `semantics/float.k:84` — rule 34
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> V1:Val ~> #mathPow1(E2:Expr) => E2 ~> #mathPow2(V1) ... </k>`
+
+### `semantics/float.k:85` — rule 35
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> V2:Val ~> #mathPow2(V1:Val) => powF(toF(V1), toF(V2)) ... </k>`
+
+### `semantics/float.k:86` — syntax 36
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(toF)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= toF(Val) [function, total, symbol(toF)]`
+
+### `semantics/float.k:87` — rule 37
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule toF(F:Float) => F [concrete]`
+
+### `semantics/float.k:88` — rule 38
+
+- Class: `equational-rule`
+- Attributes: `concrete, concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule toF(I:Int) => intToF(I) [concrete] // ceilF: math.ceil as an Int. TOTAL (K trusts it; a symbolic list element stays opaque for // kprove — structural). [concrete] so the Int2Float/ceilFloat hooks only run for krun (llvm). // Matches Python incl. negatives: ceil(-2.4) = -2 = Float2Int(ceilFloat(-2.4)).`
+
+### `semantics/float.k:93` — syntax 39
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(ceilF)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= ceilF(Val) [function, total, symbol(ceilF)]`
+
+### `semantics/float.k:94` — rule 40
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule ceilF(I:Int) => I [concrete]`
+
+### `semantics/float.k:95` — rule 41
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule ceilF(F:Float) => Float2Int(ceilFloat(F)) [concrete] // unary minus on a float (e.g. the literal -2.4 = UnaryOp("-", Float(2.4))). Concrete for krun; // proofs use symbolic elements, never a float literal.`
+
+### `semantics/float.k:99` — rule 42
+
+- Class: `equational-rule`
+- Attributes: `no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyUn("-", F:Float) => 0.0 -Float F // ---- float - / / / + (OPAQUE for kprove [no-evaluators], concrete for krun) — for float-list // element maps (x - lo) / (hi - lo). Mirror intFloatDiv: additive, sort-disjoint from the Int rules.`
+
+### `semantics/float.k:103` — syntax 43
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(subF), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= subF(Float, Float) [function, total, symbol(subF), no-evaluators]`
+
+### `semantics/float.k:104` — rule 44
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule subF(F1:Float, F2:Float) => F1 -Float F2 [concrete]`
+
+### `semantics/float.k:105` — rule 45
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("-", F1:Float, F2:Float) => subF(F1, F2)`
+
+### `semantics/float.k:107` — syntax 46
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(divF), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= divF(Float, Float) [function, total, symbol(divF), no-evaluators]`
+
+### `semantics/float.k:108` — rule 47
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule divF(F1:Float, F2:Float) => F1 /Float F2 [concrete]`
+
+### `semantics/float.k:109` — rule 48
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("/", F1:Float, F2:Float) => divF(F1, F2)`
+
+### `semantics/float.k:111` — syntax 49
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(addF), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= addF(Float, Float) [function, total, symbol(addF), no-evaluators]`
+
+### `semantics/float.k:112` — rule 50
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule addF(F1:Float, F2:Float) => F1 +Float F2 [concrete]`
+
+### `semantics/float.k:113` — rule 51
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("+", F1:Float, F2:Float) => addF(F1, F2)`
+
+### `semantics/float.k:115` — syntax 52
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(mulF), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= mulF(Float, Float) [function, total, symbol(mulF), no-evaluators]`
+
+### `semantics/float.k:116` — rule 53
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule mulF(F1:Float, F2:Float) => F1 *Float F2 [concrete]`
+
+### `semantics/float.k:117` — rule 54
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("*", F1:Float, F2:Float) => mulF(F1, F2)`
+
+### `semantics/float.k:119` — syntax 55
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(powF), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= powF(Float, Float) [function, total, symbol(powF), no-evaluators]`
+
+### `semantics/float.k:120` — rule 56
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule powF(F1:Float, F2:Float) => F1 ^Float F2 [concrete]`
+
+### `semantics/float.k:121` — rule 57
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("**", F1:Float, F2:Float) => powF(F1, F2) // ---- the remaining comparisons (gtF promoted from find_zero — its summaries // case-split on the atom; >= / <= derive from the two opaque compares) ----`
+
+### `semantics/float.k:125` — syntax 58
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(gtF), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= gtF(Float, Float) [function, total, symbol(gtF), no-evaluators]`
+
+### `semantics/float.k:126` — rule 59
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule gtF(F1:Float, F2:Float) => F1 >Float F2 [concrete]`
+
+### `semantics/float.k:127` — rule 60
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp(">", F1:Float, F2:Float) => gtF(F1, F2)`
+
+### `semantics/float.k:128` — rule 61
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp(">=", F1:Float, F2:Float) => notBool floatLt(F1, F2)`
+
+### `semantics/float.k:129` — rule 62
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("<=", F1:Float, F2:Float) => notBool gtF(F1, F2) // ---- mixed Int/Float operators promote the Int side (n ** 0.5 etc.) ----`
+
+### `semantics/float.k:132` — rule 63
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("**", I:Int, F:Float) => powF(intToF(I), F)`
+
+### `semantics/float.k:133` — rule 64
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("**", F:Float, I:Int) => powF(F, intToF(I))`
+
+### `semantics/float.k:134` — rule 65
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("-", I:Int, F:Float) => subF(intToF(I), F)`
+
+### `semantics/float.k:135` — rule 66
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("-", F:Float, I:Int) => subF(F, intToF(I))`
+
+### `semantics/float.k:136` — rule 67
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("+", I:Int, F:Float) => addF(intToF(I), F)`
+
+### `semantics/float.k:137` — rule 68
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("+", F:Float, I:Int) => addF(F, intToF(I))`
+
+### `semantics/float.k:138` — rule 69
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("*", I:Int, F:Float) => mulF(intToF(I), F)`
+
+### `semantics/float.k:139` — rule 70
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("*", F:Float, I:Int) => mulF(F, intToF(I)) // ---- mixed Int == Float (shared eqF; opaque symbolic / concrete twin) ----`
+
+### `semantics/float.k:142` — syntax 71
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(eqF), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= eqF(Float, Float) [function, total, symbol(eqF), no-evaluators]`
+
+### `semantics/float.k:143` — rule 72
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule eqF(F1:Float, F2:Float) => F1 ==Float F2 [concrete]`
+
+### `semantics/float.k:144` — rule 73
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("==", I:Int, F:Float) => eqF(intToF(I), F)`
+
+### `semantics/float.k:145` — rule 74
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("==", F:Float, I:Int) => eqF(F, intToF(I))`
+
+### `semantics/float.k:146` — rule 75
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("!=", I:Int, F:Float) => notBool eqF(intToF(I), F)`
+
+### `semantics/float.k:147` — rule 76
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("!=", F:Float, I:Int) => notBool eqF(F, intToF(I))`
+
+### `semantics/float.k:148` — rule 77
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("<", I:Int, F:Float) => floatLt(intToF(I), F)`
+
+### `semantics/float.k:149` — rule 78
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("<", F:Float, I:Int) => floatLt(F, intToF(I))`
+
+### `semantics/float.k:150` — rule 79
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp(">", I:Int, F:Float) => gtF(intToF(I), F)`
+
+### `semantics/float.k:151` — rule 80
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp(">", F:Float, I:Int) => gtF(F, intToF(I)) // ---- x == None (promoted from 137; 'is' cases live in operators.k) ----`
+
+### `semantics/float.k:154` — rule 81
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("==", V:Val, noneV) => V ==K noneV`
+
+### `semantics/float.k:155` — rule 82
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("!=", V:Val, noneV) => notBool (V ==K noneV) // ---- float(str): decimal parse (promoted from 137's defined chain) ---- // digits '.' digits, optional leading '-'; concrete evaluation only (the // symbolic side stays an opaque decStrToF term a proof case-splits on).`
+
+### `semantics/float.k:160` — syntax 83
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(decStrToF), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= decStrToF(IntSeq) [function, total, symbol(decStrToF), no-evaluators]`
+
+### `semantics/float.k:161` — rule 84
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule decStrToF(iCons(45, CS:IntSeq)) => 0.0 -Float decStrToF(CS) [concrete]`
+
+### `semantics/float.k:162` — rule 85
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule decStrToF(CS:IntSeq) => intToF(intPart(CS)) +Float (intToF(fracPart(CS)) /Float intToF(fracScale(CS))) requires isLen(CS) >Int 0 andBool headIS(CS) =/=Int 45 [concrete]`
+
+### `semantics/float.k:165` — syntax 86
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= headIS(IntSeq) [function]`
+
+### `semantics/float.k:166` — rule 87
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule headIS(iCons(C:Int, _:IntSeq)) => C`
+
+### `semantics/float.k:167` — syntax 88
+
+- Class: `function-declaration`
+- Attributes: `function, total, function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= intPart(IntSeq) [function, total] | intPartAcc(IntSeq, Int) [function, total]`
+
+### `semantics/float.k:168` — rule 89
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule intPart(CS:IntSeq) => intPartAcc(CS, 0)`
+
+### `semantics/float.k:169` — rule 90
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule intPartAcc(.IntSeq, A:Int) => A`
+
+### `semantics/float.k:170` — rule 91
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule intPartAcc(iCons(46, _:IntSeq), A:Int) => A`
+
+### `semantics/float.k:171` — rule 92
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule intPartAcc(iCons(C:Int, R:IntSeq), A:Int) => intPartAcc(R, A *Int 10 +Int (C -Int 48)) requires C =/=Int 46`
+
+### `semantics/float.k:173` — syntax 93
+
+- Class: `function-declaration`
+- Attributes: `function, total, function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= fracPart(IntSeq) [function, total] | fracAcc(IntSeq, Int) [function, total]`
+
+### `semantics/float.k:174` — rule 94
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule fracPart(.IntSeq) => 0`
+
+### `semantics/float.k:175` — rule 95
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule fracPart(iCons(46, R:IntSeq)) => fracAcc(R, 0)`
+
+### `semantics/float.k:176` — rule 96
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule fracPart(iCons(C:Int, R:IntSeq)) => fracPart(R) requires C =/=Int 46`
+
+### `semantics/float.k:177` — rule 97
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule fracAcc(.IntSeq, A:Int) => A`
+
+### `semantics/float.k:178` — rule 98
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule fracAcc(iCons(C:Int, R:IntSeq), A:Int) => fracAcc(R, A *Int 10 +Int (C -Int 48))`
+
+### `semantics/float.k:179` — syntax 99
+
+- Class: `function-declaration`
+- Attributes: `function, total, function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= fracScale(IntSeq) [function, total] | fscAcc(IntSeq, Int) [function, total]`
+
+### `semantics/float.k:180` — rule 100
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule fracScale(.IntSeq) => 1`
+
+### `semantics/float.k:181` — rule 101
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule fracScale(iCons(46, R:IntSeq)) => fscAcc(R, 1)`
+
+### `semantics/float.k:182` — rule 102
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule fracScale(iCons(C:Int, R:IntSeq)) => fracScale(R) requires C =/=Int 46`
+
+### `semantics/float.k:183` — rule 103
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule fscAcc(.IntSeq, A:Int) => A`
+
+### `semantics/float.k:184` — rule 104
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule fscAcc(iCons(_:Int, R:IntSeq), A:Int) => fscAcc(R, A *Int 10)`
+
+### `semantics/float.k:185` — rule 105
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("float", str(CS:IntSeq), .Vals) => decStrToF(CS)`
+
+### `semantics/float.k:186` — rule 106
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("float", I:Int, .Vals) => intToF(I)`
+
+### `semantics/float.k:187` — rule 107
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("float", F:Float, .Vals) => F // ---- float / int division (promoted from mean_absolute_deviation) ----`
+
+### `semantics/float.k:190` — syntax 108
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(divFloatIntV), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= divFloatIntV(Float, Int) [function, total, symbol(divFloatIntV), no-evaluators]`
+
+### `semantics/float.k:191` — rule 109
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule divFloatIntV(F:Float, I:Int) => F /Float Int2Float(I, 53, 11) [concrete]`
+
+### `semantics/float.k:192` — rule 110
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("/", F:Float, I:Int) => divFloatIntV(F, I) // ---- int -> float promotion for the remaining mixed arithmetic/compares ----`
+
+### `semantics/float.k:195` — syntax 111
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(intToF), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= intToF(Int) [function, total, symbol(intToF), no-evaluators]`
+
+### `semantics/float.k:196` — rule 112
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule intToF(I:Int) => Int2Float(I, 53, 11) [concrete]`
+
+### `semantics/float.k:197` — rule 113
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("+", I:Int, F:Float) => addF(intToF(I), F)`
+
+### `semantics/float.k:198` — rule 114
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("+", F:Float, I:Int) => addF(F, intToF(I))`
+
+### `semantics/float.k:199` — rule 115
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("-", I:Int, F:Float) => subF(intToF(I), F)`
+
+### `semantics/float.k:200` — rule 116
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("-", F:Float, I:Int) => subF(F, intToF(I))`
+
+### `semantics/float.k:201` — rule 117
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("*", I:Int, F:Float) => mulF(intToF(I), F)`
+
+### `semantics/float.k:202` — rule 118
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("*", F:Float, I:Int) => mulF(F, intToF(I))`
+
+### `semantics/float.k:203` — rule 119
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("<", I:Int, F:Float) => floatLt(intToF(I), F)`
+
+### `semantics/float.k:204` — rule 120
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("<", F:Float, I:Int) => floatLt(F, intToF(I))`
+
+### `semantics/float.k:205` — rule 121
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp(">", I:Int, F:Float) => gtF(intToF(I), F)`
+
+### `semantics/float.k:206` — rule 122
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp(">", F:Float, I:Int) => gtF(F, intToF(I)) // ---- conversions: int(float) truncates toward zero; float(int); round; math.sqrt ----`
+
+### `semantics/float.k:209` — syntax 123
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(truncF), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= truncF(Float) [function, total, symbol(truncF), no-evaluators]`
+
+### `semantics/float.k:210` — rule 124
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule truncF(F:Float) => #if F >=Float 0.0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi [concrete]`
+
+### `semantics/float.k:211` — rule 125
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("int", F:Float, .Vals) => truncF(F)`
+
+### `semantics/float.k:213` — rule 126
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("float", I:Int, .Vals) => intToF(I)`
+
+### `semantics/float.k:214` — rule 127
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("float", F:Float, .Vals) => F // round: Python half-even (banker's); round(F, N) scales by 10^N`
+
+### `semantics/float.k:217` — syntax 128
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(roundF), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= roundF(Float) [function, total, symbol(roundF), no-evaluators]`
+
+### `semantics/float.k:218` — rule 129
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule roundF(F:Float) => #if (F -Float floorFloat(F)) ==Float 0.5 #then (#if Float2Int(floorFloat(F)) %Int 2 ==Int 0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi) #else Float2Int(floorFloat(F +Float 0.5)) #fi [concrete]`
+
+### `semantics/float.k:223` — syntax 130
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(roundFN), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= roundFN(Float, Int) [function, total, symbol(roundFN), no-evaluators]`
+
+### `semantics/float.k:224` — rule 131
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule roundFN(F:Float, N:Int) => Int2Float(roundF(F *Float Int2Float(10 ^Int N, 53, 11)), 53, 11) /Float Int2Float(10 ^Int N, 53, 11) [concrete]`
+
+### `semantics/float.k:227` — rule 132
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("round", F:Float, .Vals) => roundF(F)`
+
+### `semantics/float.k:228` — rule 133
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBuiltin("round", F:Float, N:Int, .Vals) => roundFN(F, N)`
+
+### `semantics/float.k:230` — syntax 134
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(sqrtF), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Float ::= sqrtF(Float) [function, total, symbol(sqrtF), no-evaluators]`
+
+### `semantics/float.k:231` — rule 135
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule sqrtF(F:Float) => sqrtFloat(F) [concrete]`
+
+### `semantics/float.k:232` — syntax 136
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= "#mathSqrt"`
+
+### `semantics/float.k:233` — rule 137
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Call(Attribute(Name("math"), "sqrt"), (E:Expr, .Exprs)) => E ~> #mathSqrt ... </k> [priority(40)]`
+
+### `semantics/float.k:234` — rule 138
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> F:Float ~> #mathSqrt => sqrtF(F) ... </k>`
+
+### `semantics/float.k:235` — rule 139
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> I:Int ~> #mathSqrt => sqrtF(intToF(I)) ... </k> // ---- min / max over a FLOAT list — FLOAT branch of the shared #minCont0/#maxCont0 folds (which // seed/step with 'requires isInt(V)', so they are STUCK on floats). These add the 'requires // isFloat(V)' seed + a Float-accumulator fold via K's minFloat/maxFloat — concrete for krun. A proof // over a SYMBOLIC float list intercepts min/max problem-locally to an opaque minVF/maxVF (at // #applyK, priority 40, in its verification.k) BEFORE #minAcc0, so this fold is krun-only. Additive: // the isFloat guard is disjoint from the existing isInt one.`
+
+### `semantics/float.k:243` — syntax 140
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #maxAccF(Iterable, Float) | #maxContF(Float)`
+
+### `semantics/float.k:244` — rule 141
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAccF(R, {V}:>Float) ... </k> requires isFloat(V)`
+
+### `semantics/float.k:245` — rule 142
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #maxAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #maxContF(M) ... </k>`
+
+### `semantics/float.k:246` — rule 143
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterDone ~> #maxContF(M:Float) => M ... </k>`
+
+### `semantics/float.k:247` — rule 144
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxContF(M:Float) => #maxAccF(R, maxFloat(M, {V}:>Float)) ... </k> requires isFloat(V)`
+
+### `semantics/float.k:250` — syntax 145
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #minAccF(Iterable, Float) | #minContF(Float)`
+
+### `semantics/float.k:251` — rule 146
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAccF(R, {V}:>Float) ... </k> requires isFloat(V)`
+
+### `semantics/float.k:252` — rule 147
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #minAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #minContF(M) ... </k>`
+
+### `semantics/float.k:253` — rule 148
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterDone ~> #minContF(M:Float) => M ... </k>`
+
+### `semantics/float.k:254` — rule 149
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, R:Iterable) ~> #minContF(M:Float) => #minAccF(R, minFloat(M, {V}:>Float)) ... </k> requires isFloat(V) // ---- sum over a float list (krun; mirrors the min/max float paths). The Int-only shared // #sumCont sticks on a Float yield; switch to a Float-headed fold via addF (concrete twin). // The switch guard carries the SYNTACTIC negation of the Int rule's guard so a symbolic proof // with isInt(V) in its path condition refutes this branch without sort reasoning.`
+
+### `semantics/float.k:261` — syntax 150
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #sumAccF(Iterable, Float) | #sumContF(Float)`
+
+### `semantics/float.k:262` — rule 151
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int) => #sumAccF(R, addF(intToF(ACC), {V}:>Float)) ... </k> requires isFloat(V) andBool notBool (isInt(V) orBool isBool(V))`
+
+### `semantics/float.k:265` — rule 152
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #sumAccF(IT:Iterable, ACC:Float) => #iterNext(IT) ~> #sumContF(ACC) ... </k>`
+
+### `semantics/float.k:266` — rule 153
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterDone ~> #sumContF(ACC:Float) => ACC ... </k>`
+
+### `semantics/float.k:267` — rule 154
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float) => #sumAccF(R, addF(ACC, {V}:>Float)) ... </k> requires isFloat(V)`
+
+### `semantics/float.k:270` — rule 155
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float) => #sumAccF(R, addF(ACC, intToF(intOf(V)))) ... </k> requires isInt(V) orBool isBool(V)`
+
+## `semantics/functions.k`
+
+Records: 19
+
+### `semantics/functions.k:8` — syntax 1
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= frame(continuation: K, callerEnv: Int, savedLoc: Int) | #bindP(ParamNames, Vals) | "#pop" | "#endcall" // ==== def / anonymous closure =============================================`
+
+### `semantics/functions.k:14` — rule 2
+
+- Class: `operational-rule`
+- Attributes: `F <- closureVal(PNS, BODY, L)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ F <- closureVal(PNS, BODY, L) ], _) ... </scopes>`
+
+### `semantics/functions.k:18` — syntax 3
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Expr ::= closureExpr(ParamNames, Stmts)`
+
+### `semantics/functions.k:19` — rule 4
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> closureExpr(PNS:ParamNames, BODY:Stmts) => closureVal(PNS, BODY, L) ... </k> <env> L:Int </env> // ==== annotated def/lambda (closure cells; spec 2.3) ====================== // closureValC(params, cellvars, body, captured-cells). No frame anchor: all // enclosing-local reads are freevars (symtable-complete) and go through the // captured cells; everything else is global/builtin, so the callee frame's // parent is the module scope (0) — sound after the defining frame dies.`
+
+### `semantics/functions.k:27` — syntax 5
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Val ::= closureValC(ParamNames, ParamNames, Stmts, Map) // capture: resolve each freevar to the enclosing frame's cellRef, then bind // (FuncDef) or yield (Lambda) the closure value.`
+
+### `semantics/functions.k:31` — syntax 6
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #mkClosure(String, ParamNames, ParamNames, ParamNames, Stmts, Map) | #mkLambda(ParamNames, ParamNames, ParamNames, Stmts, Map)`
+
+### `semantics/functions.k:33` — rule 7
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> FuncDef(F:String, Params(PNS:ParamNames), CellVars(CVS:ParamNames), FreeVars(FVS:ParamNames), BODY:Stmts) => #mkClosure(F, PNS, CVS, FVS, BODY, .Map) ... </k>`
+
+### `semantics/functions.k:36` — rule 8
+
+- Class: `operational-rule`
+- Attributes: `FV <- {M[FV`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames, (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map) => #mkClosure(F, PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires FV in_keys(M)`
+
+### `semantics/functions.k:42` — rule 9
+
+- Class: `operational-rule`
+- Attributes: `F <- closureValC(PNS, CVS, BODY, CM)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ F <- closureValC(PNS, CVS, BODY, CM) ], _) ... </scopes>`
+
+### `semantics/functions.k:47` — rule 10
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Lambda(Params(PNS:ParamNames), E:Expr) => closureVal(PNS, Return(E) .Stmts, L) ... </k> <env> L:Int </env>`
+
+### `semantics/functions.k:50` — rule 11
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Lambda(Params(PNS:ParamNames), CellVars(CVS:ParamNames), FreeVars(FVS:ParamNames), E:Expr) => #mkLambda(PNS, CVS, FVS, Return(E) .Stmts, .Map) ... </k>`
+
+### `semantics/functions.k:53` — rule 12
+
+- Class: `operational-rule`
+- Attributes: `FV <- {M[FV`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map) => #mkLambda(PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires FV in_keys(M)`
+
+### `semantics/functions.k:59` — rule 13
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map) => closureValC(PNS, CVS, BODY, CM) ... </k> // ==== bind params ========================================================`
+
+### `semantics/functions.k:63` — rule 14
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>`
+
+### `semantics/functions.k:64` — rule 15
+
+- Class: `operational-rule`
+- Attributes: `P <- V`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ P <- V ], _) ... </scopes> // a param that is a cellvar was pre-bound to its cell at frame entry`
+
+### `semantics/functions.k:68` — rule 16
+
+- Class: `operational-rule`
+- Attributes: `P, "$cells", P, priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #cellW({M[P]}:>Val, V) ~> #bindP(PS, VS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(P, cellsOf({M["$cells"]}:>Val)) andBool P in_keys(M) andBool isCellRef({M[P]}:>Val) [priority(40)] // ==== return / pop the frame (the returned expr evaluates by strictness) ==`
+
+### `semantics/functions.k:78` — rule 17
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> Return(V:Val) ~> _ => #pop </k> <ret> noRet => retV(V) </ret>`
+
+### `semantics/functions.k:80` — rule 18
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #endcall => #pop ... </k> <ret> noRet => retV(noneV) </ret> // pop: restore env, DEALLOCATE the callee frame, and wind scopeLoc back (LIFO allocation // makes the saved loc the callee frame's own loc). Sound because no closureVal outlives its // defining frame (frontend subset: no returned/stored closures; module defs live in loc 0).`
+
+### `semantics/functions.k:85` — rule 19
+
+- Class: `operational-rule`
+- Attributes: `L <- undef`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #pop => V ~> CONT </k> <ret> retV(V) => noRet </ret> <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack> <env> L:Int => CALLERL </env> <scopes> SC:Map => SC [ L <- undef ] </scopes> <scopeLoc> _ => SAVEDL </scopeLoc>`
+
+## `semantics/int.k`
+
+Records: 17
+
+### `semantics/int.k:7` — rule 1
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyUn("-", I:Int) => 0 -Int I`
+
+### `semantics/int.k:9` — rule 2
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyBin("+", I1:Int, I2:Int) => I1 +Int I2 // Bool participates in int arithmetic (x += (a == b))`
+
+### `semantics/int.k:11` — rule 3
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyBin("+", I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi`
+
+### `semantics/int.k:12` — rule 4
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyBin("+", B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I`
+
+### `semantics/int.k:13` — rule 5
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyBin("-", I1:Int, I2:Int) => I1 -Int I2`
+
+### `semantics/int.k:14` — rule 6
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyBin("*", I1:Int, I2:Int) => I1 *Int I2`
+
+### `semantics/int.k:15` — rule 7
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyBin("%", I1:Int, I2:Int) => pyMod(I1, I2)`
+
+### `semantics/int.k:16` — rule 8
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2`
+
+### `semantics/int.k:17` — rule 9
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0`
+
+### `semantics/int.k:19` — syntax 10
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Int ::= pyMod(Int, Int) [function]`
+
+### `semantics/int.k:20` — rule 11
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2`
+
+### `semantics/int.k:22` — rule 12
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyCmp("<", I1:Int, I2:Int) => I1 <Int I2`
+
+### `semantics/int.k:23` — rule 13
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyCmp("<=", I1:Int, I2:Int) => I1 <=Int I2`
+
+### `semantics/int.k:24` — rule 14
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyCmp(">", I1:Int, I2:Int) => I1 >Int I2`
+
+### `semantics/int.k:25` — rule 15
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyCmp(">=", I1:Int, I2:Int) => I1 >=Int I2`
+
+### `semantics/int.k:26` — rule 16
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyCmp("==", I1:Int, I2:Int) => I1 ==Int I2`
+
+### `semantics/int.k:27` — rule 17
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyCmp("!=", I1:Int, I2:Int) => I1 =/=Int I2`
+
+## `semantics/iter.k`
+
+Records: 1
+
+### `semantics/iter.k:8` — syntax 1
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #iterNext(Iterable) | "#iterDone" | #iterYield(Val, Iterable)`
+
+## `semantics/list.k`
+
+Records: 32
+
+### `semantics/list.k:9` — rule 1
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #iterNext(list(.ValSeq)) => #iterDone ... </k>`
+
+### `semantics/list.k:10` — rule 2
+
+- Class: `operational-rule`
+- Attributes: `...`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #iterNext(list(vCons(V:Val, R:ValSeq))) => #iterYield(V, list(R)) ... </k> // ==== ListExpr: [...] literal -> a fresh heap object =======================`
+
+### `semantics/list.k:13` — syntax 3
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax ApplyK ::= "toList"`
+
+### `semantics/list.k:14` — rule 4
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>`
+
+### `semantics/list.k:15` — rule 5
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k> // ==== list ops: + / == / != ===============================================`
+
+### `semantics/list.k:18` — syntax 6
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]`
+
+### `semantics/list.k:19` — rule 7
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule valSeqConcat(.ValSeq, T:ValSeq) => T`
+
+### `semantics/list.k:20` — rule 8
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T)) // list + list constructs a NEW object (k-cell — it allocates; operands land here // already deref'd). priority(45) beats the generic BinOp dispatch.`
+
+### `semantics/list.k:24` — rule 9
+
+- Class: `operational-rule`
+- Attributes: `priority(45)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k> [priority(45)]`
+
+### `semantics/list.k:27` — rule 10
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B`
+
+### `semantics/list.k:28` — rule 11
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B) // ==== deep equality when elements are heap objects (list-of-lists) ======== // Python == is structural at every depth. Fires ONLY when a ref is present // (the guard decides on concrete seqs); the plain ==K path above is unchanged.`
+
+### `semantics/list.k:33` — syntax 12
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= hasRefVS(ValSeq) [function, total]`
+
+### `semantics/list.k:34` — rule 13
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule hasRefVS(.ValSeq) => false`
+
+### `semantics/list.k:35` — rule 14
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule hasRefVS(vCons(V:Val, R:ValSeq)) => isRefV(V) orBool hasRefVS(R)`
+
+### `semantics/list.k:37` — syntax 15
+
+- Class: `function-declaration`
+- Attributes: `function, function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= deepEqVS(ValSeq, ValSeq, Map) [function] | deepEqV(Val, Val, Map) [function]`
+
+### `semantics/list.k:39` — rule 16
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule deepEqVS(.ValSeq, .ValSeq, _:Map) => true`
+
+### `semantics/list.k:40` — rule 17
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule deepEqVS(.ValSeq, vCons(_:Val, _:ValSeq), _:Map) => false`
+
+### `semantics/list.k:41` — rule 18
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule deepEqVS(vCons(_:Val, _:ValSeq), .ValSeq, _:Map) => false`
+
+### `semantics/list.k:42` — rule 19
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule deepEqVS(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq), HP:Map) => deepEqV(A, B, HP) andBool deepEqVS(As, Bs, HP)`
+
+### `semantics/list.k:45` — rule 20
+
+- Class: `equational-rule`
+- Attributes: `H`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule deepEqV(ref(H:Int), B:Val, HP:Map) => deepEqV({HP[H]}:>Val, B, HP) requires H in_keys(HP)`
+
+### `semantics/list.k:47` — rule 21
+
+- Class: `equational-rule`
+- Attributes: `H`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule deepEqV(A:Val, ref(H:Int), HP:Map) => deepEqV(A, {HP[H]}:>Val, HP) requires notBool isRefV(A) andBool H in_keys(HP)`
+
+### `semantics/list.k:49` — rule 22
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule deepEqV(list(A:ValSeq), list(B:ValSeq), HP:Map) => deepEqVS(A, B, HP)`
+
+### `semantics/list.k:50` — rule 23
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule deepEqV(A:Val, B:Val, _:Map) => A ==K B [owise] // ==== mutator: xs.append(v) — an in-place heap write ======================`
+
+### `semantics/list.k:53` — rule 24
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "append")), (V:Val, .Vals)) => noneV ... </k> <heap> ... H |-> list(VS:ValSeq => valSeqConcat(VS, vCons(V, .ValSeq))) ... </heap> [priority(40)] // ==== 'x in list' — a <k>-cell fold over #iterNext ========================`
+
+### `semantics/list.k:58` — syntax 25
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #memberAcc(Val, Iterable) | #memberCont(Val) | "#notB"`
+
+### `semantics/list.k:59` — rule 26
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Compare(LV:Val, CmpOp("in", list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ... </k>`
+
+### `semantics/list.k:60` — rule 27
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Compare(LV:Val, CmpOp("not in", list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ~> #notB ... </k>`
+
+### `semantics/list.k:61` — rule 28
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #memberAcc(V:Val, IT:Iterable) => #iterNext(IT) ~> #memberCont(V) ... </k>`
+
+### `semantics/list.k:62` — rule 29
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterDone ~> #memberCont(_V:Val) => false ... </k>`
+
+### `semantics/list.k:63` — rule 30
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(E:Val, _:Iterable) ~> #memberCont(V:Val) => true ... </k> requires E ==K V`
+
+### `semantics/list.k:65` — rule 31
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterYield(E:Val, R:Iterable) ~> #memberCont(V:Val) => #memberAcc(V, R) ... </k> requires notBool (E ==K V)`
+
+### `semantics/list.k:67` — rule 32
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> B:Bool ~> #notB => notBool B ... </k>`
+
+## `semantics/methods.k`
+
+Records: 102
+
+### `semantics/methods.k:10` — syntax 1
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Val ::= applyMethod(Val, String, Vals) [function] // ==== string predicates (Python semantics) =================================`
+
+### `semantics/methods.k:13` — rule 2
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)`
+
+### `semantics/methods.k:14` — rule 3
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)`
+
+### `semantics/methods.k:15` — rule 4
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)`
+
+### `semantics/methods.k:16` — rule 5
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS) // ==== case maps ============================================================`
+
+### `semantics/methods.k:19` — rule 6
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(str(CS:IntSeq), "lower", .Vals) => str(mapLower(CS))`
+
+### `semantics/methods.k:20` — rule 7
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(str(CS:IntSeq), "upper", .Vals) => str(mapUpper(CS))`
+
+### `semantics/methods.k:21` — rule 8
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(str(CS:IntSeq), "swapcase", .Vals) => str(mapSwap(CS)) // ==== join / count / strip / encode ======================================== // S.join(list-of-str): fold with separator codes (receiver + arg deref'd by // the call layer; the result str is a value)`
+
+### `semantics/methods.k:26` — rule 9
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(str(SEP:IntSeq), "join", list(VS:ValSeq), .Vals) => str(joinCodes(SEP, VS))`
+
+### `semantics/methods.k:27` — syntax 10
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]`
+
+### `semantics/methods.k:28` — rule 11
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule joinCodes(_:IntSeq, .ValSeq) => .IntSeq`
+
+### `semantics/methods.k:29` — rule 12
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule joinCodes(_:IntSeq, vCons(str(CS:IntSeq), .ValSeq)) => CS`
+
+### `semantics/methods.k:30` — rule 13
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule joinCodes(SEP:IntSeq, vCons(str(CS:IntSeq), vCons(V:Val, R:ValSeq))) => seqConcat(CS, seqConcat(SEP, joinCodes(SEP, vCons(V, R)))) // S.count(sub): non-overlapping window scan (Python str.count)`
+
+### `semantics/methods.k:34` — rule 14
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)`
+
+### `semantics/methods.k:35` — syntax 15
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= cntSub(IntSeq, IntSeq) [function]`
+
+### `semantics/methods.k:36` — rule 16
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule cntSub(.IntSeq, _:IntSeq) => 0`
+
+### `semantics/methods.k:37` — rule 17
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC) requires strPrefix(PC, iCons(C, R)) andBool isLen(PC) >Int 0`
+
+### `semantics/methods.k:39` — rule 18
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => cntSub(R, PC) requires notBool strPrefix(PC, iCons(C, R)) orBool isLen(PC) <=Int 0`
+
+### `semantics/methods.k:41` — syntax 19
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= dropIS(IntSeq, Int) [function, total]`
+
+### `semantics/methods.k:42` — rule 20
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dropIS(S:IntSeq, N:Int) => S requires N <=Int 0`
+
+### `semantics/methods.k:43` — rule 21
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dropIS(.IntSeq, _:Int) => .IntSeq [owise]`
+
+### `semantics/methods.k:44` — rule 22
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dropIS(iCons(_:Int, R:IntSeq), N:Int) => dropIS(R, N -Int 1) requires N >Int 0 // S.strip(): trim whitespace runs from both ends`
+
+### `semantics/methods.k:47` — rule 23
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(str(CS:IntSeq), "strip", .Vals) => str(revIS(trimWS(revIS(trimWS(CS)))))`
+
+### `semantics/methods.k:48` — syntax 24
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= trimWS(IntSeq) [function, total]`
+
+### `semantics/methods.k:49` — rule 25
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule trimWS(.IntSeq) => .IntSeq`
+
+### `semantics/methods.k:50` — rule 26
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule trimWS(iCons(C:Int, R:IntSeq)) => trimWS(R) requires isWSC(C)`
+
+### `semantics/methods.k:51` — rule 27
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule trimWS(iCons(C:Int, R:IntSeq)) => iCons(C, R) requires notBool isWSC(C)`
+
+### `semantics/methods.k:52` — syntax 28
+
+- Class: `function-declaration`
+- Attributes: `function, total, function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= revIS(IntSeq) [function, total] | revISAcc(IntSeq, IntSeq) [function, total]`
+
+### `semantics/methods.k:53` — rule 29
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule revIS(S:IntSeq) => revISAcc(S, .IntSeq)`
+
+### `semantics/methods.k:54` — rule 30
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule revISAcc(.IntSeq, A:IntSeq) => A`
+
+### `semantics/methods.k:55` — rule 31
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule revISAcc(iCons(C:Int, R:IntSeq), A:IntSeq) => revISAcc(R, iCons(C, A)) // S.encode('ascii'): identity on the code-sequence model (bytes == codes)`
+
+### `semantics/methods.k:58` — rule 32
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(str(CS:IntSeq), "encode", str(_:IntSeq), .Vals) => str(CS) // ==== prefix ===============================================================`
+
+### `semantics/methods.k:61` — rule 33
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC) // ==== list.count(v) — number of occurrences of v in the list (concrete for krun) ==========`
+
+### `semantics/methods.k:64` — rule 34
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)`
+
+### `semantics/methods.k:65` — syntax 35
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= cntOccVS(ValSeq, Val) [function, total]`
+
+### `semantics/methods.k:66` — rule 36
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule cntOccVS(.ValSeq, _:Val) => 0`
+
+### `semantics/methods.k:67` — rule 37
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V`
+
+### `semantics/methods.k:68` — rule 38
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => cntOccVS(R, V) requires notBool (A ==K V) // ==== split (no-arg: on whitespace runs, dropping empty tokens) + replace (single char) ========== // Concrete string ops for krun. A proof over a symbolic string intercepts the split problem-locally.`
+
+### `semantics/methods.k:72` — rule 39
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals) => #alloc(list(splitWS(CS, .IntSeq, .ValSeq))) ... </k> [priority(40)]`
+
+### `semantics/methods.k:75` — syntax 40
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= splitWS(IntSeq, IntSeq, ValSeq) [function] // remaining, current token, result`
+
+### `semantics/methods.k:76` — rule 41
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule splitWS(.IntSeq, CUR:IntSeq, ACC:ValSeq) => flushTok(ACC, CUR)`
+
+### `semantics/methods.k:77` — rule 42
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, .IntSeq, flushTok(ACC, CUR)) requires isWSC(C)`
+
+### `semantics/methods.k:79` — rule 43
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, seqConcat(CUR, iCons(C, .IntSeq)), ACC) requires notBool isWSC(C) // flush the current token to the result list iff non-empty.`
+
+### `semantics/methods.k:82` — syntax 44
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= flushTok(ValSeq, IntSeq) [function]`
+
+### `semantics/methods.k:83` — rule 45
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule flushTok(ACC:ValSeq, .IntSeq) => ACC`
+
+### `semantics/methods.k:84` — rule 46
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule flushTok(ACC:ValSeq, iCons(C:Int, T:IntSeq)) => valSeqConcat(ACC, vCons(str(iCons(C, T)), .ValSeq))`
+
+### `semantics/methods.k:85` — syntax 47
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= isWSC(Int) [function, total]`
+
+### `semantics/methods.k:86` — rule 48
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule isWSC(C:Int) => C ==Int 32 orBool C ==Int 9 orBool C ==Int 10 orBool C ==Int 13 // split(sep='x') keyword form delegates to the positional k-cell rule`
+
+### `semantics/methods.k:89` — rule 49
+
+- Class: `operational-rule`
+- Attributes: `priority(39)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (kwV("sep", str(S:IntSeq)), .Vals)) => #applyK(toCall(boundMethodV(str(CS), "split")), (str(S), .Vals)) ... </k> [priority(39)] // str.split(sep) — single-char separator, KEEPING empty parts (Python's sep-split; len == #sep + 1).`
+
+### `semantics/methods.k:94` — rule 50
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (str(iCons(SEP:Int, .IntSeq)), .Vals)) => #alloc(list(splitSep(CS, SEP, .IntSeq))) ... </k> [priority(40)]`
+
+### `semantics/methods.k:97` — syntax 51
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= splitSep(IntSeq, Int, IntSeq) [function] // remaining, sep code, current token`
+
+### `semantics/methods.k:98` — rule 52
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule splitSep(.IntSeq, _SEP:Int, CUR:IntSeq) => vCons(str(CUR), .ValSeq)`
+
+### `semantics/methods.k:99` — rule 53
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => vCons(str(CUR), splitSep(R, SEP, .IntSeq)) requires C ==Int SEP`
+
+### `semantics/methods.k:101` — rule 54
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => splitSep(R, SEP, seqConcat(CUR, iCons(C, .IntSeq))) requires notBool (C ==Int SEP)`
+
+### `semantics/methods.k:104` — rule 55
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(str(CS:IntSeq), "replace", str(iCons(A:Int, .IntSeq)), str(iCons(B:Int, .IntSeq)), .Vals) => str(replaceC(CS, A, B))`
+
+### `semantics/methods.k:106` — syntax 56
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= replaceC(IntSeq, Int, Int) [function, total]`
+
+### `semantics/methods.k:107` — rule 57
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule replaceC(.IntSeq, _:Int, _:Int) => .IntSeq`
+
+### `semantics/methods.k:108` — rule 58
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(B, replaceC(R, A, B)) requires C ==Int A`
+
+### `semantics/methods.k:109` — rule 59
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(C, replaceC(R, A, B)) requires notBool (C ==Int A) // ==== char helpers =========================================================`
+
+### `semantics/methods.k:112` — syntax 60
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= isUpperC(Int) [function, total]`
+
+### `semantics/methods.k:113` — rule 61
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90`
+
+### `semantics/methods.k:115` — syntax 62
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= isLowerC(Int) [function, total]`
+
+### `semantics/methods.k:116` — rule 63
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122`
+
+### `semantics/methods.k:118` — syntax 64
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= isAlphaC(Int) [function, total]`
+
+### `semantics/methods.k:119` — rule 65
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)`
+
+### `semantics/methods.k:121` — syntax 66
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= isDigitC(Int) [function, total]`
+
+### `semantics/methods.k:122` — rule 67
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57`
+
+### `semantics/methods.k:124` — syntax 68
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= hasUpper(IntSeq) [function, total]`
+
+### `semantics/methods.k:125` — rule 69
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule hasUpper(.IntSeq) => false`
+
+### `semantics/methods.k:126` — rule 70
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)`
+
+### `semantics/methods.k:128` — syntax 71
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= hasLower(IntSeq) [function, total]`
+
+### `semantics/methods.k:129` — rule 72
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule hasLower(.IntSeq) => false`
+
+### `semantics/methods.k:130` — rule 73
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)`
+
+### `semantics/methods.k:132` — syntax 74
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= allAlpha(IntSeq) [function, total]`
+
+### `semantics/methods.k:133` — rule 75
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule allAlpha(.IntSeq) => true`
+
+### `semantics/methods.k:134` — rule 76
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)`
+
+### `semantics/methods.k:136` — syntax 77
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= allDigit(IntSeq) [function, total]`
+
+### `semantics/methods.k:137` — rule 78
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule allDigit(.IntSeq) => true`
+
+### `semantics/methods.k:138` — rule 79
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)`
+
+### `semantics/methods.k:140` — syntax 80
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= lowerC(Int) [function, total]`
+
+### `semantics/methods.k:142` — rule 81
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)`
+
+### `semantics/methods.k:143` — rule 82
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule lowerC(C:Int) => C [owise]`
+
+### `semantics/methods.k:145` — syntax 83
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= upperC(Int) [function, total]`
+
+### `semantics/methods.k:146` — rule 84
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule upperC(C:Int) => C -Int 32 requires isLowerC(C)`
+
+### `semantics/methods.k:147` — rule 85
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule upperC(C:Int) => C [owise]`
+
+### `semantics/methods.k:149` — syntax 86
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= swapC(Int) [function, total]`
+
+### `semantics/methods.k:150` — rule 87
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule swapC(C:Int) => C +Int 32 requires isUpperC(C)`
+
+### `semantics/methods.k:151` — rule 88
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule swapC(C:Int) => C -Int 32 requires isLowerC(C)`
+
+### `semantics/methods.k:152` — rule 89
+
+- Class: `equational-rule`
+- Attributes: `owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule swapC(C:Int) => C [owise]`
+
+### `semantics/methods.k:154` — syntax 90
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= mapLower(IntSeq) [function, total]`
+
+### `semantics/methods.k:155` — rule 91
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule mapLower(.IntSeq) => .IntSeq`
+
+### `semantics/methods.k:156` — rule 92
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule mapLower(iCons(C:Int, S:IntSeq)) => iCons(lowerC(C), mapLower(S))`
+
+### `semantics/methods.k:158` — syntax 93
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= mapUpper(IntSeq) [function, total]`
+
+### `semantics/methods.k:159` — rule 94
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule mapUpper(.IntSeq) => .IntSeq`
+
+### `semantics/methods.k:160` — rule 95
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule mapUpper(iCons(C:Int, S:IntSeq)) => iCons(upperC(C), mapUpper(S))`
+
+### `semantics/methods.k:162` — syntax 96
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= mapSwap(IntSeq) [function, total]`
+
+### `semantics/methods.k:163` — rule 97
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule mapSwap(.IntSeq) => .IntSeq`
+
+### `semantics/methods.k:164` — rule 98
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule mapSwap(iCons(C:Int, S:IntSeq)) => iCons(swapC(C), mapSwap(S))`
+
+### `semantics/methods.k:166` — syntax 99
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= startsWith(IntSeq, IntSeq) [function, total]`
+
+### `semantics/methods.k:167` — rule 100
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule startsWith(.IntSeq, _:IntSeq) => true`
+
+### `semantics/methods.k:168` — rule 101
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule startsWith(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+
+### `semantics/methods.k:169` — rule 102
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule startsWith(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool startsWith(As, Bs)`
+
+## `semantics/operators.k`
+
+Records: 12
+
+### `semantics/operators.k:10` — rule 1
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>`
+
+### `semantics/operators.k:12` — rule 2
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k> // Compare's right operand sits under the CmpOp wrapper — contexts instead of attributes`
+
+### `semantics/operators.k:15` — context 3
+
+- Class: `evaluation-context`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `context Compare(HOLE, _)`
+
+### `semantics/operators.k:16` — context 4
+
+- Class: `evaluation-context`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `context Compare(_:Val, CmpOp(_, HOLE))`
+
+### `semantics/operators.k:17` — rule 5
+
+- Class: `operational-rule`
+- Attributes: `owise`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]`
+
+### `semantics/operators.k:19` — rule 6
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("is", V:Val, noneV) => V ==K noneV`
+
+### `semantics/operators.k:20` — rule 7
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV) // ==== operand deref: heap objects combine/compare by STRUCTURE ============ // (Python: list == is structural; identity only via 'is'.) priority(40) // preempts the generic dispatch so applyUn/applyBin/applyCmp never see a ref.`
+
+### `semantics/operators.k:25` — rule 8
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+### `semantics/operators.k:28` — rule 9
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(L) [priority(40)] // the left operand of 'in'/'not in' is an ELEMENT (compares by ==K) — never deref'd`
+
+### `semantics/operators.k:34` — rule 10
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k> <heap> ... H |-> V:Val ... </heap> requires OP =/=String "in" andBool OP =/=String "not in" [priority(40)]`
+
+### `semantics/operators.k:38` — rule 11
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(L) orBool OP ==String "in" orBool OP ==String "not in" [priority(40)]`
+
+### `semantics/operators.k:44` — rule 12
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> UnaryOp(OP:String, ref(H:Int)) => UnaryOp(OP, V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+## `semantics/range.k`
+
+Records: 8
+
+### `semantics/range.k:9` — syntax 1
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Bool ::= inRange(Int, Int, Int) [function, total]`
+
+### `semantics/range.k:10` — rule 2
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule inRange(I:Int, HI:Int, ST:Int) => (ST >Int 0 andBool I <Int HI) orBool (ST <Int 0 andBool I >Int HI)`
+
+### `semantics/range.k:12` — syntax 3
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Int ::= rangeLen(Int, Int, Int) [function]`
+
+### `semantics/range.k:13` — rule 4
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule rangeLen(LO:Int, HI:Int, ST:Int) => (HI -Int LO +Int ST -Int 1) /Int ST requires ST >Int 0 andBool HI >Int LO`
+
+### `semantics/range.k:15` — rule 5
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule rangeLen(LO:Int, HI:Int, ST:Int) => (LO -Int HI -Int ST -Int 1) /Int (0 -Int ST) requires ST <Int 0 andBool HI <Int LO`
+
+### `semantics/range.k:17` — rule 6
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule rangeLen(LO:Int, HI:Int, ST:Int) => 0 requires (ST >Int 0 andBool HI <=Int LO) orBool (ST <Int 0 andBool HI >=Int LO)`
+
+### `semantics/range.k:20` — rule 7
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterYield(I, rangeObj(I +Int ST, HI, ST)) ... </k> requires inRange(I, HI, ST)`
+
+### `semantics/range.k:23` — rule 8
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterDone ... </k> requires notBool inRange(I, HI, ST)`
+
+## `semantics/set.k`
+
+Records: 18
+
+### `semantics/set.k:8` — syntax 1
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Val ::= setV(IntSeq) // membership of a code in the accumulated distinct-code sequence`
+
+### `semantics/set.k:11` — syntax 2
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= codeIn(Int, IntSeq) [function, total]`
+
+### `semantics/set.k:12` — rule 3
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule codeIn(_:Int, .IntSeq) => false`
+
+### `semantics/set.k:13` — rule 4
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule codeIn(C:Int, iCons(H:Int, T:IntSeq)) => C ==Int H orBool codeIn(C, T) // the distinct codes of CS (insert-if-absent fold, first-seen order)`
+
+### `semantics/set.k:16` — syntax 5
+
+- Class: `function-declaration`
+- Attributes: `function, total, function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= dedupCodes(IntSeq) [function, total] | dedupFrom(IntSeq, IntSeq) [function, total]`
+
+### `semantics/set.k:18` — rule 6
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dedupCodes(CS:IntSeq) => dedupFrom(CS, .IntSeq)`
+
+### `semantics/set.k:19` — rule 7
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dedupFrom(.IntSeq, ACC:IntSeq) => ACC`
+
+### `semantics/set.k:20` — rule 8
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, ACC) requires codeIn(C, ACC)`
+
+### `semantics/set.k:22` — rule 9
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, snocCode(ACC, C)) requires notBool codeIn(C, ACC)`
+
+### `semantics/set.k:25` — syntax 10
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= snocCode(IntSeq, Int) [function, total]`
+
+### `semantics/set.k:26` — rule 11
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule snocCode(.IntSeq, C:Int) => iCons(C, .IntSeq)`
+
+### `semantics/set.k:27` — rule 12
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule snocCode(iCons(H:Int, T:IntSeq), C:Int) => iCons(H, snocCode(T, C)) // ==== set equality: two sets are equal iff mutually subsuming ============== // subsetCodes(A, B) — every code of A occurs in B (duplicates in A are harmless).`
+
+### `semantics/set.k:31` — syntax 13
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= subsetCodes(IntSeq, IntSeq) [function, total]`
+
+### `semantics/set.k:32` — rule 14
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule subsetCodes(.IntSeq, _:IntSeq) => true`
+
+### `semantics/set.k:33` — rule 15
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule subsetCodes(iCons(C:Int, S:IntSeq), B:IntSeq) => codeIn(C, B) andBool subsetCodes(S, B)`
+
+### `semantics/set.k:35` — syntax 16
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= sameSet(IntSeq, IntSeq) [function, total]`
+
+### `semantics/set.k:36` — rule 17
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule sameSet(A:IntSeq, B:IntSeq) => subsetCodes(A, B) andBool subsetCodes(B, A) // set == set (the only comparison sets support here)`
+
+### `semantics/set.k:39` — rule 18
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("==", setV(A:IntSeq), setV(B:IntSeq)) => sameSet(A, B)`
+
+## `semantics/sort.k`
+
+Records: 25
+
+### `semantics/sort.k:18` — syntax 1
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(sortVS), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= sortVS(ValSeq) [function, total, symbol(sortVS), no-evaluators]`
+
+### `semantics/sort.k:19` — syntax 2
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= insVS(Int, ValSeq) [function]`
+
+### `semantics/sort.k:20` — rule 3
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule sortVS(.ValSeq) => .ValSeq [concrete]`
+
+### `semantics/sort.k:21` — rule 4
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule sortVS(vCons(X:Int, R:ValSeq)) => insVS(X, sortVS(R)) [concrete]`
+
+### `semantics/sort.k:22` — rule 5
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule insVS(X:Int, .ValSeq) => vCons(X, .ValSeq) [concrete]`
+
+### `semantics/sort.k:23` — rule 6
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]`
+
+### `semantics/sort.k:24` — rule 7
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X >Int Y [concrete] // str elements insert by the shared lexicographic strLt (methods.k)`
+
+### `semantics/sort.k:26` — syntax 8
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]`
+
+### `semantics/sort.k:27` — rule 9
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]`
+
+### `semantics/sort.k:28` — rule 10
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]`
+
+### `semantics/sort.k:29` — rule 11
+
+- Class: `equational-rule`
+- Attributes: `concrete`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(A), vCons(str(B), R)) requires strLt(A, B) orBool A ==K B [concrete]`
+
+### `semantics/sort.k:31` — rule 12
+
+- Class: `equational-rule`
+- Attributes: `concrete, owise`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(B), insVSs(A, R)) requires notBool (strLt(A, B) orBool A ==K B) [concrete] // sorted(list) constructs a NEW object: k-cell pre-dispatch (beats the [owise] // applyBuiltin routing in call.k) so the result allocates.`
+
+### `semantics/sort.k:36` — rule 13
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), .Vals)) => #alloc(list(sortVS(VS))) ... </k> // mutator: xs.sort() — the in-place heap write over the same trusted sortVS`
+
+### `semantics/sort.k:40` — rule 14
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "sort")), .Vals) => noneV ... </k> <heap> ... H |-> list(VS:ValSeq => sortVS(VS)) ... </heap> [priority(40)] // ==== keyed / reversed sorted() (WP2) ===================================== // sortKeyVS(VS, KV): the stable ascending sort of VS by the key value KV // (a closure/builtin/type — anything callable). OPAQUE here; the concrete // leg (MPY-CONCRETE, llvm only) computes keys by REAL calls and stable- // inserts, at priority(40) over these.`
+
+### `semantics/sort.k:49` — syntax 15
+
+- Class: `opaque-or-concrete-function-declaration`
+- Attributes: `function, total, symbol(sortKeyVS), no-evaluators`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= sortKeyVS(ValSeq, Val) [function, total, symbol(sortKeyVS), no-evaluators]`
+
+### `semantics/sort.k:51` — syntax 16
+
+- Class: `function-declaration`
+- Attributes: `function, total, function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= revVS(ValSeq) [function, total] | revVSAcc(ValSeq, ValSeq) [function, total]`
+
+### `semantics/sort.k:53` — rule 17
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule revVS(S:ValSeq) => revVSAcc(S, .ValSeq)`
+
+### `semantics/sort.k:54` — rule 18
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule revVSAcc(.ValSeq, A:ValSeq) => A`
+
+### `semantics/sort.k:55` — rule 19
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule revVSAcc(vCons(V:Val, R:ValSeq), A:ValSeq) => revVSAcc(R, vCons(V, A))`
+
+### `semantics/sort.k:57` — syntax 20
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= condRev(ValSeq, Bool) [function, total]`
+
+### `semantics/sort.k:58` — rule 21
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule condRev(S:ValSeq, false) => S`
+
+### `semantics/sort.k:59` — rule 22
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule condRev(S:ValSeq, true) => revVS(S)`
+
+### `semantics/sort.k:61` — rule 23
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals)) => #alloc(list(sortKeyVS(VS, KV))) ... </k>`
+
+### `semantics/sort.k:63` — rule 24
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals)) => #alloc(list(condRev(sortKeyVS(VS, KV), RB))) ... </k>`
+
+### `semantics/sort.k:65` — rule 25
+
+- Class: `operational-rule`
+- Attributes: `total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("reverse", RB:Bool), .Vals)) => #alloc(list(condRev(sortVS(VS), RB))) ... </k> // Indexing the opaque sorted list: 'valSeqAt(sortVS(VS), I)' is DEFINED because valSeqAt is // [total] (subscript.k) — it stays an abstract total value for a symbolic sort and reduces // over the concrete sort for krun. No separate sortedAt indirection is needed; wrappers write // their postcondition directly as valSeqAt(sortVS(VS), …).`
+
+## `semantics/str.k`
+
+Records: 33
+
+### `semantics/str.k:8` — rule 1
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterNext(str(.IntSeq)) => #iterDone ... </k>`
+
+### `semantics/str.k:9` — rule 2
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterNext(str(iCons(C:Int, R:IntSeq))) => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k> // ==== str literal (ASCII-only) ============================================`
+
+### `semantics/str.k:13` — syntax 3
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= strToCodes(String) [function]`
+
+### `semantics/str.k:14` — rule 4
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Str(S:String) => str(strToCodes(S)) ... </k>`
+
+### `semantics/str.k:15` — rule 5
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule strToCodes("") => .IntSeq`
+
+### `semantics/str.k:16` — rule 6
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S)))) requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128 // ==== operators: + / == / != / in =========================================`
+
+### `semantics/str.k:20` — syntax 7
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]`
+
+### `semantics/str.k:21` — rule 8
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule seqConcat(.IntSeq, T:IntSeq) => T`
+
+### `semantics/str.k:22` — rule 9
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))`
+
+### `semantics/str.k:24` — rule 10
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyBin("+", str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))`
+
+### `semantics/str.k:25` — rule 11
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B`
+
+### `semantics/str.k:26` — rule 12
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B) // substring membership: 'P in X' iff the code-seq P occurs contiguously in X`
+
+### `semantics/str.k:29` — rule 13
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("in", str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)`
+
+### `semantics/str.k:30` — rule 14
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)`
+
+### `semantics/str.k:32` — syntax 15
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]`
+
+### `semantics/str.k:33` — rule 16
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule strPrefix(.IntSeq, _:IntSeq) => true`
+
+### `semantics/str.k:34` — rule 17
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+
+### `semantics/str.k:35` — rule 18
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)`
+
+### `semantics/str.k:37` — syntax 19
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]`
+
+### `semantics/str.k:38` — rule 20
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule strContains(P:IntSeq, X:IntSeq) => true requires strPrefix(P, X)`
+
+### `semantics/str.k:39` — rule 21
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule strContains(P:IntSeq, .IntSeq) => false requires notBool strPrefix(P, .IntSeq)`
+
+### `semantics/str.k:40` — rule 22
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs) requires notBool strPrefix(P, iCons(C, Xs)) // ==== lexicographic order: < / <= / > / >= by code point (= Python str order on the code // model). strLt reduces on GROUND code-seqs (krun) but is inert/OPAQUE on symbolic ones // (a proof's codesProj(V) is an abstract IntSeq — no constructor rule matches), so a symbolic // str '<' stays a trusted opaque term the way sortVS / intFloatDiv do. Additive: fires only on // str </<=/>/>= comparisons.`
+
+### `semantics/str.k:48` — syntax 23
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]`
+
+### `semantics/str.k:49` — rule 24
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule strLt(.IntSeq, .IntSeq) => false`
+
+### `semantics/str.k:50` — rule 25
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true`
+
+### `semantics/str.k:51` — rule 26
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+
+### `semantics/str.k:52` — rule 27
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true requires A <Int B`
+
+### `semantics/str.k:53` — rule 28
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false requires A >Int B`
+
+### `semantics/str.k:54` — rule 29
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B`
+
+### `semantics/str.k:56` — rule 30
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("<", str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)`
+
+### `semantics/str.k:57` — rule 31
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp(">", str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)`
+
+### `semantics/str.k:58` — rule 32
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)`
+
+### `semantics/str.k:59` — rule 33
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)`
+
+## `semantics/subscript.k`
+
+Records: 57
+
+### `semantics/subscript.k:11` — syntax 1
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Val ::= valSeqAt(ValSeq, Int) [function, total]`
+
+### `semantics/subscript.k:12` — rule 2
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule valSeqAt(vCons(V:Val, _:ValSeq), 0) => V`
+
+### `semantics/subscript.k:13` — rule 3
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule valSeqAt(vCons(_:Val, S:ValSeq), I:Int) => valSeqAt(S, I -Int 1) requires I >Int 0`
+
+### `semantics/subscript.k:16` — syntax 4
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Int ::= intSeqAt(IntSeq, Int) [function]`
+
+### `semantics/subscript.k:17` — rule 5
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule intSeqAt(iCons(C:Int, _:IntSeq), 0) => C`
+
+### `semantics/subscript.k:18` — rule 6
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule intSeqAt(iCons(_:Int, S:IntSeq), I:Int) => intSeqAt(S, I -Int 1) requires I >Int 0`
+
+### `semantics/subscript.k:21` — syntax 7
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Int ::= normIdx(Int, Int) [function, total]`
+
+### `semantics/subscript.k:22` — rule 8
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule normIdx(I:Int, LEN:Int) => I +Int LEN requires I <Int 0`
+
+### `semantics/subscript.k:23` — rule 9
+
+- Class: `equational-rule`
+- Attributes: `i`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule normIdx(I:Int, _:Int) => I requires I >=Int 0 // ==== Subscript: indexing obj[i] (list / tuple / str) ===================== // contexts (not strict attrs): the Index slot's Slice alternative must never heat`
+
+### `semantics/subscript.k:27` — context 10
+
+- Class: `evaluation-context`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `context Subscript(HOLE, _)`
+
+### `semantics/subscript.k:28` — context 11
+
+- Class: `evaluation-context`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `context Subscript(_:Val, HOLE:Expr) // heap-object deref (covers both the index and slice forms via the Index slot)`
+
+### `semantics/subscript.k:31` — rule 12
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> Subscript(ref(H:Int), IX:Index) => Subscript(V, IX) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+### `semantics/subscript.k:35` — rule 13
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> Subscript(OBJ:Val, I:Int) => applyIndex(OBJ, I) ... </k>`
+
+### `semantics/subscript.k:37` — syntax 14
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Val ::= applyIndex(Val, Int) [function]`
+
+### `semantics/subscript.k:38` — rule 15
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyIndex(list(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))`
+
+### `semantics/subscript.k:39` — rule 16
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyIndex(tuple(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))`
+
+### `semantics/subscript.k:40` — rule 17
+
+- Class: `equational-rule`
+- Attributes: `lo:hi:step`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule applyIndex(str(IS:IntSeq), I:Int) => str(iCons(intSeqAt(IS, normIdx(I, isLen(IS))), .IntSeq)) // ==== Slice: obj[lo:hi:step] (list / str) — CPython slice.indices ==========`
+
+### `semantics/subscript.k:44` — syntax 18
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #evalB(Bound) | "#toSome" | #slLo(Val, Bound, Bound) | #slHi(Val, OptInt, Bound) | #slStep(Val, OptInt, OptInt)`
+
+### `semantics/subscript.k:49` — syntax 19
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax OptInt ::= "noB" | someB(Int)`
+
+### `semantics/subscript.k:50` — rule 20
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #evalB(NoBound) => noB ... </k>`
+
+### `semantics/subscript.k:51` — rule 21
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #evalB(E:Expr) => E ~> #toSome ... </k>`
+
+### `semantics/subscript.k:52` — rule 22
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> I:Int ~> #toSome => someB(I) ... </k>`
+
+### `semantics/subscript.k:54` — rule 23
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Subscript(OBJ:Val, Slice(LO:Bound, HI:Bound, ST:Bound)) => #evalB(LO) ~> #slLo(OBJ, HI, ST) ... </k>`
+
+### `semantics/subscript.k:55` — rule 24
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> LO:OptInt ~> #slLo(OBJ:Val, HI:Bound, ST:Bound) => #evalB(HI) ~> #slHi(OBJ, LO, ST) ... </k>`
+
+### `semantics/subscript.k:56` — rule 25
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> HI:OptInt ~> #slHi(OBJ:Val, LO:OptInt, ST:Bound) => #evalB(ST) ~> #slStep(OBJ, LO, HI) ... </k> // a list slice constructs a NEW object; a str slice stays a value`
+
+### `semantics/subscript.k:58` — rule 26
+
+- Class: `operational-rule`
+- Attributes: `priority(45)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> ST:OptInt ~> #slStep(list(VS:ValSeq), LO:OptInt, HI:OptInt) => #alloc(doSlice(list(VS), LO, HI, ST)) ... </k> [priority(45)]`
+
+### `semantics/subscript.k:61` — rule 27
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> ST:OptInt ~> #slStep(OBJ:Val, LO:OptInt, HI:OptInt) => doSlice(OBJ, LO, HI, ST) ... </k>`
+
+### `semantics/subscript.k:63` — syntax 28
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Val ::= doSlice(Val, OptInt, OptInt, OptInt) [function]`
+
+### `semantics/subscript.k:64` — rule 29
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule doSlice(list(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt) => list(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))`
+
+### `semantics/subscript.k:66` — rule 30
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule doSlice(tuple(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt) => tuple(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))`
+
+### `semantics/subscript.k:68` — rule 31
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule doSlice(str(IS:IntSeq), LO:OptInt, HI:OptInt, ST:OptInt) => str(buildIS(IS, slStart(LO, ST, isLen(IS)), slStop(HI, ST, isLen(IS)), slStep(ST))) // ==== slice.indices: step / start / stop / clamp ==========================`
+
+### `semantics/subscript.k:72` — syntax 32
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= slStep(OptInt) [function, total]`
+
+### `semantics/subscript.k:73` — rule 33
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule slStep(noB) => 1`
+
+### `semantics/subscript.k:74` — rule 34
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule slStep(someB(S:Int)) => S`
+
+### `semantics/subscript.k:76` — syntax 35
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= slStart(OptInt, OptInt, Int) [function]`
+
+### `semantics/subscript.k:77` — rule 36
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule slStart(noB, ST:OptInt, _LEN:Int) => 0 requires slStep(ST) >Int 0`
+
+### `semantics/subscript.k:79` — rule 37
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule slStart(noB, ST:OptInt, LEN:Int) => LEN -Int 1 requires slStep(ST) <Int 0`
+
+### `semantics/subscript.k:81` — rule 38
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule slStart(someB(I:Int), ST:OptInt, LEN:Int) => slAdjust(I, LEN, slStep(ST))`
+
+### `semantics/subscript.k:83` — syntax 39
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= slStop(OptInt, OptInt, Int) [function]`
+
+### `semantics/subscript.k:84` — rule 40
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule slStop(noB, ST:OptInt, LEN:Int) => LEN requires slStep(ST) >Int 0`
+
+### `semantics/subscript.k:86` — rule 41
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule slStop(noB, ST:OptInt, _LEN:Int) => -1 requires slStep(ST) <Int 0`
+
+### `semantics/subscript.k:88` — rule 42
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule slStop(someB(I:Int), ST:OptInt, LEN:Int) => slAdjust(I, LEN, slStep(ST))`
+
+### `semantics/subscript.k:90` — syntax 43
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= slAdjust(Int, Int, Int) [function, total]`
+
+### `semantics/subscript.k:91` — rule 44
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampLo(I +Int LEN, STEP) requires I <Int 0`
+
+### `semantics/subscript.k:93` — rule 45
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampHi(I, LEN, STEP) requires I >=Int 0`
+
+### `semantics/subscript.k:96` — syntax 46
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= clampLo(Int, Int) [function, total]`
+
+### `semantics/subscript.k:97` — rule 47
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule clampLo(J:Int, _STEP:Int) => J requires J >=Int 0`
+
+### `semantics/subscript.k:99` — rule 48
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule clampLo(J:Int, STEP:Int) => #if STEP <Int 0 #then -1 #else 0 #fi requires J <Int 0`
+
+### `semantics/subscript.k:102` — syntax 49
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= clampHi(Int, Int, Int) [function, total]`
+
+### `semantics/subscript.k:103` — rule 50
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule clampHi(I:Int, LEN:Int, _STEP:Int) => I requires I <Int LEN`
+
+### `semantics/subscript.k:105` — rule 51
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule clampHi(I:Int, LEN:Int, STEP:Int) => #if STEP <Int 0 #then LEN -Int 1 #else LEN #fi requires I >=Int LEN // ==== build the strided sub-sequence (indices in range by construction) ====`
+
+### `semantics/subscript.k:109` — syntax 52
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ValSeq ::= buildVS(ValSeq, Int, Int, Int) [function]`
+
+### `semantics/subscript.k:110` — rule 53
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule buildVS(VS:ValSeq, I:Int, STOP:Int, STEP:Int) => vCons(valSeqAt(VS, I), buildVS(VS, I +Int STEP, STOP, STEP)) requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)`
+
+### `semantics/subscript.k:113` — rule 54
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule buildVS(_:ValSeq, I:Int, STOP:Int, STEP:Int) => .ValSeq requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))`
+
+### `semantics/subscript.k:116` — syntax 55
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax IntSeq ::= buildIS(IntSeq, Int, Int, Int) [function]`
+
+### `semantics/subscript.k:117` — rule 56
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule buildIS(IS:IntSeq, I:Int, STOP:Int, STEP:Int) => iCons(intSeqAt(IS, I), buildIS(IS, I +Int STEP, STOP, STEP)) requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)`
+
+### `semantics/subscript.k:120` — rule 57
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule buildIS(_:IntSeq, I:Int, STOP:Int, STEP:Int) => .IntSeq requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))`
+
+## `semantics/syntax.k`
+
+Records: 16
+
+### `semantics/syntax.k:9` — syntax 1
+
+- Class: `macro-declaration`
+- Attributes: `strict(2), seqstrict(2, 3), macro, macro, strict(1), strict(1)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Expr ::= "Int" "(" Int ")" | "Float" "(" Float ")" | "Bool" "(" Bool ")" | "Name" "(" String ")" | "Str" "(" String ")" | "UnaryOp" "(" String "," Expr ")" [strict(2)] | "BinOp" "(" String "," Expr "," Expr ")" [seqstrict(2, 3)] | "BoolOp" "(" String "," Exprs ")" | "ListExpr" "(" Exprs ")" | "DictExpr" "(" Entries ")" | "ListComp" "(" Expr "," CompFors ")" [macro] | "GenExp" "(" Expr "," CompFors ")" [macro] | "TupleExpr" "(" Exprs ")" | "Subscript" "(" Expr "," Index ")" | "IfExp" "(" Expr "," Expr "," Expr ")" [strict(1)] | "Lambda" "(" Params "," Expr ")" | "KwArg" "(" String "," Expr ")" | "Lambda" "(" Params "," CellVars "," FreeVars "," Expr ")" | "NoneVal" | "Call" "(" Expr "," Exprs ")" | "Attribute" "(" Expr "," String ")" [strict(1)] | "Compare" "(" Expr "," CmpOp ")"`
+
+### `semantics/syntax.k:32` — syntax 2
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"`
+
+### `semantics/syntax.k:33` — syntax 3
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Entry ::= "Entry" "(" Expr "," Expr ")"`
+
+### `semantics/syntax.k:34` — syntax 4
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Entries ::= List{Entry, ","}`
+
+### `semantics/syntax.k:35` — syntax 5
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"`
+
+### `semantics/syntax.k:36` — syntax 6
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax CompFors ::= List{CompFor, ""}`
+
+### `semantics/syntax.k:37` — syntax 7
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Exprs ::= List{Expr, ","}`
+
+### `semantics/syntax.k:38` — syntax 8
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Index ::= Expr | "Slice" "(" Bound "," Bound "," Bound ")"`
+
+### `semantics/syntax.k:39` — syntax 9
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Bound ::= Expr | "NoBound"`
+
+### `semantics/syntax.k:41` — syntax 10
+
+- Class: `syntax-declaration`
+- Attributes: `strict(2), strict(3), strict(2), strict(1), strict, strict, strict`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Stmt ::= "Assign" "(" Expr "," Expr ")" [strict(2)] | "Import" "(" String ")" | "ImportFrom" "(" String "," ParamNames ")" | "AugAssign" "(" Expr "," String "," Expr ")" [strict(3)] | "For" "(" Expr "," Expr "," Stmts ")" [strict(2)] | "While" "(" Expr "," Stmts ")" | "Break" | "Continue" | "If" "(" Expr "," Stmts "," Stmts ")" [strict(1)] | "Return" "(" Expr ")" [strict] | "Assert" "(" Expr ")" [strict] | "Expr" "(" Expr ")" [strict] | "FuncDef" "(" String "," Params "," Stmts ")" | "FuncDef" "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"`
+
+### `semantics/syntax.k:56` — syntax 11
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Stmts ::= List{Stmt, ""}`
+
+### `semantics/syntax.k:57` — syntax 12
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Params ::= "Params" "(" ParamNames ")"`
+
+### `semantics/syntax.k:58` — syntax 13
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax CellVars ::= "CellVars" "(" ParamNames ")"`
+
+### `semantics/syntax.k:59` — syntax 14
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax FreeVars ::= "FreeVars" "(" ParamNames ")"`
+
+### `semantics/syntax.k:60` — syntax 15
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax ParamNames ::= List{String, ","}`
+
+### `semantics/syntax.k:61` — syntax 16
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax Module ::= "Module" "(" Stmts ")"`
+
+## `semantics/tuple.k`
+
+Records: 25
+
+### `semantics/tuple.k:10` — rule 1
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterNext(tuple(.ValSeq)) => #iterDone ... </k>`
+
+### `semantics/tuple.k:11` — rule 2
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #iterNext(tuple(vCons(V:Val, R:ValSeq))) => #iterYield(V, tuple(R)) ... </k> // ==== TupleExpr: tuple(ValSeq) literal + == != ===========================`
+
+### `semantics/tuple.k:14` — syntax 3
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax ApplyK ::= "toTuple"`
+
+### `semantics/tuple.k:15` — rule 4
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> TupleExpr(ES:Exprs) => #evalArgs(ES, .Vals, toTuple) ... </k>`
+
+### `semantics/tuple.k:16` — rule 5
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #applyK(toTuple, ACC:Vals) => tuple(vals2valSeq(ACC)) ... </k>`
+
+### `semantics/tuple.k:18` — rule 6
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("==", tuple(A:ValSeq), tuple(B:ValSeq)) => A ==K B // membership routes through the same k-cell fold as lists (list.k)`
+
+### `semantics/tuple.k:20` — rule 7
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Compare(LV:Val, CmpOp("in", tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ... </k>`
+
+### `semantics/tuple.k:21` — rule 8
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Compare(LV:Val, CmpOp("not in", tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ~> #notB ... </k> // t.index(v): first index of v (ValueError out of subset)`
+
+### `semantics/tuple.k:23` — rule 9
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyMethod(tuple(VS:ValSeq), "index", V:Val, .Vals) => idxOfVS(VS, V, 0)`
+
+### `semantics/tuple.k:24` — syntax 10
+
+- Class: `function-declaration`
+- Attributes: `function`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax Int ::= idxOfVS(ValSeq, Val, Int) [function]`
+
+### `semantics/tuple.k:25` — rule 11
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule idxOfVS(vCons(A:Val, _:ValSeq), V:Val, I:Int) => I requires A ==K V`
+
+### `semantics/tuple.k:26` — rule 12
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule idxOfVS(vCons(A:Val, R:ValSeq), V:Val, I:Int) => idxOfVS(R, V, I +Int 1) requires notBool (A ==K V)`
+
+### `semantics/tuple.k:28` — rule 13
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule applyCmp("!=", tuple(A:ValSeq), tuple(B:ValSeq)) => notBool (A ==K B) // ==== target binding: bind a Name or a TupleExpr target to a value ========`
+
+### `semantics/tuple.k:31` — syntax 14
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `syntax KItem ::= #bindTgt(Expr, Val)`
+
+### `semantics/tuple.k:32` — rule 15
+
+- Class: `operational-rule`
+- Attributes: `X <- V`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #bindTgt(Name(X:String), V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>`
+
+### `semantics/tuple.k:35` — rule 16
+
+- Class: `operational-rule`
+- Attributes: `X, "$cells", X, priority(40)`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_USED_FIXED_RULE: unchanged supplied-semantics rule; reviewed against the submitted AST's evaluation, control, scope, heap, call/return, and integer/list behavior.
+- Text: `rule <k> #bindTgt(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool X in_keys(M) andBool isCellRef({M[X]}:>Val) [priority(40)]`
+
+### `semantics/tuple.k:42` — rule 17
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #bindTgt(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+
+### `semantics/tuple.k:43` — rule 18
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #bindTgt(TupleExpr(TS:Exprs), list(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+
+### `semantics/tuple.k:44` — rule 19
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #bindTgt(TupleExpr(TS:Exprs), ref(H:Int)) => #bindTgt(TupleExpr(TS), V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)] // ==== unpacking: a, b = <tuple|list> (RHS evaluated by strictness) ========`
+
+### `semantics/tuple.k:49` — syntax 20
+
+- Class: `syntax-declaration`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `syntax KItem ::= #unpackSeq(Exprs, ValSeq)`
+
+### `semantics/tuple.k:50` — rule 21
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Assign(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+
+### `semantics/tuple.k:51` — rule 22
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Assign(TupleExpr(TS:Exprs), list(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+
+### `semantics/tuple.k:52` — rule 23
+
+- Class: `operational-rule`
+- Attributes: `priority(40)`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> Assign(TupleExpr(TS:Exprs), ref(H:Int)) => Assign(TupleExpr(TS), V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+
+### `semantics/tuple.k:55` — rule 24
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #unpackSeq((T:Expr, TS:Exprs), vCons(V:Val, VS:ValSeq)) => #bindTgt(T, V) ~> #unpackSeq(TS, VS) ... </k>`
+
+### `semantics/tuple.k:57` — rule 25
+
+- Class: `operational-rule`
+- Attributes: `none`
+- Audited-claim path: `no`
+- Assessment: ACCEPTED_UNUSED_FIXED_BOUNDARY: unchanged supplied-semantics declaration/rule and unreachable from all audited claims; no candidate extension and no theorem dependence.
+- Text: `rule <k> #unpackSeq(.Exprs, .ValSeq) => .K ... </k>`
+
+## `verification.k`
+
+Records: 22
+
+### `verification.k:6` — syntax 1
+
+- Class: `macro-declaration`
+- Attributes: `macro`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_PROOF_MACRO_DECLARATION: compile-time alias, not an opaque value.
+- Text: `syntax Stmts ::= "minPathAppendBody" [macro]`
+
+### `verification.k:7` — rule 2
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_EXACT_ALIAS: exact submitted append-loop body.
+- Text: `rule minPathAppendBody => If(Compare(BinOp("%", Name("i"), Int(2)), CmpOp("==", Int(0))), Expr(Call(Attribute(Name("path"), "append"), Int(1))), Expr(Call(Attribute(Name("path"), "append"), Name("neighbor")))) // The exact translated body from solution.mpy, named once so that the // execution claims and the final module closure refer to the same program.`
+
+### `verification.k:14` — syntax 3
+
+- Class: `macro-declaration`
+- Attributes: `macro`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_PROOF_MACRO_DECLARATION: compile-time alias, not an opaque value.
+- Text: `syntax Stmts ::= "minPathBody" [macro]`
+
+### `verification.k:15` — rule 4
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_EXACT_ALIAS: complete translated function body; parser-level expanded identity with solution.mpy is independently checked.
+- Text: `rule minPathBody => Assign(Name("n"), Call(Name("len"), Name("grid"))) Assign(Name("row"), Int(0)) Assign(Name("column"), Int(0)) For(Name("i"), Call(Name("range"), Name("n")), For(Name("j"), Call(Name("range"), Name("n")), If(Compare( Subscript(Subscript(Name("grid"), Name("i")), Name("j")), CmpOp("==", Int(1))), Assign(Name("row"), Name("i")) Assign(Name("column"), Name("j")), .Stmts))) Assign(Name("neighbor"), BinOp("+", BinOp("*", Name("n"), Name("n")), Int(1))) If(Compare(Name("row"), CmpOp(">", Int(0))), Assign(Name("value"), Subscript( Subscript(Name("grid"), BinOp("-", Name("row"), Int(1))), Name("column"))) If(Compare(Name("value"), CmpOp("<", Name("neighbor"))), Assign(Name("neighbor"), Name("value")), .Stmts), .Stmts) If(Compare(BinOp("+", Name("row"), Int(1)), CmpOp("<", Name("n"))), Assign(Name("value"), Subscript( Subscript(Name("grid"), BinOp("+", Name("row"), Int(1))), Name("column"))) If(Compare(Name("value"), CmpOp("<", Name("neighbor"))), Assign(Name("neighbor"), Name("value")), .Stmts), .Stmts) If(Compare(Name("column"), CmpOp(">", Int(0))), Assign(Name("value"), Subscript( Subscript(Name("grid"), Name("row")), BinOp("-", Name("column"), Int(1)))) If(Compare(Name("value"), CmpOp("<", Name("neighbor"))), Assign(Name("neighbor"), Name("value")), .Stmts), .Stmts) If(Compare(BinOp("+", Name("column"), Int(1)), CmpOp("<", Name("n"))), Assign(Name("value"), Subscript( Subscript(Name("grid"), Name("row")), BinOp("+", Name("column"), Int(1)))) If(Compare(Name("value"), CmpOp("<", Name("neighbor"))), Assign(Name("neighbor"), Name("value")), .Stmts), .Stmts) Assign(Name("path"), ListExpr(.Exprs)) For(Name("i"), Call(Name("range"), Name("k")), minPathAppendBody) Return(Name("path"))`
+
+### `verification.k:70` — syntax 5
+
+- Class: `macro-declaration`
+- Attributes: `macro`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_PROOF_MACRO_DECLARATION: compile-time alias, not an opaque value.
+- Text: `syntax Module ::= "minPathProgram" [macro]`
+
+### `verification.k:71` — rule 6
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_EXACT_ALIAS: Module(FuncDef(...)) wrapper around minPathBody.
+- Text: `rule minPathProgram => Module(FuncDef("minPath", Params("grid", "k"), minPathBody))`
+
+### `verification.k:74` — syntax 7
+
+- Class: `macro-declaration`
+- Attributes: `macro`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_PROOF_MACRO_DECLARATION: compile-time alias, not an opaque value.
+- Text: `syntax Val ::= "minPathClosure" [macro]`
+
+### `verification.k:75` — rule 8
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_EXACT_ALIAS: closure value created by loading the same function at scope 0.
+- Text: `rule minPathClosure => closureVal(("grid", "k", .ParamNames), minPathBody, 0) // Mathematical helpers used only in postconditions.`
+
+### `verification.k:79` — syntax 9
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_MATHEMATICS: disjoint <=/> cases are exhaustive and return the ordinary minimum.
+- Text: `syntax Int ::= minPathMin(Int, Int) [function, total]`
+
+### `verification.k:80` — rule 10
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_MATHEMATICS: disjoint <=/> cases are exhaustive and return the ordinary minimum.
+- Text: `rule minPathMin(A:Int, B:Int) => A requires A <=Int B`
+
+### `verification.k:81` — rule 11
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_MATHEMATICS: disjoint <=/> cases are exhaustive and return the ordinary minimum.
+- Text: `rule minPathMin(A:Int, B:Int) => B requires A >Int B // On a 2x2 grid, all cells are corners. Under the spec's permutation // precondition these four rules select the two neighbors of the unique 1.`
+
+### `verification.k:85` — syntax 12
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_DEFINITIONAL_SUMMARY: disjoint/exhaustive A/B/C location case split; under the permutation precondition it returns the smaller of the two orthogonal neighbors of the unique 1.
+- Text: `syntax Int ::= minPathNeighbor2(Int, Int, Int, Int) [function, total]`
+
+### `verification.k:86` — rule 13
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_MATHEMATICS: disjoint <=/> cases are exhaustive and return the ordinary minimum.
+- Text: `rule minPathNeighbor2(A:Int, B:Int, C:Int, _D:Int) => minPathMin(B, C) requires A ==Int 1`
+
+### `verification.k:89` — rule 14
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_MATHEMATICS: disjoint <=/> cases are exhaustive and return the ordinary minimum.
+- Text: `rule minPathNeighbor2(A:Int, B:Int, _C:Int, D:Int) => minPathMin(A, D) requires A =/=Int 1 andBool B ==Int 1`
+
+### `verification.k:92` — rule 15
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_MATHEMATICS: disjoint <=/> cases are exhaustive and return the ordinary minimum.
+- Text: `rule minPathNeighbor2(A:Int, B:Int, C:Int, D:Int) => minPathMin(A, D) requires A =/=Int 1 andBool B =/=Int 1 andBool C ==Int 1`
+
+### `verification.k:95` — rule 16
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_MATHEMATICS: disjoint <=/> cases are exhaustive and return the ordinary minimum.
+- Text: `rule minPathNeighbor2(A:Int, B:Int, C:Int, _D:Int) => minPathMin(B, C) requires A =/=Int 1 andBool B =/=Int 1 andBool C =/=Int 1`
+
+### `verification.k:99` — syntax 17
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_MATHEMATICS: constructs exactly [1,M,1,M].
+- Text: `syntax ValSeq ::= minPathFour(Int) [function, total]`
+
+### `verification.k:100` — rule 18
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_MATHEMATICS: constructs exactly [1,M,1,M].
+- Text: `rule minPathFour(M:Int) => vCons(1, vCons(M, vCons(1, vCons(M, .ValSeq)))) // Accumulator specification for the exact append loop. It is deliberately // phrased in accumulator form so the symbolic loop and this mathematical // function advance in lockstep under circularity.`
+
+### `verification.k:106` — syntax 19
+
+- Class: `function-declaration`
+- Attributes: `function, total`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_MATHEMATICS: disjoint/exhaustive base/even/odd recursion; I increases toward K and exactly models append-in-place.
+- Text: `syntax ValSeq ::= minPathBuild(ValSeq, Int, Int, Int) [function, total]`
+
+### `verification.k:107` — rule 20
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_MATHEMATICS: disjoint/exhaustive base/even/odd recursion; I increases toward K and exactly models append-in-place.
+- Text: `rule minPathBuild(P:ValSeq, I:Int, K:Int, _M:Int) => P requires I >=Int K`
+
+### `verification.k:109` — rule 21
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_MATHEMATICS: disjoint/exhaustive base/even/odd recursion; I increases toward K and exactly models append-in-place.
+- Text: `rule minPathBuild(P:ValSeq, I:Int, K:Int, M:Int) => minPathBuild( valSeqConcat(P, vCons(1, .ValSeq)), I +Int 1, K, M) requires I <Int K andBool pyMod(I, 2) ==Int 0`
+
+### `verification.k:113` — rule 22
+
+- Class: `equational-rule`
+- Attributes: `none`
+- Audited-claim path: `yes`
+- Assessment: ACCEPTED_MATHEMATICS: disjoint/exhaustive base/even/odd recursion; I increases toward K and exactly models append-in-place.
+- Text: `rule minPathBuild(P:ValSeq, I:Int, K:Int, M:Int) => minPathBuild( valSeqConcat(P, vCons(M, .ValSeq)), I +Int 1, K, M) requires I <Int K andBool pyMod(I, 2) =/=Int 0`
+
+## Totals
+
+- All inventoried records: 950
+- configuration: 1
+- context: 5
+- rule: 709
+- syntax: 235
+- Opaque/concrete function declarations: 25
+- Records carrying priority attributes: 45
+- Simplification rules: 0

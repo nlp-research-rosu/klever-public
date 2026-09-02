@@ -1,0 +1,211 @@
+Script started on 2026-07-28 02:40:15-05:00 [<not executed on terminal>]
+=== verification.k ===
+     1	requires "semantic.k"
+     2	
+     3	module MAXIMUM-VERIFICATION
+     4	  imports MAXIMUM
+     5	
+     6	  // Mathematical contract: sorting the full input and dropping all but its
+     7	  // final K values yields exactly the sorted multiset of the K largest values.
+     8	  syntax List ::= "maximumSpec" "(" List "," Int ")" [function]
+     9	  rule maximumSpec(L:List, K:Int)
+    10	    => dropInts(size(L) -Int K, sortInts(L))
+    11	endmodule
+=== semantic.k ===
+     1	requires "domains.md"
+     2	
+     3	module MAXIMUM-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports STRING-SYNTAX
+     6	  imports LIST
+     7	  imports MAP
+     8	
+     9	  syntax Module ::= "Module" "(" Stmt ")" [symbol(Module)]
+    10	  syntax Params ::= "Params" "(" String "," String ")" [symbol(Params)]
+    11	
+    12	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")" [symbol(FuncDef)]
+    13	                | "Return" "(" Expr ")"                         [symbol(Return)]
+    14	
+    15	  syntax Expr ::= "Name" "(" String ")"                         [symbol(Name)]
+    16	                | "Call" "(" Expr "," Expr ")"                 [symbol(Call)]
+    17	                | "BinOp" "(" String "," Expr "," Expr ")"     [symbol(BinOp)]
+    18	                | "Subscript" "(" Expr "," Expr ")"             [symbol(Subscript)]
+    19	                | "Slice" "(" Bound "," Bound "," Bound ")"    [symbol(Slice)]
+    20	  syntax Bound ::= Expr | "NoBound" [symbol(NoBound)]
+    21	
+    22	  syntax Val ::= "intVal" "(" Int ")"
+    23	               | "listVal" "(" List ")"
+    24	               | "noResult"
+    25	endmodule
+    26	
+    27	module MAXIMUM
+    28	  imports MAXIMUM-SYNTAX
+    29	  imports BOOL
+    30	  imports INT
+    31	  imports STRING
+    32	  imports LIST
+    33	  imports MAP
+    34	
+    35	  configuration
+    36	    <maximum>
+    37	      <k> $PGM:Module ~> boot </k>
+    38	      <args> $ARGS:List </args>
+    39	      <env> .Map </env>
+    40	      <out> noResult </out>
+    41	    </maximum>
+    42	
+    43	  syntax KItem ::= "boot" | "finish" "(" Val ")"
+    44	
+    45	  rule <k> Module(FuncDef("maximum", Params("arr", "k"), BODY:Stmt)) ~> boot
+    46	         => BODY ...</k>
+    47	       <args> ListItem(listVal(L:List)) ListItem(intVal(K:Int)) </args>
+    48	       <env> .Map => ("arr" |-> listVal(L)) ("k" |-> intVal(K)) </env>
+    49	
+    50	  rule <k> Return(E:Expr) => finish(eval(E, RHO)) </k>
+    51	       <env> RHO:Map </env>
+    52	
+    53	  rule <k> finish(V:Val) => .K </k>
+    54	       <out> noResult => V </out>
+    55	
+    56	  syntax Val ::= "eval" "(" Expr "," Map ")" [function]
+    57	  rule eval(Name(X:String), (X |-> V:Val) _REST:Map) => V
+    58	  rule eval(Call(Name("sorted"), E:Expr), RHO:Map)
+    59	    => sortedVal(eval(E, RHO))
+    60	  rule eval(Call(Name("len"), E:Expr), RHO:Map)
+    61	    => lengthVal(eval(E, RHO))
+    62	  rule eval(BinOp("-", LEFT:Expr, RIGHT:Expr), RHO:Map)
+    63	    => subtractVal(eval(LEFT, RHO), eval(RIGHT, RHO))
+    64	  rule eval(Subscript(BASE:Expr, Slice(START:Expr, NoBound, NoBound)), RHO:Map)
+    65	    => suffixVal(eval(BASE, RHO), eval(START, RHO))
+    66	
+    67	  syntax Val ::= "sortedVal" "(" Val ")" [function]
+    68	               | "lengthVal" "(" Val ")" [function]
+    69	               | "subtractVal" "(" Val "," Val ")" [function]
+    70	               | "suffixVal" "(" Val "," Val ")" [function]
+    71	  rule sortedVal(listVal(L:List)) => listVal(sortInts(L))
+    72	  rule lengthVal(listVal(L:List)) => intVal(size(L))
+    73	  rule subtractVal(intVal(I:Int), intVal(J:Int)) => intVal(I -Int J)
+    74	  rule suffixVal(listVal(L:List), intVal(N:Int)) => listVal(dropInts(N, L))
+    75	
+    76	  syntax List ::= "sortInts" "(" List ")" [function]
+    77	                | "insertInt" "(" Int "," List ")" [function]
+    78	                | "dropInts" "(" Int "," List ")" [function]
+    79	  rule sortInts(.List) => .List
+    80	  rule sortInts(ListItem(I:Int) REST:List)
+    81	    => insertInt(I, sortInts(REST))
+    82	
+    83	  rule insertInt(I:Int, .List) => ListItem(I)
+    84	  rule insertInt(I:Int, ListItem(J:Int) REST:List)
+    85	    => ListItem(I) ListItem(J) REST
+    86	    requires I <=Int J
+    87	  rule insertInt(I:Int, ListItem(J:Int) REST:List)
+    88	    => ListItem(J) insertInt(I, REST)
+    89	    requires I >Int J
+    90	
+    91	  rule dropInts(0, L:List) => L
+    92	  rule dropInts(N:Int, ListItem(_:Int) REST:List)
+    93	    => dropInts(N -Int 1, REST)
+    94	    requires N >Int 0
+    95	endmodule
+=== spec.k ===
+     1	requires "verification.k"
+     2	
+     3	module MAXIMUM-SPEC
+     4	  imports MAXIMUM-VERIFICATION
+     5	
+     6	  claim
+     7	    <k>
+     8	      Module(
+     9	        FuncDef("maximum", Params("arr", "k"),
+    10	          Return(
+    11	            Subscript(
+    12	              Call(Name("sorted"), Name("arr")),
+    13	              Slice(
+    14	                BinOp("-", Call(Name("len"), Name("arr")), Name("k")),
+    15	                NoBound,
+    16	                NoBound)))))
+    17	      ~> boot
+    18	      => .K
+    19	    </k>
+    20	    <args> ListItem(listVal(L:List)) ListItem(intVal(K:Int)) </args>
+    21	    <env> .Map => ("arr" |-> listVal(L)) ("k" |-> intVal(K)) </env>
+    22	    <out> noResult => listVal(maximumSpec(L, K)) </out>
+    23	  requires (0 <=Int K) andBool (K <=Int size(L))
+    24	endmodule
+=== solution.py ===
+     1	def maximum(arr, k):
+     2	    return sorted(arr)[len(arr) - k:]
+=== solution.mpy ===
+     1	Module(
+     2	  FuncDef("maximum", Params("arr", "k"),
+     3	    Return(
+     4	      Subscript(
+     5	        Call(Name("sorted"), Name("arr")),
+     6	        Slice(
+     7	          BinOp("-", Call(Name("len"), Name("arr")), Name("k")),
+     8	          NoBound,
+     9	          NoBound)))))
+=== prompt.py ===
+     1	
+     2	def maximum(arr, k):
+     3	    """
+     4	    Given an array arr of integers and a positive integer k, return a sorted list 
+     5	    of length k with the maximum k numbers in arr.
+     6	
+     7	    Example 1:
+     8	
+     9	        Input: arr = [-3, -4, 5], k = 3
+    10	        Output: [-4, -3, 5]
+    11	
+    12	    Example 2:
+    13	
+    14	        Input: arr = [4, -4, 4], k = 2
+    15	        Output: [4, 4]
+    16	
+    17	    Example 3:
+    18	
+    19	        Input: arr = [-3, 2, 1, 2, -1, -2, 1], k = 1
+    20	        Output: [2]
+    21	
+    22	    Note:
+    23	        1. The length of the array will be in the range of [1, 1000].
+    24	        2. The elements in the array will be in the range of [-1000, 1000].
+    25	        3. 0 <= k <= len(arr)
+    26	    """
+=== prove.sh ===
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	
+     6	kompile verification.k \
+     7	  --backend haskell \
+     8	  --main-module MAXIMUM-VERIFICATION \
+     9	  --syntax-module MAXIMUM-SYNTAX
+    10	
+    11	krun solution.mpy --definition verification-kompiled \
+    12	  -cARGS='ListItem(listVal(ListItem(-3) ListItem(-4) ListItem(5))) ListItem(intVal(3))'
+    13	krun solution.mpy --definition verification-kompiled \
+    14	  -cARGS='ListItem(listVal(ListItem(4) ListItem(-4) ListItem(4))) ListItem(intVal(2))'
+    15	krun solution.mpy --definition verification-kompiled \
+    16	  -cARGS='ListItem(listVal(ListItem(-3) ListItem(2) ListItem(1) ListItem(2) ListItem(-1) ListItem(-2) ListItem(1))) ListItem(intVal(1))'
+    17	krun solution.mpy --definition verification-kompiled \
+    18	  -cARGS='ListItem(listVal(ListItem(7) ListItem(-1))) ListItem(intVal(0))'
+    19	
+    20	kprove spec.k \
+    21	  --definition verification-kompiled \
+    22	  --spec-module MAXIMUM-SPEC
+=== lemma-discovery.json ===
+{
+    "schema_version": 2,
+    "inventory_sha256": "cf174098f4de93e5250698cf661161b7ff6cbe29755adc5bcf59d26f78daf362",
+    "rules": [
+        {
+            "source_rule_id": "rule-b232439c4babf099ec2603b1993e6927d97e11d5b79e2ca4eed6caaae5c767bd",
+            "classification": "DEFINITION",
+            "rationale": "This rule directly expands the named mathematical summary maximumSpec into the defining sort-and-drop expression used by the contract."
+        }
+    ]
+}
+
+Script done on 2026-07-28 02:40:15-05:00 [COMMAND_EXIT_CODE="0"]

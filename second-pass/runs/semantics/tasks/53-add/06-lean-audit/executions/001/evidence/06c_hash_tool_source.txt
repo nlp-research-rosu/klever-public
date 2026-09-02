@@ -1,0 +1,171 @@
+Script started on 2026-07-28 17:34:40-05:00 [<not executed on terminal>]
+def sha256_tree(root: Path) -> str:
+    root = require_real_directory(root, "tree root")
+    digest = hashlib.sha256()
+    pending = [root]
+    entries: list[tuple[str, str, Path]] = []
+    while pending:
+        directory = pending.pop()
+        try:
+            children = list(os.scandir(directory))
+        except OSError as error:
+            raise PipelineContractError(f"cannot scan tree {directory}: {error}") from error
+        for child in children:
+            path = Path(child.path)
+            try:
+                mode = child.stat(follow_symlinks=False).st_mode
+            except OSError as error:
+                raise PipelineContractError(
+                    f"cannot inspect tree entry {path}: {error}"
+                ) from error
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISDIR(mode):
+                entries.append((relative, "directory", path))
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                entries.append((relative, "file", path))
+            else:
+                raise PipelineContractError(
+                    f"tree contains linked or unsupported entry: {path}"
+                )
+    for relative, kind, path in sorted(entries):
+        encoded = relative.encode()
+        digest.update(len(encoded).to_bytes(4, "big"))
+        digest.update(encoded)
+        digest.update(kind.encode() + b"\0")
+        if kind == "file":
+            try:
+                size = path.stat(follow_symlinks=False).st_size
+                digest.update(size.to_bytes(8, "big"))
+                with path.open("rb") as stream:
+                    for chunk in iter(lambda: stream.read(_HASH_CHUNK_SIZE), b""):
+                        digest.update(chunk)
+            except OSError as error:
+                raise PipelineContractError(
+                    f"cannot hash tree file {path}: {error}"
+                ) from error
+    return digest.hexdigest()
+
+
+def write_json_atomic(path: Path, document: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    file_descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", dir=path.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as stream:
+            json.dump(document, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+169:        for _relative, kind, path in _tree_entries(workspace)
+1244:def _tree_entries(root: Path) -> list[tuple[str, str, Path]]:
+1267:def tree_digest(root: Path) -> str:
+1269:    for relative, kind, path in _tree_entries(Path(root)):
+1326:    for _relative, kind, path in _tree_entries(package):
+1381:    for relative, kind, path in _tree_entries(generated):
+            modules[name] = (path, imports)
+            declared.append(name)
+        file_modules[path] = tuple(declared)
+        file_requires[path] = tuple(
+            required_path
+            for required in REQUIRES_RE.findall(text)
+            if (
+                required_path := _local_required_file(
+                    path, required, workspace
+                )
+            )
+            is not None
+        )
+
+    try:
+        verification_module = k_rule_inventory.inventory_verification(
+            workspace
+        )["verification_module"]
+    except k_rule_inventory.KRuleInventoryError as error:
+        raise KleanExportError(str(error)) from error
+    if verification_module not in file_modules.get(verification_file, ()):
+        raise KleanExportError(
+            "selected verification module is not defined in verification.k"
+        )
+    commands = _proof_kompile_commands(workspace)
+    reached_modules: set[str] = set()
+    reached_files: set[Path] = set()
+    pending_modules = [verification_module]
+    pending_files = [verification_file, *(command.source for command in commands)]
+    pending_modules.extend(
+        module
+        for command in commands
+        for module in (command.main_module, command.syntax_module)
+        if module is not None and module in modules
+    )
+    while pending_modules or pending_files:
+        while pending_files:
+            path = pending_files.pop()
+            if path in reached_files:
+                continue
+            reached_files.add(path)
+            pending_files.extend(file_requires.get(path, ()))
+        if not pending_modules:
+            continue
+        name = pending_modules.pop()
+        if name in reached_modules:
+            continue
+        reached_modules.add(name)
+        definition = modules.get(name)
+        if definition is None:
+            continue
+        path, imports = definition
+        if path not in reached_files:
+            pending_files.append(path)
+        pending_modules.extend(imports)
+
+    explicit_syntax_modules = [
+        command.syntax_module
+        for command in commands
+        if command.syntax_module in reached_modules
+    ]
+    haskell_syntax_modules = [
+        command.syntax_module
+        for command in commands
+        if command.backend == "haskell"
+        and command.syntax_module in reached_modules
+    ]
+    syntax_modules = sorted(
+        name
+        for name in reached_modules
+        if name.endswith("-SYNTAX") and name in modules
+    )
+    preferred = (
+        verification_module.removesuffix("-VERIFICATION") + "-SYNTAX"
+    )
+    if haskell_syntax_modules:
+        syntax_module = haskell_syntax_modules[-1]
+    elif explicit_syntax_modules:
+        syntax_module = explicit_syntax_modules[-1]
+    elif preferred in syntax_modules:
+        syntax_module = preferred
+    elif len(syntax_modules) == 1:
+        syntax_module = syntax_modules[0]
+    elif not syntax_modules:
+        raise KleanExportError(
+            f"no reachable -SYNTAX module for {verification_module}"
+        )
+    else:
+        raise KleanExportError(
+            "multiple reachable -SYNTAX modules: "
+            + ", ".join(syntax_modules)
+        )
+    required_by: dict[Path, set[Path]] = {
+        path: set() for path in reached_files
+    }
+    for parent in reached_files:
+        for dependency in file_requires.get(parent, ()):
+            if dependency in reached_files:
+                required_by[dependency].add(parent)
+    entry_files = tuple(
+        sorted(
+
+Script done on 2026-07-28 17:34:40-05:00 [COMMAND_EXIT_CODE="0"]

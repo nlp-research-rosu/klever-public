@@ -1,0 +1,113 @@
+requires "verification.k"
+
+module SPEC
+  imports VERIFICATION
+
+  claim
+    <k>
+      #runEvenOdd(N:Int)
+      =>
+      tuple(vCons(evenPalindromes(N),
+            vCons(oddPalindromes(N), .ValSeq)))
+    </k>
+    <env> 0 </env>
+    <scopes>
+      0  |-> scope(.Map, parent(-1))
+      -1 |-> builtinsScope
+      =>
+      0  |-> scope(
+               "even_odd_palindrome"
+                 |-> closureVal("n", solutionBody, 0),
+               parent(-1))
+      -1 |-> builtinsScope
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    requires 1 <=Int N andBool N <Int 10
+
+  claim
+    <k>
+      #runEvenOdd(N:Int)
+      =>
+      tuple(vCons(evenPalindromes(N),
+            vCons(oddPalindromes(N), .ValSeq)))
+    </k>
+    <env> 0 </env>
+    <scopes>
+      0  |-> scope(.Map, parent(-1))
+      -1 |-> builtinsScope
+      =>
+      0  |-> scope(
+               "even_odd_palindrome"
+                 |-> closureVal("n", solutionBody, 0),
+               parent(-1))
+      -1 |-> builtinsScope
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    requires 10 <=Int N andBool N <Int 100
+
+  claim
+    <k>
+      #runEvenOdd(N:Int)
+      =>
+      tuple(vCons(evenPalindromes(N),
+            vCons(oddPalindromes(N), .ValSeq)))
+    </k>
+    <env> 0 </env>
+    <scopes>
+      0  |-> scope(.Map, parent(-1))
+      -1 |-> builtinsScope
+      =>
+      0  |-> scope(
+               "even_odd_palindrome"
+                 |-> closureVal("n", solutionBody, 0),
+               parent(-1))
+      -1 |-> builtinsScope
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    requires 100 <=Int N andBool N <Int 1000
+
+  claim
+    <k>
+      #runEvenOdd(1000)
+      =>
+      tuple(vCons(47,
+            vCons(oddPalindromes(1000), .ValSeq)))
+    </k>
+    <env> 0 </env>
+    <scopes>
+      0  |-> scope(.Map, parent(-1))
+      -1 |-> builtinsScope
+      =>
+      0  |-> scope(
+               "even_odd_palindrome"
+                 |-> closureVal("n", solutionBody, 0),
+               parent(-1))
+      -1 |-> builtinsScope
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+
+endmodule

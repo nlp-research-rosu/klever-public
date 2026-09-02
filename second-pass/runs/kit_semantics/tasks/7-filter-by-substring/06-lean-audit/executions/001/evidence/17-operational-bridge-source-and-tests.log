@@ -1,0 +1,363 @@
+$ nl -ba BridgeAudit.lean
+     1	import Proof
+     2	
+     3	namespace BridgeAudit
+     4	
+     5	def seq : List Int → SortIntSeq
+     6	  | [] => .«.IntSeq_MPY-CORE_IntSeq»
+     7	  | x :: xs => .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» x (seq xs)
+     8	
+     9	def sval (xs : List Int) : SortVal :=
+    10	  .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» (seq xs))
+    11	
+    12	-- Boundary and adversarial substring examples from the frozen strContains rules.
+    13	example :
+    14	    Proof.«applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val» "in" (sval []) (sval []) =
+    15	      true := by
+    16	  rfl
+    17	
+    18	example :
+    19	    Proof.«applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val» "in" (sval []) (sval [98, 97]) =
+    20	      true := by
+    21	  rfl
+    22	
+    23	example :
+    24	    Proof.«applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val» "in" (sval [97]) (sval [98, 97]) =
+    25	      true := by
+    26	  rfl
+    27	
+    28	example :
+    29	    Proof.«applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val» "in" (sval [97, 98]) (sval [97]) =
+    30	      false := by
+    31	  rfl
+    32	
+    33	example :
+    34	    Proof.«applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val» "in"
+    35	        (sval [97, 98]) (sval [0, 97, 98, 2]) =
+    36	      true := by
+    37	  rfl
+    38	
+    39	example :
+    40	    Proof.«applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val» "in" (sval [97, 99]) (sval [97, 98]) =
+    41	      false := by
+    42	  rfl
+    43	
+    44	-- Exact behavior of the two frozen strCodes definition rules.
+    45	example :
+    46	    Proof.«strCodes(_)_VERIFICATION_IntSeq_Val» (sval [65, 66]) = seq [65, 66] := by
+    47	  rfl
+    48	
+    49	example :
+    50	    Proof.«strCodes(_)_VERIFICATION_IntSeq_Val» (SortVal.inj_SortInt 7) =
+    51	      seq [] := by
+    52	  rfl
+    53	
+    54	-- A deliberately dishonest operational bridge still satisfies the fixed
+    55	-- equation.  This confirms why independent bridge review is essential.
+    56	def badApplyCmp (_ : SortString) (_ _ : SortVal) : SortBool := false
+    57	
+    58	def badStrCodes (_ : SortVal) : SortIntSeq := seq []
+    59	
+    60	theorem fixedTargetAcceptsCounterfactual :
+    61	    Klean7FilterBySubstring.Lemmas.targetStatement badApplyCmp badStrCodes := by
+    62	  intro V P h
+    63	  rfl
+    64	
+    65	-- The counterfactual is observably wrong on a positive substring case.
+    66	example : badApplyCmp "in" (sval [97]) (sval [98, 97]) = false := by
+    67	  rfl
+    68	
+    69	example :
+    70	    Proof.«applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val» "in" (sval [97]) (sval [98, 97]) ≠
+    71	      badApplyCmp "in" (sval [97]) (sval [98, 97]) := by
+    72	  decide
+    73	
+    74	example : badStrCodes (sval [65]) ≠ Proof.«strCodes(_)_VERIFICATION_IntSeq_Val» (sval [65]) := by
+    75	  simp [badStrCodes, sval, seq, Proof.«strCodes(_)_VERIFICATION_IntSeq_Val»]
+    76	
+    77	end BridgeAudit
+$ frozen source solution and relevant K operational equations
+     1	from typing import List
+     2	
+     3	
+     4	def filter_by_substring(strings: List[str], substring: str) -> List[str]:
+     5	    result = []
+     6	    string = ""
+     7	    for string in strings:
+     8	        if substring in string:
+     9	            result.append(string)
+    10	    return result
+     1	// reference/src/semantics/str.k — MPY-STR
+     2	
+     3	module MPY-STR
+     4	  imports MPY-CORE
+     5	  imports MPY-ITER
+     6	
+     7	  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+     8	  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+     9	  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+    10	        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+    11	
+    12	  // ==== str literal (ASCII-only) ============================================
+    13	  syntax IntSeq ::= strToCodes(String) [function]
+    14	  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+    15	  rule strToCodes("") => .IntSeq
+    16	  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    17	    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+    18	
+    19	  // ==== operators: + / == / != / in =========================================
+    20	  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+    21	  rule seqConcat(.IntSeq, T:IntSeq)                => T
+    22	  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+    23	
+    24	  rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+    25	  rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+    26	  rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)
+    27	
+    28	  // substring membership: `P in X` iff the code-seq P occurs contiguously in X
+    29	  rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)
+    30	  rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)
+    31	
+    32	  syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]
+    33	  rule strPrefix(.IntSeq, _:IntSeq)               => true
+    34	  rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false
+    35	  rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)
+    36	
+    37	  syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]
+    38	  rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)
+    39	  rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)
+    40	  rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs)
+    41	       requires notBool strPrefix(P, iCons(C, Xs))
+    42	
+    43	  // ==== lexicographic order: < / <= / > / >= by code point (= Python str order on the code
+    44	  // model). strLt reduces on GROUND code-seqs (krun) but is inert/OPAQUE on symbolic ones
+    45	  // (a proof's codesProj(V) is an abstract IntSeq — no constructor rule matches), so a symbolic
+    46	  // str `<` stays a trusted opaque term the way sortVS / intFloatDiv do. Additive: fires only on
+    47	  // str </<=/>/>= comparisons.
+    48	  syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]
+    49	  rule strLt(.IntSeq, .IntSeq)                => false
+    50	  rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true
+    51	  rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false
+    52	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true          requires A  <Int B
+    53	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false         requires A  >Int B
+    54	  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B
+    55	
+    56	  rule applyCmp("<",  str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+    57	  rule applyCmp(">",  str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)
+    58	  rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)
+    59	  rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)
+    60	endmodule
+     8	  // over the semantics' heterogeneous ValSeq representation.
+     9	  // A total projection makes string-ness solver-visible: V is a semantic
+    10	  // string exactly when V ==K str(strCodes(V)).
+    11	  syntax IntSeq ::= strCodes(Val) [function, total]
+    12	  rule strCodes(str(S:IntSeq)) => S
+    13	  rule strCodes(_:Val)         => .IntSeq [owise]
+    14	
+    15	  syntax Bool ::= allStrVS(ValSeq) [function, total]
+    16	  rule allStrVS(.ValSeq) => true
+    17	  rule allStrVS(vCons(V:Val, R:ValSeq))
+    18	    => (V ==K str(strCodes(V))) andBool allStrVS(R)
+    19	
+    20	  // Constraint-normalization lemma.  Its guard states that the old and new
+    21	  // right operands are exactly equal; MPY-STR's fixed rule still evaluates
+    22	  // the resulting applyCmp term.
+    23	  rule applyCmp("in", str(P:IntSeq), V:Val)
+    24	    => applyCmp("in", str(P), str(strCodes(V)))
+    25	    requires V ==K str(strCodes(V))
+    26	    [simplification]
+    27	
+    28	  // Mathematical filter summary in accumulator form.  Its equations cover
+    29	  // every allStrVS input; no equation is asserted for out-of-domain heads.
+    30	  syntax ValSeq ::= filterAcc(ValSeq, IntSeq, ValSeq) [function]
+    31	  rule filterAcc(A:ValSeq, _:IntSeq, .ValSeq) => A
+    32	  rule filterAcc(A:ValSeq, P:IntSeq, vCons(V:Val, R:ValSeq))
+    33	    => filterAcc(
+    34	         valSeqConcat(A, vCons(V, .ValSeq)),
+    35	         P,
+    36	         R)
+    37	    requires V ==K str(strCodes(V))
+    38	      andBool strContains(P, strCodes(V))
+    39	    [simplification]
+    40	  rule filterAcc(A:ValSeq, P:IntSeq, vCons(V:Val, R:ValSeq))
+    41	    => filterAcc(A, P, R)
+    42	    requires V ==K str(strCodes(V))
+    43	      andBool notBool strContains(P, strCodes(V))
+    44	    [simplification]
+    45	endmodule
+$ candidate parameter definitions and Proof.final
+     1	import Klean7FilterBySubstring.Lemmas
+     2	
+     3	namespace Proof
+     4	
+     5	/- KORE symbol: LblapplyCmp'LParUndsCommUndsCommUndsRParUnds'MPY-CORE'Unds'Bool'Unds'String'Unds'Val'Unds'Val; frozen source obligations: rule-ce7624945e06d02ae5606649e897ef6ded8e343e6c0ed28075613044c8e40503. Replace this stub with its honest total meaning from the frozen K semantics. -/
+     6	private def intSeqEq : SortIntSeq → SortIntSeq → Bool
+     7	  | .«.IntSeq_MPY-CORE_IntSeq», .«.IntSeq_MPY-CORE_IntSeq» => true
+     8	  | .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» a as,
+     9	      .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» b bs =>
+    10	      a == b && intSeqEq as bs
+    11	  | _, _ => false
+    12	
+    13	private def intSeqPrefix : SortIntSeq → SortIntSeq → Bool
+    14	  | .«.IntSeq_MPY-CORE_IntSeq», _ => true
+    15	  | .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» _ _,
+    16	      .«.IntSeq_MPY-CORE_IntSeq» => false
+    17	  | .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» a as,
+    18	      .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» b bs =>
+    19	      a == b && intSeqPrefix as bs
+    20	
+    21	private def intSeqContains (pattern : SortIntSeq) : SortIntSeq → Bool
+    22	  | .«.IntSeq_MPY-CORE_IntSeq» =>
+    23	      intSeqPrefix pattern .«.IntSeq_MPY-CORE_IntSeq»
+    24	  | whole@(.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» _ rest) =>
+    25	      intSeqPrefix pattern whole || intSeqContains pattern rest
+    26	
+    27	private def intSeqLt : SortIntSeq → SortIntSeq → Bool
+    28	  | .«.IntSeq_MPY-CORE_IntSeq», .«.IntSeq_MPY-CORE_IntSeq» => false
+    29	  | .«.IntSeq_MPY-CORE_IntSeq»,
+    30	      .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» _ _ => true
+    31	  | .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» _ _,
+    32	      .«.IntSeq_MPY-CORE_IntSeq» => false
+    33	  | .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» a as,
+    34	      .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» b bs =>
+    35	      if a < b then true else if a > b then false else intSeqLt as bs
+    36	
+    37	private def codeIn (code : SortInt) : SortIntSeq → Bool
+    38	  | .«.IntSeq_MPY-CORE_IntSeq» => false
+    39	  | .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» head tail =>
+    40	      code == head || codeIn code tail
+    41	
+    42	private def intSeqSubset : SortIntSeq → SortIntSeq → Bool
+    43	  | .«.IntSeq_MPY-CORE_IntSeq», _ => true
+    44	  | .«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» head tail, other =>
+    45	      codeIn head other && intSeqSubset tail other
+    46	
+    47	private def sameSet (left right : SortIntSeq) : Bool :=
+    48	  intSeqSubset left right && intSeqSubset right left
+    49	
+    50	private def valSeqLength : SortValSeq → Nat
+    51	  | .«.ValSeq_MPY-CORE_ValSeq» => 0
+    52	  | .«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» _ tail =>
+    53	      valSeqLength tail + 1
+    54	
+    55	private noncomputable def eqBool {α : Type} (left right : α) : Bool :=
+    56	  match Classical.typeDecidableEq α left right with
+    57	  | isTrue _ => true
+    58	  | isFalse _ => false
+    59	
+    60	private noncomputable def dictLookup
+    61	    (keys values : SortValSeq) (needle : SortVal) : Option SortVal :=
+    62	  match keys, values with
+    63	  | .«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» key keyTail,
+    64	      .«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» value valueTail =>
+    65	      match Classical.typeDecidableEq SortVal key needle with
+    66	      | isTrue _ => some value
+    67	      | isFalse _ => dictLookup keyTail valueTail needle
+    68	  | _, _ => none
+    69	
+    70	private noncomputable def dictSubset
+    71	    (keys values otherKeys otherValues : SortValSeq) : Bool :=
+    72	  match keys, values with
+    73	  | .«.ValSeq_MPY-CORE_ValSeq», .«.ValSeq_MPY-CORE_ValSeq» => true
+    74	  | .«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» key keyTail,
+    75	      .«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» value valueTail =>
+    76	      match dictLookup otherKeys otherValues key with
+    77	      | some otherValue =>
+    78	          eqBool otherValue value &&
+    79	            dictSubset keyTail valueTail otherKeys otherValues
+    80	      | none => false
+    81	  | _, _ => false
+    82	
+    83	private noncomputable def dictEq
+    84	    (keys₁ values₁ keys₂ values₂ : SortValSeq) : Bool :=
+    85	  valSeqLength keys₁ == valSeqLength keys₂ &&
+    86	    dictSubset keys₁ values₁ keys₂ values₂
+    87	
+    88	noncomputable def «applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val»
+    89	    (op : SortString) (left right : SortVal) : SortBool :=
+    90	  if op = "is" then
+    91	    match right with
+    92	    | .«noneV_MPY-CORE_Val» => eqBool left .«noneV_MPY-CORE_Val»
+    93	    | _ => false
+    94	  else if op = "is not" then
+    95	    match right with
+    96	    | .«noneV_MPY-CORE_Val» => !eqBool left .«noneV_MPY-CORE_Val»
+    97	    | _ => false
+    98	  else
+    99	    match op, left, right with
+   100	    | "==", _, .«noneV_MPY-CORE_Val» =>
+   101	        eqBool left .«noneV_MPY-CORE_Val»
+   102	    | "!=", _, .«noneV_MPY-CORE_Val» =>
+   103	        !eqBool left .«noneV_MPY-CORE_Val»
+   104	    | "==", .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» a),
+   105	        .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» b) => intSeqEq a b
+   106	    | "!=", .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» a),
+   107	        .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» b) => !intSeqEq a b
+   108	    | "in", .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» pattern),
+   109	        .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» text) =>
+   110	        intSeqContains pattern text
+   111	    | "not in", .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» pattern),
+   112	        .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» text) =>
+   113	        !intSeqContains pattern text
+   114	    | "<", .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» a),
+   115	        .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» b) => intSeqLt a b
+   116	    | ">", .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» a),
+   117	        .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» b) => intSeqLt b a
+   118	    | "<=", .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» a),
+   119	        .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» b) => !intSeqLt b a
+   120	    | ">=", .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» a),
+   121	        .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» b) => !intSeqLt a b
+   122	    | "==", .inj_SortBool a, .inj_SortBool b => a == b
+   123	    | "!=", .inj_SortBool a, .inj_SortBool b => !(a == b)
+   124	    | "<", .inj_SortInt a, .inj_SortInt b => decide (a < b)
+   125	    | "<=", .inj_SortInt a, .inj_SortInt b => decide (a ≤ b)
+   126	    | ">", .inj_SortInt a, .inj_SortInt b => decide (a > b)
+   127	    | ">=", .inj_SortInt a, .inj_SortInt b => decide (a ≥ b)
+   128	    | "==", .inj_SortInt a, .inj_SortInt b => a == b
+   129	    | "!=", .inj_SortInt a, .inj_SortInt b => !(a == b)
+   130	    | "<", .inj_SortFloat a, .inj_SortFloat b => decide (a < b)
+   131	    | "<=", .inj_SortFloat a, .inj_SortFloat b => !(decide (b < a))
+   132	    | ">", .inj_SortFloat a, .inj_SortFloat b => decide (b < a)
+   133	    | ">=", .inj_SortFloat a, .inj_SortFloat b => !(decide (a < b))
+   134	    | "==", .inj_SortFloat a, .inj_SortFloat b => a == b
+   135	    | "!=", .inj_SortFloat a, .inj_SortFloat b => !(a == b)
+   136	    | op, .inj_SortInt a, .inj_SortFloat b =>
+   137	        let converted := Float.ofInt a
+   138	        if op = "<" then decide (converted < b)
+   139	        else if op = ">" then decide (b < converted)
+   140	        else if op = "==" then converted == b
+   141	        else if op = "!=" then !(converted == b)
+   142	        else false
+   143	    | op, .inj_SortFloat a, .inj_SortInt b =>
+   144	        let converted := Float.ofInt b
+   145	        if op = "<" then decide (a < converted)
+   146	        else if op = ">" then decide (converted < a)
+   147	        else if op = "==" then a == converted
+   148	        else if op = "!=" then !(a == converted)
+   149	        else false
+   150	    | "==", .inj_SortIterable (.«list(_)_MPY-CORE_Iterable_ValSeq» a),
+   151	        .inj_SortIterable (.«list(_)_MPY-CORE_Iterable_ValSeq» b) => eqBool a b
+   152	    | "!=", .inj_SortIterable (.«list(_)_MPY-CORE_Iterable_ValSeq» a),
+   153	        .inj_SortIterable (.«list(_)_MPY-CORE_Iterable_ValSeq» b) => !eqBool a b
+   154	    | "==", .inj_SortIterable (.«tuple(_)_MPY-CORE_Iterable_ValSeq» a),
+   155	        .inj_SortIterable (.«tuple(_)_MPY-CORE_Iterable_ValSeq» b) => eqBool a b
+   156	    | "!=", .inj_SortIterable (.«tuple(_)_MPY-CORE_Iterable_ValSeq» a),
+   157	        .inj_SortIterable (.«tuple(_)_MPY-CORE_Iterable_ValSeq» b) => !eqBool a b
+   158	    | "==", .«setV(_)_MPY-SET_Val_IntSeq» a,
+   159	        .«setV(_)_MPY-SET_Val_IntSeq» b => sameSet a b
+   160	    | "==", .«dictV(_,_)_MPY-DICT_Val_ValSeq_ValSeq» keys₁ values₁,
+   161	        .«dictV(_,_)_MPY-DICT_Val_ValSeq_ValSeq» keys₂ values₂ =>
+   162	        dictEq keys₁ values₁ keys₂ values₂
+   163	    | _, _, _ => false
+   164	/- KORE symbol: LblstrCodes'LParUndsRParUnds'VERIFICATION'Unds'IntSeq'Unds'Val; frozen source obligations: rule-ce7624945e06d02ae5606649e897ef6ded8e343e6c0ed28075613044c8e40503. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   165	def «strCodes(_)_VERIFICATION_IntSeq_Val» : SortVal → SortIntSeq
+   166	  | .inj_SortStr (.«str(_)_MPY-CORE_Str_IntSeq» codes) => codes
+   167	  | _ => .«.IntSeq_MPY-CORE_IntSeq»
+   168	
+   169	theorem final :
+   170	    Klean7FilterBySubstring.Lemmas.targetStatement «applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val» «strCodes(_)_VERIFICATION_IntSeq_Val» := by
+   171	  intro V P h
+   172	  cases V <;> simp [inj, «strCodes(_)_VERIFICATION_IntSeq_Val»] at h
+   173	  rfl
+   174	
+   175	end Proof

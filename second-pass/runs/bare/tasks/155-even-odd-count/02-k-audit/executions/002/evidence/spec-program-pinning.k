@@ -1,0 +1,20 @@
+requires "verification.k"
+
+module SPEC-PROGRAM-PINNING
+  imports VERIFICATION
+
+  claim solutionProgram() =>
+    Module(
+      FuncDef("even_odd_count", Params("num"),
+        If(Compare(Name("num"), CmpOp("<", Int(0))),
+          Assign(Name("num"), UnaryOp("-", Name("num"))),
+          .Stmts)
+        Assign(Name("even"), Int(0))
+        Assign(Name("odd"), Int(0))
+        While(Compare(Name("num"), CmpOp(">", Int(0))),
+          If(Compare(BinOp("%", Name("num"), Int(2)), CmpOp("==", Int(0))),
+            AugAssign(Name("even"), "+", Int(1)),
+            AugAssign(Name("odd"), "+", Int(1)))
+          Assign(Name("num"), BinOp("//", Name("num"), Int(10))))
+        Return(TupleExpr(Name("even"), Name("odd")))))
+endmodule

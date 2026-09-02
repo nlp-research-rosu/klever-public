@@ -1,0 +1,406 @@
+$ nl -ba verification.k
+$ nl -ba spec.k
+$ nl -ba solution.py
+$ nl -ba solution.mpy
+$ nl -ba prompt.py
+$ rg -n "Compare|CmpOp|eqIF|mulF|addF|intToF|==Float|BoolOp|BinOp" reference-semantics/semantics
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Exact translated body of solution.py, named only to keep the eight
+     7	  // Int/Float sort-combination claims identical at the call boundary.
+     8	  syntax Val ::= rightAngleTriangleClosure() [function, total]
+     9	  rule rightAngleTriangleClosure()
+    10	    => closureVal(
+    11	         ("a", "b", "c"),
+    12	         Return(
+    13	           BoolOp(
+    14	             "or",
+    15	             Compare(
+    16	               BinOp("*", Name("a"), Name("a")),
+    17	               CmpOp(
+    18	                 "==",
+    19	                 BinOp(
+    20	                   "+",
+    21	                   BinOp("*", Name("b"), Name("b")),
+    22	                   BinOp("*", Name("c"), Name("c"))
+    23	                 )
+    24	               )
+    25	             ),
+    26	             Compare(
+    27	               BinOp("*", Name("b"), Name("b")),
+    28	               CmpOp(
+    29	                 "==",
+    30	                 BinOp(
+    31	                   "+",
+    32	                   BinOp("*", Name("a"), Name("a")),
+    33	                   BinOp("*", Name("c"), Name("c"))
+    34	                 )
+    35	               )
+    36	             ),
+    37	             Compare(
+    38	               BinOp("*", Name("c"), Name("c")),
+    39	               CmpOp(
+    40	                 "==",
+    41	                 BinOp(
+    42	                   "+",
+    43	                   BinOp("*", Name("a"), Name("a")),
+    44	                   BinOp("*", Name("b"), Name("b"))
+    45	                 )
+    46	               )
+    47	             )
+    48	           )
+    49	         ),
+    50	         0
+    51	       )
+    52	
+    53	  // MPY's Float equality delegates to the FLOAT.eq hook, which the LLVM
+    54	  // backend implements but the Haskell backend does not.  This symbol is the
+    55	  // explicit trusted primitive for that fixed external operation.
+    56	  syntax Bool ::= trustedFloatEq(Float, Float)
+    57	    [function, total, symbol(trustedFloatEq), no-evaluators]
+    58	  rule trustedFloatEq(F1:Float, F2:Float)
+    59	    => F1 ==Float F2
+    60	    [concrete]
+    61	
+    62	  // Arguments are already evaluated Float values here.  Equality is pure:
+    63	  // it reads no cells and returns one Bool into the same continuation.
+    64	  rule <k>
+    65	         Compare(F1:Float, CmpOp("==", F2:Float))
+    66	         =>
+    67	         trustedFloatEq(F1, F2)
+    68	         ...
+    69	       </k>
+    70	       [priority(40)]
+    71	
+    72	  // Mathematical description of the exact numeric operations used by the
+    73	  // candidate.  These functions occur only in postconditions.
+    74	  syntax Val ::= ratSquare(Val) [function]
+    75	               | ratAdd(Val, Val) [function]
+    76	  syntax Bool ::= ratEq(Val, Val) [function]
+    77	                | ratExpected(Val, Val, Val) [function]
+    78	
+    79	  rule ratSquare(I:Int)   => I *Int I
+    80	  rule ratSquare(F:Float) => mulF(F, F)
+    81	
+    82	  rule ratAdd(I1:Int,   I2:Int)   => I1 +Int I2
+    83	  rule ratAdd(F1:Float, F2:Float) => addF(F1, F2)
+    84	  rule ratAdd(I:Int,    F:Float)  => addF(intToF(I), F)
+    85	  rule ratAdd(F:Float,  I:Int)    => addF(F, intToF(I))
+    86	
+    87	  rule ratEq(I1:Int,   I2:Int)   => I1 ==Int I2
+    88	  rule ratEq(F1:Float, F2:Float) => trustedFloatEq(F1, F2)
+    89	  rule ratEq(I:Int,    F:Float)  => eqIF(I, F)
+    90	  rule ratEq(F:Float,  I:Int)    => eqIF(I, F)
+    91	
+    92	  rule ratExpected(A:Val, B:Val, C:Val)
+    93	    => ratEq(ratSquare(A), ratAdd(ratSquare(B), ratSquare(C)))
+    94	       orBool ratEq(ratSquare(B), ratAdd(ratSquare(A), ratSquare(C)))
+    95	       orBool ratEq(ratSquare(C), ratAdd(ratSquare(A), ratSquare(B)))
+    96	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // The eight claims cover every combination of the numeric value classes
+     7	  // represented by MPY for side lengths: Int and Float.
+     8	
+     9	  claim [right-angle-iii]:
+    10	    <k> Call(Name("right_angle_triangle"), A:Int, B:Int, C:Int)
+    11	         => ?RESULT:Bool </k>
+    12	    <env> 0 </env>
+    13	    <scopes>
+    14	      0 |-> scope(
+    15	        "right_angle_triangle" |-> rightAngleTriangleClosure(),
+    16	        parent(-1)
+    17	      )
+    18	      -1 |-> builtinsScope
+    19	    </scopes>
+    20	    <scopeLoc> 1 </scopeLoc>
+    21	    <heap> .Map </heap>
+    22	    <heapLoc> 0 </heapLoc>
+    23	    <stack> .List </stack>
+    24	    <ret> noRet </ret>
+    25	    <exc> NoExc </exc>
+    26	    <exit-code> 0 </exit-code>
+    27	    ensures ?RESULT ==Bool ratExpected(A, B, C)
+    28	
+    29	  claim [right-angle-iif]:
+    30	    <k> Call(Name("right_angle_triangle"), A:Int, B:Int, C:Float)
+    31	         => ?RESULT:Bool </k>
+    32	    <env> 0 </env>
+    33	    <scopes>
+    34	      0 |-> scope(
+    35	        "right_angle_triangle" |-> rightAngleTriangleClosure(),
+    36	        parent(-1)
+    37	      )
+    38	      -1 |-> builtinsScope
+    39	    </scopes>
+    40	    <scopeLoc> 1 </scopeLoc>
+    41	    <heap> .Map </heap>
+    42	    <heapLoc> 0 </heapLoc>
+    43	    <stack> .List </stack>
+    44	    <ret> noRet </ret>
+    45	    <exc> NoExc </exc>
+    46	    <exit-code> 0 </exit-code>
+    47	    ensures ?RESULT ==Bool ratExpected(A, B, C)
+    48	
+    49	  claim [right-angle-ifi]:
+    50	    <k> Call(Name("right_angle_triangle"), A:Int, B:Float, C:Int)
+    51	         => ?RESULT:Bool </k>
+    52	    <env> 0 </env>
+    53	    <scopes>
+    54	      0 |-> scope(
+    55	        "right_angle_triangle" |-> rightAngleTriangleClosure(),
+    56	        parent(-1)
+    57	      )
+    58	      -1 |-> builtinsScope
+    59	    </scopes>
+    60	    <scopeLoc> 1 </scopeLoc>
+    61	    <heap> .Map </heap>
+    62	    <heapLoc> 0 </heapLoc>
+    63	    <stack> .List </stack>
+    64	    <ret> noRet </ret>
+    65	    <exc> NoExc </exc>
+    66	    <exit-code> 0 </exit-code>
+    67	    ensures ?RESULT ==Bool ratExpected(A, B, C)
+    68	
+    69	  claim [right-angle-iff]:
+    70	    <k> Call(Name("right_angle_triangle"), A:Int, B:Float, C:Float)
+    71	         => ?RESULT:Bool </k>
+    72	    <env> 0 </env>
+    73	    <scopes>
+    74	      0 |-> scope(
+    75	        "right_angle_triangle" |-> rightAngleTriangleClosure(),
+    76	        parent(-1)
+    77	      )
+    78	      -1 |-> builtinsScope
+    79	    </scopes>
+    80	    <scopeLoc> 1 </scopeLoc>
+    81	    <heap> .Map </heap>
+    82	    <heapLoc> 0 </heapLoc>
+    83	    <stack> .List </stack>
+    84	    <ret> noRet </ret>
+    85	    <exc> NoExc </exc>
+    86	    <exit-code> 0 </exit-code>
+    87	    ensures ?RESULT ==Bool ratExpected(A, B, C)
+    88	
+    89	  claim [right-angle-fii]:
+    90	    <k> Call(Name("right_angle_triangle"), A:Float, B:Int, C:Int)
+    91	         => ?RESULT:Bool </k>
+    92	    <env> 0 </env>
+    93	    <scopes>
+    94	      0 |-> scope(
+    95	        "right_angle_triangle" |-> rightAngleTriangleClosure(),
+    96	        parent(-1)
+    97	      )
+    98	      -1 |-> builtinsScope
+    99	    </scopes>
+   100	    <scopeLoc> 1 </scopeLoc>
+   101	    <heap> .Map </heap>
+   102	    <heapLoc> 0 </heapLoc>
+   103	    <stack> .List </stack>
+   104	    <ret> noRet </ret>
+   105	    <exc> NoExc </exc>
+   106	    <exit-code> 0 </exit-code>
+   107	    ensures ?RESULT ==Bool ratExpected(A, B, C)
+   108	
+   109	  claim [right-angle-fif]:
+   110	    <k> Call(Name("right_angle_triangle"), A:Float, B:Int, C:Float)
+   111	         => ?RESULT:Bool </k>
+   112	    <env> 0 </env>
+   113	    <scopes>
+   114	      0 |-> scope(
+   115	        "right_angle_triangle" |-> rightAngleTriangleClosure(),
+   116	        parent(-1)
+   117	      )
+   118	      -1 |-> builtinsScope
+   119	    </scopes>
+   120	    <scopeLoc> 1 </scopeLoc>
+   121	    <heap> .Map </heap>
+   122	    <heapLoc> 0 </heapLoc>
+   123	    <stack> .List </stack>
+   124	    <ret> noRet </ret>
+   125	    <exc> NoExc </exc>
+   126	    <exit-code> 0 </exit-code>
+   127	    ensures ?RESULT ==Bool ratExpected(A, B, C)
+   128	
+   129	  claim [right-angle-ffi]:
+   130	    <k> Call(Name("right_angle_triangle"), A:Float, B:Float, C:Int)
+   131	         => ?RESULT:Bool </k>
+   132	    <env> 0 </env>
+   133	    <scopes>
+   134	      0 |-> scope(
+   135	        "right_angle_triangle" |-> rightAngleTriangleClosure(),
+   136	        parent(-1)
+   137	      )
+   138	      -1 |-> builtinsScope
+   139	    </scopes>
+   140	    <scopeLoc> 1 </scopeLoc>
+   141	    <heap> .Map </heap>
+   142	    <heapLoc> 0 </heapLoc>
+   143	    <stack> .List </stack>
+   144	    <ret> noRet </ret>
+   145	    <exc> NoExc </exc>
+   146	    <exit-code> 0 </exit-code>
+   147	    ensures ?RESULT ==Bool ratExpected(A, B, C)
+   148	
+   149	  claim [right-angle-fff]:
+   150	    <k> Call(Name("right_angle_triangle"), A:Float, B:Float, C:Float)
+   151	         => ?RESULT:Bool </k>
+   152	    <env> 0 </env>
+   153	    <scopes>
+   154	      0 |-> scope(
+   155	        "right_angle_triangle" |-> rightAngleTriangleClosure(),
+   156	        parent(-1)
+   157	      )
+   158	      -1 |-> builtinsScope
+   159	    </scopes>
+   160	    <scopeLoc> 1 </scopeLoc>
+   161	    <heap> .Map </heap>
+   162	    <heapLoc> 0 </heapLoc>
+   163	    <stack> .List </stack>
+   164	    <ret> noRet </ret>
+   165	    <exc> NoExc </exc>
+   166	    <exit-code> 0 </exit-code>
+   167	    ensures ?RESULT ==Bool ratExpected(A, B, C)
+   168	endmodule
+     1	def right_angle_triangle(a, b, c):
+     2	    return (
+     3	        a * a == b * b + c * c
+     4	        or b * b == a * a + c * c
+     5	        or c * c == a * a + b * b
+     6	    )
+     1	Module(
+     2	  FuncDef("right_angle_triangle", Params("a", "b", "c"),
+     3	    Return(
+     4	      BoolOp(
+     5	        "or",
+     6	        Compare(
+     7	          BinOp("*", Name("a"), Name("a")),
+     8	          CmpOp(
+     9	            "==",
+    10	            BinOp(
+    11	              "+",
+    12	              BinOp("*", Name("b"), Name("b")),
+    13	              BinOp("*", Name("c"), Name("c"))))),
+    14	        Compare(
+    15	          BinOp("*", Name("b"), Name("b")),
+    16	          CmpOp(
+    17	            "==",
+    18	            BinOp(
+    19	              "+",
+    20	              BinOp("*", Name("a"), Name("a")),
+    21	              BinOp("*", Name("c"), Name("c"))))),
+    22	        Compare(
+    23	          BinOp("*", Name("c"), Name("c")),
+    24	          CmpOp(
+    25	            "==",
+    26	            BinOp(
+    27	              "+",
+    28	              BinOp("*", Name("a"), Name("a")),
+    29	              BinOp("*", Name("b"), Name("b")))))))))
+     1	
+     2	def right_angle_triangle(a, b, c):
+     3	    '''
+     4	    Given the lengths of the three sides of a triangle. Return True if the three
+     5	    sides form a right-angled triangle, False otherwise.
+     6	    A right-angled triangle is a triangle in which one angle is right angle or 
+     7	    90 degree.
+     8	    Example:
+     9	    right_angle_triangle(3, 4, 5) == True
+    10	    right_angle_triangle(1, 2, 3) == False
+    11	    '''
+reference-semantics/semantics/comprehension.k:20:    => Assign(Name("$acc"), BinOp("+", Name("$acc"), ListExpr(ELT)))
+reference-semantics/semantics/comprehension.k:26:  rule compGuard((F:Expr, Fs:Exprs)) => BoolOp("and", (F, Fs))
+reference-semantics/semantics/core.k:198:  // ==== truthy (If, Assert, BoolOp, IfExp, not, While) ======================
+reference-semantics/semantics/list.k:23:  // already deref'd). priority(45) beats the generic BinOp dispatch.
+reference-semantics/semantics/list.k:24:  rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k>
+reference-semantics/semantics/list.k:59:  rule <k> Compare(LV:Val, CmpOp("in",     list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ... </k>
+reference-semantics/semantics/list.k:60:  rule <k> Compare(LV:Val, CmpOp("not in", list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ~> #notB ... </k>
+reference-semantics/semantics/float.k:43:  rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2
+reference-semantics/semantics/float.k:44:  rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2)
+reference-semantics/semantics/float.k:88:  rule toF(I:Int)   => intToF(I) [concrete]
+reference-semantics/semantics/float.k:111:  syntax Float ::= addF(Float, Float) [function, total, symbol(addF), no-evaluators]
+reference-semantics/semantics/float.k:112:  rule addF(F1:Float, F2:Float) => F1 +Float F2 [concrete]
+reference-semantics/semantics/float.k:113:  rule applyBin("+", F1:Float, F2:Float) => addF(F1, F2)
+reference-semantics/semantics/float.k:115:  syntax Float ::= mulF(Float, Float) [function, total, symbol(mulF), no-evaluators]
+reference-semantics/semantics/float.k:116:  rule mulF(F1:Float, F2:Float) => F1 *Float F2 [concrete]
+reference-semantics/semantics/float.k:117:  rule applyBin("*", F1:Float, F2:Float) => mulF(F1, F2)
+reference-semantics/semantics/float.k:132:  rule applyBin("**", I:Int, F:Float) => powF(intToF(I), F)
+reference-semantics/semantics/float.k:133:  rule applyBin("**", F:Float, I:Int) => powF(F, intToF(I))
+reference-semantics/semantics/float.k:134:  rule applyBin("-",  I:Int, F:Float) => subF(intToF(I), F)
+reference-semantics/semantics/float.k:135:  rule applyBin("-",  F:Float, I:Int) => subF(F, intToF(I))
+reference-semantics/semantics/float.k:136:  rule applyBin("+",  I:Int, F:Float) => addF(intToF(I), F)
+reference-semantics/semantics/float.k:137:  rule applyBin("+",  F:Float, I:Int) => addF(F, intToF(I))
+reference-semantics/semantics/float.k:138:  rule applyBin("*",  I:Int, F:Float) => mulF(intToF(I), F)
+reference-semantics/semantics/float.k:139:  rule applyBin("*",  F:Float, I:Int) => mulF(F, intToF(I))
+reference-semantics/semantics/float.k:142:  // The old rules compared via intToF(I), which ROUNDS ints >= 2^53 to a nearby
+reference-semantics/semantics/float.k:143:  // double (so e.g. 9007199254740993 > 9007199254740992.0 came out false). Compare
+reference-semantics/semantics/float.k:150:  // F keeps the old intToF path (rounding is irrelevant to +/-inf and NaN, and
+reference-semantics/semantics/float.k:153:  rule eqF(F1:Float, F2:Float) => F1 ==Float F2 [concrete]
+reference-semantics/semantics/float.k:160:                | eqIF(Int, Float) [function, total, symbol(eqIF), no-evaluators]   // I == F
+reference-semantics/semantics/float.k:162:  rule ltFI(F:Float, I:Int) => floatLt(F, intToF(I))            requires notBool floatFinite(F)   [concrete]
+reference-semantics/semantics/float.k:164:  rule ltIF(I:Int, F:Float) => floatLt(intToF(I), F)            requires notBool floatFinite(F)   [concrete]
+reference-semantics/semantics/float.k:165:  rule eqIF(I:Int, F:Float)
+reference-semantics/semantics/float.k:166:    => (floorFloat(F) ==Float ceilFloat(F)) andBool (Float2Int(floorFloat(F)) ==Int I)
+reference-semantics/semantics/float.k:168:  rule eqIF(I:Int, F:Float) => eqF(intToF(I), F) requires notBool floatFinite(F) [concrete]
+reference-semantics/semantics/float.k:170:  rule applyCmp("==", I:Int, F:Float) => eqIF(I, F)
+reference-semantics/semantics/float.k:171:  rule applyCmp("==", F:Float, I:Int) => eqIF(I, F)
+reference-semantics/semantics/float.k:172:  rule applyCmp("!=", I:Int, F:Float) => notBool eqIF(I, F)
+reference-semantics/semantics/float.k:173:  rule applyCmp("!=", F:Float, I:Int) => notBool eqIF(I, F)
+reference-semantics/semantics/float.k:199:    => intToF(intPart(CS)) +Float (intToF(fracPart(CS)) /Float intToF(fracScale(CS)))
+reference-semantics/semantics/float.k:222:  rule applyBuiltin("float", I:Int, .Vals)          => intToF(I)
+reference-semantics/semantics/float.k:231:  syntax Float ::= intToF(Int) [function, total, symbol(intToF), no-evaluators]
+reference-semantics/semantics/float.k:232:  rule intToF(I:Int) => Int2Float(I, 53, 11) [concrete]
+reference-semantics/semantics/float.k:233:  rule applyBin("+", I:Int, F:Float) => addF(intToF(I), F)
+reference-semantics/semantics/float.k:234:  rule applyBin("+", F:Float, I:Int) => addF(F, intToF(I))
+reference-semantics/semantics/float.k:235:  rule applyBin("-", I:Int, F:Float) => subF(intToF(I), F)
+reference-semantics/semantics/float.k:236:  rule applyBin("-", F:Float, I:Int) => subF(F, intToF(I))
+reference-semantics/semantics/float.k:237:  rule applyBin("*", I:Int, F:Float) => mulF(intToF(I), F)
+reference-semantics/semantics/float.k:238:  rule applyBin("*", F:Float, I:Int) => mulF(F, intToF(I))
+reference-semantics/semantics/float.k:239:  // (mixed Int/Float comparison is defined exactly above via ltIF/ltFI/eqIF;
+reference-semantics/semantics/float.k:240:  //  the former floatLt(intToF(...)) duplicates were removed for exactness.)
+reference-semantics/semantics/float.k:247:  rule applyBuiltin("float", I:Int, .Vals)   => intToF(I)
+reference-semantics/semantics/float.k:253:    => #if (F -Float floorFloat(F)) ==Float 0.5
+reference-semantics/semantics/float.k:318:  rule <k> I:Int ~> #mathSqrt => sqrtF(intToF(I)) ... </k>
+reference-semantics/semantics/float.k:341:  // #sumCont sticks on a Float yield; switch to a Float-headed fold via addF (concrete twin).
+reference-semantics/semantics/float.k:346:        => #sumAccF(R, addF(intToF(ACC), {V}:>Float)) ... </k>
+reference-semantics/semantics/float.k:351:        => #sumAccF(R, addF(ACC, {V}:>Float)) ... </k>
+reference-semantics/semantics/float.k:354:        => #sumAccF(R, addF(ACC, intToF(intOf(V)))) ... </k>
+reference-semantics/semantics/bool.k:24:  // ==== BoolOp: short-circuit, value-returning and / or =====================
+reference-semantics/semantics/bool.k:27:  context BoolOp(_, (HOLE:Expr, _:Exprs))
+reference-semantics/semantics/bool.k:28:  rule <k> BoolOp(_:String, (V:Val, .Exprs)) => V ... </k>
+reference-semantics/semantics/bool.k:29:  rule <k> BoolOp("and", (V:Val, A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>
+reference-semantics/semantics/bool.k:31:  rule <k> BoolOp("and", (V:Val, _:Expr, _:Exprs)) => V ... </k>
+reference-semantics/semantics/bool.k:33:  rule <k> BoolOp("or",  (V:Val, _:Expr, _:Exprs)) => V ... </k>
+reference-semantics/semantics/bool.k:35:  rule <k> BoolOp("or",  (V:Val, A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>
+reference-semantics/semantics/bool.k:40:  rule <k> BoolOp(_:String, (ref(H:Int), .Exprs)) => ref(H) ... </k>
+reference-semantics/semantics/bool.k:42:  rule <k> BoolOp("and", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k>
+reference-semantics/semantics/bool.k:46:  rule <k> BoolOp("and", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k>
+reference-semantics/semantics/bool.k:50:  rule <k> BoolOp("or", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k>
+reference-semantics/semantics/bool.k:54:  rule <k> BoolOp("or", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k>
+reference-semantics/semantics/concrete.k:13:  rule <k> Compare(list(A:ValSeq), CmpOp("==", list(B:ValSeq))) => deepEqVS(A, B, HP) ... </k>
+reference-semantics/semantics/concrete.k:16:  rule <k> Compare(list(A:ValSeq), CmpOp("!=", list(B:ValSeq))) => notBool deepEqVS(A, B, HP) ... </k>
+reference-semantics/semantics/operators.k:12:  rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>
+reference-semantics/semantics/operators.k:14:  // Compare's right operand sits under the CmpOp wrapper — contexts instead of attributes
+reference-semantics/semantics/operators.k:15:  context Compare(HOLE, _)
+reference-semantics/semantics/operators.k:16:  context Compare(_:Val, CmpOp(_, HOLE))
+reference-semantics/semantics/operators.k:17:  rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]
+reference-semantics/semantics/operators.k:25:  rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k>
+reference-semantics/semantics/operators.k:28:  rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k>
+reference-semantics/semantics/operators.k:34:  rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k>
+reference-semantics/semantics/operators.k:38:  rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k>
+reference-semantics/semantics/syntax.k:15:                | "BinOp"    "(" String "," Expr "," Expr ")" [seqstrict(2, 3)]
+reference-semantics/semantics/syntax.k:16:                | "BoolOp"    "(" String "," Exprs ")"
+reference-semantics/semantics/syntax.k:30:                | "Compare"   "(" Expr "," CmpOp ")"
+reference-semantics/semantics/syntax.k:32:  syntax CmpOp    ::= "CmpOp" "(" String "," Expr ")"
+reference-semantics/semantics/tuple.k:20:  rule <k> Compare(LV:Val, CmpOp("in",     tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ... </k>
+reference-semantics/semantics/tuple.k:21:  rule <k> Compare(LV:Val, CmpOp("not in", tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ~> #notB ... </k>
+reference-semantics/semantics/controls.k:25:  // ref-deref preemption is BinOp-level (operators.k), so applyBin never derefs and it sticks. Route
+reference-semantics/semantics/controls.k:26:  // the ref case through BinOp so the deref + list-concat + #alloc path fires (result is a fresh ref).
+reference-semantics/semantics/controls.k:27:  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k>
+EXIT_CODE=0

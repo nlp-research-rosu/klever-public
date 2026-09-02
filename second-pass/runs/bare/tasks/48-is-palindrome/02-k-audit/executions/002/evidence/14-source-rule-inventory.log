@@ -1,0 +1,209 @@
+WORKDIR: /tmp/audit-work/source
+COMMAND: bash -o pipefail -c sha256sum\ solution.py\ solution.mpy\ semantic.k\ verification.k\ spec.k\;\ for\ f\ in\ solution.mpy\ semantic.k\ verification.k\ spec.k\;\ do\ printf\ \"\\n=====\ %s\ =====\\n\"\ \"\$f\"\;\ nl\ -ba\ \"\$f\"\;\ done\;\ printf\ \"\\n=====\ local\ declaration/rule\ markers\ =====\\n\"\;\ rg\ -n\ \"\^\(\\s\*\)\(syntax\|configuration\|rule\|claim\)\|\\\[\(function\|total\|functional\|simplification\|concrete\|priority\|owise\|anywhere\|macro\)\"\ semantic.k\ verification.k\ spec.k
+START_UTC: 2026-07-26T12:38:50Z
+8e6b362f06ab781cea20cf338dbf85d4daebc6c2ed31b4bcc8c811df10f0df6b  solution.py
+8278b02d667e625ef15bdd083acb6461d92384f78a36828c230508569475e863  solution.mpy
+0066823c7267d37aeed25695e99faec5eb996bd515cc7cbab0118ea7bb2d5ade  semantic.k
+79a975c8be0b3b8971d8d5cfc9c7a7131e19ee0190b1a50a373a77a5ef2e11cd  verification.k
+1dff2887881ad0a358bf59c02f8fbadfb1cbb8282c5f7e2b7d55250dfea55843  spec.k
+
+===== solution.mpy =====
+     1	Module(
+     2	  FuncDef("is_palindrome", Params("text"),
+     3	    Return(
+     4	      Compare(
+     5	        Name("text"),
+     6	        CmpOp(
+     7	          "==",
+     8	          Subscript(
+     9	            Name("text"),
+    10	            Slice(NoBound, NoBound, UnaryOp("-", Int(1)))))))))
+
+===== semantic.k =====
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports DOMAINS
+     5	
+     6	  // The concrete grammar covers every constructor emitted for solution.mpy.
+     7	  syntax Program ::= "Module" "(" Stmt ")"
+     8	
+     9	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
+    10	                | "Return" "(" Expr ")"
+    11	
+    12	  syntax Params ::= "Params" "(" String ")"
+    13	
+    14	  syntax Expr ::= "Name" "(" String ")"
+    15	                | "Int" "(" Int ")"
+    16	                | "Str" "(" String ")"
+    17	                | "UnaryOp" "(" String "," Expr ")"
+    18	                | "Subscript" "(" Expr "," Slice ")"
+    19	                | "Compare" "(" Expr "," CmpOp ")"
+    20	                | PyVal
+    21	
+    22	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    23	  syntax Slice ::= "Slice" "(" Bound "," Bound "," Bound ")"
+    24	  syntax Bound ::= Expr | "NoBound"
+    25	
+    26	  syntax PyVal ::= "PyString" "(" String ")"
+    27	                 | "PyInt" "(" Int ")"
+    28	                 | "PyBool" "(" Bool ")"
+    29	endmodule
+    30	
+    31	module SEMANTIC
+    32	  imports MPY-SYNTAX
+    33	  imports MAP
+    34	
+    35	  syntax Function ::= "#function" "(" String "," Stmt ")"
+    36	
+    37	  syntax KItem ::= "#load" "(" Stmt ")"
+    38	                 | "#invoke" "(" String "," PyVal ")"
+    39	                 | "#return" | "#returnFrame" "(" Map ")"
+    40	                 | "#compareRight" "(" CmpOp ")"
+    41	                 | "#compareValues" "(" PyVal "," String ")"
+    42	                 | "#applySlice" "(" Slice ")"
+    43	                 | "#unaryMinus"
+    44	
+    45	  configuration
+    46	    <py>
+    47	      <k> $PGM:Program ~> #invoke($FUNCTION:String, PyString($ARG:String)) </k>
+    48	      <functions> .Map </functions>
+    49	      <env> .Map </env>
+    50	    </py>
+    51	
+    52	  // Loading and calling the one-function module emitted by the translator.
+    53	  rule <k> Module(FD) => #load(FD) ... </k>
+    54	
+    55	  rule <k> #load(FuncDef(F, Params(P), BODY)) => .K ... </k>
+    56	       <functions> .Map => F |-> #function(P, BODY) </functions>
+    57	
+    58	  rule <k> #invoke(F, V) => BODY ~> #returnFrame(OLD) ... </k>
+    59	       <functions> F |-> #function(P, BODY) </functions>
+    60	       <env> OLD => P |-> V </env>
+    61	
+    62	  // Return is evaluated before its caller's environment is restored.
+    63	  rule <k> Return(E) => E ~> #return ... </k>
+    64	  rule <k> V:PyVal ~> #return ~> #returnFrame(OLD) => V ... </k>
+    65	       <env> _CURRENT => OLD </env>
+    66	
+    67	  // Literal and variable evaluation.
+    68	  rule <k> Int(I) => PyInt(I) ... </k>
+    69	  rule <k> Str(S) => PyString(S) ... </k>
+    70	  rule <k> Name(X) => V ... </k>
+    71	       <env> X |-> V </env>
+    72	
+    73	  rule <k> UnaryOp("-", E) => E ~> #unaryMinus ... </k>
+    74	  rule <k> PyInt(I) ~> #unaryMinus => PyInt(0 -Int I) ... </k>
+    75	
+    76	  // Evaluation order for a single CPython Compare/CmpOp pair.
+    77	  rule <k> Compare(E, C) => E ~> #compareRight(C) ... </k>
+    78	  rule <k> LEFT:PyVal ~> #compareRight(CmpOp(OP, RIGHT))
+    79	        => RIGHT ~> #compareValues(LEFT, OP) ... </k>
+    80	  rule <k> PyString(RIGHT) ~> #compareValues(PyString(LEFT), "==")
+    81	        => PyBool(LEFT ==String RIGHT) ... </k>
+    82	
+    83	  // Python's s[::-1] is the only slice form used by solution.mpy.
+    84	  rule <k> Subscript(E, SL) => E ~> #applySlice(SL) ... </k>
+    85	  rule <k> PyString(S) ~> #applySlice(
+    86	          Slice(NoBound, NoBound, UnaryOp("-", Int(1))))
+    87	        => PyString(reverseString(S)) ... </k>
+    88	
+    89	  // Reverse by Unicode code point, matching Python str slicing rather than
+    90	  // reversing a UTF-8 byte representation.
+    91	  syntax String ::= reverseString(String) [function]
+    92	  syntax String ::= reverseStringN(String, Int) [function]
+    93	
+    94	  rule reverseString(S) => reverseStringN(S, lengthString(S))
+    95	  rule reverseStringN(_S, 0) => ""
+    96	  rule reverseStringN(S, N)
+    97	    => substrString(S, N -Int 1, N) +String reverseStringN(S, N -Int 1)
+    98	    requires N >Int 0
+    99	endmodule
+
+===== verification.k =====
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // Mathematical postcondition used by the reachability claim.
+     7	  syntax Bool ::= isPalindrome(String) [function]
+     8	  rule isPalindrome(S) => S ==String reverseString(S)
+     9	endmodule
+
+===== spec.k =====
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim
+     7	    <py>
+     8	      <k>
+     9	        Module(
+    10	          FuncDef("is_palindrome", Params("text"),
+    11	            Return(
+    12	              Compare(
+    13	                Name("text"),
+    14	                CmpOp(
+    15	                  "==",
+    16	                  Subscript(
+    17	                    Name("text"),
+    18	                    Slice(NoBound, NoBound, UnaryOp("-", Int(1)))))))))
+    19	        ~> #invoke("is_palindrome", PyString(S:String))
+    20	      => PyBool(isPalindrome(S))
+    21	      </k>
+    22	      <functions>
+    23	        .Map
+    24	      => "is_palindrome" |-> #function(
+    25	           "text",
+    26	           Return(
+    27	             Compare(
+    28	               Name("text"),
+    29	               CmpOp(
+    30	                 "==",
+    31	                 Subscript(
+    32	                   Name("text"),
+    33	                   Slice(NoBound, NoBound, UnaryOp("-", Int(1))))))))
+    34	      </functions>
+    35	      <env> .Map </env>
+    36	    </py>
+    37	endmodule
+
+===== local declaration/rule markers =====
+spec.k:6:  claim
+verification.k:7:  syntax Bool ::= isPalindrome(String) [function]
+verification.k:8:  rule isPalindrome(S) => S ==String reverseString(S)
+semantic.k:7:  syntax Program ::= "Module" "(" Stmt ")"
+semantic.k:9:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
+semantic.k:12:  syntax Params ::= "Params" "(" String ")"
+semantic.k:14:  syntax Expr ::= "Name" "(" String ")"
+semantic.k:22:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+semantic.k:23:  syntax Slice ::= "Slice" "(" Bound "," Bound "," Bound ")"
+semantic.k:24:  syntax Bound ::= Expr | "NoBound"
+semantic.k:26:  syntax PyVal ::= "PyString" "(" String ")"
+semantic.k:35:  syntax Function ::= "#function" "(" String "," Stmt ")"
+semantic.k:37:  syntax KItem ::= "#load" "(" Stmt ")"
+semantic.k:45:  configuration
+semantic.k:53:  rule <k> Module(FD) => #load(FD) ... </k>
+semantic.k:55:  rule <k> #load(FuncDef(F, Params(P), BODY)) => .K ... </k>
+semantic.k:58:  rule <k> #invoke(F, V) => BODY ~> #returnFrame(OLD) ... </k>
+semantic.k:63:  rule <k> Return(E) => E ~> #return ... </k>
+semantic.k:64:  rule <k> V:PyVal ~> #return ~> #returnFrame(OLD) => V ... </k>
+semantic.k:68:  rule <k> Int(I) => PyInt(I) ... </k>
+semantic.k:69:  rule <k> Str(S) => PyString(S) ... </k>
+semantic.k:70:  rule <k> Name(X) => V ... </k>
+semantic.k:73:  rule <k> UnaryOp("-", E) => E ~> #unaryMinus ... </k>
+semantic.k:74:  rule <k> PyInt(I) ~> #unaryMinus => PyInt(0 -Int I) ... </k>
+semantic.k:77:  rule <k> Compare(E, C) => E ~> #compareRight(C) ... </k>
+semantic.k:78:  rule <k> LEFT:PyVal ~> #compareRight(CmpOp(OP, RIGHT))
+semantic.k:80:  rule <k> PyString(RIGHT) ~> #compareValues(PyString(LEFT), "==")
+semantic.k:84:  rule <k> Subscript(E, SL) => E ~> #applySlice(SL) ... </k>
+semantic.k:85:  rule <k> PyString(S) ~> #applySlice(
+semantic.k:91:  syntax String ::= reverseString(String) [function]
+semantic.k:92:  syntax String ::= reverseStringN(String, Int) [function]
+semantic.k:94:  rule reverseString(S) => reverseStringN(S, lengthString(S))
+semantic.k:95:  rule reverseStringN(_S, 0) => ""
+semantic.k:96:  rule reverseStringN(S, N)
+EXIT_STATUS: 0
+END_UTC: 2026-07-26T12:38:50Z

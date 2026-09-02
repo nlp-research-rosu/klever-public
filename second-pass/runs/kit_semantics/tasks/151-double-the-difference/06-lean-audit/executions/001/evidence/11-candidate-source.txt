@@ -1,0 +1,349 @@
+     1	import Klean151DoubleTheDifference.Lemmas
+     2	
+     3	namespace Proof
+     4	
+     5	/- Executable structural equality for the generated K term datatypes.  The
+     6	   mutual `SortVal` derivation also produces equality for its mutually-defined
+     7	   component sorts; the preceding instances discharge its non-mutual fields. -/
+     8	deriving instance BEq for SortExc
+     9	deriving instance BEq for SortExcCell
+    10	deriving instance BEq for SortEnvCell
+    11	deriving instance BEq for SortExitCodeCell
+    12	deriving instance BEq for SortGeneratedCounterCell
+    13	deriving instance BEq for SortHeapLocCell
+    14	deriving instance BEq for SortIntSeq
+    15	deriving instance BEq for SortOptInt
+    16	deriving instance BEq for SortScopeLocCell
+    17	deriving instance BEq for SortParamNames
+    18	deriving instance BEq for SortCellVars
+    19	deriving instance BEq for SortFreeVars
+    20	deriving instance BEq for SortParams
+    21	deriving instance BEq for SortVal
+    22	deriving instance BEq for SortValSeq
+    23	
+    24	private def valIntProjection? : SortVal → Option SortInt
+    25	  | SortVal.inj_SortInt i => some i
+    26	  | _ => none
+    27	
+    28	private def valIntProjectionTotal (v : SortVal) : SortInt :=
+    29	  (valIntProjection? v).getD 0
+    30	
+    31	private def kIntProjection? : SortK → Option SortInt
+    32	  | SortK.kseq (SortKItem.inj_SortInt i) SortK.dotk => some i
+    33	  | _ => none
+    34	
+    35	/- K's `%Int` is truncating remainder.  Python's remainder is the frozen
+    36	   two-remainder adjustment from MPY-INT. -/
+    37	private def pythonMod? (i₁ i₂ : SortInt) : Option SortInt :=
+    38	  if i₂ = 0 then none
+    39	  else some (Int.tmod (Int.tmod i₁ i₂ + i₂) i₂)
+    40	
+    41	private def pythonModTotal (i₁ i₂ : SortInt) : SortInt :=
+    42	  (pythonMod? i₁ i₂).getD 0
+    43	
+    44	private def boolAsInt : SortBool → SortInt
+    45	  | true => 1
+    46	  | false => 0
+    47	
+    48	private def intPower? (base exponent : SortInt) : Option SortInt :=
+    49	  match exponent with
+    50	  | Int.ofNat n => some (Int.pow base n)
+    51	  | Int.negSucc _ => none
+    52	
+    53	private def floatFromInt (i : SortInt) : SortFloat :=
+    54	  Float.ofInt i
+    55	
+    56	private def pythonFloatMod (f₁ f₂ : SortFloat) : SortFloat :=
+    57	  f₁ - Float.floor (f₁ / f₂) * f₂
+    58	
+    59	private def intSeqMember (code : SortInt) : SortIntSeq → SortBool
+    60	  | SortIntSeq.«.IntSeq_MPY-CORE_IntSeq» => false
+    61	  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» head tail =>
+    62	      (code == head) || intSeqMember code tail
+    63	
+    64	private def intSeqSubset : SortIntSeq → SortIntSeq → SortBool
+    65	  | SortIntSeq.«.IntSeq_MPY-CORE_IntSeq», _ => true
+    66	  | SortIntSeq.«iCons(_,_)_MPY-CORE_IntSeq_Int_IntSeq» head tail, other =>
+    67	      intSeqMember head other && intSeqSubset tail other
+    68	
+    69	private def intSeqSetEq (left right : SortIntSeq) : SortBool :=
+    70	  intSeqSubset left right && intSeqSubset right left
+    71	
+    72	private def valSeqLength : SortValSeq → SortInt
+    73	  | SortValSeq.«.ValSeq_MPY-CORE_ValSeq» => 0
+    74	  | SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» _ tail =>
+    75	      valSeqLength tail + 1
+    76	
+    77	private def dictLookup? : SortValSeq → SortValSeq → SortVal → Option SortVal
+    78	  | SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» key keys,
+    79	    SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» value values,
+    80	    sought =>
+    81	      if key == sought then some value else dictLookup? keys values sought
+    82	  | _, _, _ => none
+    83	
+    84	private def dictSubsetOperational :
+    85	    SortValSeq → SortValSeq → SortValSeq → SortValSeq → SortBool
+    86	  | SortValSeq.«.ValSeq_MPY-CORE_ValSeq»,
+    87	    SortValSeq.«.ValSeq_MPY-CORE_ValSeq», _, _ => true
+    88	  | SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» key keys,
+    89	    SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» value values,
+    90	    otherKeys, otherValues =>
+    91	      match dictLookup? otherKeys otherValues key with
+    92	      | some otherValue =>
+    93	          (otherValue == value) &&
+    94	            dictSubsetOperational keys values otherKeys otherValues
+    95	      | none => false
+    96	  | _, _, _, _ => false
+    97	
+    98	private def dictEqOperational
+    99	    (keys₁ values₁ keys₂ values₂ : SortValSeq) : SortBool :=
+   100	  (valSeqLength keys₁ == valSeqLength keys₂) &&
+   101	    dictSubsetOperational keys₁ values₁ keys₂ values₂
+   102	
+   103	private def oddSquareOperational (i : SortInt) : SortInt :=
+   104	  if decide (i > 0) && decide (pythonModTotal i 2 = 1) then i * i else 0
+   105	
+   106	/- KORE symbol: Lbl'Unds'andBool'Unds'; frozen source obligations: rule-c3d4bdc727e825560b34733f473eca514ee7daf812bf838c8e485dc9499825dc. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   107	def _andBool_ (b₁ b₂ : SortBool) : SortBool := b₁ && b₂
+   108	/- KORE symbol: Lbl'Unds-GT-'Int'Unds'; frozen source obligations: rule-835c8361eaef00ebfc5566f8c0006f3fcda1381710a9abd174ceefbad2243388. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   109	def «_>Int_» (i₁ i₂ : SortInt) : SortBool := decide (i₁ > i₂)
+   110	/- KORE symbol: Lbl'UndsPlus'Int'Unds'; frozen source obligations: rule-04549f60991829d3658a3f2aa1db8529f345e1f464cd668bbe8ba2f031f4ed18. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   111	def «_+Int_» (i₁ i₂ : SortInt) : SortInt := i₁ + i₂
+   112	/- KORE symbol: Lbl'UndsStar'Int'Unds'; frozen source obligations: rule-c3d4bdc727e825560b34733f473eca514ee7daf812bf838c8e485dc9499825dc. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   113	def «_*Int_» (i₁ i₂ : SortInt) : SortInt := i₁ * i₂
+   114	/- KORE symbol: LblapplyBin'LParUndsCommUndsCommUndsRParUnds'MPY-CORE'Unds'Val'Unds'String'Unds'Val'Unds'Val; frozen source obligations: rule-2dd919bc012c069b3c8fffc3cbdb9c9070068f0c8eca42acdc492a3b3db5315a, rule-c3d4bdc727e825560b34733f473eca514ee7daf812bf838c8e485dc9499825dc. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   115	def «applyBin(_,_,_)_MPY-CORE_Val_String_Val_Val» :
+   116	    SortString → SortVal → SortVal → SortVal
+   117	  | "+", SortVal.inj_SortInt i₁, SortVal.inj_SortInt i₂ =>
+   118	      SortVal.inj_SortInt (i₁ + i₂)
+   119	  | "+", SortVal.inj_SortInt i, SortVal.inj_SortBool b =>
+   120	      SortVal.inj_SortInt (i + boolAsInt b)
+   121	  | "+", SortVal.inj_SortBool b, SortVal.inj_SortInt i =>
+   122	      SortVal.inj_SortInt (boolAsInt b + i)
+   123	  | "-", SortVal.inj_SortInt i₁, SortVal.inj_SortInt i₂ =>
+   124	      SortVal.inj_SortInt (i₁ - i₂)
+   125	  | "*", SortVal.inj_SortInt i₁, SortVal.inj_SortInt i₂ =>
+   126	      SortVal.inj_SortInt (i₁ * i₂)
+   127	  | "%", SortVal.inj_SortInt i₁, SortVal.inj_SortInt i₂ =>
+   128	      SortVal.inj_SortInt (pythonModTotal i₁ i₂)
+   129	  | "//", SortVal.inj_SortInt i₁, SortVal.inj_SortInt i₂ =>
+   130	      if i₂ = 0 then SortVal.«noneV_MPY-CORE_Val»
+   131	      else SortVal.inj_SortInt (Int.tdiv (i₁ - pythonModTotal i₁ i₂) i₂)
+   132	  | "**", SortVal.inj_SortInt base, SortVal.inj_SortInt exponent =>
+   133	      match intPower? base exponent with
+   134	      | some value => SortVal.inj_SortInt value
+   135	      | none => SortVal.«noneV_MPY-CORE_Val»
+   136	  | "/", SortVal.inj_SortInt i, SortVal.inj_SortFloat f =>
+   137	      SortVal.inj_SortFloat (floatFromInt i / f)
+   138	  | "/", SortVal.inj_SortInt i₁, SortVal.inj_SortInt i₂ =>
+   139	      SortVal.inj_SortFloat (floatFromInt i₁ / floatFromInt i₂)
+   140	  | "%", SortVal.inj_SortFloat f₁, SortVal.inj_SortFloat f₂ =>
+   141	      SortVal.inj_SortFloat (pythonFloatMod f₁ f₂)
+   142	  | "-", SortVal.inj_SortFloat f₁, SortVal.inj_SortFloat f₂ =>
+   143	      SortVal.inj_SortFloat (f₁ - f₂)
+   144	  | "/", SortVal.inj_SortFloat f₁, SortVal.inj_SortFloat f₂ =>
+   145	      SortVal.inj_SortFloat (f₁ / f₂)
+   146	  | "+", SortVal.inj_SortFloat f₁, SortVal.inj_SortFloat f₂ =>
+   147	      SortVal.inj_SortFloat (f₁ + f₂)
+   148	  | "*", SortVal.inj_SortFloat f₁, SortVal.inj_SortFloat f₂ =>
+   149	      SortVal.inj_SortFloat (f₁ * f₂)
+   150	  | "**", SortVal.inj_SortFloat f₁, SortVal.inj_SortFloat f₂ =>
+   151	      SortVal.inj_SortFloat (Float.pow f₁ f₂)
+   152	  | "**", SortVal.inj_SortInt i, SortVal.inj_SortFloat f =>
+   153	      SortVal.inj_SortFloat (Float.pow (floatFromInt i) f)
+   154	  | "**", SortVal.inj_SortFloat f, SortVal.inj_SortInt i =>
+   155	      SortVal.inj_SortFloat (Float.pow f (floatFromInt i))
+   156	  | "-", SortVal.inj_SortInt i, SortVal.inj_SortFloat f =>
+   157	      SortVal.inj_SortFloat (floatFromInt i - f)
+   158	  | "-", SortVal.inj_SortFloat f, SortVal.inj_SortInt i =>
+   159	      SortVal.inj_SortFloat (f - floatFromInt i)
+   160	  | "+", SortVal.inj_SortInt i, SortVal.inj_SortFloat f =>
+   161	      SortVal.inj_SortFloat (floatFromInt i + f)
+   162	  | "+", SortVal.inj_SortFloat f, SortVal.inj_SortInt i =>
+   163	      SortVal.inj_SortFloat (f + floatFromInt i)
+   164	  | "*", SortVal.inj_SortInt i, SortVal.inj_SortFloat f =>
+   165	      SortVal.inj_SortFloat (floatFromInt i * f)
+   166	  | "*", SortVal.inj_SortFloat f, SortVal.inj_SortInt i =>
+   167	      SortVal.inj_SortFloat (f * floatFromInt i)
+   168	  | "/", SortVal.inj_SortFloat f, SortVal.inj_SortInt i =>
+   169	      SortVal.inj_SortFloat (f / floatFromInt i)
+   170	  | _, _, _ => SortVal.«noneV_MPY-CORE_Val»
+   171	/- KORE symbol: LblapplyCmp'LParUndsCommUndsCommUndsRParUnds'MPY-CORE'Unds'Bool'Unds'String'Unds'Val'Unds'Val; frozen source obligations: rule-835c8361eaef00ebfc5566f8c0006f3fcda1381710a9abd174ceefbad2243388. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   172	def «applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val» :
+   173	    SortString → SortVal → SortVal → SortBool
+   174	  | "==", SortVal.inj_SortBool b₁, SortVal.inj_SortBool b₂ => b₁ == b₂
+   175	  | "!=", SortVal.inj_SortBool b₁, SortVal.inj_SortBool b₂ => b₁ != b₂
+   176	  | "<", SortVal.inj_SortInt i₁, SortVal.inj_SortInt i₂ =>
+   177	      decide (i₁ < i₂)
+   178	  | "<=", SortVal.inj_SortInt i₁, SortVal.inj_SortInt i₂ =>
+   179	      decide (i₁ ≤ i₂)
+   180	  | ">", SortVal.inj_SortInt i₁, SortVal.inj_SortInt i₂ =>
+   181	      decide (i₁ > i₂)
+   182	  | ">=", SortVal.inj_SortInt i₁, SortVal.inj_SortInt i₂ =>
+   183	      decide (i₁ ≥ i₂)
+   184	  | "==", SortVal.inj_SortInt i₁, SortVal.inj_SortInt i₂ => i₁ == i₂
+   185	  | "!=", SortVal.inj_SortInt i₁, SortVal.inj_SortInt i₂ => i₁ != i₂
+   186	  | "==", SortVal.inj_SortFloat f₁, SortVal.inj_SortFloat f₂ => f₁ == f₂
+   187	  | "!=", SortVal.inj_SortFloat f₁, SortVal.inj_SortFloat f₂ => !(f₁ == f₂)
+   188	  | "<", SortVal.inj_SortFloat f₁, SortVal.inj_SortFloat f₂ =>
+   189	      decide (f₁ < f₂)
+   190	  | ">", SortVal.inj_SortFloat f₁, SortVal.inj_SortFloat f₂ =>
+   191	      decide (f₁ > f₂)
+   192	  | ">=", SortVal.inj_SortFloat f₁, SortVal.inj_SortFloat f₂ =>
+   193	      !(decide (f₁ < f₂))
+   194	  | "<=", SortVal.inj_SortFloat f₁, SortVal.inj_SortFloat f₂ =>
+   195	      !(decide (f₁ > f₂))
+   196	  | "==", SortVal.inj_SortInt i, SortVal.inj_SortFloat f =>
+   197	      floatFromInt i == f
+   198	  | "==", SortVal.inj_SortFloat f, SortVal.inj_SortInt i =>
+   199	      f == floatFromInt i
+   200	  | "!=", SortVal.inj_SortInt i, SortVal.inj_SortFloat f =>
+   201	      !(floatFromInt i == f)
+   202	  | "!=", SortVal.inj_SortFloat f, SortVal.inj_SortInt i =>
+   203	      !(f == floatFromInt i)
+   204	  | "<", SortVal.inj_SortInt i, SortVal.inj_SortFloat f =>
+   205	      decide (floatFromInt i < f)
+   206	  | "<", SortVal.inj_SortFloat f, SortVal.inj_SortInt i =>
+   207	      decide (f < floatFromInt i)
+   208	  | ">", SortVal.inj_SortInt i, SortVal.inj_SortFloat f =>
+   209	      decide (floatFromInt i > f)
+   210	  | ">", SortVal.inj_SortFloat f, SortVal.inj_SortInt i =>
+   211	      decide (f > floatFromInt i)
+   212	  | "==", SortVal.inj_SortIterable
+   213	      (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq» values₁),
+   214	      SortVal.inj_SortIterable
+   215	      (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq» values₂) =>
+   216	      values₁ == values₂
+   217	  | "!=", SortVal.inj_SortIterable
+   218	      (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq» values₁),
+   219	      SortVal.inj_SortIterable
+   220	      (SortIterable.«list(_)_MPY-CORE_Iterable_ValSeq» values₂) =>
+   221	      values₁ != values₂
+   222	  | "==", SortVal.inj_SortIterable
+   223	      (SortIterable.«tuple(_)_MPY-CORE_Iterable_ValSeq» values₁),
+   224	      SortVal.inj_SortIterable
+   225	      (SortIterable.«tuple(_)_MPY-CORE_Iterable_ValSeq» values₂) =>
+   226	      values₁ == values₂
+   227	  | "!=", SortVal.inj_SortIterable
+   228	      (SortIterable.«tuple(_)_MPY-CORE_Iterable_ValSeq» values₁),
+   229	      SortVal.inj_SortIterable
+   230	      (SortIterable.«tuple(_)_MPY-CORE_Iterable_ValSeq» values₂) =>
+   231	      values₁ != values₂
+   232	  | "==", SortVal.«dictV(_,_)_MPY-DICT_Val_ValSeq_ValSeq» keys₁ values₁,
+   233	      SortVal.«dictV(_,_)_MPY-DICT_Val_ValSeq_ValSeq» keys₂ values₂ =>
+   234	      dictEqOperational keys₁ values₁ keys₂ values₂
+   235	  | "==", SortVal.«setV(_)_MPY-SET_Val_IntSeq» codes₁,
+   236	      SortVal.«setV(_)_MPY-SET_Val_IntSeq» codes₂ =>
+   237	      intSeqSetEq codes₁ codes₂
+   238	  | "==", value, SortVal.«noneV_MPY-CORE_Val» =>
+   239	      value == SortVal.«noneV_MPY-CORE_Val»
+   240	  | "!=", value, SortVal.«noneV_MPY-CORE_Val» =>
+   241	      value != SortVal.«noneV_MPY-CORE_Val»
+   242	  | "is", value, SortVal.«noneV_MPY-CORE_Val» =>
+   243	      value == SortVal.«noneV_MPY-CORE_Val»
+   244	  | "is not", value, SortVal.«noneV_MPY-CORE_Val» =>
+   245	      value != SortVal.«noneV_MPY-CORE_Val»
+   246	  | _, _, _ => false
+   247	/- KORE symbol: LbldefinedProjectInt'LParUndsRParUnds'VERIFICATION-SYNTAX'Unds'Bool'Unds'Val; frozen source obligations: rule-0312858a8718cb93d212cdb7b679a2875534dc14191dff8edf7bccf9a96d8b43. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   248	def «definedProjectInt(_)_VERIFICATION-SYNTAX_Bool_Val» : SortVal → SortBool
+   249	  | SortVal.inj_SortInt _ => true
+   250	  | _ => false
+   251	/- KORE symbol: Lbldtd'LParUndsRParUnds'VERIFICATION-SYNTAX'Unds'Int'Unds'ValSeq; frozen source obligations: rule-04549f60991829d3658a3f2aa1db8529f345e1f464cd668bbe8ba2f031f4ed18, rule-663dfaf9b65e6ba3e1928de01c21ec78aeceec06ef94896d881e0da14372c17c. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   252	def «dtd(_)_VERIFICATION-SYNTAX_Int_ValSeq» : SortValSeq → SortInt
+   253	  | SortValSeq.«.ValSeq_MPY-CORE_ValSeq» => 0
+   254	  | SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq»
+   255	      (SortVal.inj_SortInt i) tail =>
+   256	      oddSquareOperational i + «dtd(_)_VERIFICATION-SYNTAX_Int_ValSeq» tail
+   257	  | SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq»
+   258	      (SortVal.inj_SortFloat _) tail =>
+   259	      «dtd(_)_VERIFICATION-SYNTAX_Int_ValSeq» tail
+   260	  | SortValSeq.«vCons(_,_)_MPY-CORE_ValSeq_Val_ValSeq» _ tail =>
+   261	      «dtd(_)_VERIFICATION-SYNTAX_Int_ValSeq» tail
+   262	/- KORE symbol: LblisFloat; frozen source obligations: rule-663dfaf9b65e6ba3e1928de01c21ec78aeceec06ef94896d881e0da14372c17c. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   263	def isFloat : SortK → SortBool
+   264	  | SortK.kseq (SortKItem.inj_SortFloat _) SortK.dotk => true
+   265	  | _ => false
+   266	/- KORE symbol: LblisInt; frozen source obligations: rule-04549f60991829d3658a3f2aa1db8529f345e1f464cd668bbe8ba2f031f4ed18, rule-e0cb703bc5de627528842cad9c26edce5c5ccfba97a015cd76b3ffa227523e1e, rule-835c8361eaef00ebfc5566f8c0006f3fcda1381710a9abd174ceefbad2243388, rule-2dd919bc012c069b3c8fffc3cbdb9c9070068f0c8eca42acdc492a3b3db5315a, rule-c3d4bdc727e825560b34733f473eca514ee7daf812bf838c8e485dc9499825dc. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   267	def isInt : SortK → SortBool
+   268	  | SortK.kseq (SortKItem.inj_SortInt _) SortK.dotk => true
+   269	  | _ => false
+   270	/- KORE symbol: LblisIntV'LParUndsRParUnds'MPY-BUILTINS'Unds'Bool'Unds'Val; frozen source obligations: rule-e0cb703bc5de627528842cad9c26edce5c5ccfba97a015cd76b3ffa227523e1e. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   271	def «isIntV(_)_MPY-BUILTINS_Bool_Val» : SortVal → SortBool
+   272	  | SortVal.inj_SortInt _ => true
+   273	  | _ => false
+   274	/- KORE symbol: LbloddIntSquare'LParUndsRParUnds'VERIFICATION-SYNTAX'Unds'Int'Unds'Int; frozen source obligations: rule-04549f60991829d3658a3f2aa1db8529f345e1f464cd668bbe8ba2f031f4ed18. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   275	def «oddIntSquare(_)_VERIFICATION-SYNTAX_Int_Int» (i : SortInt) : SortInt :=
+   276	  oddSquareOperational i
+   277	/- KORE symbol: LblprojectIntTotal; frozen source obligations: rule-04549f60991829d3658a3f2aa1db8529f345e1f464cd668bbe8ba2f031f4ed18, rule-9e1486b6d25b62bd0949213fd58d7aac97ed89cc3e87b8c5063f915d1d6b7081, rule-835c8361eaef00ebfc5566f8c0006f3fcda1381710a9abd174ceefbad2243388, rule-2dd919bc012c069b3c8fffc3cbdb9c9070068f0c8eca42acdc492a3b3db5315a, rule-c3d4bdc727e825560b34733f473eca514ee7daf812bf838c8e485dc9499825dc. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   278	def projectIntTotal (v : SortVal) : SortInt :=
+   279	  valIntProjectionTotal v
+   280	/- KORE symbol: LblpyMod'LParUndsCommUndsRParUnds'MPY-INT'Unds'Int'Unds'Int'Unds'Int; frozen source obligations: rule-2dd919bc012c069b3c8fffc3cbdb9c9070068f0c8eca42acdc492a3b3db5315a. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   281	def «pyMod(_,_)_MPY-INT_Int_Int_Int» (i₁ i₂ : SortInt) : SortInt :=
+   282	  pythonModTotal i₁ i₂
+   283	/- KORE symbol: Lblproject'Coln'Int; frozen source obligations: rule-0312858a8718cb93d212cdb7b679a2875534dc14191dff8edf7bccf9a96d8b43. Replace this stub with its honest total meaning from the frozen K semantics. -/
+   284	def «project:Int?» (k : SortK) : Option SortInt :=
+   285	  kIntProjection? k
+   286	
+   287	private theorem isIntGuardValue
+   288	    (v : SortVal)
+   289	    (h : isInt (SortK.kseq ((@inj SortVal SortKItem) v) SortK.dotk) = true) :
+   290	    ∃ i, v = SortVal.inj_SortInt i := by
+   291	  cases v <;> simp_all [isInt, inj]
+   292	
+   293	private theorem isFloatGuardValue
+   294	    (v : SortVal)
+   295	    (h : isFloat (SortK.kseq ((@inj SortVal SortKItem) v) SortK.dotk) = true) :
+   296	    ∃ f, v = SortVal.inj_SortFloat f := by
+   297	  cases v <;> simp_all [isFloat, inj]
+   298	
+   299	private theorem andTrueLeft (a b : SortBool)
+   300	    (h : _andBool_ a b = true) : a = true := by
+   301	  cases a <;> simp_all [_andBool_]
+   302	
+   303	private theorem andTrueRight (a b : SortBool)
+   304	    (h : _andBool_ a b = true) : b = true := by
+   305	  cases a <;> cases b <;> simp_all [_andBool_]
+   306	
+   307	theorem final :
+   308	    Klean151DoubleTheDifference.Lemmas.targetStatement _andBool_ «_>Int_» «_+Int_» «_*Int_» «applyBin(_,_,_)_MPY-CORE_Val_String_Val_Val» «applyCmp(_,_,_)_MPY-CORE_Bool_String_Val_Val» «definedProjectInt(_)_VERIFICATION-SYNTAX_Bool_Val» «dtd(_)_VERIFICATION-SYNTAX_Int_ValSeq» isFloat isInt «isIntV(_)_MPY-BUILTINS_Bool_Val» «oddIntSquare(_)_VERIFICATION-SYNTAX_Int_Int» projectIntTotal «pyMod(_,_)_MPY-INT_Int_Int_Int» «project:Int?» := by
+   309	  unfold Klean151DoubleTheDifference.Lemmas.targetStatement
+   310	  constructor
+   311	  · intro VS V h
+   312	    obtain ⟨i, rfl⟩ := isIntGuardValue V h
+   313	    rfl
+   314	  constructor
+   315	  · intro VS V h
+   316	    obtain ⟨f, rfl⟩ := isFloatGuardValue V h
+   317	    rfl
+   318	  constructor
+   319	  · intro V
+   320	    cases V <;>
+   321	      simp [«project:Int?», kIntProjection?, inj,
+   322	        «definedProjectInt(_)_VERIFICATION-SYNTAX_Bool_Val»]
+   323	  constructor
+   324	  · intro V
+   325	    rfl
+   326	  constructor
+   327	  · intro V
+   328	    cases V <;>
+   329	      rfl
+   330	  constructor
+   331	  · intro I V h
+   332	    obtain ⟨i, rfl⟩ := isIntGuardValue V h
+   333	    rfl
+   334	  constructor
+   335	  · intro I V h
+   336	    obtain ⟨i, rfl⟩ := isIntGuardValue V h
+   337	    rfl
+   338	  · intro V₂ V₁ h
+   339	    have h₁ :
+   340	        isInt (SortK.kseq ((@inj SortVal SortKItem) V₁) SortK.dotk) = true :=
+   341	      andTrueLeft _ _ h
+   342	    have h₂ :
+   343	        isInt (SortK.kseq ((@inj SortVal SortKItem) V₂) SortK.dotk) = true :=
+   344	      andTrueRight _ _ h
+   345	    obtain ⟨i₁, rfl⟩ := isIntGuardValue V₁ h₁
+   346	    obtain ⟨i₂, rfl⟩ := isIntGuardValue V₂ h₂
+   347	    rfl
+   348	
+   349	end Proof

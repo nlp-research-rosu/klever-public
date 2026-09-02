@@ -1,0 +1,238 @@
+COMMAND: bash -lc set\ -u\;\ for\ file\ in\ semantic.k\ verification.k\ spec.k\;\ do\ printf\ \"=====\ %s\ =====\\n\"\ \"\$file\"\;\ nl\ -ba\ \"\$file\"\;\ done\;\ printf\ \"\\nDECLARATION\ COUNTS\\n\"\;\ for\ file\ in\ semantic.k\ verification.k\ spec.k\;\ do\ printf\ \"%s\ syntax=%s\ rules=%s\ claims=%s\ priority=%s\ function=%s\ total=%s\ functional=%s\ simplification=%s\ opaque=%s\\n\"\ \"\$file\"\ \"\$\(rg\ -c\ \"\^\[\[:space:\]\]\*syntax\ \"\ \"\$file\"\ \|\|\ true\)\"\ \"\$\(rg\ -c\ \"\^\[\[:space:\]\]\*rule\ \"\ \"\$file\"\ \|\|\ true\)\"\ \"\$\(rg\ -c\ \"\^\[\[:space:\]\]\*claim\ \"\ \"\$file\"\ \|\|\ true\)\"\ \"\$\(rg\ -c\ \"priority\"\ \"\$file\"\ \|\|\ true\)\"\ \"\$\(rg\ -c\ \"function\"\ \"\$file\"\ \|\|\ true\)\"\ \"\$\(rg\ -c\ \"total\"\ \"\$file\"\ \|\|\ true\)\"\ \"\$\(rg\ -c\ \"functional\"\ \"\$file\"\ \|\|\ true\)\"\ \"\$\(rg\ -c\ \"simplification\"\ \"\$file\"\ \|\|\ true\)\"\ \"\$\(rg\ -c\ \"opaque\"\ \"\$file\"\ \|\|\ true\)\"\;\ done
+WORKDIR: /tmp/audit-work/110-exchange
+--- OUTPUT ---
+===== semantic.k =====
+     1	requires "verification.k"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports STRING-SYNTAX
+     6	  imports BOOL-SYNTAX
+     7	
+     8	  syntax Ids ::= List{String, ","}
+     9	  syntax Params ::= "Params" "(" Ids ")" [symbol(Params)]
+    10	
+    11	  syntax Exprs ::= List{Expr, ","}
+    12	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")" [symbol(CmpOp)]
+    13	  syntax CmpOps ::= List{CmpOp, ","}
+    14	
+    15	  syntax Expr ::= "Int" "(" Int ")" [symbol(IntExpr)]
+    16	                | "Str" "(" String ")" [symbol(StrExpr)]
+    17	                | "Name" "(" String ")" [symbol(Name)]
+    18	                | "BinOp" "(" String "," Expr "," Expr ")" [symbol(BinOp)]
+    19	                | "Compare" "(" Expr "," CmpOps ")" [symbol(Compare)]
+    20	                | "Call" "(" Expr "," Exprs ")" [symbol(Call)]
+    21	
+    22	  syntax Stmts ::= List{Stmt, ""}
+    23	  syntax Stmt ::= "Module" "(" Stmts ")" [symbol(Module)]
+    24	                | "FuncDef" "(" String "," Params "," Stmts ")" [symbol(FuncDef)]
+    25	                | "Assign" "(" Expr "," Expr ")" [symbol(Assign)]
+    26	                | "If" "(" Expr "," Stmts "," Stmts ")" [symbol(If)]
+    27	                | "For" "(" Expr "," Expr "," Stmts ")" [symbol(For)]
+    28	                | "Return" "(" Expr ")" [symbol(Return)]
+    29	
+    30	  syntax PyList ::= "Nil" [symbol(Nil)]
+    31	                  | "Cons" "(" Int "," PyList ")" [symbol(Cons)]
+    32	  syntax Val ::= Int | String | Bool | PyList
+    33	  syntax Result ::= "noResult" [symbol(noResult)] | Val
+    34	endmodule
+    35	
+    36	module SEMANTIC
+    37	  imports VERIFICATION
+    38	  imports INT
+    39	  imports STRING
+    40	  imports BOOL
+    41	  imports MAP
+    42	
+    43	  syntax KItem ::= "init" "(" Stmt "," PyList "," PyList ")" [symbol(init)]
+    44	                 | "exec" "(" Stmts ")" [symbol(exec)]
+    45	                 | "eval" "(" Expr ")" [symbol(eval)]
+    46	                 | "write" "(" String ")" [symbol(write)]
+    47	                 | "binRight" "(" String "," Expr ")" [symbol(binRight)]
+    48	                 | "applyBin" "(" String "," Val ")" [symbol(applyBin)]
+    49	                 | "cmpRight" "(" String "," Expr ")" [symbol(cmpRight)]
+    50	                 | "applyCmp" "(" String "," Val ")" [symbol(applyCmp)]
+    51	                 | "doLen" [symbol(doLen)]
+    52	                 | "branch" "(" Stmts "," Stmts ")" [symbol(branch)]
+    53	                 | "startFor" "(" String "," Stmts ")" [symbol(startFor)]
+    54	                 | "loop" "(" String "," PyList "," Stmts ")" [symbol(loop)]
+    55	                 | "finish" [symbol(finish)]
+    56	
+    57	  syntax Int ::= length(PyList) [function, total]
+    58	  rule length(Nil) => 0
+    59	  rule length(Cons(_, REST)) => 1 +Int length(REST)
+    60	
+    61	  configuration
+    62	    <exchange>
+    63	      <k> init($PGM:Stmt, $LST1:PyList, $LST2:PyList) </k>
+    64	      <env> .Map </env>
+    65	      <result> noResult </result>
+    66	    </exchange>
+    67	
+    68	  rule <k> init(Module(FuncDef("exchange", Params("lst1", "lst2"), BODY)), L1, L2)
+    69	        => exec(BODY) ... </k>
+    70	       <env> .Map
+    71	        => "lst1" |-> L1
+    72	           "lst2" |-> L2
+    73	           "even" |-> 0
+    74	           "value" |-> 0
+    75	       </env>
+    76	
+    77	  rule <k> exec(.Stmts) => .K ... </k>
+    78	  rule <k> exec(Assign(Name(X), E) REST)
+    79	        => eval(E) ~> write(X) ~> exec(REST) ... </k>
+    80	  rule <k> V:Val ~> write(X) => .K ... </k>
+    81	       <env> RHO => RHO [ X <- V ] </env>
+    82	
+    83	  rule <k> exec(If(E, THEN, ELSE) REST)
+    84	        => eval(E) ~> branch(THEN, ELSE) ~> exec(REST) ... </k>
+    85	  rule <k> true  ~> branch(THEN, _) => exec(THEN) ... </k>
+    86	  rule <k> false ~> branch(_, ELSE) => exec(ELSE) ... </k>
+    87	
+    88	  // A pure-statement rule for the translated parity-counting idiom.  It is
+    89	  // equivalent to the general If/evaluation rules below, while keeping the
+    90	  // symbolic loop invariant independent of a solver case split.
+    91	  rule <k> exec(
+    92	          If(Compare(BinOp("%", Name(X), Int(2)), CmpOp("==", Int(0))),
+    93	             Assign(Name(Y), BinOp("+", Name(Y), Int(1))),
+    94	             .Stmts)
+    95	          REST)
+    96	        => exec(REST) ... </k>
+    97	       <env> ... X |-> I:Int
+    98	                 Y |-> (N:Int => N +Int evenBit(I)) ... </env>
+    99	       [priority(40)]
+   100	
+   101	  rule <k> exec(For(Name(X), E, BODY) REST)
+   102	        => eval(E) ~> startFor(X, BODY) ~> exec(REST) ... </k>
+   103	  rule <k> L:PyList ~> startFor(X, BODY)
+   104	        => loop(X, L, BODY) ... </k>
+   105	  rule <k> loop(_, Nil, _) => .K ... </k>
+   106	  rule <k> loop(X, Cons(I, REST), BODY)
+   107	        => I ~> write(X) ~> exec(BODY) ~> loop(X, REST, BODY) ... </k>
+   108	
+   109	  rule <k> exec(Return(E) _REST)
+   110	        => eval(E) ~> finish ... </k>
+   111	  rule <k> V:Val ~> finish ~> _REST:K => .K </k>
+   112	       <result> noResult => V </result>
+   113	
+   114	  rule <k> eval(Int(I)) => I ... </k>
+   115	  rule <k> eval(Str(S)) => S ... </k>
+   116	  rule <k> eval(Name(X)) => V ... </k>
+   117	       <env> ... X |-> V ... </env>
+   118	
+   119	  rule <k> eval(BinOp(OP, LEFT, RIGHT))
+   120	        => eval(LEFT) ~> binRight(OP, RIGHT) ... </k>
+   121	  rule <k> LEFT:Val ~> binRight(OP, RIGHT)
+   122	        => eval(RIGHT) ~> applyBin(OP, LEFT) ... </k>
+   123	  rule <k> RIGHT:Int ~> applyBin("+", LEFT:Int)
+   124	        => LEFT +Int RIGHT ... </k>
+   125	  rule <k> RIGHT:Int ~> applyBin("%", LEFT:Int)
+   126	        => LEFT %Int RIGHT ... </k>
+   127	
+   128	  rule <k> eval(Compare(LEFT, CmpOp(OP, RIGHT)))
+   129	        => eval(LEFT) ~> cmpRight(OP, RIGHT) ... </k>
+   130	  rule <k> LEFT:Val ~> cmpRight(OP, RIGHT)
+   131	        => eval(RIGHT) ~> applyCmp(OP, LEFT) ... </k>
+   132	  rule <k> RIGHT:Int ~> applyCmp("==", LEFT:Int)
+   133	        => LEFT ==Int RIGHT ... </k>
+   134	  rule <k> RIGHT:Int ~> applyCmp(">=", LEFT:Int)
+   135	        => LEFT >=Int RIGHT ... </k>
+   136	
+   137	  rule <k> eval(Call(Name("len"), ARG))
+   138	        => eval(ARG) ~> doLen ... </k>
+   139	  rule <k> L:PyList ~> doLen => length(L) ... </k>
+   140	endmodule
+===== verification.k =====
+     1	module VERIFICATION
+     2	  imports MPY-SYNTAX
+     3	  imports INT
+     4	  imports BOOL
+     5	
+     6	  syntax Stmts ::= "countBody" [macro]
+     7	  rule countBody =>
+     8	    If(Compare(BinOp("%", Name("value"), Int(2)), CmpOp("==", Int(0))),
+     9	       Assign(Name("even"), BinOp("+", Name("even"), Int(1))),
+    10	       .Stmts)
+    11	
+    12	  syntax Stmt ::= "solutionProgram" [macro]
+    13	  rule solutionProgram =>
+    14	    Module(
+    15	      FuncDef("exchange", Params("lst1", "lst2"),
+    16	        Assign(Name("even"), Int(0))
+    17	        For(Name("value"), Name("lst1"), countBody)
+    18	        For(Name("value"), Name("lst2"), countBody)
+    19	        If(Compare(Name("even"), CmpOp(">=", Call(Name("len"), Name("lst1")))),
+    20	           Return(Str("YES")),
+    21	           .Stmts)
+    22	        Return(Str("NO"))))
+    23	
+    24	  syntax Int ::= evenBit(Int) [function, total]
+    25	  rule evenBit(I) => 1 requires I %Int 2 ==Int 0
+    26	  rule evenBit(I) => 0 requires notBool (I %Int 2 ==Int 0)
+    27	
+    28	  syntax Int ::= countEven(PyList) [function, total]
+    29	  rule countEven(Nil) => 0
+    30	  rule countEven(Cons(I, REST)) => evenBit(I) +Int countEven(REST)
+    31	
+    32	  syntax Int ::= lastValue(PyList, Int) [function, total]
+    33	  rule lastValue(Nil, DEFAULT) => DEFAULT
+    34	  rule lastValue(Cons(I, REST), _) => lastValue(REST, I)
+    35	endmodule
+===== spec.k =====
+     1	requires "semantic.k"
+     2	
+     3	module SPEC
+     4	  imports SEMANTIC
+     5	
+     6	  claim [loop-counts-even]:
+     7	    <exchange>
+     8	      <k> loop("value", L, countBody) ~> CONT => CONT </k>
+     9	      <env>
+    10	        "lst1" |-> L1
+    11	        "lst2" |-> L2
+    12	        "even" |-> N
+    13	        "value" |-> OLD
+    14	      =>
+    15	        "lst1" |-> L1
+    16	        "lst2" |-> L2
+    17	        "even" |-> (N +Int countEven(L))
+    18	        "value" |-> lastValue(L, OLD)
+    19	      </env>
+    20	      <result> noResult </result>
+    21	    </exchange>
+    22	
+    23	  claim [exchange-yes]:
+    24	    <exchange>
+    25	      <k> init(solutionProgram, L1, L2) => .K </k>
+    26	      <env> .Map
+    27	      =>
+    28	        "lst1" |-> L1
+    29	        "lst2" |-> L2
+    30	        "even" |-> (countEven(L1) +Int countEven(L2))
+    31	        "value" |-> lastValue(L2, lastValue(L1, 0))
+    32	      </env>
+    33	      <result> noResult => "YES" </result>
+    34	    </exchange>
+    35	    requires countEven(L1) +Int countEven(L2) >=Int length(L1)
+    36	
+    37	  claim [exchange-no]:
+    38	    <exchange>
+    39	      <k> init(solutionProgram, L1, L2) => .K </k>
+    40	      <env> .Map
+    41	      =>
+    42	        "lst1" |-> L1
+    43	        "lst2" |-> L2
+    44	        "even" |-> (countEven(L1) +Int countEven(L2))
+    45	        "value" |-> lastValue(L2, lastValue(L1, 0))
+    46	      </env>
+    47	      <result> noResult => "NO" </result>
+    48	    </exchange>
+    49	    requires countEven(L1) +Int countEven(L2) <Int length(L1)
+    50	endmodule
+
+DECLARATION COUNTS
+semantic.k syntax=13 rules=29 claims= priority=1 function=1 total=1 functional= simplification= opaque=
+verification.k syntax=5 rules=8 claims= priority= function=3 total=3 functional= simplification= opaque=
+spec.k syntax= rules= claims=3 priority= function= total= functional= simplification= opaque=
+--- END OUTPUT ---
+EXIT_STATUS: 0

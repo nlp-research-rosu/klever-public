@@ -1,0 +1,705 @@
+$ sed -n "1,360p" /reference/tools/k_rule_inventory.py
+#!/usr/bin/env python3
+"""Canonical lexical inventory of simplification rules in verification.k."""
+
+from __future__ import annotations
+
+import dataclasses
+import hashlib
+import json
+import re
+import stat
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+_MODULE_NAME_RE = re.compile(
+    r"^[ \t]+(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"(?:[ \t]+\[[^\]\r\n]*\])?[ \t]*$"
+)
+_TRAILING_ATTRIBUTES_RE = re.compile(
+    r"\[(?P<attributes>[^\[\]]*)\][ \t\r\n]*\Z", re.S
+)
+_CELL_TAG_RE = re.compile(
+    r"<(?P<close>/)?(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"[ \t]*(?P<self_close>/)?>"
+)
+_OUTER_SENTENCE_KEYWORDS = {
+    "imports",
+    "syntax",
+    "rule",
+    "configuration",
+    "context",
+    "claim",
+    "alias",
+}
+
+
+class KRuleInventoryError(RuntimeError):
+    """Raised when verification.k cannot produce a canonical inventory."""
+
+
+@dataclass(frozen=True)
+class KRule:
+    source_rule_id: str
+    module: str
+    start_line: int
+    end_line: int
+    normalized_sha256: str
+    attributes: list[str]
+    text: str
+
+
+@dataclass(frozen=True)
+class _Sentence:
+    keyword: str
+    start: int
+
+
+@dataclass(frozen=True)
+class _Module:
+    name: str
+    content_start: int
+    content_end: int
+    imports: tuple[str, ...]
+    sentences: tuple[_Sentence, ...]
+
+
+@dataclass(frozen=True)
+class _RuleSpan:
+    rule: KRule
+    start_offset: int
+    end_offset: int
+    attribute_start: int | None
+    attribute_end: int | None
+
+
+def canonical_json_sha256(document: Any) -> str:
+    encoded = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _mask_non_code(text: str) -> str:
+    """Mask comments and string bodies without changing source offsets."""
+
+    output = list(text)
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                state = "code"
+            else:
+                output[index] = " "
+            index += 1
+            continue
+        if state == "string":
+            if character == "\\" and following:
+                output[index] = " "
+                output[index + 1] = " "
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            elif character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                output[index] = output[index + 1] = " "
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                output[index] = output[index + 1] = " "
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            output[index] = output[index + 1] = " "
+            state = "line-comment"
+            index += 2
+            continue
+        if character == "/" and following == "*":
+            output[index] = output[index + 1] = " "
+            state = "block-comment"
+            block_depth = 1
+            index += 2
+            continue
+        if character == '"':
+            state = "string"
+        index += 1
+    return "".join(output)
+
+
+def _line_ranges(text: str, start: int = 0) -> list[tuple[int, int, int]]:
+    ranges: list[tuple[int, int, int]] = []
+    line_start = start
+    while line_start < len(text):
+        newline = text.find("\n", line_start)
+        next_start = len(text) if newline < 0 else newline + 1
+        line_end = len(text) if newline < 0 else newline
+        content_end = (
+            line_end - 1
+            if line_end > line_start and text[line_end - 1] == "\r"
+            else line_end
+        )
+        ranges.append((line_start, content_end, next_start))
+        if newline < 0:
+            break
+        line_start = next_start
+    return ranges
+
+
+def _line_heads(text: str) -> list[tuple[int, int, str, str]]:
+    """Return physical-line word heads without assigning K grammar meaning."""
+
+    heads: list[tuple[int, int, str, str]] = []
+    for line_start, content_end, _next_start in _line_ranges(text):
+        index = line_start
+        while index < content_end and text[index] in " \t":
+            index += 1
+        word_end = index
+        while word_end < content_end and (
+            text[word_end].isalnum() or text[word_end] in "_'"
+        ):
+            word_end += 1
+        if word_end > index:
+            heads.append(
+                (
+                    line_start,
+                    content_end,
+                    text[index:word_end],
+                    text[word_end:content_end],
+                )
+            )
+    return heads
+
+
+def _line_word(line: str) -> tuple[str, str, int]:
+    stripped = line.lstrip()
+    indent = len(line) - len(stripped)
+    word_end = 0
+    while word_end < len(stripped) and (
+        stripped[word_end].isalnum() or stripped[word_end] in "_'"
+    ):
+        word_end += 1
+    return stripped[:word_end], stripped[word_end:], indent + word_end
+
+
+def _rule_continuation(line: str) -> tuple[str, int] | None:
+    stripped = line.lstrip()
+    if stripped.startswith("["):
+        return "attributes", len(line) - len(stripped)
+    word, rest, word_end = _line_word(line)
+    for keyword in ("requires", "ensures"):
+        if word == keyword and (
+            not rest
+            or not (
+                rest[0].isalnum()
+                or rest[0] in "_'"
+            )
+        ):
+            return keyword, word_end
+    return None
+
+
+def _starts_outer_transition(line: str) -> bool:
+    keyword, rest, _word_end = _line_word(line)
+    separated = bool(rest) and rest[0] in " \t"
+    if keyword == "module":
+        return separated and _MODULE_NAME_RE.fullmatch(rest) is not None
+    if keyword == "endmodule":
+        return not rest.strip()
+    if keyword == "rule":
+        return separated
+    return keyword in _OUTER_SENTENCE_KEYWORDS and separated
+
+
+def _terminal_attribute_line(line: str) -> bool:
+    match = _TRAILING_ATTRIBUTES_RE.search(line)
+    if match is None:
+        return False
+    start = match.start()
+    return start == 0 or line[start - 1].isspace()
+
+
+def _scan_rule_delimiters(
+    line: str,
+    delimiters: list[str],
+) -> None:
+    closing = {")": "(", "]": "[", "}": "{"}
+    index = 0
+    while index < len(line):
+        if line[index] == "<":
+            cell = _CELL_TAG_RE.match(line, index)
+            if cell is not None:
+                marker = f"<{cell.group('name')}>"
+                if cell.group("close"):
+                    if delimiters and delimiters[-1] == marker:
+                        delimiters.pop()
+                elif not cell.group("self_close"):
+                    delimiters.append(marker)
+                index = cell.end()
+                continue
+        character = line[index]
+        if character in "([{":
+            delimiters.append(character)
+        elif character in closing:
+            if delimiters and delimiters[-1] == closing[character]:
+                delimiters.pop()
+        index += 1
+
+
+def _rule_bubble_end(masked_text: str, start: int) -> int:
+    """Find when an outer rule bubble returns control to outer parsing."""
+
+    seen_rewrite = False
+    clause_has_content = False
+    candidate_end: int | None = None
+    delimiters: list[str] = []
+    ranges = _line_ranges(masked_text, start)
+    for line_start, line_end, next_start in ranges:
+        line = masked_text[line_start:line_end]
+        if not line.strip():
+            continue
+
+        continuation = (
+            _rule_continuation(line)
+            if seen_rewrite and candidate_end is not None
+            else None
+        )
+        if candidate_end is not None:
+            if continuation is None and _starts_outer_transition(line):
+                return candidate_end
+            candidate_end = None
+
+        content_start = 0
+        if continuation is not None:
+            kind, content_start = continuation
+            if kind in {"requires", "ensures"}:
+                clause_has_content = False
+
+        if not seen_rewrite:
+            rewrite = line.find("=>")
+            if rewrite >= 0:
+                seen_rewrite = True
+                content_start = rewrite + 2
+            else:
+                content_start = len(line)
+
+        _scan_rule_delimiters(line, delimiters)
+        if seen_rewrite and line[content_start:].strip():
+            clause_has_content = True
+
+        if (
+            seen_rewrite
+            and clause_has_content
+            and not delimiters
+            and _terminal_attribute_line(line)
+        ):
+            return next_start
+        if seen_rewrite and clause_has_content and not delimiters:
+            candidate_end = next_start
+    if candidate_end is not None:
+        return candidate_end
+    return len(masked_text) + 1
+
+
+def _modules(masked_text: str) -> tuple[_Module, ...]:
+    modules: list[_Module] = []
+    open_module: tuple[
+        str, int, list[str], list[_Sentence]
+    ] | None = None
+    open_rule_until = 0
+    for line_start, line_end, keyword, rest in _line_heads(masked_text):
+        if line_start < open_rule_until:
+            continue
+        open_rule_until = 0
+        separated = bool(rest) and rest[0] in " \t"
+        if keyword == "module":
+            if not separated:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            named = _MODULE_NAME_RE.fullmatch(rest)
+            if named is None or open_module is not None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            open_module = (named.group("name"), line_end, [], [])
+            continue
+        if keyword == "endmodule":
+            if rest.strip():
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            if open_module is None:
+                raise KRuleInventoryError(
+                    "verification.k has malformed module boundaries"
+                )
+            name, content_start, imports, sentences = open_module
+            modules.append(
+                _Module(
+                    name=name,
+                    content_start=content_start,
+$ sed -n "1,360p" /reference/lemma-discovery.json
+{
+  "schema_version": 2,
+  "inventory_sha256": "bdc76b589c31174ad35d4f87c6970c4c9e6aa6b9be392e0dfd015630536ba6e2",
+  "rules": [
+    {
+      "source_rule_id": "rule-3568314463b5f0cda0f318ebb08026d85632ffd161cd8c2d5ff1e4900f260969",
+      "classification": "DEFINITION",
+      "rationale": "This is the terminating base equation for the recursively defined primeFrom mathematical summary: once D squared exceeds N, no remaining candidate divisor is in the represented search range."
+    },
+    {
+      "source_rule_id": "rule-3cf9b4eaf0fc37f16b9c02bb86612432cff3badfb2761f79b078441bc26ec601",
+      "classification": "DEFINITION",
+      "rationale": "This equation defines the false case of primeFrom when the current in-range candidate D divides N; it is a defining branch of the summary, not an independently asserted number-theory fact."
+    },
+    {
+      "source_rule_id": "rule-580860a84af419565613f03a6f4376674abe6fff2d2b519766ba75fb4f40e451",
+      "classification": "DEFINITION",
+      "rationale": "This is the recursive equation for primeFrom, advancing the definition from a non-dividing in-range candidate D to D plus one."
+    },
+    {
+      "source_rule_id": "rule-f8fc3c53a0505978f01db74728a727cd7869eda32ada9bd4865028c91fd75d91",
+      "classification": "DEFINITION",
+      "rationale": "This equation defines isPrime to be false below 2, supplying one branch of the named primality summary used by the specification."
+    },
+    {
+      "source_rule_id": "rule-9290ca5c6a6bfa55d5fce813d33d07aa7984f4656f33938a4e34fa11fa9d0655",
+      "classification": "DEFINITION",
+      "rationale": "This equation defines isPrime for inputs at least 2 by expanding it to the primeFrom recurrence beginning with candidate divisor 2."
+    },
+    {
+      "source_rule_id": "rule-430e599ca96d42aacd636f22618c18839f186b29b46581a108c51be2a8b03ef5",
+      "classification": "DEFINITION",
+      "rationale": "This structural helper equation defines chooseVal on true by selecting and wrapping X; it merely expands a named proof-result term."
+    },
+    {
+      "source_rule_id": "rule-0cf2886c9720ca8500888e844b48dbcef4157496738d556f4340310b1c85ce00",
+      "classification": "DEFINITION",
+      "rationale": "This structural helper equation defines chooseVal on false by selecting and wrapping Y; it merely expands a named proof-result term."
+    }
+  ]
+}
+$ sed -n "1,320p" /reference/k-proof/verification.k
+requires "semantic.k"
+
+module MPY-VERIFICATION
+  imports MPY
+
+  // primeFrom(N, D) means that N has no divisor in the inclusive range
+  // from D through floor(sqrt(N)).  Its recursive shape mirrors the loop.
+  syntax Bool ::= primeFrom(Int, Int) [function]
+  rule primeFrom(N, D) => true
+    requires N <Int D *Int D
+  rule primeFrom(N, D) => false
+    requires D *Int D <=Int N andBool N %Int D ==Int 0
+  rule primeFrom(N, D) => primeFrom(N, D +Int 1)
+    requires D *Int D <=Int N andBool N %Int D =/=Int 0
+
+  syntax Bool ::= isPrime(Int) [function]
+  rule isPrime(N) => false
+    requires N <Int 2
+  rule isPrime(N) => primeFrom(N, 2)
+    requires 2 <=Int N
+
+  syntax Val ::= chooseVal(Bool, Int, Int) [function]
+  rule chooseVal(true, X, _Y) => intVal(X)
+  rule chooseVal(false, _X, Y) => intVal(Y)
+endmodule
+$ sed -n "1,320p" /reference/k-proof/semantic.k
+module MPY-SYNTAX
+  imports INT
+  imports BOOL
+  imports STRING
+  imports MAP
+
+  syntax Program ::= "Module" "(" Stmts ")"
+
+  syntax Stmts ::= List{Stmt, ""}
+  syntax Stmt ::= "FuncDef" "(" String "," "Params" "(" Ids ")" "," Stmts ")"
+                | "If" "(" Expr "," Stmts "," Stmts ")"
+                | "While" "(" Expr "," Stmts ")"
+                | "Assign" "(" Expr "," Expr ")"
+                | "Return" "(" Expr ")"
+
+  syntax Ids ::= List{String, ","}
+  syntax Expr ::= "Int" "(" Int ")"
+                | "Name" "(" String ")"
+                | "BinOp" "(" String "," Expr "," Expr ")"
+                | "Compare" "(" Expr "," CmpOps ")"
+  syntax CmpOps ::= List{CmpOp, ","}
+  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+endmodule
+
+module MPY
+  imports MPY-SYNTAX
+
+  syntax Val ::= intVal(Int) | boolVal(Bool)
+
+  syntax KItem ::= exec(Stmts)
+                 | eval(Expr)
+                 | store(String)
+                 | binLeft(String, Expr)
+                 | binApply(String, Int)
+                 | cmpLeft(String, Expr)
+                 | cmpApply(String, Int)
+                 | branch(Stmts, Stmts, Stmts)
+                 | whileBranch(Expr, Stmts, Stmts)
+                 | "doReturn"
+
+  configuration
+    <mpy>
+      <k> $PGM:Program </k>
+      <env> .Map </env>
+      <n> $N:Int </n>
+      <x> $X:Int </x>
+      <y> $Y:Int </y>
+      <result> .K </result>
+    </mpy>
+
+  rule <k> Module(FuncDef("x_or_y", Params("n", "x", "y"), BODY))
+            => exec(BODY) ...</k>
+       <env> .Map =>
+         ("n" |-> intVal(N))
+         ("x" |-> intVal(X))
+         ("y" |-> intVal(Y))
+       </env>
+       <n> N </n>
+       <x> X </x>
+       <y> Y </y>
+
+  rule exec(.Stmts) => .K
+  rule exec(S:Stmt SS:Stmts) => S ~> exec(SS)
+
+  rule If(COND, THEN, ELSE) => eval(COND) ~> branch(THEN, ELSE, .Stmts)
+  rule While(COND, BODY) => eval(COND) ~> whileBranch(COND, BODY, .Stmts)
+  rule Assign(Name(A), E) => eval(E) ~> store(A)
+  rule Return(E) => eval(E) ~> doReturn
+
+  rule boolVal(true) ~> branch(THEN, _ELSE, REST)
+    => exec(THEN) ~> exec(REST)
+  rule boolVal(false) ~> branch(_THEN, ELSE, REST)
+    => exec(ELSE) ~> exec(REST)
+
+  rule boolVal(true) ~> whileBranch(COND, BODY, REST)
+    => exec(BODY) ~> eval(COND) ~> whileBranch(COND, BODY, REST)
+  rule boolVal(false) ~> whileBranch(_COND, _BODY, REST)
+    => exec(REST)
+
+  rule <k> V:Val ~> store(A) => .K ...</k>
+       <env> ENV => ENV [ A <- V ] </env>
+
+  rule <k> V:Val ~> doReturn ~> _REST => .K </k>
+       <result> .K => V </result>
+
+  rule eval(Int(I)) => intVal(I)
+  rule <k> eval(Name(A)) => V ...</k>
+       <env>... A |-> V ...</env>
+
+  rule eval(BinOp(OP, LEFT, RIGHT))
+    => eval(LEFT) ~> binLeft(OP, RIGHT)
+  rule intVal(I) ~> binLeft(OP, RIGHT)
+    => eval(RIGHT) ~> binApply(OP, I)
+  rule intVal(J) ~> binApply("+", I) => intVal(I +Int J)
+  rule intVal(J) ~> binApply("*", I) => intVal(I *Int J)
+  rule intVal(J) ~> binApply("%", I) => intVal(I %Int J)
+    requires J =/=Int 0
+
+  rule eval(Compare(LEFT, CmpOp(OP, RIGHT)))
+    => eval(LEFT) ~> cmpLeft(OP, RIGHT)
+  rule intVal(I) ~> cmpLeft(OP, RIGHT)
+    => eval(RIGHT) ~> cmpApply(OP, I)
+  rule intVal(J) ~> cmpApply("<", I) => boolVal(I <Int J)
+  rule intVal(J) ~> cmpApply("<=", I) => boolVal(I <=Int J)
+  rule intVal(J) ~> cmpApply("==", I) => boolVal(I ==Int J)
+endmodule
+$ sed -n "1,260p" /reference/k-proof/spec.k
+requires "verification.k"
+
+module LOOP-SPEC
+  imports MPY-VERIFICATION
+
+  // Generalized loop invariant.  It deliberately starts at an arbitrary
+  // D >= 2 so that one non-dividing iteration re-enters the same claim at
+  // D + 1 and K's reachability prover can apply circularity.
+  claim
+    <k>
+      eval(
+        Compare(
+          BinOp("*", Name("divisor"), Name("divisor")),
+          CmpOp("<=", Name("n"))))
+      ~> whileBranch(
+        Compare(
+          BinOp("*", Name("divisor"), Name("divisor")),
+          CmpOp("<=", Name("n"))),
+        If(
+          Compare(
+            BinOp("%", Name("n"), Name("divisor")),
+            CmpOp("==", Int(0))),
+          Return(Name("y")),
+          .Stmts)
+        Assign(
+          Name("divisor"),
+          BinOp("+", Name("divisor"), Int(1))),
+        .Stmts)
+      ~> exec(Return(Name("x")))
+      => .K
+    </k>
+    <env>
+      ("divisor" |-> intVal(D))
+      ("n" |-> intVal(N))
+      ("x" |-> intVal(X))
+      ("y" |-> intVal(Y))
+      => ?_FINALENV:Map
+    </env>
+    <n> N </n>
+    <x> X </x>
+    <y> Y </y>
+    <result> .K => chooseVal(primeFrom(N, D), X, Y) </result>
+    requires 2 <=Int D
+endmodule
+
+module SPEC
+  imports LOOP-SPEC
+
+  claim
+    <k>
+      Module(
+        FuncDef("x_or_y", Params("n", "x", "y"),
+          If(
+            Compare(Name("n"), CmpOp("<", Int(2))),
+            Return(Name("y")),
+            .Stmts)
+          Assign(Name("divisor"), Int(2))
+          While(
+            Compare(
+              BinOp("*", Name("divisor"), Name("divisor")),
+              CmpOp("<=", Name("n"))),
+            If(
+              Compare(
+                BinOp("%", Name("n"), Name("divisor")),
+                CmpOp("==", Int(0))),
+              Return(Name("y")),
+              .Stmts)
+            Assign(
+              Name("divisor"),
+              BinOp("+", Name("divisor"), Int(1))))
+          Return(Name("x"))))
+      => .K
+    </k>
+    <env> .Map => ?_FINALENV:Map </env>
+    <n> N </n>
+    <x> X </x>
+    <y> Y </y>
+    <result> .K => chooseVal(isPrime(N), X, Y) </result>
+
+  claim
+    <k>
+      Module(
+        FuncDef("x_or_y", Params("n", "x", "y"),
+          If(
+            Compare(Name("n"), CmpOp("<", Int(2))),
+            Return(Name("y")),
+            .Stmts)
+          Assign(Name("divisor"), Int(2))
+          While(
+            Compare(
+              BinOp("*", Name("divisor"), Name("divisor")),
+              CmpOp("<=", Name("n"))),
+            If(
+              Compare(
+                BinOp("%", Name("n"), Name("divisor")),
+                CmpOp("==", Int(0))),
+              Return(Name("y")),
+              .Stmts)
+            Assign(
+              Name("divisor"),
+              BinOp("+", Name("divisor"), Int(1))))
+          Return(Name("x"))))
+      => .K
+    </k>
+    <env> .Map => ?_FINALENV:Map </env>
+    <n> 7 </n>
+    <x> 34 </x>
+    <y> 12 </y>
+    <result> .K => intVal(34) </result>
+
+  claim
+    <k>
+      Module(
+        FuncDef("x_or_y", Params("n", "x", "y"),
+          If(
+            Compare(Name("n"), CmpOp("<", Int(2))),
+            Return(Name("y")),
+            .Stmts)
+          Assign(Name("divisor"), Int(2))
+          While(
+            Compare(
+              BinOp("*", Name("divisor"), Name("divisor")),
+              CmpOp("<=", Name("n"))),
+            If(
+              Compare(
+                BinOp("%", Name("n"), Name("divisor")),
+                CmpOp("==", Int(0))),
+              Return(Name("y")),
+              .Stmts)
+            Assign(
+              Name("divisor"),
+              BinOp("+", Name("divisor"), Int(1))))
+          Return(Name("x"))))
+      => .K
+    </k>
+    <env> .Map => ?_FINALENV:Map </env>
+    <n> 15 </n>
+    <x> 8 </x>
+    <y> 5 </y>
+    <result> .K => intVal(5) </result>
+endmodule
+$ sed -n "1,260p" /reference/k-proof/solution.py
+def x_or_y(n, x, y):
+    if n < 2:
+        return y
+    divisor = 2
+    while divisor * divisor <= n:
+        if n % divisor == 0:
+            return y
+        divisor = divisor + 1
+    return x
+$ sed -n "1,260p" /reference/k-proof/solution.mpy
+Module(
+  FuncDef("x_or_y", Params("n", "x", "y"),
+    If(Compare(Name("n"), CmpOp("<", Int(2))),
+      Return(Name("y")),
+      )
+    Assign(Name("divisor"), Int(2))
+    While(Compare(
+      BinOp("*", Name("divisor"), Name("divisor")),
+      CmpOp("<=", Name("n"))),
+      If(Compare(
+        BinOp("%", Name("n"), Name("divisor")),
+        CmpOp("==", Int(0))),
+        Return(Name("y")),
+        )
+      Assign(Name("divisor"), BinOp("+", Name("divisor"), Int(1))))
+    Return(Name("x"))))

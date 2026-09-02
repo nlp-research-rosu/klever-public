@@ -1,0 +1,21 @@
+requires "verification.k"
+
+module SPEC
+  imports VERIFICATION
+
+  claim [multiply-correct-after-false-body-mutation]:
+    <k> #runMultiply(A:Int, B:Int)
+      => unitDigitProduct(A, B) </k>
+    <env> 0 </env>
+    <scopes>
+      0  |-> scope(.Map, parent(-1))
+      -1 |-> builtinsScope
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+endmodule

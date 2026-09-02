@@ -1,0 +1,80 @@
+     1	// reference/src/semantics/float.k — MPY-FLOAT
+     2	//
+     3	// Minimal, TRUSTED float support. K/Haskell (kprove) has no usable symbolic IEEE-754 theory and
+     4	// no Int2Float hook, so a float value stays an OPAQUE proof-domain primitive: `intFloatDiv(I, F)`
+     5	// (the Python true division I / F) is `[no-evaluators]` for kprove — it never reduces on symbolic
+     6	// input, and the proof verifies only the STRUCTURE (the result is the exact term the program
+     7	// builds). The `[concrete]` rule evaluates it for krun (llvm HAS the Int2Float / /Float hooks), so
+     8	// smoke tests run the real float value.
+     9	//
+    10	// Only the pieces needed so far: Float as a Val, the float literal, and Int / float true division
+    11	// (the `a * h / 2.0` idiom). More float ops (float +/-/*, comparison) are added as float problems
+    12	// need them — kept minimal + sound.
+    13	
+    14	module MPY-FLOAT
+    15	  imports MPY-OPERATORS
+    16	  imports MPY-BUILTINS
+    17	  imports FLOAT
+    18	
+    19	  // Float is a value; the float literal evaluates to the K Float.
+    20	  syntax Val ::= Float
+    21	  rule <k> Float(F:Float) => F ... </k>
+    22	
+    23	  // Int / float true division. OPAQUE for kprove (no-evaluators); concrete for krun.
+    24	  syntax Float ::= intFloatDiv(Int, Float) [function, total, symbol(intFloatDiv), no-evaluators]
+    25	  rule intFloatDiv(I:Int, F:Float) => Int2Float(I, 53, 11) /Float F [concrete]
+    26	
+    27	  rule applyBin("/", I:Int, F:Float) => intFloatDiv(I, F)
+    28	
+    29	  // Int / Int true division (Python: always a float). OPAQUE for kprove; concrete for krun.
+    30	  syntax Float ::= divII(Int, Int) [function, total, symbol(divII), no-evaluators]
+    31	  rule divII(I1:Int, I2:Int) => Int2Float(I1, 53, 11) /Float Int2Float(I2, 53, 11) [concrete]
+    32	  rule applyBin("/", I1:Int, I2:Int) => divII(I1, I2)
+    33	
+    34	  // float % float (e.g. `number % 1.0` = the fractional part). OPAQUE for kprove, concrete for
+    35	  // krun. Python's float `%` is floor-based: a % b = a - floor(a/b)*b (K's %Float is IEEE
+    36	  // remainder, which differs — 3.5 %Float 1.0 = -0.5 vs Python 0.5 — so it is NOT used).
+    37	  syntax Float ::= floatMod(Float, Float) [function, total, symbol(floatMod), no-evaluators]
+    38	  rule floatMod(F1:Float, F2:Float) => F1 -Float (floorFloat(F1 /Float F2) *Float F2) [concrete]
+    39	  rule applyBin("%", F1:Float, F2:Float) => floatMod(F1, F2)
+    40	
+    41	  // float equality — for concrete krun asserts (e.g. `area == 7.5`); the FLOAT.eq hook is fine on
+    42	  // concrete floats. kprove proofs return floats structurally and do not compare them.
+    43	  rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2
+    44	  rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2)
+    45	
+    46	  // float `<` and abs — OPAQUE for kprove ([no-evaluators], so a SYMBOLIC float compare stays an
+    47	  // uninterpreted Bool a proof case-splits on — a SINGLE compare per branch, not a nonlinear cascade),
+    48	  // [concrete] for krun. Additive, sort-disjoint from the Int rules. (has_close_elements: the pairwise
+    49	  // `abs(a-b) < t` proximity test.)
+    50	  syntax Bool ::= floatLt(Float, Float) [function, total, symbol(floatLt), no-evaluators]
+    51	  rule floatLt(F1:Float, F2:Float) => F1 <Float F2 [concrete]
+    52	  rule applyCmp("<", F1:Float, F2:Float) => floatLt(F1, F2)
+    53	
+    54	  syntax Float ::= absF(Float) [function, total, symbol(absF), no-evaluators]
+    55	  rule absF(F:Float) => absFloat(F) [concrete]
+    56	  rule applyBuiltin("abs", F:Float, .Vals) => absF(F)
+    57	
+    58	  // ==== math.ceil ===========================================================
+    59	  // `import X` is a no-op (we intercept the specific math functions syntactically; `math` itself is
+    60	  // never bound as a value).
+    61	  rule <k> Import(_:String) => .K ... </k>
+    62	
+    63	  // math.ceil(x): ceiling to an int. Intercepted at the Call BEFORE `math` is looked up (higher
+    64	  // priority than the generic Attribute/method dispatch in call.k).
+    65	  syntax KItem ::= "#mathCeil"
+    66	  rule <k> Call(Attribute(Name("math"), "ceil"), (E:Expr, .Exprs)) => E ~> #mathCeil ... </k> [priority(40)]
+    67	  rule <k> V:Val ~> #mathCeil => ceilF(V) ... </k>
+    68	
+    69	  // math.floor(x) — same interception shape as math.ceil
+    70	  syntax KItem ::= "#mathFloor"
+    71	  rule <k> Call(Attribute(Name("math"), "floor"), (E:Expr, .Exprs)) => E ~> #mathFloor ... </k> [priority(40)]
+    72	  rule <k> V:Val ~> #mathFloor => floorFI(V) ... </k>
+    73	  syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]
+    74	  rule floorFI(I:Int)   => I                        [concrete]
+    75	  rule floorFI(F:Float) => Float2Int(floorFloat(F)) [concrete]
+    76	
+    77	  // bare floor/ceil (bound by `from math import floor, ceil`)
+    78	  rule applyBuiltin("floor", V:Val, .Vals) => floorFI(V)
+    79	  rule applyBuiltin("ceil",  V:Val, .Vals) => ceilF(V)
+    80	

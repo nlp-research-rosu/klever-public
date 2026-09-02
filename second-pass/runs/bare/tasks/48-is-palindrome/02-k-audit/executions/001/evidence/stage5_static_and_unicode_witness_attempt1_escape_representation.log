@@ -1,0 +1,300 @@
+$ nl -ba /tmp/audit-work/48-is-palindrome/source/semantic.k
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports DOMAINS
+     5	
+     6	  // The concrete grammar covers every constructor emitted for solution.mpy.
+     7	  syntax Program ::= "Module" "(" Stmt ")"
+     8	
+     9	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
+    10	                | "Return" "(" Expr ")"
+    11	
+    12	  syntax Params ::= "Params" "(" String ")"
+    13	
+    14	  syntax Expr ::= "Name" "(" String ")"
+    15	                | "Int" "(" Int ")"
+    16	                | "Str" "(" String ")"
+    17	                | "UnaryOp" "(" String "," Expr ")"
+    18	                | "Subscript" "(" Expr "," Slice ")"
+    19	                | "Compare" "(" Expr "," CmpOp ")"
+    20	                | PyVal
+    21	
+    22	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    23	  syntax Slice ::= "Slice" "(" Bound "," Bound "," Bound ")"
+    24	  syntax Bound ::= Expr | "NoBound"
+    25	
+    26	  syntax PyVal ::= "PyString" "(" String ")"
+    27	                 | "PyInt" "(" Int ")"
+    28	                 | "PyBool" "(" Bool ")"
+    29	endmodule
+    30	
+    31	module SEMANTIC
+    32	  imports MPY-SYNTAX
+    33	  imports MAP
+    34	
+    35	  syntax Function ::= "#function" "(" String "," Stmt ")"
+    36	
+    37	  syntax KItem ::= "#load" "(" Stmt ")"
+    38	                 | "#invoke" "(" String "," PyVal ")"
+    39	                 | "#return" | "#returnFrame" "(" Map ")"
+    40	                 | "#compareRight" "(" CmpOp ")"
+    41	                 | "#compareValues" "(" PyVal "," String ")"
+    42	                 | "#applySlice" "(" Slice ")"
+    43	                 | "#unaryMinus"
+    44	
+    45	  configuration
+    46	    <py>
+    47	      <k> $PGM:Program ~> #invoke($FUNCTION:String, PyString($ARG:String)) </k>
+    48	      <functions> .Map </functions>
+    49	      <env> .Map </env>
+    50	    </py>
+    51	
+    52	  // Loading and calling the one-function module emitted by the translator.
+    53	  rule <k> Module(FD) => #load(FD) ... </k>
+    54	
+    55	  rule <k> #load(FuncDef(F, Params(P), BODY)) => .K ... </k>
+    56	       <functions> .Map => F |-> #function(P, BODY) </functions>
+    57	
+    58	  rule <k> #invoke(F, V) => BODY ~> #returnFrame(OLD) ... </k>
+    59	       <functions> F |-> #function(P, BODY) </functions>
+    60	       <env> OLD => P |-> V </env>
+    61	
+    62	  // Return is evaluated before its caller's environment is restored.
+    63	  rule <k> Return(E) => E ~> #return ... </k>
+    64	  rule <k> V:PyVal ~> #return ~> #returnFrame(OLD) => V ... </k>
+    65	       <env> _CURRENT => OLD </env>
+    66	
+    67	  // Literal and variable evaluation.
+    68	  rule <k> Int(I) => PyInt(I) ... </k>
+    69	  rule <k> Str(S) => PyString(S) ... </k>
+    70	  rule <k> Name(X) => V ... </k>
+    71	       <env> X |-> V </env>
+    72	
+    73	  rule <k> UnaryOp("-", E) => E ~> #unaryMinus ... </k>
+    74	  rule <k> PyInt(I) ~> #unaryMinus => PyInt(0 -Int I) ... </k>
+    75	
+    76	  // Evaluation order for a single CPython Compare/CmpOp pair.
+    77	  rule <k> Compare(E, C) => E ~> #compareRight(C) ... </k>
+    78	  rule <k> LEFT:PyVal ~> #compareRight(CmpOp(OP, RIGHT))
+    79	        => RIGHT ~> #compareValues(LEFT, OP) ... </k>
+    80	  rule <k> PyString(RIGHT) ~> #compareValues(PyString(LEFT), "==")
+    81	        => PyBool(LEFT ==String RIGHT) ... </k>
+    82	
+    83	  // Python's s[::-1] is the only slice form used by solution.mpy.
+    84	  rule <k> Subscript(E, SL) => E ~> #applySlice(SL) ... </k>
+    85	  rule <k> PyString(S) ~> #applySlice(
+    86	          Slice(NoBound, NoBound, UnaryOp("-", Int(1))))
+    87	        => PyString(reverseString(S)) ... </k>
+    88	
+    89	  // Reverse by Unicode code point, matching Python str slicing rather than
+    90	  // reversing a UTF-8 byte representation.
+    91	  syntax String ::= reverseString(String) [function]
+    92	  syntax String ::= reverseStringN(String, Int) [function]
+    93	
+    94	  rule reverseString(S) => reverseStringN(S, lengthString(S))
+    95	  rule reverseStringN(_S, 0) => ""
+    96	  rule reverseStringN(S, N)
+    97	    => substrString(S, N -Int 1, N) +String reverseStringN(S, N -Int 1)
+    98	    requires N >Int 0
+    99	endmodule
+[exit 0]
+$ nl -ba /tmp/audit-work/48-is-palindrome/source/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // Mathematical postcondition used by the reachability claim.
+     7	  syntax Bool ::= isPalindrome(String) [function]
+     8	  rule isPalindrome(S) => S ==String reverseString(S)
+     9	endmodule
+[exit 0]
+$ nl -ba /tmp/audit-work/48-is-palindrome/source/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim
+     7	    <py>
+     8	      <k>
+     9	        Module(
+    10	          FuncDef("is_palindrome", Params("text"),
+    11	            Return(
+    12	              Compare(
+    13	                Name("text"),
+    14	                CmpOp(
+    15	                  "==",
+    16	                  Subscript(
+    17	                    Name("text"),
+    18	                    Slice(NoBound, NoBound, UnaryOp("-", Int(1)))))))))
+    19	        ~> #invoke("is_palindrome", PyString(S:String))
+    20	      => PyBool(isPalindrome(S))
+    21	      </k>
+    22	      <functions>
+    23	        .Map
+    24	      => "is_palindrome" |-> #function(
+    25	           "text",
+    26	           Return(
+    27	             Compare(
+    28	               Name("text"),
+    29	               CmpOp(
+    30	                 "==",
+    31	                 Subscript(
+    32	                   Name("text"),
+    33	                   Slice(NoBound, NoBound, UnaryOp("-", Int(1))))))))
+    34	      </functions>
+    35	      <env> .Map </env>
+    36	    </py>
+    37	endmodule
+[exit 0]
+$ sed -n 1681\,1765p /usr/include/kframework/builtin/domains.md
+Provided here is the syntax of an implementation of Unicode strings in K. This
+type is hooked to an implementation of strings provided by the backend. The
+implementation is currently incomplete and does not fully support encodings
+and code points beyond the initial 256 code points of the Basic Latin and
+Latin-1 Supplement blocks. In the future, there may be breaking changes to
+the semantics of this module in order to support this functionality.
+
+The syntax of strings in K is delineated by double quotes. Inside the double
+quotes, any character can appear verbatim except double quotes, backslash,
+newline, and carriage return. K also supports the following escape sequences:
+
+* \" - the " character
+* \\ - the \ character
+* \n - newline character
+* \r - carriage return character
+* \t - tab character
+* \f - form feed character
+* \xFF - \x followed by two hexadecimal characters indicates a code point
+  between 0x00 and 0xff
+* \uFFFF - \u followed by four hexadecimal characters indicates a code point
+  between 0x0000 and 0xffff
+* \UFFFFFFFF - \U followed by eight hexadecimal characters indicates a code
+  point between 0x000000 and 0x10ffff
+
+```k
+module STRING-SYNTAX
+  syntax String [hook(STRING.String)]
+  syntax String ::= r"[\\\"](([^\\\"\\n\\r\\\\])|([\\\\][nrtf\\\"\\\\])|([\\\\][x][0-9a-fA-F]{2})|([\\\\][u][0-9a-fA-F]{4})|([\\\\][U][0-9a-fA-F]{8}))*[\\\"]"      [token]
+endmodule
+
+module STRING-COMMON
+  imports STRING-SYNTAX
+  imports private INT
+  imports private FLOAT-SYNTAX
+  imports private K-EQUAL
+  imports private BOOL
+```
+
+### String concatenation
+
+You can concatenate two strings in O(N) time. For successive concatenation
+operations, it may be better to use the `STRING-BUFFER` module.
+
+```k
+  syntax String ::= String "+String" String    [function, total, left, hook(STRING.concat)]
+```
+
+### String length
+
+You can get the length of a string in O(1) time.
+
+```k
+  syntax Int ::= lengthString ( String ) [function, total, hook(STRING.length)]
+```
+
+### Character and integer conversion
+
+You can convert between a character (as represented by a string containing
+a single code point) and an integer in O(1) time.
+
+```k
+  syntax String ::= chrChar ( Int )      [function, hook(STRING.chr)]
+  syntax Int ::= ordChar ( String )      [function, hook(STRING.ord)]
+```
+
+### String substring
+
+You can compute a substring of a string in O(N) time (where N is the
+length of the substring). There are two important facts to note:
+
+1.  the range generated includes the character at `startIndex` but excludes the
+    character at `endIndex`, i.e., the range is `[startIndex..endIndex)`.
+2.  this function is only defined on valid indices (i.e., it is defined when
+    `startIndex < endIndex` and `endIndex` is less than or equal to the string
+    length).
+
+```k
+  syntax String ::= substrString ( String , startIndex: Int , endIndex: Int ) [function, total, hook(STRING.substr)]
+```
+
+### String search
+
+You can find the first (respectively, last) occurrence of a substring, starting
+at a certain `index`, in another string in O(N*M) time.
+Returns `-1` if the substring is not found.
+[exit 0]
+$ rg -n \^\[\[:space:\]\]\*\(syntax\|rule\|claim\|configuration\)\\b\|\\\[\(function\|total\|functional\|simplification\|priority\|anywhere\|macro\) /tmp/audit-work/48-is-palindrome/source/semantic.k /tmp/audit-work/48-is-palindrome/source/verification.k /tmp/audit-work/48-is-palindrome/source/spec.k
+/tmp/audit-work/48-is-palindrome/source/semantic.k:7:  syntax Program ::= "Module" "(" Stmt ")"
+/tmp/audit-work/48-is-palindrome/source/semantic.k:9:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
+/tmp/audit-work/48-is-palindrome/source/semantic.k:12:  syntax Params ::= "Params" "(" String ")"
+/tmp/audit-work/48-is-palindrome/source/semantic.k:14:  syntax Expr ::= "Name" "(" String ")"
+/tmp/audit-work/48-is-palindrome/source/semantic.k:22:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+/tmp/audit-work/48-is-palindrome/source/semantic.k:23:  syntax Slice ::= "Slice" "(" Bound "," Bound "," Bound ")"
+/tmp/audit-work/48-is-palindrome/source/semantic.k:24:  syntax Bound ::= Expr | "NoBound"
+/tmp/audit-work/48-is-palindrome/source/semantic.k:26:  syntax PyVal ::= "PyString" "(" String ")"
+/tmp/audit-work/48-is-palindrome/source/semantic.k:35:  syntax Function ::= "#function" "(" String "," Stmt ")"
+/tmp/audit-work/48-is-palindrome/source/semantic.k:37:  syntax KItem ::= "#load" "(" Stmt ")"
+/tmp/audit-work/48-is-palindrome/source/semantic.k:45:  configuration
+/tmp/audit-work/48-is-palindrome/source/semantic.k:53:  rule <k> Module(FD) => #load(FD) ... </k>
+/tmp/audit-work/48-is-palindrome/source/semantic.k:55:  rule <k> #load(FuncDef(F, Params(P), BODY)) => .K ... </k>
+/tmp/audit-work/48-is-palindrome/source/semantic.k:58:  rule <k> #invoke(F, V) => BODY ~> #returnFrame(OLD) ... </k>
+/tmp/audit-work/48-is-palindrome/source/semantic.k:63:  rule <k> Return(E) => E ~> #return ... </k>
+/tmp/audit-work/48-is-palindrome/source/semantic.k:64:  rule <k> V:PyVal ~> #return ~> #returnFrame(OLD) => V ... </k>
+/tmp/audit-work/48-is-palindrome/source/semantic.k:68:  rule <k> Int(I) => PyInt(I) ... </k>
+/tmp/audit-work/48-is-palindrome/source/semantic.k:69:  rule <k> Str(S) => PyString(S) ... </k>
+/tmp/audit-work/48-is-palindrome/source/semantic.k:70:  rule <k> Name(X) => V ... </k>
+/tmp/audit-work/48-is-palindrome/source/semantic.k:73:  rule <k> UnaryOp("-", E) => E ~> #unaryMinus ... </k>
+/tmp/audit-work/48-is-palindrome/source/semantic.k:74:  rule <k> PyInt(I) ~> #unaryMinus => PyInt(0 -Int I) ... </k>
+/tmp/audit-work/48-is-palindrome/source/semantic.k:77:  rule <k> Compare(E, C) => E ~> #compareRight(C) ... </k>
+/tmp/audit-work/48-is-palindrome/source/semantic.k:78:  rule <k> LEFT:PyVal ~> #compareRight(CmpOp(OP, RIGHT))
+/tmp/audit-work/48-is-palindrome/source/semantic.k:80:  rule <k> PyString(RIGHT) ~> #compareValues(PyString(LEFT), "==")
+/tmp/audit-work/48-is-palindrome/source/semantic.k:84:  rule <k> Subscript(E, SL) => E ~> #applySlice(SL) ... </k>
+/tmp/audit-work/48-is-palindrome/source/semantic.k:85:  rule <k> PyString(S) ~> #applySlice(
+/tmp/audit-work/48-is-palindrome/source/semantic.k:91:  syntax String ::= reverseString(String) [function]
+/tmp/audit-work/48-is-palindrome/source/semantic.k:92:  syntax String ::= reverseStringN(String, Int) [function]
+/tmp/audit-work/48-is-palindrome/source/semantic.k:94:  rule reverseString(S) => reverseStringN(S, lengthString(S))
+/tmp/audit-work/48-is-palindrome/source/semantic.k:95:  rule reverseStringN(_S, 0) => ""
+/tmp/audit-work/48-is-palindrome/source/semantic.k:96:  rule reverseStringN(S, N)
+/tmp/audit-work/48-is-palindrome/source/spec.k:6:  claim
+/tmp/audit-work/48-is-palindrome/source/verification.k:7:  syntax Bool ::= isPalindrome(String) [function]
+/tmp/audit-work/48-is-palindrome/source/verification.k:8:  rule isPalindrome(S) => S ==String reverseString(S)
+[exit 0]
+$ cmp -s /tmp/audit-work/48-is-palindrome/witnesses/spec-unicode-candidate-result.k /audit-output/evidence/spec-unicode-candidate-result.k
+[exit 0]
+$ cmp -s /tmp/audit-work/48-is-palindrome/witnesses/spec-unicode-python-expected.k /audit-output/evidence/spec-unicode-python-expected.k
+[exit 0]
+$ kprove /tmp/audit-work/48-is-palindrome/witnesses/spec-unicode-candidate-result.k --definition /tmp/audit-work/48-is-palindrome/build-final/verification-haskell-kompiled --spec-module SPEC-UNICODE-CANDIDATE-RESULT --dry-run
+kore-exec /tmp/audit-work/48-is-palindrome/build-final/verification-haskell-kompiled/definition.kore --module VERIFICATION --prove /tmp/.kprove-2026-07-23-08-17-30-775-0e0d3633-4128-44cf-b049-81af8ab738bb/spec.kore --spec-module SPEC-UNICODE-CANDIDATE-RESULT --output /tmp/.kprove-2026-07-23-08-17-30-775-0e0d3633-4128-44cf-b049-81af8ab738bb/result.kore
+[exit 0]
+$ kprove /tmp/audit-work/48-is-palindrome/witnesses/spec-unicode-candidate-result.k --definition /tmp/audit-work/48-is-palindrome/build-final/verification-haskell-kompiled --spec-module SPEC-UNICODE-CANDIDATE-RESULT
+kore-exec: [370993] Warning (WarnStuckClaimState):
+    The configuration's term doesn't unify with the destination's term and the configuration cannot be rewritten further. Location: /tmp/audit-work/48-is-palindrome/witnesses/spec-unicode-candidate-result.k:7:5-38:10
+Context:
+    (InfoReachability) while checking the implication
+<py>
+  <k>
+    PyBool ( true ) ~> .K
+  </k>
+  <functions>
+    "is_palindrome" |-> #function ( "text" , Return ( Compare ( Name ( "text" ) , CmpOp ( "==" , Subscript ( Name ( "text" ) , Slice ( NoBound , NoBound , UnaryOp ( "-" , Int ( 1 ) ) ) ) ) ) ) )
+  </functions>
+  <env>
+    .Map
+  </env>
+</py>
+[Error] Prover: backend terminated because the configuration cannot be
+rewritten further. See output for more details.
+[exit 1]

@@ -1,0 +1,5 @@
+import Klean115MaxFill.Func
+
+inductive Rewrites : SortGeneratedTopCell → SortGeneratedTopCell → Prop where
+  | tran {s1 s2 s3 : SortGeneratedTopCell} (t1 : Rewrites s1 s2) (t2 : Rewrites s2 s3) : Rewrites s1 s3
+  | VERIFICATION_KLEAN_EXPORT_kxExport0 {V0 : SortModule} {_DotVar0 : SortGeneratedCounterCell} {_DotVar2 : SortK} {_Gen0 : SortArgsCell} {_Gen1 : SortFunctionsCell} {_Gen2 : SortEnvCell} {_Gen3 : SortResultCell} {_Val0 : SortMap} (defn_Val0 : «functionsOf(_)_VERIFICATION_Map_Module» V0 = some _Val0) : Rewrites { maxFill := { k := { val := SortK.kseq (SortKItem.«#kxExport0(_)_VERIFICATION-KLEAN-EXPORT_KItem_Module» V0) _DotVar2 }, args := _Gen0, functions := _Gen1, env := _Gen2, result := _Gen3 }, generatedCounter := _DotVar0 } { maxFill := { k := { val := SortK.kseq ((@inj SortMap SortKItem) _Val0) _DotVar2 }, args := _Gen0, functions := _Gen1, env := _Gen2, result := _Gen3 }, generatedCounter := _DotVar0 }

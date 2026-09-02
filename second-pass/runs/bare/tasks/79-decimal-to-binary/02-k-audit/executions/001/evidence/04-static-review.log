@@ -1,0 +1,352 @@
+$ nl -ba /tmp/audit-work/source/semantic.k
+     1	requires "domains.md"
+     2	
+     3	module SEMANTIC-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports STRING-SYNTAX
+     6	
+     7	  syntax Program ::= "Module" "(" Stmt ")" [symbol(moduleProgram)]
+     8	
+     9	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
+    10	                [symbol(functionDefinition)]
+    11	                | "Return" "(" Expr ")" [symbol(returnStatement)]
+    12	
+    13	  syntax Params ::= "Params" "(" String ")" [symbol(parameters)]
+    14	
+    15	  syntax Expr ::= "Int" "(" Int ")" [symbol(integerExpression)]
+    16	                | "Str" "(" String ")" [symbol(stringExpression)]
+    17	                | "Name" "(" String ")" [symbol(nameExpression)]
+    18	                | "BinOp" "(" String "," Expr "," Expr ")"
+    19	                  [symbol(binaryExpression)]
+    20	                | "Call" "(" Expr "," Expr ")" [symbol(callExpression)]
+    21	                | "Subscript" "(" Expr "," Slice ")"
+    22	                  [symbol(subscriptExpression)]
+    23	
+    24	  syntax Slice ::= "Slice" "(" Bound "," Bound "," Bound ")"
+    25	                   [symbol(sliceExpression)]
+    26	  syntax Bound ::= Expr | "NoBound" [symbol(noBound)]
+    27	endmodule
+    28	
+    29	module SEMANTIC
+    30	  imports SEMANTIC-SYNTAX
+    31	  imports BOOL
+    32	  imports INT
+    33	  imports STRING
+    34	
+    35	  syntax Env ::= "bind" "(" String "," Int ")" [symbol(bind)]
+    36	
+    37	  syntax Val ::= "intVal" "(" Int ")" [symbol(intVal)]
+    38	               | "strVal" "(" String ")" [symbol(strVal)]
+    39	               | "binVal" "(" String ")" [symbol(binVal)]
+    40	               | "negativeBinVal" "(" String ")" [symbol(negativeBinVal)]
+    41	
+    42	  syntax Val ::= eval(Expr, Env) [function]
+    43	               | addValues(Val, Val) [function]
+    44	               | callBin(Val) [function]
+    45	               | suffixFrom(Val, Int) [function]
+    46	
+    47	  syntax String ::= binDigits(Int) [function]
+    48	
+    49	  configuration
+    50	    <python>
+    51	      <k> $PGM:Program </k>
+    52	      <arg> $ARG:Int </arg>
+    53	      <result> .K </result>
+    54	    </python>
+    55	
+    56	  rule <k>
+    57	         Module(
+    58	           FuncDef("decimal_to_binary", Params("decimal"), Return(E))
+    59	         )
+    60	       => .K
+    61	       </k>
+    62	       <arg> I </arg>
+    63	       <result> .K => eval(E, bind("decimal", I)) </result>
+    64	
+    65	  rule eval(Int(I), _) => intVal(I)
+    66	  rule eval(Str(S), _) => strVal(S)
+    67	  rule eval(Name(X), bind(X, I)) => intVal(I)
+    68	  rule eval(BinOp("+", LEFT, RIGHT), RHO)
+    69	    => addValues(eval(LEFT, RHO), eval(RIGHT, RHO))
+    70	  rule eval(Call(Name("bin"), ARG), RHO) => callBin(eval(ARG, RHO))
+    71	  rule eval(Subscript(BASE, Slice(Int(START), NoBound, NoBound)), RHO)
+    72	    => suffixFrom(eval(BASE, RHO), START)
+    73	
+    74	  rule addValues(intVal(I), intVal(J)) => intVal(I +Int J)
+    75	  rule addValues(strVal(S), strVal(T)) => strVal(S +String T)
+    76	
+    77	  // binVal(S) is the internal value denoting Python's string "0b" + S.
+    78	  rule callBin(intVal(I)) => binVal(binDigits(I))
+    79	    requires I >=Int 0
+    80	  // Python renders a negative input as "-0b" + digits.
+    81	  rule callBin(intVal(I)) => negativeBinVal(binDigits(0 -Int I))
+    82	    requires I <Int 0
+    83	
+    84	  rule suffixFrom(binVal(S), 2) => strVal(S)
+    85	  rule suffixFrom(negativeBinVal(S), 2) => strVal("b" +String S)
+    86	
+    87	  rule binDigits(I) => Int2String(I)
+    88	    requires (0 <=Int I) andBool (I <Int 2)
+    89	  rule binDigits(I) => binDigits(I /Int 2) +String Int2String(I %Int 2)
+    90	    requires I >=Int 2
+    91	endmodule
+[exit 0]
+$ nl -ba /tmp/audit-work/source/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // A mathematical presentation of the required wrapper around the usual
+     7	  // base-two digit expansion.  Keeping it separate from expression evaluation
+     8	  // makes the reachability claim state the contract rather than an AST result.
+     9	  syntax String ::= decimalToBinarySpec(Int) [function]
+    10	
+    11	  rule decimalToBinarySpec(I)
+    12	    => "db" +String binDigits(I) +String "db"
+    13	    requires I >=Int 0
+    14	  rule decimalToBinarySpec(I)
+    15	    => ("db" +String ("b" +String binDigits(0 -Int I))) +String "db"
+    16	    requires I <Int 0
+    17	endmodule
+[exit 0]
+$ nl -ba /tmp/audit-work/source/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim
+     7	    <k>
+     8	      Module(
+     9	        FuncDef(
+    10	          "decimal_to_binary",
+    11	          Params("decimal"),
+    12	          Return(
+    13	            BinOp(
+    14	              "+",
+    15	              BinOp(
+    16	                "+",
+    17	                Str("db"),
+    18	                Subscript(
+    19	                  Call(Name("bin"), Name("decimal")),
+    20	                  Slice(Int(2), NoBound, NoBound)
+    21	                )
+    22	              ),
+    23	              Str("db")
+    24	            )
+    25	          )
+    26	        )
+    27	      )
+    28	    => .K
+    29	    </k>
+    30	    <arg> I:Int </arg>
+    31	    <result> .K => strVal(decimalToBinarySpec(I)) </result>
+    32	    requires I >=Int 0
+    33	
+    34	  claim
+    35	    <k>
+    36	      Module(
+    37	        FuncDef(
+    38	          "decimal_to_binary",
+    39	          Params("decimal"),
+    40	          Return(
+    41	            BinOp(
+    42	              "+",
+    43	              BinOp(
+    44	                "+",
+    45	                Str("db"),
+    46	                Subscript(
+    47	                  Call(Name("bin"), Name("decimal")),
+    48	                  Slice(Int(2), NoBound, NoBound)
+    49	                )
+    50	              ),
+    51	              Str("db")
+    52	            )
+    53	          )
+    54	        )
+    55	      )
+    56	    => .K
+    57	    </k>
+    58	    <arg> I:Int </arg>
+    59	    <result> .K => strVal(decimalToBinarySpec(I)) </result>
+    60	    requires I <Int 0
+    61	
+    62	  claim
+    63	    <k>
+    64	      Module(
+    65	        FuncDef(
+    66	          "decimal_to_binary",
+    67	          Params("decimal"),
+    68	          Return(
+    69	            BinOp(
+    70	              "+",
+    71	              BinOp(
+    72	                "+",
+    73	                Str("db"),
+    74	                Subscript(
+    75	                  Call(Name("bin"), Name("decimal")),
+    76	                  Slice(Int(2), NoBound, NoBound)
+    77	                )
+    78	              ),
+    79	              Str("db")
+    80	            )
+    81	          )
+    82	        )
+    83	      )
+    84	    => .K
+    85	    </k>
+    86	    <arg> 15 </arg>
+    87	    <result> .K => strVal("db1111db") </result>
+    88	
+    89	  claim
+    90	    <k>
+    91	      Module(
+    92	        FuncDef(
+    93	          "decimal_to_binary",
+    94	          Params("decimal"),
+    95	          Return(
+    96	            BinOp(
+    97	              "+",
+    98	              BinOp(
+    99	                "+",
+   100	                Str("db"),
+   101	                Subscript(
+   102	                  Call(Name("bin"), Name("decimal")),
+   103	                  Slice(Int(2), NoBound, NoBound)
+   104	                )
+   105	              ),
+   106	              Str("db")
+   107	            )
+   108	          )
+   109	        )
+   110	      )
+   111	    => .K
+   112	    </k>
+   113	    <arg> 32 </arg>
+   114	    <result> .K => strVal("db100000db") </result>
+   115	
+   116	  claim
+   117	    <k>
+   118	      Module(
+   119	        FuncDef(
+   120	          "decimal_to_binary",
+   121	          Params("decimal"),
+   122	          Return(
+   123	            BinOp(
+   124	              "+",
+   125	              BinOp(
+   126	                "+",
+   127	                Str("db"),
+   128	                Subscript(
+   129	                  Call(Name("bin"), Name("decimal")),
+   130	                  Slice(Int(2), NoBound, NoBound)
+   131	                )
+   132	              ),
+   133	              Str("db")
+   134	            )
+   135	          )
+   136	        )
+   137	      )
+   138	    => .K
+   139	    </k>
+   140	    <arg> -5 </arg>
+   141	    <result> .K => strVal("dbb101db") </result>
+   142	endmodule
+[exit 0]
+$ nl -ba /tmp/audit-work/submitted-solution.mpy
+     1	Module(
+     2	  FuncDef("decimal_to_binary", Params("decimal"),
+     3	    Return(
+     4	      BinOp(
+     5	        "+",
+     6	        BinOp(
+     7	          "+",
+     8	          Str("db"),
+     9	          Subscript(
+    10	            Call(Name("bin"), Name("decimal")),
+    11	            Slice(Int(2), NoBound, NoBound))),
+    12	        Str("db")))))
+[exit 0]
+$ rg -n \^\(requires\|module\|endmodule\|\ \ imports\|\ \ syntax\|\ \ configuration\|\ \ rule\|\ \ claim\)\|\\\[\(function\|total\|functional\|simplification\|concrete\|priority\|symbol\) /tmp/audit-work/source/semantic.k /tmp/audit-work/source/verification.k /tmp/audit-work/source/spec.k
+/tmp/audit-work/source/spec.k:1:requires "verification.k"
+/tmp/audit-work/source/spec.k:3:module SPEC
+/tmp/audit-work/source/spec.k:4:  imports VERIFICATION
+/tmp/audit-work/source/spec.k:6:  claim
+/tmp/audit-work/source/spec.k:34:  claim
+/tmp/audit-work/source/spec.k:62:  claim
+/tmp/audit-work/source/spec.k:89:  claim
+/tmp/audit-work/source/spec.k:116:  claim
+/tmp/audit-work/source/spec.k:142:endmodule
+/tmp/audit-work/source/verification.k:1:requires "semantic.k"
+/tmp/audit-work/source/verification.k:3:module VERIFICATION
+/tmp/audit-work/source/verification.k:4:  imports SEMANTIC
+/tmp/audit-work/source/verification.k:9:  syntax String ::= decimalToBinarySpec(Int) [function]
+/tmp/audit-work/source/verification.k:11:  rule decimalToBinarySpec(I)
+/tmp/audit-work/source/verification.k:14:  rule decimalToBinarySpec(I)
+/tmp/audit-work/source/verification.k:17:endmodule
+/tmp/audit-work/source/semantic.k:1:requires "domains.md"
+/tmp/audit-work/source/semantic.k:3:module SEMANTIC-SYNTAX
+/tmp/audit-work/source/semantic.k:4:  imports INT-SYNTAX
+/tmp/audit-work/source/semantic.k:5:  imports STRING-SYNTAX
+/tmp/audit-work/source/semantic.k:7:  syntax Program ::= "Module" "(" Stmt ")" [symbol(moduleProgram)]
+/tmp/audit-work/source/semantic.k:9:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmt ")"
+/tmp/audit-work/source/semantic.k:10:                [symbol(functionDefinition)]
+/tmp/audit-work/source/semantic.k:11:                | "Return" "(" Expr ")" [symbol(returnStatement)]
+/tmp/audit-work/source/semantic.k:13:  syntax Params ::= "Params" "(" String ")" [symbol(parameters)]
+/tmp/audit-work/source/semantic.k:15:  syntax Expr ::= "Int" "(" Int ")" [symbol(integerExpression)]
+/tmp/audit-work/source/semantic.k:16:                | "Str" "(" String ")" [symbol(stringExpression)]
+/tmp/audit-work/source/semantic.k:17:                | "Name" "(" String ")" [symbol(nameExpression)]
+/tmp/audit-work/source/semantic.k:19:                  [symbol(binaryExpression)]
+/tmp/audit-work/source/semantic.k:20:                | "Call" "(" Expr "," Expr ")" [symbol(callExpression)]
+/tmp/audit-work/source/semantic.k:22:                  [symbol(subscriptExpression)]
+/tmp/audit-work/source/semantic.k:24:  syntax Slice ::= "Slice" "(" Bound "," Bound "," Bound ")"
+/tmp/audit-work/source/semantic.k:25:                   [symbol(sliceExpression)]
+/tmp/audit-work/source/semantic.k:26:  syntax Bound ::= Expr | "NoBound" [symbol(noBound)]
+/tmp/audit-work/source/semantic.k:27:endmodule
+/tmp/audit-work/source/semantic.k:29:module SEMANTIC
+/tmp/audit-work/source/semantic.k:30:  imports SEMANTIC-SYNTAX
+/tmp/audit-work/source/semantic.k:31:  imports BOOL
+/tmp/audit-work/source/semantic.k:32:  imports INT
+/tmp/audit-work/source/semantic.k:33:  imports STRING
+/tmp/audit-work/source/semantic.k:35:  syntax Env ::= "bind" "(" String "," Int ")" [symbol(bind)]
+/tmp/audit-work/source/semantic.k:37:  syntax Val ::= "intVal" "(" Int ")" [symbol(intVal)]
+/tmp/audit-work/source/semantic.k:38:               | "strVal" "(" String ")" [symbol(strVal)]
+/tmp/audit-work/source/semantic.k:39:               | "binVal" "(" String ")" [symbol(binVal)]
+/tmp/audit-work/source/semantic.k:40:               | "negativeBinVal" "(" String ")" [symbol(negativeBinVal)]
+/tmp/audit-work/source/semantic.k:42:  syntax Val ::= eval(Expr, Env) [function]
+/tmp/audit-work/source/semantic.k:43:               | addValues(Val, Val) [function]
+/tmp/audit-work/source/semantic.k:44:               | callBin(Val) [function]
+/tmp/audit-work/source/semantic.k:45:               | suffixFrom(Val, Int) [function]
+/tmp/audit-work/source/semantic.k:47:  syntax String ::= binDigits(Int) [function]
+/tmp/audit-work/source/semantic.k:49:  configuration
+/tmp/audit-work/source/semantic.k:56:  rule <k>
+/tmp/audit-work/source/semantic.k:65:  rule eval(Int(I), _) => intVal(I)
+/tmp/audit-work/source/semantic.k:66:  rule eval(Str(S), _) => strVal(S)
+/tmp/audit-work/source/semantic.k:67:  rule eval(Name(X), bind(X, I)) => intVal(I)
+/tmp/audit-work/source/semantic.k:68:  rule eval(BinOp("+", LEFT, RIGHT), RHO)
+/tmp/audit-work/source/semantic.k:70:  rule eval(Call(Name("bin"), ARG), RHO) => callBin(eval(ARG, RHO))
+/tmp/audit-work/source/semantic.k:71:  rule eval(Subscript(BASE, Slice(Int(START), NoBound, NoBound)), RHO)
+/tmp/audit-work/source/semantic.k:74:  rule addValues(intVal(I), intVal(J)) => intVal(I +Int J)
+/tmp/audit-work/source/semantic.k:75:  rule addValues(strVal(S), strVal(T)) => strVal(S +String T)
+/tmp/audit-work/source/semantic.k:78:  rule callBin(intVal(I)) => binVal(binDigits(I))
+/tmp/audit-work/source/semantic.k:81:  rule callBin(intVal(I)) => negativeBinVal(binDigits(0 -Int I))
+/tmp/audit-work/source/semantic.k:84:  rule suffixFrom(binVal(S), 2) => strVal(S)
+/tmp/audit-work/source/semantic.k:85:  rule suffixFrom(negativeBinVal(S), 2) => strVal("b" +String S)
+/tmp/audit-work/source/semantic.k:87:  rule binDigits(I) => Int2String(I)
+/tmp/audit-work/source/semantic.k:89:  rule binDigits(I) => binDigits(I /Int 2) +String Int2String(I %Int 2)
+/tmp/audit-work/source/semantic.k:91:endmodule
+[exit 0]
+$ python3 /audit-output/evidence/check_pinning.py
+submitted normalized AST=Module(FuncDef("decimal_to_binary",Params("decimal"),Return(BinOp("+",BinOp("+",Str("db"),Subscript(Call(Name("bin"),Name("decimal")),Slice(Int(2),NoBound,NoBound))),Str("db")))))
+submitted normalized sha256=fbb7ca290d81c351043a0db996ba32e407e861e9e68b38dadba0cba1bbca954b
+entry Module terms found=5
+claim=1 same_as_submitted=True sha256=fbb7ca290d81c351043a0db996ba32e407e861e9e68b38dadba0cba1bbca954b
+claim=2 same_as_submitted=True sha256=fbb7ca290d81c351043a0db996ba32e407e861e9e68b38dadba0cba1bbca954b
+claim=3 same_as_submitted=True sha256=fbb7ca290d81c351043a0db996ba32e407e861e9e68b38dadba0cba1bbca954b
+claim=4 same_as_submitted=True sha256=fbb7ca290d81c351043a0db996ba32e407e861e9e68b38dadba0cba1bbca954b
+claim=5 same_as_submitted=True sha256=fbb7ca290d81c351043a0db996ba32e407e861e9e68b38dadba0cba1bbca954b
+pinning mismatches=0
+[exit 0]
+[script exit 0]
+[outer command exit 0]

@@ -1,0 +1,2 @@
+import Klean48IsPalindrome.Rewrite
+import Klean48IsPalindrome.Lemmas

@@ -1,0 +1,762 @@
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	set -x
+     4	
+     5	python3 py2mpy.py solution.py > solution.mpy
+     6	
+     7	kompile \
+     8	  --backend llvm \
+     9	  reference-semantics/semantics.k \
+    10	  --main-module MPY-KRUN \
+    11	  --syntax-module MPY-SYNTAX \
+    12	  --output-definition runtime-kompiled
+    13	python3 py2mpy.py concrete-tests.py > concrete-tests.mpy
+    14	krun concrete-tests.mpy --definition runtime-kompiled
+    15	python3 validate.py
+    16	
+    17	kompile \
+    18	  --backend haskell \
+    19	  foundation.k \
+    20	  --main-module FOUNDATION \
+    21	  --syntax-module FOUNDATION-SYNTAX \
+    22	  --output-definition connection-kompiled
+    23	kprove \
+    24	  connection-spec.k \
+    25	  --definition connection-kompiled \
+    26	  --spec-module CONNECTION-SPEC
+    27	
+    28	kompile \
+    29	  --backend haskell \
+    30	  helper-verification.k \
+    31	  --main-module HELPER-VERIFICATION \
+    32	  --syntax-module HELPER-VERIFICATION-SYNTAX \
+    33	  --output-definition loop-connection-kompiled
+    34	kprove \
+    35	  loop-connection-spec.k \
+    36	  --definition loop-connection-kompiled \
+    37	  --spec-module LOOP-CONNECTION-SPEC
+    38	
+    39	kompile \
+    40	  --backend haskell \
+    41	  verification.k \
+    42	  --main-module VERIFICATION \
+    43	  --syntax-module VERIFICATION-SYNTAX \
+    44	  --output-definition verification-kompiled
+    45	
+    46	kast \
+    47	  --definition verification-kompiled \
+    48	  --module VERIFICATION-SYNTAX \
+    49	  --sort Module \
+    50	  --expression getClosestProgram \
+    51	  --expand-macros \
+    52	  --output kore \
+    53	  > /tmp/get-closest-proof-program.kore
+    54	kast \
+    55	  --definition verification-kompiled \
+    56	  --module VERIFICATION-SYNTAX \
+    57	  --sort Module \
+    58	  solution.mpy \
+    59	  --expand-macros \
+    60	  --output kore \
+    61	  > /tmp/get-closest-solution-program.kore
+    62	cmp \
+    63	  /tmp/get-closest-proof-program.kore \
+    64	  /tmp/get-closest-solution-program.kore
+    65	wc -c \
+    66	  /tmp/get-closest-proof-program.kore \
+    67	  /tmp/get-closest-solution-program.kore
+    68	
+    69	kprove \
+    70	  spec.k \
+    71	  --definition verification-kompiled \
+    72	  --spec-module SPEC
+    73	
+    74	expect_kprove_failure() {
+    75	  if "$@"; then
+    76	    echo "ERROR: negative validation probe unexpectedly proved" >&2
+    77	    return 1
+    78	  else
+    79	    local exit_code=$?
+    80	    echo "Expected non-zero validation-probe exit: ${exit_code}"
+    81	  fi
+    82	}
+    83	
+    84	expect_kprove_failure \
+    85	  kprove spec-vacuity.k \
+    86	  --definition verification-kompiled \
+    87	  --spec-module SPEC-VACUITY
+    88	expect_kprove_failure \
+    89	  kprove helper-body-mutation-spec.k \
+    90	  --definition connection-kompiled \
+    91	  --spec-module HELPER-BODY-MUTATION-SPEC
+    92	expect_kprove_failure \
+    93	  kprove loop-body-mutation-spec.k \
+    94	  --definition verification-kompiled \
+    95	  --spec-module LOOP-BODY-MUTATION-SPEC
+    96	expect_kprove_failure \
+    97	  kprove continuation-mutation-spec.k \
+    98	  --definition verification-kompiled \
+    99	  --spec-module CONTINUATION-MUTATION-SPEC
+     1	requires "helper-verification.k"
+     2	
+     3	module VERIFICATION-SYNTAX
+     4	  imports HELPER-VERIFICATION-SYNTAX
+     5	endmodule
+     6	
+     7	module VERIFICATION
+     8	  imports HELPER-VERIFICATION
+     9	
+    10	  // Exact loop/return/frame-pop summary justified by the bridge-free
+    11	  // reachability theorem in loop-connection-spec.k.
+    12	  rule
+    13	    <k>
+    14	      #while(
+    15	        Compare(Name("i"), CmpOp(">", Int(0))),
+    16	        While(
+    17	          BoolOp("and",
+    18	            ( UnaryOp("not", Name("found")),
+    19	              Call(
+    20	                Name("_is_vowel"),
+    21	                Subscript(Name("word"), Name("i"))),
+    22	              UnaryOp(
+    23	                "not",
+    24	                Call(
+    25	                  Name("_is_vowel"),
+    26	                  Subscript(
+    27	                    Name("word"),
+    28	                    BinOp("-", Name("i"), Int(1))))),
+    29	              UnaryOp(
+    30	                "not",
+    31	                Call(
+    32	                  Name("_is_vowel"),
+    33	                  Subscript(
+    34	                    Name("word"),
+    35	                    BinOp("+", Name("i"), Int(1))))),
+    36	              .Exprs)),
+    37	          Assign(Name("result"), Subscript(Name("word"), Name("i")))
+    38	          Assign(Name("found"), Bool(true)))
+    39	        Assign(Name("i"), BinOp("-", Name("i"), Int(1))))
+    40	      ~> (Return(Name("result")) .Stmts)
+    41	      ~> #endcall
+    42	      => str(closestScan(CS, I, R, F))
+    43	    </k>
+    44	    <env> 1 => 0 </env>
+    45	    <scopes>
+    46	      ( 0 |-> scope(
+    47	          ( "_is_vowel" |-> closureVal(
+    48	              ("ch", .ParamNames),
+    49	              isVowelBody,
+    50	              0)
+    51	            "get_closest_vowel" |-> closureVal(
+    52	              ("word", .ParamNames),
+    53	              getClosestBody,
+    54	              0) ),
+    55	          parent(-1))
+    56	        1 |-> scope(
+    57	          ( "word"   |-> str(CS)
+    58	            "result" |-> str(R)
+    59	            "found"  |-> F
+    60	            "i"      |-> I ),
+    61	          parent(0))
+    62	        -1 |-> BUILTINS )
+    63	      =>
+    64	      ( 0 |-> scope(
+    65	          ( "_is_vowel" |-> closureVal(
+    66	              ("ch", .ParamNames),
+    67	              isVowelBody,
+    68	              0)
+    69	            "get_closest_vowel" |-> closureVal(
+    70	              ("word", .ParamNames),
+    71	              getClosestBody,
+    72	              0) ),
+    73	          parent(-1))
+    74	        -1 |-> BUILTINS )
+    75	    </scopes>
+    76	    <scopeLoc> 2 => 1 </scopeLoc>
+    77	    <heap> .Map </heap>
+    78	    <heapLoc> 0 </heapLoc>
+    79	    <stack>
+    80	      ListItem(frame(.K, 0, 1)) => .List
+    81	    </stack>
+    82	    <ret> noRet </ret>
+    83	    <exc> NoExc </exc>
+    84	    <exit-code> 0 </exit-code>
+    85	    requires I >=Int 0
+    86	     andBool I +Int 1 <Int isLen(CS)
+    87	    [priority(40)]
+    88	endmodule
+     1	requires "foundation.k"
+     2	
+     3	module HELPER-VERIFICATION-SYNTAX
+     4	  imports FOUNDATION-SYNTAX
+     5	endmodule
+     6	
+     7	module HELPER-VERIFICATION
+     8	  imports FOUNDATION
+     9	
+    10	  // These exact-context call summaries are justified by the bridge-free
+    11	  // helper claims in connection-spec.k.  Their arbitrary k continuation is
+    12	  // contained by the CONT:K quantified in those claims; all other cells and
+    13	  // bindings are matched exactly and remain unchanged.
+    14	  rule
+    15	    <k>
+    16	      #applyK(
+    17	        toCall(closureVal(
+    18	          ("ch", .ParamNames),
+    19	          isVowelBody,
+    20	          0)),
+    21	        (str(iCons(C, .IntSeq)), .Vals))
+    22	      => true
+    23	      ...
+    24	    </k>
+    25	    <env> 1 </env>
+    26	    <scopes>
+    27	      ( 0 |-> scope(
+    28	          ( "_is_vowel" |-> closureVal(
+    29	              ("ch", .ParamNames),
+    30	              isVowelBody,
+    31	              0)
+    32	            "get_closest_vowel" |-> closureVal(
+    33	              ("word", .ParamNames),
+    34	              getClosestBody,
+    35	              0) ),
+    36	          parent(-1))
+    37	        1 |-> scope(
+    38	          ( "word"   |-> str(CS)
+    39	            "result" |-> str(R)
+    40	            "found"  |-> F
+    41	            "i"      |-> I ),
+    42	          parent(0))
+    43	        -1 |-> BUILTINS )
+    44	    </scopes>
+    45	    <scopeLoc> 2 </scopeLoc>
+    46	    <heap> .Map </heap>
+    47	    <heapLoc> 0 </heapLoc>
+    48	    <stack> ListItem(frame(.K, 0, 1)) </stack>
+    49	    <ret> noRet </ret>
+    50	    <exc> NoExc </exc>
+    51	    <exit-code> 0 </exit-code>
+    52	    requires vowelPred(C)
+    53	    [priority(40)]
+    54	
+    55	  rule
+    56	    <k>
+    57	      #applyK(
+    58	        toCall(closureVal(
+    59	          ("ch", .ParamNames),
+    60	          isVowelBody,
+    61	          0)),
+    62	        (str(iCons(C, .IntSeq)), .Vals))
+    63	      => false
+    64	      ...
+    65	    </k>
+    66	    <env> 1 </env>
+    67	    <scopes>
+    68	      ( 0 |-> scope(
+    69	          ( "_is_vowel" |-> closureVal(
+    70	              ("ch", .ParamNames),
+    71	              isVowelBody,
+    72	              0)
+    73	            "get_closest_vowel" |-> closureVal(
+    74	              ("word", .ParamNames),
+    75	              getClosestBody,
+    76	              0) ),
+    77	          parent(-1))
+    78	        1 |-> scope(
+    79	          ( "word"   |-> str(CS)
+    80	            "result" |-> str(R)
+    81	            "found"  |-> F
+    82	            "i"      |-> I ),
+    83	          parent(0))
+    84	        -1 |-> BUILTINS )
+    85	    </scopes>
+    86	    <scopeLoc> 2 </scopeLoc>
+    87	    <heap> .Map </heap>
+    88	    <heapLoc> 0 </heapLoc>
+    89	    <stack> ListItem(frame(.K, 0, 1)) </stack>
+    90	    <ret> noRet </ret>
+    91	    <exc> NoExc </exc>
+    92	    <exit-code> 0 </exit-code>
+    93	    requires notBool vowelPred(C)
+    94	    [priority(40)]
+    95	endmodule
+     1	requires "foundation.k"
+     2	
+     3	module CONNECTION-SPEC
+     4	  imports FOUNDATION
+     5	
+     6	  claim [helper-vowel]:
+     7	    <k>
+     8	      #applyK(
+     9	        toCall(closureVal(
+    10	          ("ch", .ParamNames),
+    11	          isVowelBody,
+    12	          0)),
+    13	        (str(iCons(C, .IntSeq)), .Vals))
+    14	      ~> CONT:K
+    15	      =>
+    16	      true ~> CONT
+    17	    </k>
+    18	    <env> 1 </env>
+    19	    <scopes>
+    20	      ( 0 |-> scope(
+    21	          ( "_is_vowel" |-> closureVal(
+    22	              ("ch", .ParamNames),
+    23	              isVowelBody,
+    24	              0)
+    25	            "get_closest_vowel" |-> closureVal(
+    26	              ("word", .ParamNames),
+    27	              getClosestBody,
+    28	              0) ),
+    29	          parent(-1))
+    30	        1 |-> scope(
+    31	          ( "word"   |-> str(CS)
+    32	            "result" |-> str(R)
+    33	            "found"  |-> F
+    34	            "i"      |-> I ),
+    35	          parent(0))
+    36	        -1 |-> BUILTINS )
+    37	    </scopes>
+    38	    <scopeLoc> 2 </scopeLoc>
+    39	    <heap> .Map </heap>
+    40	    <heapLoc> 0 </heapLoc>
+    41	    <stack> ListItem(frame(.K, 0, 1)) </stack>
+    42	    <ret> noRet </ret>
+    43	    <exc> NoExc </exc>
+    44	    <exit-code> 0 </exit-code>
+    45	    requires vowelPred(C)
+    46	
+    47	  claim [helper-consonant]:
+    48	    <k>
+    49	      #applyK(
+    50	        toCall(closureVal(
+    51	          ("ch", .ParamNames),
+    52	          isVowelBody,
+    53	          0)),
+    54	        (str(iCons(C, .IntSeq)), .Vals))
+    55	      ~> CONT:K
+    56	      =>
+    57	      false ~> CONT
+    58	    </k>
+    59	    <env> 1 </env>
+    60	    <scopes>
+    61	      ( 0 |-> scope(
+    62	          ( "_is_vowel" |-> closureVal(
+    63	              ("ch", .ParamNames),
+    64	              isVowelBody,
+    65	              0)
+    66	            "get_closest_vowel" |-> closureVal(
+    67	              ("word", .ParamNames),
+    68	              getClosestBody,
+    69	              0) ),
+    70	          parent(-1))
+    71	        1 |-> scope(
+    72	          ( "word"   |-> str(CS)
+    73	            "result" |-> str(R)
+    74	            "found"  |-> F
+    75	            "i"      |-> I ),
+    76	          parent(0))
+    77	        -1 |-> BUILTINS )
+    78	    </scopes>
+    79	    <scopeLoc> 2 </scopeLoc>
+    80	    <heap> .Map </heap>
+    81	    <heapLoc> 0 </heapLoc>
+    82	    <stack> ListItem(frame(.K, 0, 1)) </stack>
+    83	    <ret> noRet </ret>
+    84	    <exc> NoExc </exc>
+    85	    <exit-code> 0 </exit-code>
+    86	    requires notBool vowelPred(C)
+    87	endmodule
+     1	requires "helper-verification.k"
+     2	
+     3	module LOOP-CONNECTION-SPEC
+     4	  imports HELPER-VERIFICATION
+     5	
+     6	  claim [loop-invariant]:
+     7	    <k>
+     8	      #while(
+     9	        Compare(Name("i"), CmpOp(">", Int(0))),
+    10	        getClosestLoopBody)
+    11	      ~> (Return(Name("result")) .Stmts)
+    12	      ~> #endcall
+    13	      => str(closestScan(CS, I, R, F))
+    14	    </k>
+    15	    <env> 1 => 0 </env>
+    16	    <scopes>
+    17	      ( 0 |-> scope(
+    18	          ( "_is_vowel" |-> closureVal(
+    19	              ("ch", .ParamNames),
+    20	              isVowelBody,
+    21	              0)
+    22	            "get_closest_vowel" |-> closureVal(
+    23	              ("word", .ParamNames),
+    24	              getClosestBody,
+    25	              0) ),
+    26	          parent(-1))
+    27	        1 |-> scope(
+    28	          ( "word"   |-> str(CS)
+    29	            "result" |-> str(R)
+    30	            "found"  |-> F
+    31	            "i"      |-> I ),
+    32	          parent(0))
+    33	        -1 |-> BUILTINS )
+    34	      =>
+    35	      ( 0 |-> scope(
+    36	          ( "_is_vowel" |-> closureVal(
+    37	              ("ch", .ParamNames),
+    38	              isVowelBody,
+    39	              0)
+    40	            "get_closest_vowel" |-> closureVal(
+    41	              ("word", .ParamNames),
+    42	              getClosestBody,
+    43	              0) ),
+    44	          parent(-1))
+    45	        -1 |-> BUILTINS )
+    46	    </scopes>
+    47	    <scopeLoc> 2 => 1 </scopeLoc>
+    48	    <heap> .Map </heap>
+    49	    <heapLoc> 0 </heapLoc>
+    50	    <stack>
+    51	      ListItem(frame(.K, 0, 1)) => .List
+    52	    </stack>
+    53	    <ret> noRet </ret>
+    54	    <exc> NoExc </exc>
+    55	    <exit-code> 0 </exit-code>
+    56	    requires I >=Int 0
+    57	     andBool I +Int 1 <Int isLen(CS)
+    58	endmodule
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module FOUNDATION-SYNTAX
+     4	  imports MPY-SYNTAX
+     5	  imports MPY-CORE
+     6	
+     7	  syntax Stmts ::= "isVowelBody" [macro]
+     8	  syntax Stmts ::= "getClosestBody" [macro]
+     9	  syntax Stmts ::= "getClosestLoopBody" [macro]
+    10	  syntax Module ::= "getClosestProgram" [macro]
+    11	
+    12	  syntax IntSeq ::= closestCandidate(IntSeq, Int) [function]
+    13	  syntax Bool ::= vowelPred(Int) [function, total]
+    14	  syntax Bool ::= isVowelCode(Int) [function, total]
+    15	  syntax Bool ::= closestQualifies(IntSeq, Int) [function]
+    16	  syntax IntSeq ::= closestScan(IntSeq, Int, IntSeq, Bool) [function]
+    17	  syntax IntSeq ::= closestVowel(IntSeq) [function, total]
+    18	endmodule
+    19	
+    20	module FOUNDATION
+    21	  imports FOUNDATION-SYNTAX
+    22	  imports MPY
+    23	
+    24	  rule isVowelBody =>
+    25	    Assign(Name("result"), Bool(false))
+    26	    While(
+    27	      Compare(Name("ch"), CmpOp("==", Str("a"))),
+    28	      Assign(Name("result"), Bool(true))
+    29	      Assign(Name("ch"), Str("")))
+    30	    While(
+    31	      Compare(Name("ch"), CmpOp("==", Str("e"))),
+    32	      Assign(Name("result"), Bool(true))
+    33	      Assign(Name("ch"), Str("")))
+    34	    While(
+    35	      Compare(Name("ch"), CmpOp("==", Str("i"))),
+    36	      Assign(Name("result"), Bool(true))
+    37	      Assign(Name("ch"), Str("")))
+    38	    While(
+    39	      Compare(Name("ch"), CmpOp("==", Str("o"))),
+    40	      Assign(Name("result"), Bool(true))
+    41	      Assign(Name("ch"), Str("")))
+    42	    While(
+    43	      Compare(Name("ch"), CmpOp("==", Str("u"))),
+    44	      Assign(Name("result"), Bool(true))
+    45	      Assign(Name("ch"), Str("")))
+    46	    While(
+    47	      Compare(Name("ch"), CmpOp("==", Str("A"))),
+    48	      Assign(Name("result"), Bool(true))
+    49	      Assign(Name("ch"), Str("")))
+    50	    While(
+    51	      Compare(Name("ch"), CmpOp("==", Str("E"))),
+    52	      Assign(Name("result"), Bool(true))
+    53	      Assign(Name("ch"), Str("")))
+    54	    While(
+    55	      Compare(Name("ch"), CmpOp("==", Str("I"))),
+    56	      Assign(Name("result"), Bool(true))
+    57	      Assign(Name("ch"), Str("")))
+    58	    While(
+    59	      Compare(Name("ch"), CmpOp("==", Str("O"))),
+    60	      Assign(Name("result"), Bool(true))
+    61	      Assign(Name("ch"), Str("")))
+    62	    While(
+    63	      Compare(Name("ch"), CmpOp("==", Str("U"))),
+    64	      Assign(Name("result"), Bool(true))
+    65	      Assign(Name("ch"), Str("")))
+    66	    Return(Name("result"))
+    67	
+    68	  rule getClosestLoopBody =>
+    69	    While(
+    70	      BoolOp("and",
+    71	        ( UnaryOp("not", Name("found")),
+    72	          Call(
+    73	            Name("_is_vowel"),
+    74	            Subscript(Name("word"), Name("i"))),
+    75	          UnaryOp(
+    76	            "not",
+    77	            Call(
+    78	              Name("_is_vowel"),
+    79	              Subscript(
+    80	                Name("word"),
+    81	                BinOp("-", Name("i"), Int(1))))),
+    82	          UnaryOp(
+    83	            "not",
+    84	            Call(
+    85	              Name("_is_vowel"),
+    86	              Subscript(
+    87	                Name("word"),
+    88	                BinOp("+", Name("i"), Int(1))))),
+    89	          .Exprs)),
+    90	      Assign(Name("result"), Subscript(Name("word"), Name("i")))
+    91	      Assign(Name("found"), Bool(true)))
+    92	    Assign(Name("i"), BinOp("-", Name("i"), Int(1)))
+    93	
+    94	  rule getClosestBody =>
+    95	    Assign(Name("result"), Str(""))
+    96	    Assign(Name("found"), Bool(false))
+    97	    Assign(
+    98	      Name("i"),
+    99	      BinOp("-", Call(Name("len"), Name("word")), Int(2)))
+   100	    While(Compare(Name("i"), CmpOp(">", Int(0))), getClosestLoopBody)
+   101	    Return(Name("result"))
+   102	
+   103	  rule getClosestProgram =>
+   104	    Module(
+   105	      FuncDef(
+   106	        "_is_vowel",
+   107	        Params("ch"),
+   108	        isVowelBody)
+   109	      FuncDef(
+   110	        "get_closest_vowel",
+   111	        Params("word"),
+   112	        getClosestBody))
+   113	
+   114	  rule closestCandidate(CS, I)
+   115	    => iCons(intSeqAt(CS, I), .IntSeq)
+   116	
+   117	  rule vowelPred(C)
+   118	    => C ==Int 97
+   119	     orBool C ==Int 101
+   120	     orBool C ==Int 105
+   121	     orBool C ==Int 111
+   122	     orBool C ==Int 117
+   123	     orBool C ==Int 65
+   124	     orBool C ==Int 69
+   125	     orBool C ==Int 73
+   126	     orBool C ==Int 79
+   127	     orBool C ==Int 85
+   128	  rule isVowelCode(C)
+   129	    => true
+   130	    requires vowelPred(C)
+   131	  rule isVowelCode(C)
+   132	    => false
+   133	    requires notBool vowelPred(C)
+   134	
+   135	  rule closestQualifies(CS, I)
+   136	    => isVowelCode(intSeqAt(CS, I))
+   137	       andBool notBool isVowelCode(intSeqAt(CS, I -Int 1))
+   138	       andBool notBool isVowelCode(intSeqAt(CS, I +Int 1))
+   139	
+   140	  rule closestScan(_CS, I, R, _F) => R
+   141	    requires I <=Int 0
+   142	    [simplification]
+   143	  rule closestScan(CS, I, R, true)
+   144	    => closestScan(CS, I -Int 1, R, true)
+   145	    requires I >Int 0
+   146	    [simplification]
+   147	  rule closestScan(CS, I, R, false)
+   148	    => closestScan(
+   149	         CS,
+   150	         I -Int 1,
+   151	         closestCandidate(CS, I),
+   152	         true)
+   153	    requires I >Int 0
+   154	     andBool vowelPred(intSeqAt(CS, I))
+   155	     andBool notBool vowelPred(intSeqAt(CS, I -Int 1))
+   156	     andBool notBool vowelPred(intSeqAt(CS, I +Int 1))
+   157	    [simplification]
+   158	  rule closestScan(CS, I, R, false)
+   159	    => closestScan(CS, I -Int 1, R, false)
+   160	    requires I >Int 0
+   161	     andBool notBool vowelPred(intSeqAt(CS, I))
+   162	    [simplification]
+   163	  rule closestScan(CS, I, R, false)
+   164	    => closestScan(CS, I -Int 1, R, false)
+   165	    requires I >Int 0
+   166	     andBool vowelPred(intSeqAt(CS, I))
+   167	     andBool vowelPred(intSeqAt(CS, I -Int 1))
+   168	    [simplification]
+   169	  rule closestScan(CS, I, R, false)
+   170	    => closestScan(CS, I -Int 1, R, false)
+   171	    requires I >Int 0
+   172	     andBool vowelPred(intSeqAt(CS, I))
+   173	     andBool notBool vowelPred(intSeqAt(CS, I -Int 1))
+   174	     andBool vowelPred(intSeqAt(CS, I +Int 1))
+   175	    [simplification]
+   176	
+   177	  rule closestVowel(CS)
+   178	    => closestScan(CS, isLen(CS) -Int 2, .IntSeq, false)
+   179	
+   180	  // intSeqAt has rules only for in-bounds constructor cases in the supplied
+   181	  // semantics.  This derived definedness lemma exposes the corresponding
+   182	  // structural induction fact to the symbolic backend.
+   183	  rule #Ceil(intSeqAt(CS, I)) => #Top
+   184	    requires 0 <=Int I
+   185	     andBool I <Int isLen(CS)
+   186	    [simplification]
+   187	
+   188	  rule #Ceil(closestScan(CS, I, R, F)) => #Top
+   189	    requires I >=Int 0
+   190	     andBool I +Int 1 <Int isLen(CS)
+   191	    [simplification]
+   192	
+   193	endmodule
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [entry]:
+     7	    <k>
+     8	      #loadAll(getClosestProgram)
+     9	      ~> Call(Name("get_closest_vowel"), (str(CS), .Exprs))
+    10	      => str(closestVowel(CS))
+    11	    </k>
+    12	    <env> 0 </env>
+    13	    <scopes>
+    14	      ( 0 |-> scope(.Map, parent(-1))
+    15	        -1 |-> builtinsScope )
+    16	      =>
+    17	      ( 0 |-> scope(
+    18	          ( "_is_vowel" |-> closureVal(
+    19	              ("ch", .ParamNames),
+    20	              isVowelBody,
+    21	              0)
+    22	            "get_closest_vowel" |-> closureVal(
+    23	              ("word", .ParamNames),
+    24	              getClosestBody,
+    25	              0) ),
+    26	          parent(-1))
+    27	        -1 |-> builtinsScope )
+    28	    </scopes>
+    29	    <scopeLoc> 1 </scopeLoc>
+    30	    <heap> .Map </heap>
+    31	    <heapLoc> 0 </heapLoc>
+    32	    <stack> .List </stack>
+    33	    <ret> noRet </ret>
+    34	    <exc> NoExc </exc>
+    35	    <exit-code> 0 </exit-code>
+    36	endmodule
+     1	def _is_vowel(ch):
+     2	    result = False
+     3	    while ch == "a":
+     4	        result = True
+     5	        ch = ""
+     6	    while ch == "e":
+     7	        result = True
+     8	        ch = ""
+     9	    while ch == "i":
+    10	        result = True
+    11	        ch = ""
+    12	    while ch == "o":
+    13	        result = True
+    14	        ch = ""
+    15	    while ch == "u":
+    16	        result = True
+    17	        ch = ""
+    18	    while ch == "A":
+    19	        result = True
+    20	        ch = ""
+    21	    while ch == "E":
+    22	        result = True
+    23	        ch = ""
+    24	    while ch == "I":
+    25	        result = True
+    26	        ch = ""
+    27	    while ch == "O":
+    28	        result = True
+    29	        ch = ""
+    30	    while ch == "U":
+    31	        result = True
+    32	        ch = ""
+    33	    return result
+    34	
+    35	
+    36	def get_closest_vowel(word):
+    37	    result = ""
+    38	    found = False
+    39	    i = len(word) - 2
+    40	    while i > 0:
+    41	        while (not found and _is_vowel(word[i])
+    42	               and not _is_vowel(word[i - 1])
+    43	               and not _is_vowel(word[i + 1])):
+    44	            result = word[i]
+    45	            found = True
+    46	        i = i - 1
+    47	    return result
+     1	Module(
+     2	  FuncDef("_is_vowel", Params("ch"),
+     3	    Assign(Name("result"), Bool(false))
+     4	    While(Compare(Name("ch"), CmpOp("==", Str("a"))),
+     5	      Assign(Name("result"), Bool(true))
+     6	      Assign(Name("ch"), Str("")))
+     7	    While(Compare(Name("ch"), CmpOp("==", Str("e"))),
+     8	      Assign(Name("result"), Bool(true))
+     9	      Assign(Name("ch"), Str("")))
+    10	    While(Compare(Name("ch"), CmpOp("==", Str("i"))),
+    11	      Assign(Name("result"), Bool(true))
+    12	      Assign(Name("ch"), Str("")))
+    13	    While(Compare(Name("ch"), CmpOp("==", Str("o"))),
+    14	      Assign(Name("result"), Bool(true))
+    15	      Assign(Name("ch"), Str("")))
+    16	    While(Compare(Name("ch"), CmpOp("==", Str("u"))),
+    17	      Assign(Name("result"), Bool(true))
+    18	      Assign(Name("ch"), Str("")))
+    19	    While(Compare(Name("ch"), CmpOp("==", Str("A"))),
+    20	      Assign(Name("result"), Bool(true))
+    21	      Assign(Name("ch"), Str("")))
+    22	    While(Compare(Name("ch"), CmpOp("==", Str("E"))),
+    23	      Assign(Name("result"), Bool(true))
+    24	      Assign(Name("ch"), Str("")))
+    25	    While(Compare(Name("ch"), CmpOp("==", Str("I"))),
+    26	      Assign(Name("result"), Bool(true))
+    27	      Assign(Name("ch"), Str("")))
+    28	    While(Compare(Name("ch"), CmpOp("==", Str("O"))),
+    29	      Assign(Name("result"), Bool(true))
+    30	      Assign(Name("ch"), Str("")))
+    31	    While(Compare(Name("ch"), CmpOp("==", Str("U"))),
+    32	      Assign(Name("result"), Bool(true))
+    33	      Assign(Name("ch"), Str("")))
+    34	    Return(Name("result")))
+    35	  FuncDef("get_closest_vowel", Params("word"),
+    36	    Assign(Name("result"), Str(""))
+    37	    Assign(Name("found"), Bool(false))
+    38	    Assign(
+    39	      Name("i"),
+    40	      BinOp("-", Call(Name("len"), Name("word")), Int(2)))
+    41	    While(Compare(Name("i"), CmpOp(">", Int(0))),
+    42	      While(BoolOp(
+    43	        "and",
+    44	        UnaryOp("not", Name("found")),
+    45	        Call(Name("_is_vowel"), Subscript(Name("word"), Name("i"))),
+    46	        UnaryOp(
+    47	          "not",
+    48	          Call(
+    49	            Name("_is_vowel"),
+    50	            Subscript(Name("word"), BinOp("-", Name("i"), Int(1))))),
+    51	        UnaryOp(
+    52	          "not",
+    53	          Call(
+    54	            Name("_is_vowel"),
+    55	            Subscript(Name("word"), BinOp("+", Name("i"), Int(1)))))),
+    56	        Assign(Name("result"), Subscript(Name("word"), Name("i")))
+    57	        Assign(Name("found"), Bool(true)))
+    58	      Assign(Name("i"), BinOp("-", Name("i"), Int(1))))
+    59	    Return(Name("result"))))

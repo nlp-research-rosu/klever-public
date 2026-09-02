@@ -1,0 +1,87 @@
+Continue this same benchmark session by classifying the trust boundary of the
+finalized K proof.
+
+The finalized Stage 1 workspace is mounted read-only at
+`/reference/k-proof`. Do not edit or copy the Stage 1 artifacts. Treat the
+launcher-generated `/reference/rule-inventory.json` as the exhaustive,
+canonical inventory of every rule in the local verification-module closure.
+
+Classify every rule in /reference/rule-inventory.json exactly once.
+Allowed classifications: DEFINITION, OPERATIONAL_RULE,
+PROVED_DERIVED_LEMMA, and DOMAIN_LEMMA.
+
+- `DEFINITION` means an equation, recurrence, macro expansion, or structural
+  helper defining a mathematical summary or named proof term. A rule
+  qualifies only when it is a defining equation OF a fresh symbol the
+  verification module introduces. A `[simplification]` equation stating a
+  fact ABOUT an operation that is defined elsewhere (a hook, the reference
+  semantics, or another module's function — e.g. a `strLt` ordering fact)
+  is a `DOMAIN_LEMMA`, not a `DEFINITION`, even when the fact looks like a
+  rewrite the operation obviously satisfies. Misfiling such a fact as
+  `DEFINITION` silently deletes a required Lean obligation.
+- `OPERATIONAL_RULE` means an ordinary execution or observation rule that is
+  part of the verification model rather than an additional mathematical fact.
+- `PROVED_DERIVED_LEMMA` means a reusable rule whose exact statement is first
+  proved by `prove.sh` against a module that does not contain that rule. Use
+  this classification only when the mounted Stage 1 evidence demonstrates
+  that ordering and exact correspondence. EXACT means the identical
+  statement: a prior claim that strictly generalizes the installed rule
+  (extra quantified variables the rule instantiates, weaker guards, a
+  corollary relationship) does NOT qualify — the installed instance is
+  then a `DOMAIN_LEMMA`. Exactness is judged on the COMPILED forms,
+  including compiler-added cells: if the installed rule's compiled KORE
+  carries a `<generatedCounter>` cell the proved claim's compiled form
+  lacks (or vice versa), the statements are not identical and the rule
+  is a `DOMAIN_LEMMA`.
+
+  REGISTERED PROVISION (2026-08-01, generated-counter rendering
+  asymmetry): the K compiler renders the SAME source statement
+  differently in the `<generatedCounter>` cell depending on whether it
+  is compiled as a claim or as a rule — a compiled claim inserts an
+  explicit `<generatedCounter>` whose final value is a fresh
+  existential (`_Gen0 => ?_GenN`), while the compiled installed rule
+  carries one preserved `_DotVar:GeneratedCounterCell`. When this
+  compiler-authored rendering of the counter cell is the ONLY compiled
+  delta — every other cell, guard, LHS and RHS term corresponds
+  exactly — classify the installed rule `PROVED_DERIVED_LEMMA`, and
+  record in both the rationale and `DISCOVERY.md` the mandatory
+  residual caveat: the proved claim leaves the final counter
+  existential while the installed rule additionally asserts counter
+  preservation, so counter preservation is uncredited by the claim.
+  Include the structural justification when it holds: the
+  `<generatedCounter>` cell is compiler bookkeeping incremented only
+  by fresh-variable allocation, no rule of the fixed semantics reads
+  it, and if the summarized code performs no fresh allocation its
+  preservation is a structural side-fact. This provision never weakens
+  the trust boundary relative to the alternative: demoting to
+  `DOMAIN_LEMMA` trusts the FULL rule unproven pending a downstream
+  re-proof of content the claim already established. Any other delta —
+  guards, ordinary cells, quantifier structure beyond the counter cell
+  — still disqualifies exactly as above.
+- `DOMAIN_LEMMA` means an additional mathematical fact trusted to close the K
+  proof.
+
+Every rule carrying the `simplification` attribute must be classified as
+either `DEFINITION` or `DOMAIN_LEMMA`. Do not classify an unproved helper as a
+`PROVED_DERIVED_LEMMA` merely because its comment calls it a lemma.
+
+Do not write a Lean theorem statement. Do not add a theorem, statement, Lean,
+replacement, or other alternative formulation to the JSON.
+
+Write /workspace/trust-boundary.json and /workspace/DISCOVERY.md.
+
+`trust-boundary.json` must be a JSON object with exactly:
+
+- `"schema_version": 2`;
+- `"inventory_sha256"` copied exactly from the canonical inventory; and
+- `"rules"`, an array containing every canonical `source_rule_id` exactly
+  once, in inventory order.
+
+Each `rules` entry must have exactly `source_rule_id`, `classification`, and a
+nonempty `rationale`. `DISCOVERY.md` must explain the classifications,
+identify every separately proved derived lemma and its Stage 1 proof evidence,
+and explicitly say whether the domain-lemma set is empty.
+
+Finish with exactly one marker in your final response:
+
+RESULT: LEMMA_DISCOVERY_COMPLETE — <brief summary>

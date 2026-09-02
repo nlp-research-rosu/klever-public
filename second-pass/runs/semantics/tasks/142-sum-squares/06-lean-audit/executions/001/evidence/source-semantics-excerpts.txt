@@ -1,0 +1,295 @@
+$ nl -ba /reference/k-proof/verification.k | sed -n "1,110p"
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module SUM-SQUARES-VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // A mathematical sequence containing only integers.  intVals embeds it in
+     7	  // the semantic ValSeq used by Python lists.
+     8	  syntax Ints ::= ".Ints" | intCons(Int, Ints)
+     9	
+    10	  syntax ValSeq ::= intVals(Ints)
+    11	
+    12	  // Symbolic iterator bridge.  It presents Ints through the reference
+    13	  // semantics' iterator protocol and makes the constructor split visible to
+    14	  // the prover.
+    15	  rule <k> #iterNext(list(intVals(.Ints))) => #iterDone ... </k>
+    16	    [priority(40)]
+    17	  rule <k> #iterNext(list(intVals(intCons(X:Int, XS:Ints))))
+    18	        => #iterYield(X, list(intVals(XS))) ... </k>
+    19	    [priority(40)]
+    20	
+    21	  // The contribution prescribed by the prompt.  The multiple-of-3 case has
+    22	  // priority over the multiple-of-4 case, including at index zero.
+    23	  syntax Int ::= contribution(Int, Int) [function]
+    24	  rule contribution(I:Int, X:Int) => X *Int X
+    25	    requires pyMod(I, 3) ==Int 0
+    26	  rule contribution(I:Int, X:Int) => X *Int X *Int X
+    27	    requires pyMod(I, 3) =/=Int 0 andBool pyMod(I, 4) ==Int 0
+    28	  rule contribution(I:Int, X:Int) => X
+    29	    requires pyMod(I, 3) =/=Int 0 andBool pyMod(I, 4) =/=Int 0
+    30	
+    31	  // Tail-recursive contract for the complete result.
+    32	  syntax Int ::= sumSquares(Ints, Int, Int) [function, total]
+    33	  rule sumSquares(.Ints, _:Int, ACC:Int) => ACC
+    34	  rule sumSquares(intCons(X:Int, XS:Ints), I:Int, ACC:Int)
+    35	    => sumSquares(XS, I +Int 1, ACC +Int contribution(I, X))
+    36	
+    37	  // The other two pieces of the exact loop post-state.
+    38	  syntax Int ::= endIndex(Ints, Int) [function, total]
+    39	  rule endIndex(.Ints, I:Int) => I
+    40	  rule endIndex(intCons(_:Int, XS:Ints), I:Int)
+    41	    => endIndex(XS, I +Int 1)
+    42	
+    43	  syntax Int ::= endValue(Ints, Int) [function, total]
+    44	  rule endValue(.Ints, OLD:Int) => OLD
+    45	  rule endValue(intCons(X:Int, XS:Ints), _:Int)
+    46	    => endValue(XS, X)
+    47	
+    48	  syntax Stmts ::= "sumSquaresLoopBody" [macro]
+    49	  rule sumSquaresLoopBody
+    50	    => If(
+    51	         Compare(
+    52	           BinOp("%", Name("index"), Int(3)),
+    53	           CmpOp("==", Int(0))),
+    54	         AugAssign(
+    55	           Name("total"),
+    56	           "+",
+    57	           BinOp("*", Name("value"), Name("value")))
+    58	         .Stmts,
+    59	         If(
+    60	           Compare(
+    61	             BinOp("%", Name("index"), Int(4)),
+    62	             CmpOp("==", Int(0))),
+    63	           AugAssign(
+    64	             Name("total"),
+    65	             "+",
+    66	             BinOp(
+    67	               "*",
+    68	               BinOp("*", Name("value"), Name("value")),
+    69	               Name("value")))
+    70	           .Stmts,
+    71	           AugAssign(Name("total"), "+", Name("value"))
+    72	           .Stmts)
+    73	         .Stmts)
+    74	       AugAssign(Name("index"), "+", Int(1))
+    75	       .Stmts
+    76	
+    77	  syntax Stmts ::= "sumSquaresFunctionBody" [macro]
+    78	  rule sumSquaresFunctionBody
+    79	    => Assign(Name("total"), Int(0))
+    80	       Assign(Name("index"), Int(0))
+    81	       For(Name("value"), Name("lst"), sumSquaresLoopBody)
+    82	       Return(Name("total"))
+    83	       .Stmts
+    84	endmodule
+$ nl -ba /reference/k-proof/spec.k | sed -n "1,130p"
+     1	requires "verification.k"
+     2	
+     3	module SUM-SQUARES-SPEC
+     4	  imports SUM-SQUARES-VERIFICATION
+     5	
+     6	  // Inductive loop invariant after at least one element has been bound.  The
+     7	  // local map is exact, which also records that this is a plain (non-cell)
+     8	  // function frame.  The claim is proved first, then admitted as a proved
+     9	  // lemma while proving the end-to-end function claim.
+    10	  claim [loop]:
+    11	    <k>
+    12	      #loop(list(intVals(IS:Ints)), Name("value"), sumSquaresLoopBody)
+    13	      ~> (Return(Name("total")) .Stmts)
+    14	      ~> #endcall
+    15	      ~> KONT:K
+    16	    =>
+    17	      (Return(Name("total")) .Stmts)
+    18	      ~> #endcall
+    19	      ~> KONT
+    20	    </k>
+    21	    <env> L:Int </env>
+    22	    <scopes>
+    23	      SC:Map
+    24	      (L |-> scope(
+    25	        "lst"   |-> list(intVals(ORIG:Ints))
+    26	        "value" |-> OLD:Int
+    27	        "total" |-> ACC:Int
+    28	        "index" |-> I:Int,
+    29	        P:Parent))
+    30	    =>
+    31	      SC
+    32	      (L |-> scope(
+    33	        "lst"   |-> list(intVals(ORIG))
+    34	        "value" |-> endValue(IS, OLD)
+    35	        "total" |-> sumSquares(IS, I, ACC)
+    36	        "index" |-> endIndex(IS, I),
+    37	        P))
+    38	    </scopes>
+    39	
+    40	  // Function-body summary from the initialized local frame through return.
+    41	  // This isolates frame cleanup from the loop induction.
+    42	  claim [body]:
+    43	    <k>
+    44	      #loop(list(intVals(IS:Ints)), Name("value"), sumSquaresLoopBody)
+    45	      ~> (Return(Name("total")) .Stmts)
+    46	      ~> #endcall
+    47	    =>
+    48	      sumSquares(IS, 0, 0)
+    49	      ~> CONT:K
+    50	    </k>
+    51	    <env> 1 => 0 </env>
+    52	    <scopes>
+    53	      -1 |-> builtinsScope
+    54	      0  |-> scope(
+    55	        "sum_squares" |->
+    56	          closureVal(
+    57	            ("lst", .ParamNames),
+    58	            sumSquaresFunctionBody,
+    59	            0),
+    60	        parent(-1))
+    61	      1  |-> scope(
+    62	        "lst"   |-> list(intVals(IS))
+    63	        "total" |-> 0
+    64	        "index" |-> 0,
+    65	        parent(0))
+    66	    =>
+    67	      -1 |-> builtinsScope
+    68	      0  |-> scope(
+    69	        "sum_squares" |->
+    70	          closureVal(
+    71	            ("lst", .ParamNames),
+    72	            sumSquaresFunctionBody,
+    73	            0),
+    74	        parent(-1))
+    75	    </scopes>
+    76	    <scopeLoc> 2 => 1 </scopeLoc>
+    77	    <heap> .Map </heap>
+    78	    <heapLoc> 0 </heapLoc>
+    79	    <stack> ListItem(frame(CONT, 0, 1)) => .List </stack>
+    80	    <ret> noRet </ret>
+    81	    <exc> NoExc </exc>
+    82	    <exit-code> 0 </exit-code>
+    83	
+    84	  // End-to-end correctness for every finite list of mathematical integers.
+    85	  claim [main]:
+    86	    <k>
+    87	      Call(
+    88	        Name("sum_squares"),
+    89	        (list(intVals(IS:Ints)), .Exprs))
+    90	    =>
+    91	      sumSquares(IS, 0, 0)
+    92	    </k>
+    93	    <env> 0 </env>
+    94	    <scopes>
+    95	      -1 |-> builtinsScope
+    96	      0  |-> scope(
+    97	        "sum_squares" |->
+    98	          closureVal(
+    99	            ("lst", .ParamNames),
+   100	            sumSquaresFunctionBody,
+   101	            0),
+   102	        parent(-1))
+   103	    </scopes>
+   104	    <scopeLoc> 1 </scopeLoc>
+   105	    <heap> .Map </heap>
+   106	    <heapLoc> 0 </heapLoc>
+   107	    <stack> .List </stack>
+   108	    <ret> noRet </ret>
+   109	    <exc> NoExc </exc>
+   110	    <exit-code> 0 </exit-code>
+   111	endmodule
+$ nl -ba /reference/k-proof/solution.py | sed -n "1,80p"
+     1	def sum_squares(lst):
+     2	    total = 0
+     3	    index = 0
+     4	    for value in lst:
+     5	        if index % 3 == 0:
+     6	            total += value * value
+     7	        else:
+     8	            if index % 4 == 0:
+     9	                total += value * value * value
+    10	            else:
+    11	                total += value
+    12	        index += 1
+    13	    return total
+$ nl -ba /reference/k-proof/reference-semantics/semantics/list.k | sed -n "1,18p"
+     1	// reference/src/semantics/list.k — MPY-LIST
+     2	
+     3	module MPY-LIST
+     4	  imports MPY-CORE
+     5	  imports MPY-ITER
+     6	  imports MPY-OPERATORS
+     7	
+     8	  // ==== iteration (the iterator protocol's list case) =======================
+     9	  rule <k> #iterNext(list(.ValSeq))                => #iterDone ... </k>
+    10	  rule <k> #iterNext(list(vCons(V:Val, R:ValSeq))) => #iterYield(V, list(R)) ... </k>
+    11	
+    12	  // ==== ListExpr: [...] literal -> a fresh heap object =======================
+    13	  syntax ApplyK ::= "toList"
+    14	  rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>
+    15	  rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>
+    16	
+    17	  // ==== list ops: + / == / != ===============================================
+    18	  syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]
+$ nl -ba /reference/k-proof/reference-semantics/semantics/controls.k | sed -n "62,76p"
+    62	  // ==== For: one loop, in-cell continuation, over #iterNext =================
+    63	  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+    64	  // circularities anchor on #loop and narrowing substitutes the structure)
+    65	  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+    66	                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+    67	                 | #loopLbl(K) | "#cont" | "#brk"
+    68	
+    69	  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+    70	
+    71	  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+    72	  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+    73	  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+    74	        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+    75	
+    76	  // ==== While ==============================================================
+$ nl -ba /reference/k-proof/reference-semantics/semantics/int.k | sed -n "9,25p"
+     9	  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+    10	  // Bool participates in int arithmetic (x += (a == b))
+    11	  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+    12	  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+    13	  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+    14	  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+    15	  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+    16	  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+    17	  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+    18	
+    19	  syntax Int ::= pyMod(Int, Int) [function]
+    20	  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+    21	
+    22	  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+    23	  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+    24	  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+    25	  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+$ nl -ba /reference/k-proof/prove.sh | sed -n "20,60p"
+    20	# Compile the symbolic definition.  SUM-SQUARES-VERIFICATION imports MPY,
+    21	# deliberately excluding the concrete-only MPY-CONCRETE module.
+    22	kompile verification.k \
+    23	  --backend haskell \
+    24	  --main-module SUM-SQUARES-VERIFICATION \
+    25	  --syntax-module MPY-SYNTAX \
+    26	  --output-definition verification-kompiled
+    27	
+    28	# Prove the induction lemma without assumptions.
+    29	kprove spec.k \
+    30	  --definition verification-kompiled \
+    31	  --spec-module SUM-SQUARES-SPEC \
+    32	  --claims SUM-SQUARES-SPEC.loop \
+    33	  --output pretty
+    34	
+    35	# Prove the body summary, admitting only the lemma just proved.
+    36	kprove spec.k \
+    37	  --definition verification-kompiled \
+    38	  --spec-module SUM-SQUARES-SPEC \
+    39	  --claims SUM-SQUARES-SPEC.body,SUM-SQUARES-SPEC.loop \
+    40	  --trusted SUM-SQUARES-SPEC.loop \
+    41	  --output pretty
+    42	
+    43	# Prove the end-to-end call, admitting only the body summary just proved.
+    44	kprove spec.k \
+    45	  --definition verification-kompiled \
+    46	  --spec-module SUM-SQUARES-SPEC \
+    47	  --claims SUM-SQUARES-SPEC.main,SUM-SQUARES-SPEC.body \
+    48	  --trusted SUM-SQUARES-SPEC.body \
+    49	  --output pretty

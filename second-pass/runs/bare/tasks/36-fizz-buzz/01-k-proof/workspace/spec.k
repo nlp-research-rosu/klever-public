@@ -1,0 +1,49 @@
+requires "verification.k"
+
+module SPEC
+  imports VERIFICATION
+
+  // Inner-loop invariant: starting with x = X adds exactly the number of
+  // decimal sevens in X and terminates with x = 0.
+  claim <k> INNER-LOOP ~> REST => REST </k>
+        <env>
+          "count" |-> (C => C +Int digitSevens(X))
+          "i" |-> _I
+          "n" |-> _N
+          "x" |-> (X => 0)
+        </env>
+    requires X >=Int 0
+
+  // Outer-loop invariant: [I,N) contributes fizzFrom(I,N); x is zero at each
+  // outer-loop boundary because the inner loop exhausts it.
+  claim <k> OUTER-LOOP ~> REST => REST </k>
+        <env>
+          "count" |-> (C => C +Int fizzFrom(I, N))
+          "i" |-> (I => N)
+          "n" |-> N
+          "x" |-> 0
+        </env>
+    requires I >=Int 0 andBool I <=Int N
+
+  // End-to-end theorem for every integer input.  For N <= 0, fizzFrom(0,N)
+  // and the program's empty iteration both yield zero.
+  claim <fizz>
+          <k>
+            Module(
+              FuncDef("fizz_buzz", Params("n"),
+                Assign(Name("count"), Int(0))
+                Assign(Name("i"), Int(0))
+                OUTER-LOOP
+                Return(Name("count"))))
+            => .K
+          </k>
+          <input> N </input>
+          <env> .Map =>
+            "count" |-> fizzFrom(0, N)
+            "i" |-> fizzEnd(N)
+            "n" |-> N
+            "x" |-> 0
+          </env>
+          <result> 0 => fizzFrom(0, N) </result>
+        </fizz>
+endmodule

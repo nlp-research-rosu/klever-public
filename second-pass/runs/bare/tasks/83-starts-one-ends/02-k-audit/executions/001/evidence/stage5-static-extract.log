@@ -1,0 +1,312 @@
+command: find /candidate -maxdepth 1 -type f -name *.k
+semantic.k
+spec.k
+verification.k
+exit: 0
+command: nl -ba /candidate/semantic.k
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports STRING-SYNTAX
+     4	
+     5	  // The constructor grammar needed by solution.mpy.  Constructor names and
+     6	  // argument order deliberately match py2mpy.py exactly.
+     7	  syntax Pgm ::= "Module" "(" Stmts ")" [symbol(Module)]
+     8	
+     9	  syntax Stmts ::= List{Stmt, ""}
+    10	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")" [symbol(FuncDef)]
+    11	                | "Return" "(" Expr ")"                         [symbol(Return)]
+    12	                | "If" "(" Expr "," Stmts "," Stmts ")"       [symbol(If)]
+    13	                | "Expr" "(" Expr ")"                           [symbol(ExprStmt)]
+    14	
+    15	  syntax Params ::= "Params" "(" String ")" [symbol(Params)]
+    16	
+    17	  syntax Expr ::= "Int" "(" Int ")"                            [symbol(IntExpr)]
+    18	                | "Str" "(" String ")"                          [symbol(StrExpr)]
+    19	                | "Name" "(" String ")"                         [symbol(NameExpr)]
+    20	                | "BinOp" "(" String "," Expr "," Expr ")"    [symbol(BinOp)]
+    21	                | "Compare" "(" Expr "," CmpOp ")"             [symbol(Compare)]
+    22	
+    23	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")" [symbol(CmpOp)]
+    24	endmodule
+    25	
+    26	module MPY
+    27	  imports MPY-SYNTAX
+    28	  imports BOOL
+    29	  imports INT
+    30	  imports MAP
+    31	
+    32	  syntax FunctionValue ::= "noFunction"
+    33	                         | "function" "(" String "," String "," Stmts ")"
+    34	  syntax Control ::= "normal" | "returned"
+    35	  syntax Result ::= "noResult" | "result" "(" Int ")"
+    36	
+    37	  syntax KItem ::= "exec" "(" Stmts ")"
+    38	                 | "entry" "(" String "," Int ")"
+    39	                 | "endCall"
+    40	
+    41	  configuration
+    42	    <mpy>
+    43	      <k> $PGM:Pgm ~> entry("starts_one_ends", $N:Int) </k>
+    44	      <function> noFunction </function>
+    45	      <env> .Map </env>
+    46	      <control> normal </control>
+    47	      <result> noResult </result>
+    48	    </mpy>
+    49	
+    50	  // Module evaluation registers top-level functions before the configured
+    51	  // entry call is made.
+    52	  rule <k> Module(SS) => exec(SS) ... </k>
+    53	  rule <k> exec(.Stmts) => .K ... </k>
+    54	  rule <k> exec(S SS) => S ~> exec(SS) ... </k>
+    55	       <control> normal </control>
+    56	  rule <k> exec(_SS) => .K ... </k>
+    57	       <control> returned </control>
+    58	
+    59	  rule <k> FuncDef(F, Params(P), BODY) => .K ... </k>
+    60	       <function> _ => function(F, P, BODY) </function>
+    61	
+    62	  rule <k> entry(F, N) => exec(BODY) ~> endCall ... </k>
+    63	       <function> function(F, P, BODY) </function>
+    64	       <env> _ => P |-> N </env>
+    65	       <control> normal </control>
+    66	       <result> noResult </result>
+    67	
+    68	  rule <k> endCall => .K ... </k>
+    69	       <control> returned => normal </control>
+    70	
+    71	  // A standalone expression (the function docstring here) has no externally
+    72	  // observable effect in this integer-only fragment.
+    73	  rule <k> Expr(_E) => .K ... </k>
+    74	
+    75	  rule <k> If(COND, THEN, _ELSE) => exec(THEN) ... </k>
+    76	       <env> ENV </env>
+    77	    requires evalBool(COND, ENV)
+    78	  rule <k> If(COND, _THEN, ELSE) => exec(ELSE) ... </k>
+    79	       <env> ENV </env>
+    80	    requires notBool evalBool(COND, ENV)
+    81	
+    82	  rule <k> Return(E) => .K ... </k>
+    83	       <env> ENV </env>
+    84	       <control> normal => returned </control>
+    85	       <result> noResult => result(evalInt(E, ENV)) </result>
+    86	
+    87	  // Pure expression semantics.  Keeping this layer independent of statement
+    88	  // control makes it directly simplifiable in both execution and proofs.
+    89	  syntax Int ::= evalInt(Expr, Map) [function]
+    90	  rule evalInt(Int(I), _ENV) => I
+    91	  rule evalInt(Name(X), (X |-> I) M) => I
+    92	    requires notBool (X in_keys(M))
+    93	  rule evalInt(BinOp("+", A, B), ENV) => evalInt(A, ENV) +Int evalInt(B, ENV)
+    94	  rule evalInt(BinOp("-", A, B), ENV) => evalInt(A, ENV) -Int evalInt(B, ENV)
+    95	  rule evalInt(BinOp("*", A, B), ENV) => evalInt(A, ENV) *Int evalInt(B, ENV)
+    96	  rule evalInt(BinOp("**", A, B), ENV) => evalInt(A, ENV) ^Int evalInt(B, ENV)
+    97	
+    98	  syntax Bool ::= evalBool(Expr, Map) [function]
+    99	  rule evalBool(Compare(A, CmpOp("==", B)), ENV)
+   100	    => evalInt(A, ENV) ==Int evalInt(B, ENV)
+   101	endmodule
+exit: 0
+command: nl -ba /candidate/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Mathematical specification by inclusion-exclusion.  For N > 1, fixing
+     7	  // the first digit leaves 10 * 10^(N-2) choices; fixing the last leaves
+     8	  // 9 * 10^(N-2), since the first digit cannot be zero; fixing both leaves
+     9	  // 10^(N-2).  The union is starts + ends - overlap.
+    10	  syntax Int ::= decimalMiddles(Int) [function]
+    11	               | startsWithOne(Int) [function]
+    12	               | endsWithOne(Int) [function]
+    13	               | startsAndEndsWithOne(Int) [function]
+    14	               | qualifyingCount(Int) [function]
+    15	
+    16	  rule decimalMiddles(K) => 10 ^Int K requires K >=Int 0
+    17	  rule startsWithOne(N) => 10 *Int decimalMiddles(N -Int 2)
+    18	    requires N >Int 1
+    19	  rule endsWithOne(N) => 9 *Int decimalMiddles(N -Int 2)
+    20	    requires N >Int 1
+    21	  rule startsAndEndsWithOne(N) => decimalMiddles(N -Int 2)
+    22	    requires N >Int 1
+    23	
+    24	  rule qualifyingCount(1) => 1
+    25	  rule qualifyingCount(N)
+    26	    => startsWithOne(N) +Int endsWithOne(N) -Int startsAndEndsWithOne(N)
+    27	    requires N >Int 1
+    28	endmodule
+exit: 0
+command: nl -ba /candidate/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // The generated solution.mpy term appears literally in each claim.  The
+     7	  // two claims partition precisely the prompt's positive-integer domain.
+     8	  claim [positive-n-one]:
+     9	    <mpy>
+    10	      <k>
+    11	        Module(
+    12	          FuncDef("starts_one_ends", Params("n"),
+    13	            Expr(
+    14	              Str(
+    15	                "\n    Given a positive integer n, return the count of the numbers of n-digit\n    positive integers that start or end with 1.\n    "))
+    16	            If(Compare(Name("n"), CmpOp("==", Int(1))),
+    17	              Return(Int(1)),
+    18	              Return(
+    19	                BinOp(
+    20	                  "*",
+    21	                  Int(18),
+    22	                  BinOp("**", Int(10), BinOp("-", Name("n"), Int(2))))))))
+    23	        ~> entry("starts_one_ends", 1)
+    24	      => .K
+    25	      </k>
+    26	      <function>
+    27	        noFunction
+    28	      => function("starts_one_ends", "n",
+    29	           Expr(
+    30	             Str(
+    31	               "\n    Given a positive integer n, return the count of the numbers of n-digit\n    positive integers that start or end with 1.\n    "))
+    32	           If(Compare(Name("n"), CmpOp("==", Int(1))),
+    33	             Return(Int(1)),
+    34	             Return(
+    35	               BinOp(
+    36	                 "*",
+    37	                 Int(18),
+    38	                 BinOp("**", Int(10), BinOp("-", Name("n"), Int(2)))))))
+    39	      </function>
+    40	      <env> .Map => "n" |-> 1 </env>
+    41	      <control> normal </control>
+    42	      <result> noResult => result(qualifyingCount(1)) </result>
+    43	    </mpy>
+    44	
+    45	  claim [positive-n-gt-one]:
+    46	    <mpy>
+    47	      <k>
+    48	        Module(
+    49	          FuncDef("starts_one_ends", Params("n"),
+    50	            Expr(
+    51	              Str(
+    52	                "\n    Given a positive integer n, return the count of the numbers of n-digit\n    positive integers that start or end with 1.\n    "))
+    53	            If(Compare(Name("n"), CmpOp("==", Int(1))),
+    54	              Return(Int(1)),
+    55	              Return(
+    56	                BinOp(
+    57	                  "*",
+    58	                  Int(18),
+    59	                  BinOp("**", Int(10), BinOp("-", Name("n"), Int(2))))))))
+    60	        ~> entry("starts_one_ends", N)
+    61	      => .K
+    62	      </k>
+    63	      <function>
+    64	        noFunction
+    65	      => function("starts_one_ends", "n",
+    66	           Expr(
+    67	             Str(
+    68	               "\n    Given a positive integer n, return the count of the numbers of n-digit\n    positive integers that start or end with 1.\n    "))
+    69	           If(Compare(Name("n"), CmpOp("==", Int(1))),
+    70	             Return(Int(1)),
+    71	             Return(
+    72	               BinOp(
+    73	                 "*",
+    74	                 Int(18),
+    75	                 BinOp("**", Int(10), BinOp("-", Name("n"), Int(2)))))))
+    76	      </function>
+    77	      <env> .Map => "n" |-> N </env>
+    78	      <control> normal </control>
+    79	      <result> noResult => result(qualifyingCount(N)) </result>
+    80	    </mpy>
+    81	    requires N >Int 1
+    82	endmodule
+exit: 0
+command: nl -ba /candidate/solution.mpy
+     1	Module(
+     2	  FuncDef("starts_one_ends", Params("n"),
+     3	    Expr(
+     4	      Str(
+     5	        "\n    Given a positive integer n, return the count of the numbers of n-digit\n    positive integers that start or end with 1.\n    "))
+     6	    If(Compare(Name("n"), CmpOp("==", Int(1))),
+     7	      Return(Int(1)),
+     8	      Return(
+     9	        BinOp(
+    10	          "*",
+    11	          Int(18),
+    12	          BinOp("**", Int(10), BinOp("-", Name("n"), Int(2))))))))
+exit: 0
+command: rg -n declaration/rule/claim/attribute inventory
+/candidate/spec.k:8:  claim [positive-n-one]:
+/candidate/spec.k:45:  claim [positive-n-gt-one]:
+/candidate/verification.k:10:  syntax Int ::= decimalMiddles(Int) [function]
+/candidate/verification.k:11:               | startsWithOne(Int) [function]
+/candidate/verification.k:12:               | endsWithOne(Int) [function]
+/candidate/verification.k:13:               | startsAndEndsWithOne(Int) [function]
+/candidate/verification.k:14:               | qualifyingCount(Int) [function]
+/candidate/verification.k:16:  rule decimalMiddles(K) => 10 ^Int K requires K >=Int 0
+/candidate/verification.k:17:  rule startsWithOne(N) => 10 *Int decimalMiddles(N -Int 2)
+/candidate/verification.k:19:  rule endsWithOne(N) => 9 *Int decimalMiddles(N -Int 2)
+/candidate/verification.k:21:  rule startsAndEndsWithOne(N) => decimalMiddles(N -Int 2)
+/candidate/verification.k:24:  rule qualifyingCount(1) => 1
+/candidate/verification.k:25:  rule qualifyingCount(N)
+/candidate/semantic.k:7:  syntax Pgm ::= "Module" "(" Stmts ")" [symbol(Module)]
+/candidate/semantic.k:9:  syntax Stmts ::= List{Stmt, ""}
+/candidate/semantic.k:10:  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")" [symbol(FuncDef)]
+/candidate/semantic.k:11:                | "Return" "(" Expr ")"                         [symbol(Return)]
+/candidate/semantic.k:12:                | "If" "(" Expr "," Stmts "," Stmts ")"       [symbol(If)]
+/candidate/semantic.k:13:                | "Expr" "(" Expr ")"                           [symbol(ExprStmt)]
+/candidate/semantic.k:15:  syntax Params ::= "Params" "(" String ")" [symbol(Params)]
+/candidate/semantic.k:17:  syntax Expr ::= "Int" "(" Int ")"                            [symbol(IntExpr)]
+/candidate/semantic.k:18:                | "Str" "(" String ")"                          [symbol(StrExpr)]
+/candidate/semantic.k:19:                | "Name" "(" String ")"                         [symbol(NameExpr)]
+/candidate/semantic.k:20:                | "BinOp" "(" String "," Expr "," Expr ")"    [symbol(BinOp)]
+/candidate/semantic.k:21:                | "Compare" "(" Expr "," CmpOp ")"             [symbol(Compare)]
+/candidate/semantic.k:23:  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")" [symbol(CmpOp)]
+/candidate/semantic.k:32:  syntax FunctionValue ::= "noFunction"
+/candidate/semantic.k:34:  syntax Control ::= "normal" | "returned"
+/candidate/semantic.k:35:  syntax Result ::= "noResult" | "result" "(" Int ")"
+/candidate/semantic.k:37:  syntax KItem ::= "exec" "(" Stmts ")"
+/candidate/semantic.k:41:  configuration
+/candidate/semantic.k:52:  rule <k> Module(SS) => exec(SS) ... </k>
+/candidate/semantic.k:53:  rule <k> exec(.Stmts) => .K ... </k>
+/candidate/semantic.k:54:  rule <k> exec(S SS) => S ~> exec(SS) ... </k>
+/candidate/semantic.k:56:  rule <k> exec(_SS) => .K ... </k>
+/candidate/semantic.k:59:  rule <k> FuncDef(F, Params(P), BODY) => .K ... </k>
+/candidate/semantic.k:62:  rule <k> entry(F, N) => exec(BODY) ~> endCall ... </k>
+/candidate/semantic.k:68:  rule <k> endCall => .K ... </k>
+/candidate/semantic.k:73:  rule <k> Expr(_E) => .K ... </k>
+/candidate/semantic.k:75:  rule <k> If(COND, THEN, _ELSE) => exec(THEN) ... </k>
+/candidate/semantic.k:78:  rule <k> If(COND, _THEN, ELSE) => exec(ELSE) ... </k>
+/candidate/semantic.k:82:  rule <k> Return(E) => .K ... </k>
+/candidate/semantic.k:89:  syntax Int ::= evalInt(Expr, Map) [function]
+/candidate/semantic.k:90:  rule evalInt(Int(I), _ENV) => I
+/candidate/semantic.k:91:  rule evalInt(Name(X), (X |-> I) M) => I
+/candidate/semantic.k:93:  rule evalInt(BinOp("+", A, B), ENV) => evalInt(A, ENV) +Int evalInt(B, ENV)
+/candidate/semantic.k:94:  rule evalInt(BinOp("-", A, B), ENV) => evalInt(A, ENV) -Int evalInt(B, ENV)
+/candidate/semantic.k:95:  rule evalInt(BinOp("*", A, B), ENV) => evalInt(A, ENV) *Int evalInt(B, ENV)
+/candidate/semantic.k:96:  rule evalInt(BinOp("**", A, B), ENV) => evalInt(A, ENV) ^Int evalInt(B, ENV)
+/candidate/semantic.k:98:  syntax Bool ::= evalBool(Expr, Map) [function]
+/candidate/semantic.k:99:  rule evalBool(Compare(A, CmpOp("==", B)), ENV)
+exit: 0
+command: rg -n proof-risk attributes (expected no matches; rg exit 1)
+exit: 1
+command: constructor/operator inventory from submitted solution.mpy
+      1 "*"
+      1 "**"
+      1 "-"
+      1 "=="
+      3 BinOp
+      1 CmpOp
+      1 Compare
+      1 Expr
+      1 FuncDef
+      1 If
+      5 Int
+      1 Module
+      2 Name
+      1 Params
+      2 Return
+      1 Str
+exit: 0
+script_exit: 0
+invocation: bash /audit-output/evidence/stage5-static-extract.sh
+invocation_exit: 0

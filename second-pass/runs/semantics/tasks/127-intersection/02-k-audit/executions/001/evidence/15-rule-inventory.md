@@ -1,0 +1,2930 @@
+# Exhaustive K declaration and rule inventory
+
+Generated from the fresh scratch source copy. Every local `configuration`, `syntax`, `context`, `rule`, and `claim` directive is listed once. Continuation alternatives belonging to a multiline syntax declaration remain inside that declaration.
+
+- Items: 947
+- Kinds: {'claim': 2, 'configuration': 1, 'context': 5, 'rule': 707, 'syntax': 232}
+- Roles: {'concrete-equation': 35, 'configuration': 1, 'equation-or-macro-rule': 433, 'evaluation-context': 5, 'function-declaration': 129, 'macro-declaration': 4, 'opaque-symbol-declaration': 22, 'operational-rule': 239, 'reachability-claim': 2, 'syntax-declaration': 77}
+- Attributes: {'concrete': 35, 'function': 151, 'macro': 4, 'macro-rec': 1, 'no-evaluators': 22, 'owise': 26, 'priority(': 46, 'seqstrict': 1, 'strict': 2, 'symbol(': 25, 'total': 107}
+- Decisions: {'ACCEPT_FIXED': 928, 'CLAIM': 2, 'SOUND': 16, 'SOUND_DERIVED': 1}
+
+## `reference-semantics/semantics.k`
+
+No local K declarations or rules.
+
+## `reference-semantics/semantics/assert.k`
+
+- L6 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Assert(V:Val) => .K ... </k> requires truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L8 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Assert(V:Val) ~> _ => .K </k> <exc> NoExc => AssertionError </exc> <exit-code> _ => 1 </exit-code> requires notBool truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L13 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> Assert(ref(H:Int)) => Assert(V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/bool.k`
+
+- L8 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyUn("not", V:Val) => notBool truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L10 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("==", B1:Bool, B2:Bool) => B1 ==Bool B2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L11 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("!=", B1:Bool, B2:Bool) => B1 =/=Bool B2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L16 · context · evaluation-context · attrs: none · **ACCEPT_FIXED**
+  - `context BoolOp(_, (HOLE:Expr, _:Exprs))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L17 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> BoolOp(_:String, (V:Val, .Exprs)) => V ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L18 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> BoolOp("and", (V:Val, A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k> requires truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L20 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> BoolOp("and", (V:Val, _:Expr, _:Exprs)) => V ... </k> requires notBool truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L22 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> BoolOp("or", (V:Val, _:Expr, _:Exprs)) => V ... </k> requires truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L24 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> BoolOp("or", (V:Val, A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k> requires notBool truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L29 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> BoolOp(_:String, (ref(H:Int), .Exprs)) => ref(H) ... </k> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L31 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> BoolOp("and", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("and", (A, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires truthy(V) [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L35 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> BoolOp("and", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool truthy(V) [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L39 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> BoolOp("or", (ref(H:Int), _:Expr, _:Exprs)) => ref(H) ... </k> <heap> ... H |-> V:Val ... </heap> requires truthy(V) [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L43 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> BoolOp("or", (ref(H:Int), A:Expr, REST:Exprs)) => BoolOp("or", (A, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool truthy(V) [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/builtins.k`
+
+- L17 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Val ::= applyBuiltin(String, Vals) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L20 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Int ::= seqLen(Val) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L21 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("len", OBJ:Val, .Vals) => seqLen(OBJ)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L22 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule seqLen(list(VS:ValSeq)) => vsLen(VS)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L23 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule seqLen(tuple(VS:ValSeq)) => vsLen(VS)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L24 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule seqLen(str(IS:IntSeq)) => isLen(IS)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L25 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule seqLen(setV(DS:IntSeq)) => isLen(DS)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L26 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule seqLen(rangeObj(LO:Int, HI:Int, ST:Int)) => rangeLen(LO, HI, ST)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L32 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("list")), (list(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L33 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("list")), (tuple(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L34 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("list")), .Vals) => #alloc(list(.ValSeq)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L35 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("list")), (str(CS:IntSeq), .Vals)) => #alloc(list(charsOf(CS))) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L36 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= charsOf(IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L37 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule charsOf(.IntSeq) => .ValSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L38 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule charsOf(iCons(C:Int, R:IntSeq)) => vCons(str(iCons(C, .IntSeq)), charsOf(R))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L41 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("set", str(CS:IntSeq), .Vals) => setV(dedupCodes(CS))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L44 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("abs", I:Int, .Vals) => absInt(I)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L47 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #sumAcc(Iterable, Int) | #sumCont(Int)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L48 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #sumAcc(IT:Iterable, ACC:Int) => #iterNext(IT) ~> #sumCont(ACC) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L49 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterDone ~> #sumCont(ACC:Int) => ACC ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L50 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int) => #sumAcc(R, ACC +Int intOf(V)) ... </k> requires isInt(V) orBool isBool(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L54 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Int ::= intOf(Val) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L55 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule intOf(I:Int) => I`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L56 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule intOf(B:Bool) => #if B #then 1 #else 0 #fi`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L59 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #allAcc(Iterable) | "#allCont"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L60 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #allAcc(IT:Iterable) => #iterNext(IT) ~> #allCont ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L61 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterDone ~> #allCont => true ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L62 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, R:Iterable) ~> #allCont => #allAcc(R) ... </k> requires truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L64 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, _:Iterable) ~> #allCont => false ... </k> requires notBool truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L67 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #anyAcc(Iterable) | "#anyCont"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L68 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #anyAcc(IT:Iterable) => #iterNext(IT) ~> #anyCont ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L69 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterDone ~> #anyCont => false ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L70 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, _:Iterable) ~> #anyCont => true ... </k> requires truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L72 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, R:Iterable) ~> #anyCont => #anyAcc(R) ... </k> requires notBool truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L76 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #maxAcc0(Iterable) | "#maxCont0" | #maxAcc(Iterable, Int) | #maxCont(Int)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L77 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #maxAcc0(IT:Iterable) => #iterNext(IT) ~> #maxCont0 ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L78 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAcc(R, {V}:>Int) ... </k> requires isInt(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L80 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #maxAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #maxCont(M) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L81 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterDone ~> #maxCont(M:Int) => M ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L82 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont(M:Int) => #maxAcc(R, maxInt(M, {V}:>Int)) ... </k> requires isInt(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L86 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #minAcc0(Iterable) | "#minCont0" | #minAcc(Iterable, Int) | #minCont(Int)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L87 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #minAcc0(IT:Iterable) => #iterNext(IT) ~> #minCont0 ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L88 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAcc(R, {V}:>Int) ... </k> requires isInt(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L90 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #minAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #minCont(M) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L91 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterDone ~> #minCont(M:Int) => M ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L92 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont(M:Int) => #minAcc(R, minInt(M, {V}:>Int)) ... </k> requires isInt(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L97 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Int ::= maxVals(Int, Vals) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L98 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("max", I:Int, REST:Vals) => maxVals(I, REST)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L99 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule maxVals(M:Int, .Vals) => M`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L100 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule maxVals(M:Int, (I:Int, R:Vals)) => maxVals(maxInt(M, I), R)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L102 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Int ::= minVals(Int, Vals) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L103 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("min", I:Int, REST:Vals) => minVals(I, REST)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L104 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule minVals(M:Int, .Vals) => M`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L105 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule minVals(M:Int, (I:Int, R:Vals)) => minVals(minInt(M, I), R)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L108 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(48, iCons(98, binCodes(N)))) requires N >=Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L111 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(45, iCons(48, iCons(98, binCodes(0 -Int N))))) requires N <Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L114 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= binCodes(Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L115 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule binCodes(0) => iCons(48, .IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L116 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule binCodes(N:Int) => binAcc(N, .IntSeq) requires N >Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L117 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= binAcc(Int, IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L118 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule binAcc(0, ACC:IntSeq) => ACC`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L119 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule binAcc(N:Int, ACC:IntSeq) => binAcc((N -Int pyMod(N, 2)) /Int 2, iCons(48 +Int pyMod(N, 2), ACC)) requires N >Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L124 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("enumerate")), (list(VS:ValSeq), .Vals)) => #alloc(list(enumVS(VS, 0))) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L126 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= enumVS(ValSeq, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L127 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule enumVS(.ValSeq, _:Int) => .ValSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L128 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule enumVS(vCons(V:Val, R:ValSeq), I:Int) => vCons(tuple(vCons(I, vCons(V, .ValSeq))), enumVS(R, I +Int 1))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L132 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("map")), (typeV("str"), list(VS:ValSeq), .Vals)) => #alloc(list(mapStrVS(VS))) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L134 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= mapStrVS(ValSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L135 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule mapStrVS(.ValSeq) => .ValSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L136 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L137 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule mapStrVS(vCons(str(CS:IntSeq), R:ValSeq)) => vCons(str(CS), mapStrVS(R))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L140 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("int", I:Int, .Vals) => I`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L143 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("ord", str(iCons(C:Int, .IntSeq)), .Vals) => C`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L144 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("chr", I:Int, .Vals) => str(iCons(I, .IntSeq)) requires 0 <=Int I andBool I <Int 128`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L148 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("str", I:Int, .Vals) => str(strToCodes(Int2String(I)))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L149 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("str", str(CS:IntSeq), .Vals) => str(CS)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L152 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("int", str(iCons(C:Int, .IntSeq)), .Vals) => C -Int 48 requires 48 <=Int C andBool C <=Int 57`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L156 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("int", str(CS:IntSeq), .Vals) => intDigAcc(CS, 0) requires isLen(CS) >=Int 2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L158 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= intDigAcc(IntSeq, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L159 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule intDigAcc(.IntSeq, ACC:Int) => ACC`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L160 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule intDigAcc(iCons(C:Int, R:IntSeq), ACC:Int) => intDigAcc(R, (ACC *Int 10) +Int (C -Int 48))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L163 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("zip", list(A:ValSeq), list(B:ValSeq), .Vals) => zipObj(A, B)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L164 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("zip", str(A:IntSeq), str(B:IntSeq), .Vals) => zipObjS(A, B)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L167 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterNext(zipObj(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq))) => #iterYield(tuple(vCons(A, vCons(B, .ValSeq))), zipObj(As, Bs)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L169 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterNext(zipObj(.ValSeq, _:ValSeq)) => #iterDone ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L170 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterNext(zipObj(vCons(_:Val, _:ValSeq), .ValSeq)) => #iterDone ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L171 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterNext(zipObjS(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq))) => #iterYield(tuple(vCons(str(iCons(A, .IntSeq)), vCons(str(iCons(B, .IntSeq)), .ValSeq))), zipObjS(As, Bs)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L173 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterNext(zipObjS(.IntSeq, _:IntSeq)) => #iterDone ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L174 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterNext(zipObjS(iCons(_:Int, _:IntSeq), .IntSeq)) => #iterDone ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L177 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("range", I:Int, .Vals) => rangeObj(0, I, 1)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L178 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("range", A:Int, B:Int, .Vals) => rangeObj(A, B, 1)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L179 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("range", A:Int, B:Int, S:Int, .Vals) => rangeObj(A, B, S) requires S =/=Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L187 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("eval", str(CS:IntSeq), .Vals) => evalArith(CS)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L188 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Int ::= evalArith(IntSeq) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L189 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule evalArith(CS:IntSeq) => firstNdE(passAddE(passMulE(passPowE(tokOps(CS), tokNds(CS)))))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L192 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax OpSeq ::= ".OpSeq" | oCons(String, OpSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L194 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= evDigit(Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L195 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule evDigit(C:Int) => C >=Int 48 andBool C <=Int 57`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L196 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= evHead42(IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L197 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule evHead42(iCons(42, _:IntSeq)) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L198 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule evHead42(_:IntSeq) => false [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L199 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= evHead47(IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L200 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule evHead47(iCons(47, _:IntSeq)) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L201 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule evHead47(_:IntSeq) => false [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L203 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax OpSeq ::= tokOps(IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L204 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule tokOps(.IntSeq) => .OpSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L205 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule tokOps(iCons(32, R:IntSeq)) => tokOps(R)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L206 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule tokOps(iCons(C:Int, R:IntSeq)) => tokOps(R) requires evDigit(C)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L207 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule tokOps(iCons(42, iCons(42, R:IntSeq))) => oCons("**", tokOps(R))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L208 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule tokOps(iCons(42, R:IntSeq)) => oCons("*", tokOps(R)) requires notBool evHead42(R)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L209 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule tokOps(iCons(47, iCons(47, R:IntSeq))) => oCons("//", tokOps(R))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L210 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule tokOps(iCons(47, R:IntSeq)) => oCons("/", tokOps(R)) requires notBool evHead47(R)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L211 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule tokOps(iCons(43, R:IntSeq)) => oCons("+", tokOps(R))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L212 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule tokOps(iCons(45, R:IntSeq)) => oCons("-", tokOps(R))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L214 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= tokNds(IntSeq) [function, total] | tokNdAcc(Int, IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L216 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule tokNds(.IntSeq) => .IntSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L217 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule tokNds(iCons(32, R:IntSeq)) => tokNds(R)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L218 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule tokNds(iCons(C:Int, R:IntSeq)) => tokNdAcc(C -Int 48, R) requires evDigit(C)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L219 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule tokNds(iCons(C:Int, R:IntSeq)) => tokNds(R) requires notBool evDigit(C) andBool C =/=Int 32`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L221 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule tokNdAcc(A:Int, iCons(C:Int, R:IntSeq)) => tokNdAcc(A *Int 10 +Int (C -Int 48), R) requires evDigit(C)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L223 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule tokNdAcc(A:Int, S:IntSeq) => iCons(A, tokNds(S)) [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L225 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax EvPair ::= evp(OpSeq, IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L226 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= firstNdE(EvPair) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L227 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule firstNdE(evp(_:OpSeq, iCons(N:Int, _:IntSeq))) => N`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L228 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule firstNdE(_:EvPair) => 0 [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L230 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= applyOpE(String, Int, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L231 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyOpE("+", A:Int, B:Int) => A +Int B`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L232 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyOpE("-", A:Int, B:Int) => A -Int B`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L233 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyOpE("*", A:Int, B:Int) => A *Int B`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L234 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyOpE("//", A:Int, B:Int) => A divInt B`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L235 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyOpE("**", A:Int, B:Int) => A ^Int B`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L236 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule applyOpE(_:String, A:Int, _:Int) => A [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L238 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax EvPair ::= passPowE(OpSeq, IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L239 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule passPowE(.OpSeq, NDS:IntSeq) => evp(.OpSeq, NDS)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L240 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule passPowE(oCons("**", OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCombE(N, passPowE(OPS, NDS))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L241 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule passPowE(oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq)) => powCarryE(O, N, passPowE(OPS, NDS)) requires O =/=String "**"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L243 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule passPowE(_:OpSeq, .IntSeq) => evp(.OpSeq, .IntSeq) [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L244 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax EvPair ::= powCombE(Int, EvPair) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L245 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule powCombE(N:Int, evp(OPS:OpSeq, iCons(M:Int, REST:IntSeq))) => evp(OPS, iCons(N ^Int M, REST))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L246 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule powCombE(N:Int, evp(OPS:OpSeq, .IntSeq)) => evp(OPS, iCons(N, .IntSeq))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L247 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax EvPair ::= powCarryE(String, Int, EvPair) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L248 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule powCarryE(O:String, N:Int, evp(OPS:OpSeq, NDS:IntSeq)) => evp(oCons(O, OPS), iCons(N, NDS))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L250 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax EvPair ::= passMulE(EvPair) [function, total] | passAddE(EvPair) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L251 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule passMulE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("mul", N0, OPS, NDS, .OpSeq, .IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L252 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule passMulE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L253 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule passAddE(evp(OPS:OpSeq, iCons(N0:Int, NDS:IntSeq))) => passLGoE("add", N0, OPS, NDS, .OpSeq, .IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L254 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule passAddE(evp(OPS:OpSeq, .IntSeq)) => evp(OPS, .IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L255 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax EvPair ::= passLGoE(String, Int, OpSeq, IntSeq, OpSeq, IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L256 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule passLGoE(_:String, CUR:Int, .OpSeq, _:IntSeq, OO:OpSeq, ON:IntSeq) => evp(OO, appendIE(ON, CUR))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L257 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq) => passLGoE(L, applyOpE(O, CUR, N), OPS, NDS, OO, ON) requires inLevelE(L, O)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L260 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule passLGoE(L:String, CUR:Int, oCons(O:String, OPS:OpSeq), iCons(N:Int, NDS:IntSeq), OO:OpSeq, ON:IntSeq) => passLGoE(L, N, OPS, NDS, appendOpE(OO, O), appendIE(ON, CUR)) requires notBool inLevelE(L, O)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L263 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule passLGoE(_:String, CUR:Int, oCons(_:String, _:OpSeq), .IntSeq, OO:OpSeq, ON:IntSeq) => evp(OO, appendIE(ON, CUR)) [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L265 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= inLevelE(String, String) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L266 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule inLevelE("mul", O:String) => O ==String "*" orBool O ==String "//" orBool O ==String "/"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L267 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule inLevelE("add", O:String) => O ==String "+" orBool O ==String "-"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L268 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule inLevelE(_:String, _:String) => false [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L269 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax OpSeq ::= appendOpE(OpSeq, String) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L270 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule appendOpE(.OpSeq, O:String) => oCons(O, .OpSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L271 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule appendOpE(oCons(H:String, T:OpSeq), O:String) => oCons(H, appendOpE(T, O))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L272 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= appendIE(IntSeq, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L273 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule appendIE(.IntSeq, N:Int) => iCons(N, .IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L274 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule appendIE(iCons(H:Int, T:IntSeq), N:Int) => iCons(H, appendIE(T, N))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L279 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= "#md5"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L280 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> Call(Attribute(Name("hashlib"), "md5"), (E:Expr, .Exprs)) => E ~> #md5 ... </k> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L282 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> str(CS:IntSeq) ~> #md5 => md5Obj(CS) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L283 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Val ::= md5Obj(IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L284 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(md5Obj(CS:IntSeq), "hexdigest", .Vals) => str(md5hexCodes(CS))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L285 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= md5hexCodes(IntSeq) [function, total, symbol(md5hexCodes), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L291 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("isinstance", V:Val, typeV("int"), .Vals) => isIntV(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L292 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("isinstance", V:Val, typeV("str"), .Vals) => isStrV(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L293 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Bool ::= isIntV(Val) [function] | isStrV(Val) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L294 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule isIntV(_:Int) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L295 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule isIntV(_:Val) => false [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L296 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule isStrV(str(_:IntSeq)) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L297 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule isStrV(_:Val) => false [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/call.k`
+
+- L16 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Attribute(V:Val, M:String) => boundMethodV(V, M) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L19 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #callee(Exprs)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L20 · rule · operational-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L21 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L24 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L26 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L27 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L28 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L29 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L30 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L31 · rule · operational-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L32 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(typeV(T:String)), ACC:Vals) => applyBuiltin(T, ACC) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L38 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV(BN:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(builtinV(BN)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L42 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV(BN:String)), (A:Val, ref(H:Int), REST:Vals)) => #applyK(toCall(builtinV(BN)), (A, V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(A) [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L47 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(typeV(T:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(typeV(T)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L52 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= isMutMethod(String) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L53 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule isMutMethod(M:String) => M ==String "append" orBool M ==String "sort" orBool M ==String "extend" orBool M ==String "insert" orBool M ==String "pop" orBool M ==String "remove"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L56 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), M:String)), ACC:Vals) => #applyK(toCall(boundMethodV(V, M)), ACC) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isMutMethod(M) [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L63 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), (ref(H:Int), REST:Vals)) => #applyK(toCall(boundMethodV(OBJ, M)), (V, REST)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isMutMethod(M) andBool notBool isRefV(OBJ) [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L69 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT => #bindP(PNS, ACC) ~> BODY ~> #endcall </k> <env> CALLERL:Int => NEWL </env> <scopes> STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes> <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc> <stack> .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L80 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(closureValC(PNS:ParamNames, CVS:ParamNames, BODY:Stmts, CM:Map)), ACC:Vals) ~> CONT => #allocCells(CVS) ~> #bindP(PNS, ACC) ~> BODY ~> #endcall </k> <env> CALLERL:Int => NEWL </env> <scopes> STORE:Map => STORE [ NEWL <- scope(CM [ "$cells" <- cellsMark(CVS) ], parent(0)) ] </scopes> <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc> <stack> .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L87 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #allocCells(ParamNames)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L88 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #allocCells(.ParamNames) => .K ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L89 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #allocCells((CV:String, R:ParamNames)) => #allocCells(R) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ CV <- cellRef(N) ], _) ... </scopes> <heap> H:Map => (N |-> cellV(noneV)) H </heap> <heapLoc> N:Int => N +Int 1 </heapLoc> requires notBool N in_keys(H)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/comprehension.k`
+
+- L11 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule ListComp(ELT:Expr, Gs:CompFors) => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L12 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule GenExp(ELT:Expr, Gs:CompFors) => Call(closureExpr(.ParamNames, compBody(Gs, ELT)), .Exprs)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L14 · syntax · macro-declaration · attrs: macro · **ACCEPT_FIXED**
+  - `syntax Stmts ::= compBody(CompFors, Expr) [macro]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L15 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule compBody(Gs:CompFors, ELT:Expr) => Assign(Name("$acc"), ListExpr(.Exprs)) compNest(Gs, ELT) Return(Name("$acc"))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L18 · syntax · macro-declaration · attrs: macro, macro-rec · **ACCEPT_FIXED**
+  - `syntax Stmt ::= compNest(CompFors, Expr) [macro-rec]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L19 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule compNest(.CompFors, ELT:Expr) => Assign(Name("$acc"), BinOp("+", Name("$acc"), ListExpr(ELT)))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L21 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule compNest((CompFor(T:Expr, ITER:Expr, Fs:Exprs) GRest:CompFors), ELT:Expr) => For(T, ITER, If(compGuard(Fs), compNest(GRest, ELT), .Stmts))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L24 · syntax · macro-declaration · attrs: macro · **ACCEPT_FIXED**
+  - `syntax Expr ::= compGuard(Exprs) [macro]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L25 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule compGuard(.Exprs) => Bool(true)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L26 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule compGuard((F:Expr, Fs:Exprs)) => BoolOp("and", (F, Fs))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/concrete.k`
+
+- L13 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Compare(list(A:ValSeq), CmpOp("==", list(B:ValSeq))) => deepEqVS(A, B, HP) ... </k> <heap> HP:Map </heap> requires hasRefVS(A) orBool hasRefVS(B)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L16 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Compare(list(A:ValSeq), CmpOp("!=", list(B:ValSeq))) => notBool deepEqVS(A, B, HP) ... </k> <heap> HP:Map </heap> requires hasRefVS(A) orBool hasRefVS(B)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L25 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Val ::= kvP(Val, Val)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L26 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #ksort(ValSeq, Val, ValSeq, Bool) | #ksIns(Val, ValSeq, Val, ValSeq, Bool)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L28 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals)) => #ksort(VS, KV, .ValSeq, false) ... </k> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L31 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals)) => #ksort(VS, KV, .ValSeq, RB) ... </k> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L34 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #ksort(.ValSeq, _:Val, ACC:ValSeq, RB:Bool) => #alloc(list(condRev(unpairVS(ACC), RB))) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L36 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #ksort(vCons(V:Val, R:ValSeq), KV:Val, ACC:ValSeq, RB:Bool) => KV ~> #callee((V, .Exprs)) ~> #ksIns(V, R, KV, ACC, RB) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L38 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> K:Val ~> #ksIns(V:Val, R:ValSeq, KV:Val, ACC:ValSeq, RB:Bool) => #ksort(R, KV, insPair(ACC, K, V), RB) ... </k> requires notBool isKwV(K)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L42 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= insPair(ValSeq, Val, Val) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L43 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule insPair(.ValSeq, K:Val, V:Val) => vCons(kvP(K, V), .ValSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L44 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val) => vCons(kvP(K, V), vCons(kvP(K2, V2), R)) requires kLt(K, K2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L47 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule insPair(vCons(kvP(K2:Val, V2:Val), R:ValSeq), K:Val, V:Val) => vCons(kvP(K2, V2), insPair(R, K, V)) requires notBool kLt(K, K2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L51 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Bool ::= kLt(Val, Val) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L52 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule kLt(I1:Int, I2:Int) => I1 <Int I2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L53 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule kLt(F1:Float, F2:Float) => F1 <Float F2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L54 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule kLt(str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L56 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= unpairVS(ValSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L57 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule unpairVS(.ValSeq) => .ValSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L58 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule unpairVS(vCons(kvP(_:Val, V:Val), R:ValSeq)) => vCons(V, unpairVS(R))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L59 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule unpairVS(vCons(V:Val, R:ValSeq)) => vCons(V, unpairVS(R)) [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/controls.k`
+
+- L9 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Assign(Name(X:String), V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L12 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool X in_keys(M) andBool isCellRef({M[X]}:>Val) [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L20 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes> requires X in_keys(M)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L27 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires X in_keys(M) andBool isRefV({M[X]}:>Val) [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L35 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> ImportFrom("math", NS:ParamNames) => #bindImports(NS) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L36 · rule · operational-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule <k> ImportFrom(_:String, _:ParamNames) => .K ... </k> [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L37 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #bindImports(ParamNames)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L38 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #bindImports(.ParamNames) => .K ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L39 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ N <- builtinV(N) ], _) ... </scopes> requires N ==String "floor" orBool N ==String "ceil"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L43 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k> requires notBool (N ==String "floor" orBool N ==String "ceil")`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L48 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Expr(_:Val) => .K ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L51 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #branch(Bool, Stmts, Stmts)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L52 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L53 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #branch(true, T:Stmts, _:Stmts) => T ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L54 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L57 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k> requires truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L59 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k> requires notBool truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L65 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts) | #while(Expr, Stmts) | #whileCond(Expr, Stmts) | #loopLbl(K) | "#cont" | "#brk"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L69 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L71 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L72 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L73 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts) => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L77 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L78 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L79 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k> requires truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L81 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k> requires notBool truthy(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L85 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #loopLbl(NEXT:K) => NEXT ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L86 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Continue => #cont ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L87 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Break => #brk ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L88 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L89 · rule · operational-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L90 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L91 · rule · operational-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L95 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L98 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L101 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L106 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/core.k`
+
+- L13 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L14 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L15 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Str ::= str(IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L18 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Iterable ::= list(ValSeq) | tuple(ValSeq) | Str | rangeObj(Int, Int, Int) | zipObj(ValSeq, ValSeq) | zipObjS(IntSeq, IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L25 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Val ::= Int | Bool | "noneV" | Iterable | ref(Int) // a heap object: <heap> holds its list(VS) | cellRef(Int) // a closure cell: <heap> holds cellV(V) | closureVal(ParamNames, Stmts, Int) | typeV(String) // a type object (int/str), resolved from the builtins frame | builtinV(String) // a builtin function, resolved like any name (LEGB fallthrough) | boundMethodV(Val, String) // a cooled Attribute: obj.method`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L36 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Parent ::= "root" | parent(Int)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L37 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Scope ::= scope(Map, Parent)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L38 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KResult ::= Val`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L39 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Expr ::= Val // cooling puts results back into expression holes`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L40 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Vals ::= List{Val, ","}`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L41 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Exc ::= "NoExc" | "AssertionError"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L42 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax RetState ::= "noRet" | retV(Val)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L49 · configuration · configuration · attrs: none · **ACCEPT_FIXED**
+  - `configuration <k> #loadAll($PGM:Module) </k> <env> 0 </env> <scopes> 0 |-> scope(.Map, parent(-1)) -1 |-> builtinsScope </scopes> <scopeLoc> 1 </scopeLoc> <heap> .Map </heap> <heapLoc> 0 </heapLoc> <stack> .List </stack> <ret> noRet </ret> <exc> NoExc </exc> <exit-code exit=""> 0 </exit-code>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L68 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= isRefV(Val) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L69 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule isRefV(ref(_:Int)) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L70 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule isRefV(_:Val) => false [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L75 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax HeapVal ::= cellV(Val)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L76 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= isCellRef(Val) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L77 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule isCellRef(cellRef(_:Int)) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L78 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule isCellRef(_:Val) => false [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L85 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> cellRef(H:Int) => V ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> <heap> ... H |-> cellV(V:Val) ... </heap> requires "$cells" in_keys(M) [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L95 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Val ::= kwV(String, Val)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L96 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #kwTag(String)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L97 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L98 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k> requires notBool isKwV(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L100 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= isKwV(Val) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L101 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule isKwV(kwV(_:String, _:Val)) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L102 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule isKwV(_:Val) => false [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L106 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Val ::= cellsMark(ParamNames)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L107 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax ParamNames ::= cellsOf(Val) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L108 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule cellsOf(cellsMark(CVS:ParamNames)) => CVS`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L109 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= pnMember(String, ParamNames) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L110 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule pnMember(_:String, .ParamNames) => false`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L111 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L113 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #cellW(Val, Val)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L114 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k> <heap> ... H |-> cellV(_:Val => V) ... </heap>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L117 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #alloc(Val)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L118 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #alloc(V:Val) => ref(N) ... </k> <heap> H:Map => (N |-> V) H </heap> <heapLoc> N:Int => N +Int 1 </heapLoc> requires notBool N in_keys(H)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L124 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #loadAll(Module)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L125 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #loadAll(Module(SS:Stmts)) => SS ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L126 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> (S:Stmt SS:Stmts):Stmts => S ~> SS ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L127 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> .Stmts => .K ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L130 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #look(String, Int)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L131 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Name(X:String) => #look(X, L) ... </k> <env> L:Int </env>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L132 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #look(X:String, L:Int) => {M[X]}:>Val ... </k> <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes> requires X in_keys(M)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L145 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #look(X:String, L:Int) => V ... </k> <scopes> ... L |-> scope(M:Map, _:Parent) ... </scopes> <heap> ... H |-> cellV(V:Val) ... </heap> requires X in_keys(M) andBool "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool {M[X]}:>Val ==K cellRef(H) [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L152 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #look(X:String, L:Int) => #look(X, P) ... </k> <scopes> ... L |-> scope(M:Map, parent(P:Int)) ... </scopes> requires notBool (X in_keys(M))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L157 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Scope ::= "builtinsScope" [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L158 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule builtinsScope => scope(.Map [ "len" <- builtinV("len") ] [ "set" <- builtinV("set") ] [ "sum" <- builtinV("sum") ] [ "abs" <- builtinV("abs") ] [ "min" <- builtinV("min") ] [ "max" <- builtinV("max") ] [ "ord" <- builtinV("ord") ] [ "chr" <- builtinV("chr") ] [ "range" <- builtinV("range") ] [ "all" <- builtinV("all") ] [ "any" <- builtinV("any") ] [ "zip" <- builtinV("zip") ] [ "isinstance" <- builtinV("isinstance") ] [ "sorted" <- builtinV("sorted") ] [ "list" <- builtinV("list") ] [ "round" <- builtinV("round") ] [ "bin" <- builtinV("bin") ] [ "enumerate" <- builtinV("enumerate") ] [ "map" <- builtinV("map") ] [ "eval" <- builtinV("eval") ] [ "int" <- typeV("int") ] [ "str" <- typeV("str") ] [ "float" <- typeV("float") ], root)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L185 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax ApplyK ::= toCall(Val)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L186 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #evalArgs(Exprs, Vals, ApplyK) | #evalArgCont(Exprs, Vals, ApplyK) | #applyK(ApplyK, Vals)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L189 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #evalArgs((A:Expr, REST:Exprs), ACC:Vals, K:ApplyK) => A ~> #evalArgCont(REST, ACC, K) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L190 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> V:Val ~> #evalArgCont(REST:Exprs, ACC:Vals, K:ApplyK) => #evalArgs(REST, appendVal(ACC, V), K) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L191 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #evalArgs(.Exprs, ACC:Vals, K:ApplyK) => #applyK(K, ACC) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L194 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Int(I:Int) => I ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L195 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Bool(B:Bool) => B ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L196 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> NoneVal => noneV ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L199 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Bool ::= truthy(Val) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L200 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule truthy(B:Bool) => B`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L201 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule truthy(noneV) => false`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L202 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule truthy(I:Int) => I =/=Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L203 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule truthy(str(S:IntSeq)) => notBool (S ==K .IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L204 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule truthy(list(V:ValSeq)) => notBool (V ==K .ValSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L205 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule truthy(tuple(V:ValSeq)) => notBool (V ==K .ValSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L208 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Val ::= applyUn(String, Val) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L209 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Val ::= applyBin(String, Val, Val) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L210 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Bool ::= applyCmp(String, Val, Val) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L213 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Vals ::= appendVal(Vals, Val) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L214 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule appendVal(.Vals, V:Val) => V , .Vals`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L215 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule appendVal((V0:Val, VS:Vals), V:Val) => V0 , appendVal(VS, V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L217 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= vals2valSeq(Vals) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L218 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule vals2valSeq(.Vals) => .ValSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L219 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule vals2valSeq((V:Val, VS:Vals)) => vCons(V, vals2valSeq(VS))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L223 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= vsLen(ValSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L224 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule vsLen(.ValSeq) => 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L225 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule vsLen(vCons(_:Val, S:ValSeq)) => 1 +Int vsLen(S)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L227 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= isLen(IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L228 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule isLen(.IntSeq) => 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L229 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule isLen(iCons(_:Int, S:IntSeq)) => 1 +Int isLen(S)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L233 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= setVSAt(ValSeq, Int, Val) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L234 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule setVSAt(.ValSeq, _:Int, _:Val) => .ValSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L235 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule setVSAt(vCons(_:Val, S:ValSeq), 0, V:Val) => vCons(V, S)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L236 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule setVSAt(vCons(W:Val, S:ValSeq), I:Int, V:Val) => vCons(W, setVSAt(S, I -Int 1, V)) requires I >Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L238 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule setVSAt(VS:ValSeq, I:Int, _:Val) => VS requires I <Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/dict.k`
+
+- L20 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Val ::= dictV(ValSeq, ValSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L23 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #dictAcc(Entries, ValSeq, ValSeq) | #dictKey(Expr, Entries, ValSeq, ValSeq) | #dictVal(Val, Entries, ValSeq, ValSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L26 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> DictExpr(ES:Entries) => #dictAcc(ES, .ValSeq, .ValSeq) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L27 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #dictAcc(.Entries, KS:ValSeq, VS:ValSeq) => dictV(KS, VS) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L28 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #dictAcc((Entry(K:Expr, V:Expr), REST:Entries), KS:ValSeq, VS:ValSeq) => K ~> #dictKey(V, REST, KS, VS) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L30 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> KV:Val ~> #dictKey(V:Expr, REST:Entries, KS:ValSeq, VS:ValSeq) => V ~> #dictVal(KV, REST, KS, VS) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L32 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> VV:Val ~> #dictVal(KV:Val, REST:Entries, KS:ValSeq, VS:ValSeq) => #dictAcc(REST, dPutK(KS, KV), dPutV(KS, VS, KV, VV)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L37 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= dHasKey(ValSeq, Val) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L38 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dHasKey(.ValSeq, _:Val) => false`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L39 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dHasKey(vCons(A:Val, _:ValSeq), K:Val) => true requires A ==K K`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L40 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dHasKey(vCons(A:Val, R:ValSeq), K:Val) => dHasKey(R, K) requires notBool (A ==K K)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L43 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= dPutK(ValSeq, Val) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L44 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dPutK(KS:ValSeq, K:Val) => KS requires dHasKey(KS, K)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L45 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dPutK(KS:ValSeq, K:Val) => valSeqConcat(KS, vCons(K, .ValSeq)) requires notBool dHasKey(KS, K)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L49 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= dPutV(ValSeq, ValSeq, Val, Val) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L50 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dPutV(vCons(A:Val, _:ValSeq), vCons(_:Val, VR:ValSeq), K:Val, V:Val) => vCons(V, VR) requires A ==K K`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L52 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dPutV(vCons(A:Val, KR:ValSeq), vCons(B:Val, VR:ValSeq), K:Val, V:Val) => vCons(B, dPutV(KR, VR, K, V)) requires notBool (A ==K K)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L54 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule dPutV(_KS:ValSeq, VS:ValSeq, _K:Val, V:Val) => valSeqConcat(VS, vCons(V, .ValSeq)) [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L58 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(boundMethodV(dictV(KS:ValSeq, _:ValSeq), "keys")), .Vals) => #alloc(list(KS)) ... </k> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L63 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyIndexD(dictV(KS:ValSeq, VS:ValSeq), K:Val) => dGet(KS, VS, K)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L64 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Val ::= applyIndexD(Val, Val) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L65 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> Subscript(dictV(KS:ValSeq, VS:ValSeq), K:Val) => applyIndexD(dictV(KS, VS), K) ... </k> [priority(45)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L70 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Val ::= dictSet(Val, Val, Val) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L71 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dictSet(dictV(KS:ValSeq, VS:ValSeq), K:Val, V:Val) => dictV(dPutK(KS, K), dPutV(KS, VS, K, V))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L76 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #dsetK(String, Val)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L77 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Assign(Subscript(Name(X:String), K:Expr), VV:Val) => K ~> #dsetK(X, VV) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L78 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- dictSet({M[X]}:>Val, KV, VV) ], _) ... </scopes> requires X in_keys(M) andBool notBool isRefV({M[X]}:>Val)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L82 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> KV:Val ~> #dsetK(X:String, VV:Val) => #dsetV({M[X]}:>Val, KV, VV) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires X in_keys(M) andBool isRefV({M[X]}:>Val)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L86 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #dsetV(Val, Val, Val)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L87 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #dsetV(ref(H:Int), I:Int, VV:Val) => .K ... </k> <heap> ... H |-> list(VS:ValSeq => setVSAt(VS, normIdxD(I, vsLen(VS)), VV)) ... </heap>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L90 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= normIdxD(Int, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L91 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule normIdxD(I:Int, LEN:Int) => I +Int LEN requires I <Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L92 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule normIdxD(I:Int, _:Int) => I requires I >=Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L95 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("==", dictV(KS1:ValSeq, VS1:ValSeq), dictV(KS2:ValSeq, VS2:ValSeq)) => (vsLen(KS1) ==Int vsLen(KS2)) andBool dSubset(KS1, VS1, KS2, VS2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L97 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Bool ::= dSubset(ValSeq, ValSeq, ValSeq, ValSeq) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L98 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dSubset(.ValSeq, .ValSeq, _:ValSeq, _:ValSeq) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L99 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dSubset(vCons(K:Val, KR:ValSeq), vCons(V:Val, VR:ValSeq), KS2:ValSeq, VS2:ValSeq) => dHasKey(KS2, K) andBool (dGet(KS2, VS2, K) ==K V) andBool dSubset(KR, VR, KS2, VS2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L101 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Val ::= dGet(ValSeq, ValSeq, Val) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L102 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dGet(vCons(A:Val, _:ValSeq), vCons(B:Val, _:ValSeq), K:Val) => B requires A ==K K`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L103 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dGet(vCons(A:Val, KR:ValSeq), vCons(_:Val, VR:ValSeq), K:Val) => dGet(KR, VR, K) requires notBool (A ==K K)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/float.k`
+
+- L20 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Val ::= Float`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L21 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Float(F:Float) => F ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L24 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= intFloatDiv(Int, Float) [function, total, symbol(intFloatDiv), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L25 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule intFloatDiv(I:Int, F:Float) => Int2Float(I, 53, 11) /Float F [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L27 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("/", I:Int, F:Float) => intFloatDiv(I, F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L30 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= divII(Int, Int) [function, total, symbol(divII), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L31 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule divII(I1:Int, I2:Int) => Int2Float(I1, 53, 11) /Float Int2Float(I2, 53, 11) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L32 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("/", I1:Int, I2:Int) => divII(I1, I2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L37 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= floatMod(Float, Float) [function, total, symbol(floatMod), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L38 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule floatMod(F1:Float, F2:Float) => F1 -Float (floorFloat(F1 /Float F2) *Float F2) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L39 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("%", F1:Float, F2:Float) => floatMod(F1, F2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L43 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("==", F1:Float, F2:Float) => F1 ==Float F2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L44 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("!=", F1:Float, F2:Float) => notBool (F1 ==Float F2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L50 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Bool ::= floatLt(Float, Float) [function, total, symbol(floatLt), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L51 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule floatLt(F1:Float, F2:Float) => F1 <Float F2 [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L52 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("<", F1:Float, F2:Float) => floatLt(F1, F2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L54 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= absF(Float) [function, total, symbol(absF), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L55 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule absF(F:Float) => absFloat(F) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L56 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("abs", F:Float, .Vals) => absF(F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L61 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Import(_:String) => .K ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L65 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= "#mathCeil"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L66 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> Call(Attribute(Name("math"), "ceil"), (E:Expr, .Exprs)) => E ~> #mathCeil ... </k> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L67 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> V:Val ~> #mathCeil => ceilF(V) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L70 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= "#mathFloor"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L71 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> Call(Attribute(Name("math"), "floor"), (E:Expr, .Exprs)) => E ~> #mathFloor ... </k> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L72 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> V:Val ~> #mathFloor => floorFI(V) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L73 · syntax · function-declaration · attrs: function, total, symbol( · **ACCEPT_FIXED**
+  - `syntax Int ::= floorFI(Val) [function, total, symbol(floorFI)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L74 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule floorFI(I:Int) => I [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L75 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule floorFI(F:Float) => Float2Int(floorFloat(F)) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L78 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("floor", V:Val, .Vals) => floorFI(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L79 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("ceil", V:Val, .Vals) => ceilF(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L82 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #mathPow1(Expr) | #mathPow2(Val)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L83 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> Call(Attribute(Name("math"), "pow"), (E1:Expr, E2:Expr, .Exprs)) => E1 ~> #mathPow1(E2) ... </k> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L84 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> V1:Val ~> #mathPow1(E2:Expr) => E2 ~> #mathPow2(V1) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L85 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> V2:Val ~> #mathPow2(V1:Val) => powF(toF(V1), toF(V2)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L86 · syntax · function-declaration · attrs: function, total, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= toF(Val) [function, total, symbol(toF)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L87 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule toF(F:Float) => F [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L88 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule toF(I:Int) => intToF(I) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L93 · syntax · function-declaration · attrs: function, total, symbol( · **ACCEPT_FIXED**
+  - `syntax Int ::= ceilF(Val) [function, total, symbol(ceilF)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L94 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule ceilF(I:Int) => I [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L95 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule ceilF(F:Float) => Float2Int(ceilFloat(F)) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L99 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyUn("-", F:Float) => 0.0 -Float F`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L103 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= subF(Float, Float) [function, total, symbol(subF), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L104 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule subF(F1:Float, F2:Float) => F1 -Float F2 [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L105 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("-", F1:Float, F2:Float) => subF(F1, F2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L107 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= divF(Float, Float) [function, total, symbol(divF), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L108 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule divF(F1:Float, F2:Float) => F1 /Float F2 [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L109 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("/", F1:Float, F2:Float) => divF(F1, F2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L111 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= addF(Float, Float) [function, total, symbol(addF), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L112 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule addF(F1:Float, F2:Float) => F1 +Float F2 [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L113 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("+", F1:Float, F2:Float) => addF(F1, F2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L115 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= mulF(Float, Float) [function, total, symbol(mulF), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L116 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule mulF(F1:Float, F2:Float) => F1 *Float F2 [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L117 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("*", F1:Float, F2:Float) => mulF(F1, F2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L119 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= powF(Float, Float) [function, total, symbol(powF), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L120 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule powF(F1:Float, F2:Float) => F1 ^Float F2 [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L121 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("**", F1:Float, F2:Float) => powF(F1, F2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L125 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Bool ::= gtF(Float, Float) [function, total, symbol(gtF), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L126 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule gtF(F1:Float, F2:Float) => F1 >Float F2 [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L127 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp(">", F1:Float, F2:Float) => gtF(F1, F2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L128 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp(">=", F1:Float, F2:Float) => notBool floatLt(F1, F2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L129 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("<=", F1:Float, F2:Float) => notBool gtF(F1, F2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L132 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("**", I:Int, F:Float) => powF(intToF(I), F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L133 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("**", F:Float, I:Int) => powF(F, intToF(I))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L134 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("-", I:Int, F:Float) => subF(intToF(I), F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L135 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("-", F:Float, I:Int) => subF(F, intToF(I))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L136 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("+", I:Int, F:Float) => addF(intToF(I), F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L137 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("+", F:Float, I:Int) => addF(F, intToF(I))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L138 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("*", I:Int, F:Float) => mulF(intToF(I), F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L139 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("*", F:Float, I:Int) => mulF(F, intToF(I))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L142 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Bool ::= eqF(Float, Float) [function, total, symbol(eqF), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L143 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule eqF(F1:Float, F2:Float) => F1 ==Float F2 [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L144 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("==", I:Int, F:Float) => eqF(intToF(I), F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L145 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("==", F:Float, I:Int) => eqF(F, intToF(I))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L146 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("!=", I:Int, F:Float) => notBool eqF(intToF(I), F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L147 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("!=", F:Float, I:Int) => notBool eqF(F, intToF(I))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L148 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("<", I:Int, F:Float) => floatLt(intToF(I), F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L149 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("<", F:Float, I:Int) => floatLt(F, intToF(I))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L150 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp(">", I:Int, F:Float) => gtF(intToF(I), F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L151 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp(">", F:Float, I:Int) => gtF(F, intToF(I))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L154 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("==", V:Val, noneV) => V ==K noneV`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L155 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("!=", V:Val, noneV) => notBool (V ==K noneV)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L160 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= decStrToF(IntSeq) [function, total, symbol(decStrToF), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L161 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule decStrToF(iCons(45, CS:IntSeq)) => 0.0 -Float decStrToF(CS) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L162 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule decStrToF(CS:IntSeq) => intToF(intPart(CS)) +Float (intToF(fracPart(CS)) /Float intToF(fracScale(CS))) requires isLen(CS) >Int 0 andBool headIS(CS) =/=Int 45 [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L165 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Int ::= headIS(IntSeq) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L166 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule headIS(iCons(C:Int, _:IntSeq)) => C`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L167 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= intPart(IntSeq) [function, total] | intPartAcc(IntSeq, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L168 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule intPart(CS:IntSeq) => intPartAcc(CS, 0)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L169 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule intPartAcc(.IntSeq, A:Int) => A`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L170 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule intPartAcc(iCons(46, _:IntSeq), A:Int) => A`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L171 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule intPartAcc(iCons(C:Int, R:IntSeq), A:Int) => intPartAcc(R, A *Int 10 +Int (C -Int 48)) requires C =/=Int 46`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L173 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= fracPart(IntSeq) [function, total] | fracAcc(IntSeq, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L174 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule fracPart(.IntSeq) => 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L175 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule fracPart(iCons(46, R:IntSeq)) => fracAcc(R, 0)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L176 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule fracPart(iCons(C:Int, R:IntSeq)) => fracPart(R) requires C =/=Int 46`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L177 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule fracAcc(.IntSeq, A:Int) => A`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L178 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule fracAcc(iCons(C:Int, R:IntSeq), A:Int) => fracAcc(R, A *Int 10 +Int (C -Int 48))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L179 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= fracScale(IntSeq) [function, total] | fscAcc(IntSeq, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L180 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule fracScale(.IntSeq) => 1`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L181 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule fracScale(iCons(46, R:IntSeq)) => fscAcc(R, 1)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L182 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule fracScale(iCons(C:Int, R:IntSeq)) => fracScale(R) requires C =/=Int 46`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L183 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule fscAcc(.IntSeq, A:Int) => A`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L184 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule fscAcc(iCons(_:Int, R:IntSeq), A:Int) => fscAcc(R, A *Int 10)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L185 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("float", str(CS:IntSeq), .Vals) => decStrToF(CS)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L186 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("float", I:Int, .Vals) => intToF(I)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L187 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("float", F:Float, .Vals) => F`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L190 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= divFloatIntV(Float, Int) [function, total, symbol(divFloatIntV), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L191 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule divFloatIntV(F:Float, I:Int) => F /Float Int2Float(I, 53, 11) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L192 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("/", F:Float, I:Int) => divFloatIntV(F, I)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L195 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= intToF(Int) [function, total, symbol(intToF), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L196 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule intToF(I:Int) => Int2Float(I, 53, 11) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L197 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("+", I:Int, F:Float) => addF(intToF(I), F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L198 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("+", F:Float, I:Int) => addF(F, intToF(I))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L199 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("-", I:Int, F:Float) => subF(intToF(I), F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L200 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("-", F:Float, I:Int) => subF(F, intToF(I))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L201 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("*", I:Int, F:Float) => mulF(intToF(I), F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L202 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("*", F:Float, I:Int) => mulF(F, intToF(I))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L203 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("<", I:Int, F:Float) => floatLt(intToF(I), F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L204 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("<", F:Float, I:Int) => floatLt(F, intToF(I))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L205 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp(">", I:Int, F:Float) => gtF(intToF(I), F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L206 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp(">", F:Float, I:Int) => gtF(F, intToF(I))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L209 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Int ::= truncF(Float) [function, total, symbol(truncF), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L210 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule truncF(F:Float) => #if F >=Float 0.0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L211 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("int", F:Float, .Vals) => truncF(F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L213 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("float", I:Int, .Vals) => intToF(I)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L214 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("float", F:Float, .Vals) => F`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L217 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Int ::= roundF(Float) [function, total, symbol(roundF), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L218 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule roundF(F:Float) => #if (F -Float floorFloat(F)) ==Float 0.5 #then (#if Float2Int(floorFloat(F)) %Int 2 ==Int 0 #then Float2Int(floorFloat(F)) #else Float2Int(ceilFloat(F)) #fi) #else Float2Int(floorFloat(F +Float 0.5)) #fi [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L223 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= roundFN(Float, Int) [function, total, symbol(roundFN), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L224 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule roundFN(F:Float, N:Int) => Int2Float(roundF(F *Float Int2Float(10 ^Int N, 53, 11)), 53, 11) /Float Int2Float(10 ^Int N, 53, 11) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L227 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("round", F:Float, .Vals) => roundF(F)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L228 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBuiltin("round", F:Float, N:Int, .Vals) => roundFN(F, N)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L230 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax Float ::= sqrtF(Float) [function, total, symbol(sqrtF), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L231 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule sqrtF(F:Float) => sqrtFloat(F) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L232 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= "#mathSqrt"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L233 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> Call(Attribute(Name("math"), "sqrt"), (E:Expr, .Exprs)) => E ~> #mathSqrt ... </k> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L234 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> F:Float ~> #mathSqrt => sqrtF(F) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L235 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> I:Int ~> #mathSqrt => sqrtF(intToF(I)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L243 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #maxAccF(Iterable, Float) | #maxContF(Float)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L244 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAccF(R, {V}:>Float) ... </k> requires isFloat(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L245 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #maxAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #maxContF(M) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L246 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterDone ~> #maxContF(M:Float) => M ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L247 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, R:Iterable) ~> #maxContF(M:Float) => #maxAccF(R, maxFloat(M, {V}:>Float)) ... </k> requires isFloat(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L250 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #minAccF(Iterable, Float) | #minContF(Float)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L251 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAccF(R, {V}:>Float) ... </k> requires isFloat(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L252 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #minAccF(IT:Iterable, M:Float) => #iterNext(IT) ~> #minContF(M) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L253 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterDone ~> #minContF(M:Float) => M ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L254 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, R:Iterable) ~> #minContF(M:Float) => #minAccF(R, minFloat(M, {V}:>Float)) ... </k> requires isFloat(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L261 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #sumAccF(Iterable, Float) | #sumContF(Float)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L262 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int) => #sumAccF(R, addF(intToF(ACC), {V}:>Float)) ... </k> requires isFloat(V) andBool notBool (isInt(V) orBool isBool(V))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L265 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #sumAccF(IT:Iterable, ACC:Float) => #iterNext(IT) ~> #sumContF(ACC) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L266 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterDone ~> #sumContF(ACC:Float) => ACC ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L267 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float) => #sumAccF(R, addF(ACC, {V}:>Float)) ... </k> requires isFloat(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L270 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(V:Val, R:Iterable) ~> #sumContF(ACC:Float) => #sumAccF(R, addF(ACC, intToF(intOf(V)))) ... </k> requires isInt(V) orBool isBool(V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/functions.k`
+
+- L8 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= frame(continuation: K, callerEnv: Int, savedLoc: Int) | #bindP(ParamNames, Vals) | "#pop" | "#endcall"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L14 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ F <- closureVal(PNS, BODY, L) ], _) ... </scopes>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L18 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Expr ::= closureExpr(ParamNames, Stmts)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L19 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> closureExpr(PNS:ParamNames, BODY:Stmts) => closureVal(PNS, BODY, L) ... </k> <env> L:Int </env>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L27 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Val ::= closureValC(ParamNames, ParamNames, Stmts, Map)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L31 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #mkClosure(String, ParamNames, ParamNames, ParamNames, Stmts, Map) | #mkLambda(ParamNames, ParamNames, ParamNames, Stmts, Map)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L33 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> FuncDef(F:String, Params(PNS:ParamNames), CellVars(CVS:ParamNames), FreeVars(FVS:ParamNames), BODY:Stmts) => #mkClosure(F, PNS, CVS, FVS, BODY, .Map) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L36 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames, (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map) => #mkClosure(F, PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires FV in_keys(M)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L42 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ F <- closureValC(PNS, CVS, BODY, CM) ], _) ... </scopes>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L47 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Lambda(Params(PNS:ParamNames), E:Expr) => closureVal(PNS, Return(E) .Stmts, L) ... </k> <env> L:Int </env>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L50 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Lambda(Params(PNS:ParamNames), CellVars(CVS:ParamNames), FreeVars(FVS:ParamNames), E:Expr) => #mkLambda(PNS, CVS, FVS, Return(E) .Stmts, .Map) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L53 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map) => #mkLambda(PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires FV in_keys(M)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L59 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map) => closureValC(PNS, CVS, BODY, CM) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L63 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L64 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ P <- V ], _) ... </scopes>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L68 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #cellW({M[P]}:>Val, V) ~> #bindP(PS, VS) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(P, cellsOf({M["$cells"]}:>Val)) andBool P in_keys(M) andBool isCellRef({M[P]}:>Val) [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L78 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Return(V:Val) ~> _ => #pop </k> <ret> noRet => retV(V) </ret>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L80 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #endcall => #pop ... </k> <ret> noRet => retV(noneV) </ret>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L85 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #pop => V ~> CONT </k> <ret> retV(V) => noRet </ret> <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack> <env> L:Int => CALLERL </env> <scopes> SC:Map => SC [ L <- undef ] </scopes> <scopeLoc> _ => SAVEDL </scopeLoc>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/int.k`
+
+- L7 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyUn("-", I:Int) => 0 -Int I`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L9 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("+", I1:Int, I2:Int) => I1 +Int I2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L11 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("+", I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L12 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("+", B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L13 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("-", I1:Int, I2:Int) => I1 -Int I2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L14 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("*", I1:Int, I2:Int) => I1 *Int I2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L15 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("%", I1:Int, I2:Int) => pyMod(I1, I2)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L16 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L17 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L19 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Int ::= pyMod(Int, Int) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L20 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L22 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("<", I1:Int, I2:Int) => I1 <Int I2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L23 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("<=", I1:Int, I2:Int) => I1 <=Int I2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L24 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp(">", I1:Int, I2:Int) => I1 >Int I2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L25 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp(">=", I1:Int, I2:Int) => I1 >=Int I2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L26 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("==", I1:Int, I2:Int) => I1 ==Int I2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L27 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("!=", I1:Int, I2:Int) => I1 =/=Int I2`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/iter.k`
+
+- L8 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #iterNext(Iterable) | "#iterDone" | #iterYield(Val, Iterable)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/list.k`
+
+- L9 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterNext(list(.ValSeq)) => #iterDone ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L10 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterNext(list(vCons(V:Val, R:ValSeq))) => #iterYield(V, list(R)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L13 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax ApplyK ::= "toList"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L14 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> ListExpr(ES:Exprs) => #evalArgs(ES, .Vals, toList) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L15 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toList, ACC:Vals) => #alloc(list(vals2valSeq(ACC))) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L18 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= valSeqConcat(ValSeq, ValSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L19 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule valSeqConcat(.ValSeq, T:ValSeq) => T`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L20 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule valSeqConcat(vCons(V:Val, S:ValSeq), T:ValSeq) => vCons(V, valSeqConcat(S, T))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L24 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> BinOp("+", list(A:ValSeq), list(B:ValSeq)) => #alloc(list(valSeqConcat(A, B))) ... </k> [priority(45)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L27 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("==", list(A:ValSeq), list(B:ValSeq)) => A ==K B`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L28 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("!=", list(A:ValSeq), list(B:ValSeq)) => notBool (A ==K B)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L33 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= hasRefVS(ValSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L34 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule hasRefVS(.ValSeq) => false`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L35 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule hasRefVS(vCons(V:Val, R:ValSeq)) => isRefV(V) orBool hasRefVS(R)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L37 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Bool ::= deepEqVS(ValSeq, ValSeq, Map) [function] | deepEqV(Val, Val, Map) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L39 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule deepEqVS(.ValSeq, .ValSeq, _:Map) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L40 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule deepEqVS(.ValSeq, vCons(_:Val, _:ValSeq), _:Map) => false`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L41 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule deepEqVS(vCons(_:Val, _:ValSeq), .ValSeq, _:Map) => false`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L42 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule deepEqVS(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq), HP:Map) => deepEqV(A, B, HP) andBool deepEqVS(As, Bs, HP)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L45 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule deepEqV(ref(H:Int), B:Val, HP:Map) => deepEqV({HP[H]}:>Val, B, HP) requires H in_keys(HP)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L47 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule deepEqV(A:Val, ref(H:Int), HP:Map) => deepEqV(A, {HP[H]}:>Val, HP) requires notBool isRefV(A) andBool H in_keys(HP)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L49 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule deepEqV(list(A:ValSeq), list(B:ValSeq), HP:Map) => deepEqVS(A, B, HP)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L50 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule deepEqV(A:Val, B:Val, _:Map) => A ==K B [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L53 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "append")), (V:Val, .Vals)) => noneV ... </k> <heap> ... H |-> list(VS:ValSeq => valSeqConcat(VS, vCons(V, .ValSeq))) ... </heap> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L58 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #memberAcc(Val, Iterable) | #memberCont(Val) | "#notB"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L59 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Compare(LV:Val, CmpOp("in", list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L60 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Compare(LV:Val, CmpOp("not in", list(VS:ValSeq))) => #memberAcc(LV, list(VS)) ~> #notB ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L61 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #memberAcc(V:Val, IT:Iterable) => #iterNext(IT) ~> #memberCont(V) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L62 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterDone ~> #memberCont(_V:Val) => false ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L63 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(E:Val, _:Iterable) ~> #memberCont(V:Val) => true ... </k> requires E ==K V`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L65 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterYield(E:Val, R:Iterable) ~> #memberCont(V:Val) => #memberAcc(V, R) ... </k> requires notBool (E ==K V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L67 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> B:Bool ~> #notB => notBool B ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/methods.k`
+
+- L10 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Val ::= applyMethod(Val, String, Vals) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L13 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L14 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L15 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L16 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L19 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(str(CS:IntSeq), "lower", .Vals) => str(mapLower(CS))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L20 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(str(CS:IntSeq), "upper", .Vals) => str(mapUpper(CS))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L21 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(str(CS:IntSeq), "swapcase", .Vals) => str(mapSwap(CS))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L26 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(str(SEP:IntSeq), "join", list(VS:ValSeq), .Vals) => str(joinCodes(SEP, VS))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L27 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L28 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule joinCodes(_:IntSeq, .ValSeq) => .IntSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L29 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule joinCodes(_:IntSeq, vCons(str(CS:IntSeq), .ValSeq)) => CS`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L30 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule joinCodes(SEP:IntSeq, vCons(str(CS:IntSeq), vCons(V:Val, R:ValSeq))) => seqConcat(CS, seqConcat(SEP, joinCodes(SEP, vCons(V, R))))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L34 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L35 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Int ::= cntSub(IntSeq, IntSeq) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L36 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule cntSub(.IntSeq, _:IntSeq) => 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L37 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC) requires strPrefix(PC, iCons(C, R)) andBool isLen(PC) >Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L39 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => cntSub(R, PC) requires notBool strPrefix(PC, iCons(C, R)) orBool isLen(PC) <=Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L41 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= dropIS(IntSeq, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L42 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dropIS(S:IntSeq, N:Int) => S requires N <=Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L43 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule dropIS(.IntSeq, _:Int) => .IntSeq [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L44 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dropIS(iCons(_:Int, R:IntSeq), N:Int) => dropIS(R, N -Int 1) requires N >Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L47 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(str(CS:IntSeq), "strip", .Vals) => str(revIS(trimWS(revIS(trimWS(CS)))))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L48 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= trimWS(IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L49 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule trimWS(.IntSeq) => .IntSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L50 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule trimWS(iCons(C:Int, R:IntSeq)) => trimWS(R) requires isWSC(C)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L51 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule trimWS(iCons(C:Int, R:IntSeq)) => iCons(C, R) requires notBool isWSC(C)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L52 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= revIS(IntSeq) [function, total] | revISAcc(IntSeq, IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L53 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule revIS(S:IntSeq) => revISAcc(S, .IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L54 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule revISAcc(.IntSeq, A:IntSeq) => A`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L55 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule revISAcc(iCons(C:Int, R:IntSeq), A:IntSeq) => revISAcc(R, iCons(C, A))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L58 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(str(CS:IntSeq), "encode", str(_:IntSeq), .Vals) => str(CS)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L61 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L64 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L65 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= cntOccVS(ValSeq, Val) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L66 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule cntOccVS(.ValSeq, _:Val) => 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L67 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L68 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => cntOccVS(R, V) requires notBool (A ==K V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L72 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals) => #alloc(list(splitWS(CS, .IntSeq, .ValSeq))) ... </k> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L75 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= splitWS(IntSeq, IntSeq, ValSeq) [function] // remaining, current token, result`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L76 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule splitWS(.IntSeq, CUR:IntSeq, ACC:ValSeq) => flushTok(ACC, CUR)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L77 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, .IntSeq, flushTok(ACC, CUR)) requires isWSC(C)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L79 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, seqConcat(CUR, iCons(C, .IntSeq)), ACC) requires notBool isWSC(C)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L82 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= flushTok(ValSeq, IntSeq) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L83 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule flushTok(ACC:ValSeq, .IntSeq) => ACC`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L84 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule flushTok(ACC:ValSeq, iCons(C:Int, T:IntSeq)) => valSeqConcat(ACC, vCons(str(iCons(C, T)), .ValSeq))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L85 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= isWSC(Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L86 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule isWSC(C:Int) => C ==Int 32 orBool C ==Int 9 orBool C ==Int 10 orBool C ==Int 13`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L89 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (kwV("sep", str(S:IntSeq)), .Vals)) => #applyK(toCall(boundMethodV(str(CS), "split")), (str(S), .Vals)) ... </k> [priority(39)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L94 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (str(iCons(SEP:Int, .IntSeq)), .Vals)) => #alloc(list(splitSep(CS, SEP, .IntSeq))) ... </k> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L97 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= splitSep(IntSeq, Int, IntSeq) [function] // remaining, sep code, current token`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L98 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule splitSep(.IntSeq, _SEP:Int, CUR:IntSeq) => vCons(str(CUR), .ValSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L99 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => vCons(str(CUR), splitSep(R, SEP, .IntSeq)) requires C ==Int SEP`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L101 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => splitSep(R, SEP, seqConcat(CUR, iCons(C, .IntSeq))) requires notBool (C ==Int SEP)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L104 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(str(CS:IntSeq), "replace", str(iCons(A:Int, .IntSeq)), str(iCons(B:Int, .IntSeq)), .Vals) => str(replaceC(CS, A, B))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L106 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= replaceC(IntSeq, Int, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L107 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule replaceC(.IntSeq, _:Int, _:Int) => .IntSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L108 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(B, replaceC(R, A, B)) requires C ==Int A`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L109 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(C, replaceC(R, A, B)) requires notBool (C ==Int A)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L112 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= isUpperC(Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L113 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L115 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= isLowerC(Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L116 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L118 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= isAlphaC(Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L119 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L121 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= isDigitC(Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L122 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L124 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= hasUpper(IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L125 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule hasUpper(.IntSeq) => false`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L126 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L128 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= hasLower(IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L129 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule hasLower(.IntSeq) => false`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L130 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L132 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= allAlpha(IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L133 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule allAlpha(.IntSeq) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L134 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L136 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= allDigit(IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L137 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule allDigit(.IntSeq) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L138 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L140 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= lowerC(Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L142 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L143 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule lowerC(C:Int) => C [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L145 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= upperC(Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L146 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule upperC(C:Int) => C -Int 32 requires isLowerC(C)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L147 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule upperC(C:Int) => C [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L149 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= swapC(Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L150 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule swapC(C:Int) => C +Int 32 requires isUpperC(C)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L151 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule swapC(C:Int) => C -Int 32 requires isLowerC(C)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L152 · rule · equation-or-macro-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule swapC(C:Int) => C [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L154 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= mapLower(IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L155 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule mapLower(.IntSeq) => .IntSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L156 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule mapLower(iCons(C:Int, S:IntSeq)) => iCons(lowerC(C), mapLower(S))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L158 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= mapUpper(IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L159 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule mapUpper(.IntSeq) => .IntSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L160 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule mapUpper(iCons(C:Int, S:IntSeq)) => iCons(upperC(C), mapUpper(S))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L162 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= mapSwap(IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L163 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule mapSwap(.IntSeq) => .IntSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L164 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule mapSwap(iCons(C:Int, S:IntSeq)) => iCons(swapC(C), mapSwap(S))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L166 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= startsWith(IntSeq, IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L167 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule startsWith(.IntSeq, _:IntSeq) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L168 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule startsWith(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L169 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule startsWith(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool startsWith(As, Bs)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/operators.k`
+
+- L10 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> UnaryOp(OP:String, V:Val) => applyUn(OP, V) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L12 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> BinOp(OP:String, L:Val, R:Val) => applyBin(OP, L, R) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L15 · context · evaluation-context · attrs: none · **ACCEPT_FIXED**
+  - `context Compare(HOLE, _)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L16 · context · evaluation-context · attrs: none · **ACCEPT_FIXED**
+  - `context Compare(_:Val, CmpOp(_, HOLE))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L17 · rule · operational-rule · attrs: owise · **ACCEPT_FIXED**
+  - `rule <k> Compare(LV:Val, CmpOp(OP:String, RV:Val)) => applyCmp(OP, LV, RV) ... </k> [owise]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L19 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("is", V:Val, noneV) => V ==K noneV`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L20 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("is not", V:Val, noneV) => notBool (V ==K noneV)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L25 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> BinOp(OP:String, ref(H:Int), R:Expr) => BinOp(OP, V, R) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L28 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> BinOp(OP:String, L:Val, ref(H:Int)) => BinOp(OP, L, V) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(L) [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L34 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> Compare(ref(H:Int), CmpOp(OP:String, R:Expr)) => Compare(V, CmpOp(OP, R)) ... </k> <heap> ... H |-> V:Val ... </heap> requires OP =/=String "in" andBool OP =/=String "not in" [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L38 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> Compare(L:Val, CmpOp(OP:String, ref(H:Int))) => Compare(L, CmpOp(OP, V)) ... </k> <heap> ... H |-> V:Val ... </heap> requires notBool isRefV(L) orBool OP ==String "in" orBool OP ==String "not in" [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L44 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> UnaryOp(OP:String, ref(H:Int)) => UnaryOp(OP, V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/range.k`
+
+- L9 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= inRange(Int, Int, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L10 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule inRange(I:Int, HI:Int, ST:Int) => (ST >Int 0 andBool I <Int HI) orBool (ST <Int 0 andBool I >Int HI)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L12 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Int ::= rangeLen(Int, Int, Int) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L13 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule rangeLen(LO:Int, HI:Int, ST:Int) => (HI -Int LO +Int ST -Int 1) /Int ST requires ST >Int 0 andBool HI >Int LO`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L15 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule rangeLen(LO:Int, HI:Int, ST:Int) => (LO -Int HI -Int ST -Int 1) /Int (0 -Int ST) requires ST <Int 0 andBool HI <Int LO`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L17 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule rangeLen(LO:Int, HI:Int, ST:Int) => 0 requires (ST >Int 0 andBool HI <=Int LO) orBool (ST <Int 0 andBool HI >=Int LO)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L20 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterYield(I, rangeObj(I +Int ST, HI, ST)) ... </k> requires inRange(I, HI, ST)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L23 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterNext(rangeObj(I:Int, HI:Int, ST:Int)) => #iterDone ... </k> requires notBool inRange(I, HI, ST)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/set.k`
+
+- L8 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Val ::= setV(IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L11 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= codeIn(Int, IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L12 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule codeIn(_:Int, .IntSeq) => false`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L13 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule codeIn(C:Int, iCons(H:Int, T:IntSeq)) => C ==Int H orBool codeIn(C, T)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L16 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= dedupCodes(IntSeq) [function, total] | dedupFrom(IntSeq, IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L18 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dedupCodes(CS:IntSeq) => dedupFrom(CS, .IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L19 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dedupFrom(.IntSeq, ACC:IntSeq) => ACC`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L20 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, ACC) requires codeIn(C, ACC)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L22 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule dedupFrom(iCons(C:Int, S:IntSeq), ACC:IntSeq) => dedupFrom(S, snocCode(ACC, C)) requires notBool codeIn(C, ACC)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L25 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= snocCode(IntSeq, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L26 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule snocCode(.IntSeq, C:Int) => iCons(C, .IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L27 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule snocCode(iCons(H:Int, T:IntSeq), C:Int) => iCons(H, snocCode(T, C))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L31 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= subsetCodes(IntSeq, IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L32 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule subsetCodes(.IntSeq, _:IntSeq) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L33 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule subsetCodes(iCons(C:Int, S:IntSeq), B:IntSeq) => codeIn(C, B) andBool subsetCodes(S, B)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L35 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= sameSet(IntSeq, IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L36 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule sameSet(A:IntSeq, B:IntSeq) => subsetCodes(A, B) andBool subsetCodes(B, A)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L39 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("==", setV(A:IntSeq), setV(B:IntSeq)) => sameSet(A, B)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/sort.k`
+
+- L18 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= sortVS(ValSeq) [function, total, symbol(sortVS), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L19 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= insVS(Int, ValSeq) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L20 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule sortVS(.ValSeq) => .ValSeq [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L21 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule sortVS(vCons(X:Int, R:ValSeq)) => insVS(X, sortVS(R)) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L22 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule insVS(X:Int, .ValSeq) => vCons(X, .ValSeq) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L23 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(X, vCons(Y, R)) requires X <=Int Y [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L24 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule insVS(X:Int, vCons(Y:Int, R:ValSeq)) => vCons(Y, insVS(X, R)) requires X >Int Y [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L26 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= insVSs(IntSeq, ValSeq) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L27 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule sortVS(vCons(str(CS:IntSeq), R:ValSeq)) => insVSs(CS, sortVS(R)) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L28 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule insVSs(A:IntSeq, .ValSeq) => vCons(str(A), .ValSeq) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L29 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(A), vCons(str(B), R)) requires strLt(A, B) orBool A ==K B [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L31 · rule · concrete-equation · attrs: concrete · **ACCEPT_FIXED**
+  - `rule insVSs(A:IntSeq, vCons(str(B:IntSeq), R:ValSeq)) => vCons(str(B), insVSs(A, R)) requires notBool (strLt(A, B) orBool A ==K B) [concrete]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L36 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), .Vals)) => #alloc(list(sortVS(VS))) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L40 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(boundMethodV(ref(H:Int), "sort")), .Vals) => noneV ... </k> <heap> ... H |-> list(VS:ValSeq => sortVS(VS)) ... </heap> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L49 · syntax · opaque-symbol-declaration · attrs: function, total, no-evaluators, symbol( · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= sortKeyVS(ValSeq, Val) [function, total, symbol(sortKeyVS), no-evaluators]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L51 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= revVS(ValSeq) [function, total] | revVSAcc(ValSeq, ValSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L53 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule revVS(S:ValSeq) => revVSAcc(S, .ValSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L54 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule revVSAcc(.ValSeq, A:ValSeq) => A`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L55 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule revVSAcc(vCons(V:Val, R:ValSeq), A:ValSeq) => revVSAcc(R, vCons(V, A))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L57 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= condRev(ValSeq, Bool) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L58 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule condRev(S:ValSeq, false) => S`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L59 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule condRev(S:ValSeq, true) => revVS(S)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L61 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), .Vals)) => #alloc(list(sortKeyVS(VS, KV))) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L63 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("key", KV:Val), kwV("reverse", RB:Bool), .Vals)) => #alloc(list(condRev(sortKeyVS(VS, KV), RB))) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L65 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toCall(builtinV("sorted")), (list(VS:ValSeq), kwV("reverse", RB:Bool), .Vals)) => #alloc(list(condRev(sortVS(VS), RB))) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/str.k`
+
+- L8 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterNext(str(.IntSeq)) => #iterDone ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L9 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterNext(str(iCons(C:Int, R:IntSeq))) => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L13 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= strToCodes(String) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L14 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Str(S:String) => str(strToCodes(S)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L15 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule strToCodes("") => .IntSeq`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L16 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S)))) requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L20 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L21 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule seqConcat(.IntSeq, T:IntSeq) => T`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L22 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L24 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyBin("+", str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L25 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L26 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L29 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("in", str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L30 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L32 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L33 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule strPrefix(.IntSeq, _:IntSeq) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L34 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L35 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L37 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L38 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule strContains(P:IntSeq, X:IntSeq) => true requires strPrefix(P, X)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L39 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule strContains(P:IntSeq, .IntSeq) => false requires notBool strPrefix(P, .IntSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L40 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs) requires notBool strPrefix(P, iCons(C, Xs))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L48 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L49 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule strLt(.IntSeq, .IntSeq) => false`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L50 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L51 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L52 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true requires A <Int B`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L53 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false requires A >Int B`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L54 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L56 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("<", str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L57 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp(">", str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L58 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L59 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/subscript.k`
+
+- L11 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Val ::= valSeqAt(ValSeq, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L12 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule valSeqAt(vCons(V:Val, _:ValSeq), 0) => V`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L13 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule valSeqAt(vCons(_:Val, S:ValSeq), I:Int) => valSeqAt(S, I -Int 1) requires I >Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L16 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Int ::= intSeqAt(IntSeq, Int) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L17 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule intSeqAt(iCons(C:Int, _:IntSeq), 0) => C`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L18 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule intSeqAt(iCons(_:Int, S:IntSeq), I:Int) => intSeqAt(S, I -Int 1) requires I >Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L21 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= normIdx(Int, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L22 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule normIdx(I:Int, LEN:Int) => I +Int LEN requires I <Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L23 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule normIdx(I:Int, _:Int) => I requires I >=Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L27 · context · evaluation-context · attrs: none · **ACCEPT_FIXED**
+  - `context Subscript(HOLE, _)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L28 · context · evaluation-context · attrs: none · **ACCEPT_FIXED**
+  - `context Subscript(_:Val, HOLE:Expr)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L31 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> Subscript(ref(H:Int), IX:Index) => Subscript(V, IX) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L35 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Subscript(OBJ:Val, I:Int) => applyIndex(OBJ, I) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L37 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Val ::= applyIndex(Val, Int) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L38 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyIndex(list(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L39 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyIndex(tuple(VS:ValSeq), I:Int) => valSeqAt(VS, normIdx(I, vsLen(VS)))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L40 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyIndex(str(IS:IntSeq), I:Int) => str(iCons(intSeqAt(IS, normIdx(I, isLen(IS))), .IntSeq))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L44 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #evalB(Bound) | "#toSome" | #slLo(Val, Bound, Bound) | #slHi(Val, OptInt, Bound) | #slStep(Val, OptInt, OptInt)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L49 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax OptInt ::= "noB" | someB(Int)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L50 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #evalB(NoBound) => noB ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L51 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #evalB(E:Expr) => E ~> #toSome ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L52 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> I:Int ~> #toSome => someB(I) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L54 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Subscript(OBJ:Val, Slice(LO:Bound, HI:Bound, ST:Bound)) => #evalB(LO) ~> #slLo(OBJ, HI, ST) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L55 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> LO:OptInt ~> #slLo(OBJ:Val, HI:Bound, ST:Bound) => #evalB(HI) ~> #slHi(OBJ, LO, ST) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L56 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> HI:OptInt ~> #slHi(OBJ:Val, LO:OptInt, ST:Bound) => #evalB(ST) ~> #slStep(OBJ, LO, HI) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L58 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> ST:OptInt ~> #slStep(list(VS:ValSeq), LO:OptInt, HI:OptInt) => #alloc(doSlice(list(VS), LO, HI, ST)) ... </k> [priority(45)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L61 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> ST:OptInt ~> #slStep(OBJ:Val, LO:OptInt, HI:OptInt) => doSlice(OBJ, LO, HI, ST) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L63 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Val ::= doSlice(Val, OptInt, OptInt, OptInt) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L64 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule doSlice(list(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt) => list(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L66 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule doSlice(tuple(VS:ValSeq), LO:OptInt, HI:OptInt, ST:OptInt) => tuple(buildVS(VS, slStart(LO, ST, vsLen(VS)), slStop(HI, ST, vsLen(VS)), slStep(ST)))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L68 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule doSlice(str(IS:IntSeq), LO:OptInt, HI:OptInt, ST:OptInt) => str(buildIS(IS, slStart(LO, ST, isLen(IS)), slStop(HI, ST, isLen(IS)), slStep(ST)))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L72 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= slStep(OptInt) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L73 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule slStep(noB) => 1`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L74 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule slStep(someB(S:Int)) => S`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L76 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Int ::= slStart(OptInt, OptInt, Int) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L77 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule slStart(noB, ST:OptInt, _LEN:Int) => 0 requires slStep(ST) >Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L79 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule slStart(noB, ST:OptInt, LEN:Int) => LEN -Int 1 requires slStep(ST) <Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L81 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule slStart(someB(I:Int), ST:OptInt, LEN:Int) => slAdjust(I, LEN, slStep(ST))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L83 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Int ::= slStop(OptInt, OptInt, Int) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L84 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule slStop(noB, ST:OptInt, LEN:Int) => LEN requires slStep(ST) >Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L86 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule slStop(noB, ST:OptInt, _LEN:Int) => -1 requires slStep(ST) <Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L88 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule slStop(someB(I:Int), ST:OptInt, LEN:Int) => slAdjust(I, LEN, slStep(ST))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L90 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= slAdjust(Int, Int, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L91 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampLo(I +Int LEN, STEP) requires I <Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L93 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule slAdjust(I:Int, LEN:Int, STEP:Int) => clampHi(I, LEN, STEP) requires I >=Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L96 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= clampLo(Int, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L97 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule clampLo(J:Int, _STEP:Int) => J requires J >=Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L99 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule clampLo(J:Int, STEP:Int) => #if STEP <Int 0 #then -1 #else 0 #fi requires J <Int 0`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L102 · syntax · function-declaration · attrs: function, total · **ACCEPT_FIXED**
+  - `syntax Int ::= clampHi(Int, Int, Int) [function, total]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L103 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule clampHi(I:Int, LEN:Int, _STEP:Int) => I requires I <Int LEN`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L105 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule clampHi(I:Int, LEN:Int, STEP:Int) => #if STEP <Int 0 #then LEN -Int 1 #else LEN #fi requires I >=Int LEN`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L109 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax ValSeq ::= buildVS(ValSeq, Int, Int, Int) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L110 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule buildVS(VS:ValSeq, I:Int, STOP:Int, STEP:Int) => vCons(valSeqAt(VS, I), buildVS(VS, I +Int STEP, STOP, STEP)) requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L113 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule buildVS(_:ValSeq, I:Int, STOP:Int, STEP:Int) => .ValSeq requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L116 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax IntSeq ::= buildIS(IntSeq, Int, Int, Int) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L117 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule buildIS(IS:IntSeq, I:Int, STOP:Int, STEP:Int) => iCons(intSeqAt(IS, I), buildIS(IS, I +Int STEP, STOP, STEP)) requires (STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L120 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule buildIS(_:IntSeq, I:Int, STOP:Int, STEP:Int) => .IntSeq requires notBool ((STEP >Int 0 andBool I <Int STOP) orBool (STEP <Int 0 andBool I >Int STOP))`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/syntax.k`
+
+- L9 · syntax · macro-declaration · attrs: macro, strict, seqstrict · **ACCEPT_FIXED**
+  - `syntax Expr ::= "Int" "(" Int ")" | "Float" "(" Float ")" | "Bool" "(" Bool ")" | "Name" "(" String ")" | "Str" "(" String ")" | "UnaryOp" "(" String "," Expr ")" [strict(2)] | "BinOp" "(" String "," Expr "," Expr ")" [seqstrict(2, 3)] | "BoolOp" "(" String "," Exprs ")" | "ListExpr" "(" Exprs ")" | "DictExpr" "(" Entries ")" | "ListComp" "(" Expr "," CompFors ")" [macro] | "GenExp" "(" Expr "," CompFors ")" [macro] | "TupleExpr" "(" Exprs ")" | "Subscript" "(" Expr "," Index ")" | "IfExp" "(" Expr "," Expr "," Expr ")" [strict(1)] | "Lambda" "(" Params "," Expr ")" | "KwArg" "(" String "," Expr ")" | "Lambda" "(" Params "," CellVars "," FreeVars "," Expr ")" | "NoneVal" | "Call" "(" Expr "," Exprs ")" | "Attribute" "(" Expr "," String ")" [strict(1)] | "Compare" "(" Expr "," CmpOp ")"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L32 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L33 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Entry ::= "Entry" "(" Expr "," Expr ")"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L34 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Entries ::= List{Entry, ","}`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L35 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax CompFor ::= "CompFor" "(" Expr "," Expr "," Exprs ")"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L36 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax CompFors ::= List{CompFor, ""}`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L37 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Exprs ::= List{Expr, ","}`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L38 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Index ::= Expr | "Slice" "(" Bound "," Bound "," Bound ")"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L39 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Bound ::= Expr | "NoBound"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L41 · syntax · syntax-declaration · attrs: strict · **ACCEPT_FIXED**
+  - `syntax Stmt ::= "Assign" "(" Expr "," Expr ")" [strict(2)] | "Import" "(" String ")" | "ImportFrom" "(" String "," ParamNames ")" | "AugAssign" "(" Expr "," String "," Expr ")" [strict(3)] | "For" "(" Expr "," Expr "," Stmts ")" [strict(2)] | "While" "(" Expr "," Stmts ")" | "Break" | "Continue" | "If" "(" Expr "," Stmts "," Stmts ")" [strict(1)] | "Return" "(" Expr ")" [strict] | "Assert" "(" Expr ")" [strict] | "Expr" "(" Expr ")" [strict] | "FuncDef" "(" String "," Params "," Stmts ")" | "FuncDef" "(" String "," Params "," CellVars "," FreeVars "," Stmts ")"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L56 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Stmts ::= List{Stmt, ""}`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L57 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Params ::= "Params" "(" ParamNames ")"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L58 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax CellVars ::= "CellVars" "(" ParamNames ")"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L59 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax FreeVars ::= "FreeVars" "(" ParamNames ")"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L60 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax ParamNames ::= List{String, ","}`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L61 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax Module ::= "Module" "(" Stmts ")"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `reference-semantics/semantics/tuple.k`
+
+- L10 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterNext(tuple(.ValSeq)) => #iterDone ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L11 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #iterNext(tuple(vCons(V:Val, R:ValSeq))) => #iterYield(V, tuple(R)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L14 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax ApplyK ::= "toTuple"`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L15 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> TupleExpr(ES:Exprs) => #evalArgs(ES, .Vals, toTuple) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L16 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #applyK(toTuple, ACC:Vals) => tuple(vals2valSeq(ACC)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L18 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("==", tuple(A:ValSeq), tuple(B:ValSeq)) => A ==K B`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L20 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Compare(LV:Val, CmpOp("in", tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L21 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Compare(LV:Val, CmpOp("not in", tuple(VS:ValSeq))) => #memberAcc(LV, tuple(VS)) ~> #notB ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L23 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyMethod(tuple(VS:ValSeq), "index", V:Val, .Vals) => idxOfVS(VS, V, 0)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L24 · syntax · function-declaration · attrs: function · **ACCEPT_FIXED**
+  - `syntax Int ::= idxOfVS(ValSeq, Val, Int) [function]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L25 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule idxOfVS(vCons(A:Val, _:ValSeq), V:Val, I:Int) => I requires A ==K V`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L26 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule idxOfVS(vCons(A:Val, R:ValSeq), V:Val, I:Int) => idxOfVS(R, V, I +Int 1) requires notBool (A ==K V)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L28 · rule · equation-or-macro-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule applyCmp("!=", tuple(A:ValSeq), tuple(B:ValSeq)) => notBool (A ==K B)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L31 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #bindTgt(Expr, Val)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L32 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #bindTgt(Name(X:String), V:Val) => .K ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L35 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #bindTgt(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k> <env> L:Int </env> <scopes> ... L |-> scope(M:Map, _) ... </scopes> requires "$cells" in_keys(M) andBool pnMember(X, cellsOf({M["$cells"]}:>Val)) andBool X in_keys(M) andBool isCellRef({M[X]}:>Val) [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L42 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #bindTgt(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L43 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #bindTgt(TupleExpr(TS:Exprs), list(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L44 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> #bindTgt(TupleExpr(TS:Exprs), ref(H:Int)) => #bindTgt(TupleExpr(TS), V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L49 · syntax · syntax-declaration · attrs: none · **ACCEPT_FIXED**
+  - `syntax KItem ::= #unpackSeq(Exprs, ValSeq)`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L50 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Assign(TupleExpr(TS:Exprs), tuple(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L51 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> Assign(TupleExpr(TS:Exprs), list(VS:ValSeq)) => #unpackSeq(TS, VS) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L52 · rule · operational-rule · attrs: priority( · **ACCEPT_FIXED**
+  - `rule <k> Assign(TupleExpr(TS:Exprs), ref(H:Int)) => Assign(TupleExpr(TS), V) ... </k> <heap> ... H |-> V:Val ... </heap> [priority(40)]`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L55 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #unpackSeq((T:Expr, TS:Exprs), vCons(V:Val, VS:ValSeq)) => #bindTgt(T, V) ~> #unpackSeq(TS, VS) ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+- L57 · rule · operational-rule · attrs: none · **ACCEPT_FIXED**
+  - `rule <k> #unpackSeq(.Exprs, .ValSeq) => .K ... </k>`
+  - Decision basis: byte-identical supplied-semantics baseline; fixed theory, with used-path rules separately checked for applicability and fidelity.
+
+## `verification.k`
+
+- L9 · rule · equation-or-macro-rule · attrs: none · **SOUND**
+  - `rule (1 |-> _FRAME:Scope REST:Map) [1 <- undef] => REST requires notBool (1 in_keys(REST))`
+  - Decision basis: Map deletion normalization: removing known key 1 from a disjoint 1-binding plus remainder yields exactly the remainder.
+- L15 · syntax · function-declaration · attrs: function · **SOUND**
+  - `syntax Stmts ::= "intersectionBody" [function]`
+  - Decision basis: name-only function declaration for an exact submitted statement list.
+- L16 · rule · equation-or-macro-rule · attrs: none · **SOUND**
+  - `rule intersectionBody => Assign(Name("left"), Call(Name("max"), Subscript(Name("interval1"), Int(0)), Subscript(Name("interval2"), Int(0)), .Exprs)) Assign(Name("right"), Call(Name("min"), Subscript(Name("interval1"), Int(1)), Subscript(Name("interval2"), Int(1)), .Exprs)) Assign(Name("length"), BinOp("-", Name("right"), Name("left"))) If(Compare(Name("length"), CmpOp("<=", Int(1))), Return(Str("NO")) .Stmts, .Stmts) Assign(Name("divisor"), Int(2)) For(Name("divisor"), Call(Name("range"), Int(2), Name("length"), .Exprs), divisorBody) Return(Str("YES")) .Stmts`
+  - Decision basis: transparent definitional expansion; constructor-for-constructor match to the trusted regeneration of solution.mpy.
+- L37 · syntax · function-declaration · attrs: function · **SOUND**
+  - `syntax Stmts ::= "divisorBody" [function]`
+  - Decision basis: name-only function declaration for an exact submitted statement list.
+- L38 · rule · equation-or-macro-rule · attrs: none · **SOUND**
+  - `rule divisorBody => If(Compare(BinOp("%", Name("length"), Name("divisor")), CmpOp("==", Int(0))), Return(Str("NO")) .Stmts, .Stmts) .Stmts`
+  - Decision basis: transparent definitional expansion; constructor-for-constructor match to the trusted regeneration of solution.mpy.
+- L46 · syntax · function-declaration · attrs: function · **SOUND**
+  - `syntax Val ::= "yesV" [function] | "noV" [function]`
+  - Decision basis: name-only function declarations for the two concrete result strings.
+- L48 · rule · equation-or-macro-rule · attrs: none · **SOUND**
+  - `rule yesV => str(iCons(89, iCons(69, iCons(83, .IntSeq))))`
+  - Decision basis: transparent ASCII encoding of YES or NO.
+- L49 · rule · equation-or-macro-rule · attrs: none · **SOUND**
+  - `rule noV => str(iCons(78, iCons(79, .IntSeq)))`
+  - Decision basis: transparent ASCII encoding of YES or NO.
+- L53 · syntax · function-declaration · attrs: function · **SOUND**
+  - `syntax Val ::= primeFrom(Int, Int) [function] | primeResult(Int) [function]`
+  - Decision basis: transparent mathematical helper declarations; no opacity or total axiom.
+- L55 · rule · equation-or-macro-rule · attrs: none · **SOUND**
+  - `rule primeFrom(N:Int, D:Int) => yesV requires D >=Int N`
+  - Decision basis: disjoint, exhaustive divisor-search equations over the reachable domain D >= 2; recursive case strictly increases D toward N.
+- L57 · rule · equation-or-macro-rule · attrs: none · **SOUND**
+  - `rule primeFrom(N:Int, D:Int) => noV requires D <Int N andBool pyMod(N, D) ==Int 0`
+  - Decision basis: disjoint, exhaustive divisor-search equations over the reachable domain D >= 2; recursive case strictly increases D toward N.
+- L59 · rule · equation-or-macro-rule · attrs: none · **SOUND**
+  - `rule primeFrom(N:Int, D:Int) => primeFrom(N, D +Int 1) requires D <Int N andBool pyMod(N, D) =/=Int 0`
+  - Decision basis: disjoint, exhaustive divisor-search equations over the reachable domain D >= 2; recursive case strictly increases D toward N.
+- L62 · rule · equation-or-macro-rule · attrs: none · **SOUND**
+  - `rule primeResult(N:Int) => noV requires N <=Int 1`
+  - Decision basis: disjoint and exhaustive prime-result equations.
+- L64 · rule · equation-or-macro-rule · attrs: none · **SOUND**
+  - `rule primeResult(N:Int) => primeFrom(N, 2) requires N >Int 1`
+  - Decision basis: disjoint and exhaustive prime-result equations.
+- L67 · syntax · function-declaration · attrs: function · **SOUND**
+  - `syntax Int ::= overlapLength(Int, Int, Int, Int) [function]`
+  - Decision basis: transparent overlap-length helper declaration.
+- L68 · rule · equation-or-macro-rule · attrs: none · **SOUND**
+  - `rule overlapLength(A:Int, B:Int, C:Int, D:Int) => minInt(B, D) -Int maxInt(A, C)`
+  - Decision basis: closed-interval overlap length min(endpoints)-max(starts), matching the task's length convention.
+- L78 · rule · operational-rule · attrs: priority( · **SOUND_DERIVED**
+  - `rule <k> #loop(rangeObj(DIVISOR:Int, LENGTH:Int, 1), Name("divisor"), If(Compare(BinOp("%", Name("length"), Name("divisor")), CmpOp("==", Int(0))), Return(Str("NO")) .Stmts, .Stmts) .Stmts) ~> (Return(Str("YES")) .Stmts) ~> #endcall => primeFrom(LENGTH, DIVISOR) ~> KONT:K </k> <env> 1 => 0 </env> <scopes> SC:Map 1 |-> scope( "interval1" |-> _INTERVAL1:Val "interval2" |-> _INTERVAL2:Val "left" |-> _LEFT:Int "right" |-> _RIGHT:Int "length" |-> LENGTH "divisor" |-> _OLD:Int, parent(0)) => SC </scopes> <scopeLoc> 2 => 1 </scopeLoc> <stack> ListItem(frame(KONT, 0, 1)) => .List </stack> <ret> noRet </ret> requires 2 <=Int DIVISOR andBool DIVISOR <=Int LENGTH [priority(40)]`
+  - Decision basis: operational loop summary is the independently proved LOOP-SPEC claim over the same body, suffix, stack, cells, and guard.
+
+## `spec.k`
+
+- L8 · claim · reachability-claim · attrs: none · **CLAIM**
+  - `claim <k> #loop(rangeObj(DIVISOR:Int, LENGTH:Int, 1), Name("divisor"), divisorBody) ~> (Return(Str("YES")) .Stmts) ~> #endcall => primeFrom(LENGTH, DIVISOR) ~> KONT:K </k> <env> 1 => 0 </env> <scopes> SC:Map 1 |-> scope( "interval1" |-> INTERVAL1:Val "interval2" |-> INTERVAL2:Val "left" |-> LEFT:Int "right" |-> RIGHT:Int "length" |-> LENGTH "divisor" |-> OLD:Int, parent(0)) => SC </scopes> <scopeLoc> 2 => 1 </scopeLoc> <stack> ListItem(frame(KONT, 0, 1)) => .List </stack> <ret> noRet </ret> requires 2 <=Int DIVISOR andBool DIVISOR <=Int LENGTH [label(loop-correct)]`
+  - Decision basis: positive theorem obligation; independently rebuilt and audited below.
+- L41 · claim · reachability-claim · attrs: none · **CLAIM**
+  - `claim <k> Call(Name("intersection"), TupleExpr(Int(A:Int), Int(B:Int), .Exprs), TupleExpr(Int(C:Int), Int(D:Int), .Exprs), .Exprs) => primeResult(overlapLength(A, B, C, D)) </k> <env> 0 </env> <scopes> 0 |-> scope( "intersection" |-> closureVal(("interval1", "interval2", .ParamNames), intersectionBody, 0), parent(-1)) -1 |-> builtinsScope </scopes> <scopeLoc> 1 </scopeLoc> <heap> .Map </heap> <heapLoc> 0 </heapLoc> <stack> .List </stack> <ret> noRet </ret> <exc> NoExc </exc> <exit-code> 0 </exit-code> requires A <=Int B andBool C <=Int D [label(intersection-correct)]`
+  - Decision basis: positive theorem obligation; independently rebuilt and audited below.
+

@@ -1,0 +1,280 @@
+$ find /reference -mindepth 1 -maxdepth 1 -printf "%f %y
+" | sort
+generation-tools d
+k-audit d
+k-proof d
+klean-generation d
+klean-toolchain.lock.json f
+lemma-discovery.json f
+tools d
+
+$ sed -n "1,120p" /reference/k-proof/reference-semantics/semantics/core.k
+// reference/src/semantics/core.k — MPY-CORE
+
+module MPY-CORE
+  imports MPY-SYNTAX
+  imports INT
+  imports BOOL
+  imports STRING
+  imports MAP
+  imports LIST
+  imports K-EQUAL
+
+  // ==== values, the algebraic lists, and the scope heap =====================
+  syntax IntSeq ::= ".IntSeq" | iCons(Int, IntSeq)
+  syntax ValSeq ::= ".ValSeq" | vCons(Val, ValSeq)
+  syntax Str    ::= str(IntSeq)
+
+  // the iterable values, grouped under one sort (typing only — dispatch is <k>-cell)
+  syntax Iterable ::= list(ValSeq)
+                    | tuple(ValSeq)
+                    | Str
+                    | rangeObj(Int, Int, Int)
+                    | zipObj(ValSeq, ValSeq)
+                    | zipObjS(IntSeq, IntSeq)
+
+  syntax Val      ::= Int
+                    | Bool
+                    | "noneV"
+                    | Iterable
+                    | ref(Int)          // a heap object: <heap> holds its list(VS)
+                    | cellRef(Int)      // a closure cell: <heap> holds cellV(V)
+                    | closureVal(ParamNames, Stmts, Int)
+                    | typeV(String)     // a type object (int/str), resolved from the builtins frame
+                    | builtinV(String)  // a builtin function, resolved like any name (LEGB fallthrough)
+                    | boundMethodV(Val, String)   // a cooled Attribute: obj.method
+
+  syntax Parent   ::= "root" | parent(Int)
+  syntax Scope    ::= scope(Map, Parent)
+  syntax KResult  ::= Val
+  syntax Expr     ::= Val   // cooling puts results back into expression holes
+  syntax Vals     ::= List{Val, ","}
+  syntax Exc      ::= "NoExc" | "AssertionError"
+  syntax RetState ::= "noRet" | retV(Val)
+
+  // ==== configuration =======================================================
+  // The builtins namespace is a real scope at reserved location -1 (the bottom of every
+  // chain; scopeLoc only allocates >=1, so -1 never collides). The module scope (loc 0)
+  // has it as parent, so an unbound name resolves there last — exactly LEGB. `int`/`str`
+  // resolve to their type objects; any local/global binding shadows them via normal lookup.
+  configuration
+    <k>       #loadAll($PGM:Module) </k>
+    <env>     0 </env>
+    <scopes>   0     |-> scope(.Map, parent(-1))
+              -1    |-> builtinsScope </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap>    .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack>   .List </stack>
+    <ret>     noRet </ret>
+    <exc>     NoExc </exc>
+    <exit-code exit=""> 0 </exit-code>
+
+  // ==== heap allocation (constructed lists become objects) ==================
+  // Cons-form emission with a freshness guard (the heap-list-probe discipline:
+  // an update-form H[N <- _] never re-normalizes symbolically). heapLoc is
+  // monotonic — it does NOT wind back at #pop: returned lists escape by ref.
+  // A bare list(VS) Val stays legal (read-only inputs in claims flow unboxed);
+  // only CONSTRUCTORS in program syntax allocate.
+  syntax Bool ::= isRefV(Val) [function, total]
+  rule isRefV(ref(_:Int)) => true
+  rule isRefV(_:Val)      => false [owise]
+
+  // closure cells (Python-faithful capture): the heap holds cellV(V); a
+  // cellRef surfacing as the k-redex reads through (lookup is the only use —
+  // cellRefs never escape to user-visible values)
+  syntax HeapVal ::= cellV(Val)
+  syntax Bool ::= isCellRef(Val) [function, total]
+  rule isCellRef(cellRef(_:Int)) => true
+  rule isCellRef(_:Val)          => false [owise]
+  // k-top deref for cell-bound reads surfacing INSIDE the annotated frame
+  // (AugAssign's in-place read and friends). The "$cells" guard keeps this
+  // DECIDABLY inapplicable in plain frames — an unguarded rule lets the
+  // prover narrow abstract k-top values into cellRef junk (probed on
+  // 26-remove-duplicates). Cross-frame reads (a comprehension closure
+  // reading the enclosing function's cellvar) deref inside #look instead.
+  rule <k> cellRef(H:Int) => V ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       <heap> ... H |-> cellV(V:Val) ... </heap>
+       requires "$cells" in_keys(M)
+       [priority(40)]
+
+  // write through a cell (Assign / #bindP / #bindTgt dispatch here on
+  // cell-bound names)
+  // a keyword argument cools to a TAGGED value (consumed by kw-aware builtins)
+  syntax Val ::= kwV(String, Val)
+  syntax KItem ::= #kwTag(String)
+  rule <k> KwArg(N:String, E:Expr) => E ~> #kwTag(N) ... </k>
+  rule <k> V:Val ~> #kwTag(N:String) => kwV(N, V) ... </k>
+       requires notBool isKwV(V)
+  syntax Bool ::= isKwV(Val) [function, total]
+  rule isKwV(kwV(_:String, _:Val)) => true
+  rule isKwV(_:Val)                => false [owise]
+
+  // the frame marker carries the CONCRETE cellvar list, so cell-write dispatch
+  // decides by pnMember even over an abstract frame rest (no prover branching)
+  syntax Val ::= cellsMark(ParamNames)
+  syntax ParamNames ::= cellsOf(Val) [function]
+  rule cellsOf(cellsMark(CVS:ParamNames)) => CVS
+  syntax Bool ::= pnMember(String, ParamNames) [function, total]
+  rule pnMember(_:String, .ParamNames) => false
+  rule pnMember(X:String, (P:String, R:ParamNames)) => X ==String P orBool pnMember(X, R)
+
+  syntax KItem ::= #cellW(Val, Val)
+  rule <k> #cellW(cellRef(H:Int), V:Val) => .K ... </k>
+       <heap> ... H |-> cellV(_:Val => V) ... </heap>
+
+  syntax KItem ::= #alloc(Val)
+  rule <k> #alloc(V:Val) => ref(N) ... </k>
+       <heap>    H:Map => (N |-> V) H </heap>
+       <heapLoc> N:Int => N +Int 1 </heapLoc>
+
+$ sed -n "1,75p" /reference/k-proof/reference-semantics/semantics/methods.k
+// reference/src/semantics/methods.k — MPY-METHODS
+
+module MPY-METHODS
+  imports MPY-CORE
+  imports K-EQUAL
+  imports MPY-STR
+  imports MPY-LIST
+
+  // method-call routing + arg-eval live in call.k; this module owns applyMethod.
+  syntax Val ::= applyMethod(Val, String, Vals) [function]
+
+  // ==== string predicates (Python semantics) =================================
+  rule applyMethod(str(CS:IntSeq), "isupper", .Vals) => hasUpper(CS) andBool notBool hasLower(CS)
+  rule applyMethod(str(CS:IntSeq), "islower", .Vals) => hasLower(CS) andBool notBool hasUpper(CS)
+  rule applyMethod(str(CS:IntSeq), "isalpha", .Vals) => notBool (CS ==K .IntSeq) andBool allAlpha(CS)
+  rule applyMethod(str(CS:IntSeq), "isdigit", .Vals) => notBool (CS ==K .IntSeq) andBool allDigit(CS)
+
+  // ==== case maps ============================================================
+  rule applyMethod(str(CS:IntSeq), "lower",    .Vals) => str(mapLower(CS))
+  rule applyMethod(str(CS:IntSeq), "upper",    .Vals) => str(mapUpper(CS))
+  rule applyMethod(str(CS:IntSeq), "swapcase", .Vals) => str(mapSwap(CS))
+
+  // ==== join / count / strip / encode ========================================
+  // S.join(list-of-str): fold with separator codes (receiver + arg deref'd by
+  // the call layer; the result str is a value)
+  rule applyMethod(str(SEP:IntSeq), "join", list(VS:ValSeq), .Vals) => str(joinCodes(SEP, VS))
+  syntax IntSeq ::= joinCodes(IntSeq, ValSeq) [function, total]
+  rule joinCodes(_:IntSeq, .ValSeq) => .IntSeq
+  rule joinCodes(_:IntSeq, vCons(str(CS:IntSeq), .ValSeq)) => CS
+  rule joinCodes(SEP:IntSeq, vCons(str(CS:IntSeq), vCons(V:Val, R:ValSeq)))
+    => seqConcat(CS, seqConcat(SEP, joinCodes(SEP, vCons(V, R))))
+
+  // S.count(sub): non-overlapping window scan (Python str.count)
+  rule applyMethod(str(CS:IntSeq), "count", str(PC:IntSeq), .Vals) => cntSub(CS, PC)
+  syntax Int ::= cntSub(IntSeq, IntSeq) [function]
+  rule cntSub(.IntSeq, _:IntSeq) => 0
+  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => 1 +Int cntSub(dropIS(iCons(C, R), isLen(PC)), PC)
+       requires strPrefix(PC, iCons(C, R)) andBool isLen(PC) >Int 0
+  rule cntSub(iCons(C:Int, R:IntSeq), PC:IntSeq) => cntSub(R, PC)
+       requires notBool strPrefix(PC, iCons(C, R)) orBool isLen(PC) <=Int 0
+  syntax IntSeq ::= dropIS(IntSeq, Int) [function, total]
+  rule dropIS(S:IntSeq, N:Int) => S requires N <=Int 0
+  rule dropIS(.IntSeq, _:Int) => .IntSeq [owise]
+  rule dropIS(iCons(_:Int, R:IntSeq), N:Int) => dropIS(R, N -Int 1) requires N >Int 0
+
+  // S.strip(): trim whitespace runs from both ends
+  rule applyMethod(str(CS:IntSeq), "strip", .Vals) => str(revIS(trimWS(revIS(trimWS(CS)))))
+  syntax IntSeq ::= trimWS(IntSeq) [function, total]
+  rule trimWS(.IntSeq) => .IntSeq
+  rule trimWS(iCons(C:Int, R:IntSeq)) => trimWS(R) requires isWSC(C)
+  rule trimWS(iCons(C:Int, R:IntSeq)) => iCons(C, R) requires notBool isWSC(C)
+  syntax IntSeq ::= revIS(IntSeq) [function, total] | revISAcc(IntSeq, IntSeq) [function, total]
+  rule revIS(S:IntSeq) => revISAcc(S, .IntSeq)
+  rule revISAcc(.IntSeq, A:IntSeq) => A
+  rule revISAcc(iCons(C:Int, R:IntSeq), A:IntSeq) => revISAcc(R, iCons(C, A))
+
+  // S.encode('ascii'): identity on the code-sequence model (bytes == codes)
+  rule applyMethod(str(CS:IntSeq), "encode", str(_:IntSeq), .Vals) => str(CS)
+
+  // ==== prefix ===============================================================
+  rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)
+
+  // ==== list.count(v) — number of occurrences of v in the list (concrete for krun) ==========
+  rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)
+  syntax Int ::= cntOccVS(ValSeq, Val) [function, total]
+  rule cntOccVS(.ValSeq, _:Val)                => 0
+  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V
+  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => cntOccVS(R, V)        requires notBool (A ==K V)
+
+  // ==== split (no-arg: on whitespace runs, dropping empty tokens) + replace (single char) ==========
+  // Concrete string ops for krun. A proof over a symbolic string intercepts the split problem-locally.
+  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals)
+        => #alloc(list(splitWS(CS, .IntSeq, .ValSeq))) ... </k>
+       [priority(40)]
+  syntax ValSeq ::= splitWS(IntSeq, IntSeq, ValSeq) [function]  // remaining, current token, result
+
+$ sed -n "1,70p" /reference/k-proof/reference-semantics/semantics/call.k
+// reference/src/semantics/call.k — MPY-CALL
+// ONE call route for every callable: evaluate the callee to a VALUE (name lookup reaches
+// builtins at the root; a cooled Attribute is a bound method), evaluate the args (the shared
+// #evalArgs loop in core.k), then dispatch on the callee value:
+//   closureVal    -> bind params, push a frame (user function)
+//   boundMethodV  -> applyMethod
+//   builtinV      -> the #iterNext folds (sum/all/any/max/min) or applyBuiltin
+//   typeV         -> callable type objects: int(...) / str(...)
+
+module MPY-CALL
+  imports MPY-METHODS
+  imports MPY-BUILTINS
+  imports MPY-FUNCTIONS
+
+  // a cooled attribute is a bound method value
+  rule <k> Attribute(V:Val, M:String) => boundMethodV(V, M) ... </k>
+
+  // evaluate callee, then args ([owise]: problem-local Call interceptions beat this)
+  syntax KItem ::= #callee(Exprs)
+  rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]
+  rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>
+
+  // ==== dispatch on the callee value ========================================
+  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>
+
+  rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>
+  rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ)    ... </k>
+  rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ)    ... </k>
+  rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ)   ... </k>
+  rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ)   ... </k>
+  rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]
+  rule <k> #applyK(toCall(typeV(T:String)),     ACC:Vals) => applyBuiltin(T, ACC)  ... </k>
+
+  // ==== heap-object arguments/receivers =====================================
+  // Builtins and type calls READ structure — deref the first two arg positions
+  // (covers len/sum/all/any/max/min/sorted/list/set + zip's pair). Mutating list
+  // methods take the ref itself; every other method receiver is deref'd.
+  rule <k> #applyK(toCall(builtinV(BN:String)), (ref(H:Int), REST:Vals))
+        => #applyK(toCall(builtinV(BN)), (V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> #applyK(toCall(builtinV(BN:String)), (A:Val, ref(H:Int), REST:Vals))
+        => #applyK(toCall(builtinV(BN)), (A, V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isRefV(A)
+       [priority(40)]
+  rule <k> #applyK(toCall(typeV(T:String)), (ref(H:Int), REST:Vals))
+        => #applyK(toCall(typeV(T)), (V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+
+  syntax Bool ::= isMutMethod(String) [function, total]
+  rule isMutMethod(M:String)
+    => M ==String "append" orBool M ==String "sort" orBool M ==String "extend"
+       orBool M ==String "insert" orBool M ==String "pop" orBool M ==String "remove"
+  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), M:String)), ACC:Vals)
+        => #applyK(toCall(boundMethodV(V, M)), ACC) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isMutMethod(M)
+       [priority(40)]
+  // non-mutating methods READ their heap-object arguments too (join's list);
+  // mutators keep refs (append of a list into a list-of-lists stays aliased)
+  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), (ref(H:Int), REST:Vals))
+        => #applyK(toCall(boundMethodV(OBJ, M)), (V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isMutMethod(M) andBool notBool isRefV(OBJ)
+       [priority(40)]
+
+  rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT
+        => #bindP(PNS, ACC) ~> BODY ~> #endcall </k>

@@ -1,0 +1,333 @@
+WORKDIR: /tmp/audit-work/127-intersection/run
+COMMAND: bash -lc sha256sum\ semantic.k\ verification.k\ spec.k\ solution.mpy\ solution.py\;\ nl\ -ba\ semantic.k\;\ nl\ -ba\ verification.k\;\ nl\ -ba\ spec.k\;\ printf\ \"ATTRIBUTE_SCAN\\n\"\;\ rg\ -n\ \"\\\[\(function\|total\|functional\|simplification\|concrete\|priority\|anywhere\|macro\|macro-rec\)\"\ semantic.k\ verification.k\ spec.k\ \|\|\ true\;\ printf\ \"OPAQUE_SCAN\\n\"\;\ rg\ -n\ \"opaque\|uninterpreted\|fresh\|oracle\"\ semantic.k\ verification.k\ spec.k\ \|\|\ true
+29c7c9e45312281f604f6a3e8be5cc8bbb1bbc21edd4fd2cffd163171bb4d281  semantic.k
+b7549128466e618963d244db3435eb29c15072b19a02367e9c6b876a276ae23f  verification.k
+3098ceaa336021fd1dc8f4a9fcbce90a65d569e41567b33335d2d7e19b83e4f4  spec.k
+50e2785172fe16e32b01bf02041d6aa4672707b205cafd12b2bc30c201f3627e  solution.mpy
+d0392ab2adaaa58149550e1dfe37ba56dd7b6c72003cbf31d43e080dca4133cf  solution.py
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports BOOL-SYNTAX
+     6	  imports STRING-SYNTAX
+     7	
+     8	  syntax Program ::= "Module" "(" Stmts ")" [symbol(module)]
+     9	
+    10	  syntax Stmts ::= List{Stmt, ""}
+    11	  syntax Params ::= "Params" "(" String "," String ")" [symbol(params)]
+    12	
+    13	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")" [symbol(funcDef)]
+    14	                | "Assign" "(" Expr "," Expr ")"                 [symbol(assign)]
+    15	                | "If" "(" Expr "," Stmts "," Stmts ")"       [symbol(ifStmt)]
+    16	                | "While" "(" Expr "," Stmts ")"               [symbol(whileStmt)]
+    17	                | "Return" "(" Expr ")"                         [symbol(returnStmt)]
+    18	
+    19	  syntax Cmp ::= "CmpOp" "(" String "," Expr ")" [symbol(cmpOp)]
+    20	
+    21	  syntax Expr ::= "Int" "(" Int ")"                         [symbol(intExpr)]
+    22	                | "Str" "(" String ")"                      [symbol(strExpr)]
+    23	                | "Name" "(" String ")"                     [symbol(nameExpr)]
+    24	                | "TupleExpr" "(" Expr "," Expr ")"        [symbol(tupleExpr)]
+    25	                | "Subscript" "(" Expr "," Expr ")"        [symbol(subscript)]
+    26	                | "BinOp" "(" String "," Expr "," Expr ")" [symbol(binOp)]
+    27	                | "Compare" "(" Expr "," Cmp ")"            [symbol(compare)]
+    28	endmodule
+    29	
+    30	module MPY
+    31	  imports MPY-SYNTAX
+    32	  imports INT
+    33	  imports BOOL
+    34	  imports STRING
+    35	  imports MAP
+    36	
+    37	  syntax Value ::= "intVal" "(" Int ")"
+    38	                 | "strVal" "(" String ")"
+    39	                 | "boolVal" "(" Bool ")"
+    40	                 | "tupleVal" "(" Value "," Value ")"
+    41	                 | "unbound"
+    42	  syntax Expr ::= Value
+    43	  syntax KResult ::= Value
+    44	
+    45	  syntax Function ::= "function" "(" String "," String "," Stmts ")"
+    46	
+    47	  syntax KItem ::= Program | Stmt | Stmts | Expr
+    48	                 | "runWith" "(" Expr "," Expr ")"
+    49	                 | "saveFirstArg" "(" Expr ")"
+    50	                 | "saveSecondArg" "(" Value ")"
+    51	                 | "invoke" "(" String "," Value "," Value ")"
+    52	                 | "assignTo" "(" String ")"
+    53	                 | "choose" "(" Stmts "," Stmts ")"
+    54	                 | "loopGuard" "(" Expr "," Stmts ")"
+    55	                 | "functionReturn"
+    56	
+    57	  configuration
+    58	    <mpy>
+    59	      <k> $PGM:Program ~> runWith($INTERVAL1:Expr, $INTERVAL2:Expr) </k>
+    60	      <functions> .Map </functions>
+    61	      <env> .Map </env>
+    62	    </mpy>
+    63	
+    64	  // Module loading and entry-point invocation.
+    65	  rule <k> Module(S) => S ...</k>
+    66	  rule <k> .Stmts => .K ...</k>
+    67	  rule <k> (S:Stmt SS:Stmts) => S ~> SS ...</k>
+    68	
+    69	  rule <k> FuncDef(F, Params(P1, P2), BODY) => .K ...</k>
+    70	       <functions> .Map => F |-> function(P1, P2, BODY) </functions>
+    71	
+    72	  rule <k> runWith(A, B) => A ~> saveFirstArg(B) ...</k>
+    73	  rule <k> V:Value ~> saveFirstArg(B) => B ~> saveSecondArg(V) ...</k>
+    74	  rule <k> V2:Value ~> saveSecondArg(V1) => invoke("intersection", V1, V2) ...</k>
+    75	
+    76	  rule <k> invoke(F, V1, V2) => BODY ...</k>
+    77	       <functions> F |-> function(P1, P2, BODY) </functions>
+    78	       <env> _ =>
+    79	         P1 |-> V1
+    80	         P2 |-> V2
+    81	         "left"    |-> unbound
+    82	         "right"   |-> unbound
+    83	         "length"  |-> unbound
+    84	         "divisor" |-> unbound
+    85	       </env>
+    86	
+    87	  // Statement execution.
+    88	  rule <k> Assign(Name(X), E) => E ~> assignTo(X) ...</k>
+    89	  rule <k> V:Value ~> assignTo(X) => .K ...</k>
+    90	       <env>... X |-> (_ => V) ...</env>
+    91	
+    92	  rule <k> If(COND, THEN, ELSE) => COND ~> choose(THEN, ELSE) ...</k>
+    93	  rule <k> boolVal(true)  ~> choose(THEN, _) => THEN ...</k>
+    94	  rule <k> boolVal(false) ~> choose(_, ELSE) => ELSE ...</k>
+    95	
+    96	  rule <k> While(COND, BODY) => COND ~> loopGuard(COND, BODY) ...</k>
+    97	  rule <k> boolVal(true)  ~> loopGuard(COND, BODY) => BODY ~> While(COND, BODY) ...</k>
+    98	  rule <k> boolVal(false) ~> loopGuard(_, _) => .K ...</k>
+    99	
+   100	  // A return abandons the rest of the current function body, including a
+   101	  // surrounding loop continuation, and leaves the returned Value in <k>.
+   102	  rule <k> Return(E) ~> _REST => E ~> functionReturn </k>
+   103	  rule <k> V:Value ~> functionReturn => V ...</k>
+   104	
+   105	  // Expression execution.  Contexts make operands evaluate left-to-right.
+   106	  rule <k> Int(I) => intVal(I) ...</k>
+   107	  rule <k> Str(S) => strVal(S) ...</k>
+   108	  rule <k> Name(X) => V ...</k>
+   109	       <env>... X |-> V ...</env>
+   110	
+   111	  context TupleExpr(HOLE, _)
+   112	  context TupleExpr(_V:Value, HOLE)
+   113	  rule <k> TupleExpr(V1:Value, V2:Value) => tupleVal(V1, V2) ...</k>
+   114	
+   115	  context Subscript(HOLE, _)
+   116	  context Subscript(_V:Value, HOLE)
+   117	  rule <k> Subscript(tupleVal(V0, _), intVal(0)) => V0 ...</k>
+   118	  rule <k> Subscript(tupleVal(_, V1), intVal(1)) => V1 ...</k>
+   119	
+   120	  context BinOp(_, HOLE, _)
+   121	  context BinOp(_, _V:Value, HOLE)
+   122	  rule <k> BinOp("+", intVal(A), intVal(B)) => intVal(A +Int B) ...</k>
+   123	  rule <k> BinOp("-", intVal(A), intVal(B)) => intVal(A -Int B) ...</k>
+   124	  rule <k> BinOp("*", intVal(A), intVal(B)) => intVal(A *Int B) ...</k>
+   125	  rule <k> BinOp("%", intVal(A), intVal(B)) => intVal(A %Int B) ...</k>
+   126	       requires B =/=Int 0
+   127	
+   128	  rule <k> Compare(A, CmpOp(OP, B)) => compareValues(OP, A, B) ...</k>
+   129	  syntax Expr ::= "compareValues" "(" String "," Expr "," Expr ")"
+   130	  context compareValues(_, HOLE, _)
+   131	  context compareValues(_, _V:Value, HOLE)
+   132	  rule <k> compareValues("<",  intVal(A), intVal(B)) => boolVal(A <Int B) ...</k>
+   133	  rule <k> compareValues("<=", intVal(A), intVal(B)) => boolVal(A <=Int B) ...</k>
+   134	  rule <k> compareValues(">",  intVal(A), intVal(B)) => boolVal(A >Int B) ...</k>
+   135	  rule <k> compareValues("==", intVal(A), intVal(B)) => boolVal(A ==Int B) ...</k>
+   136	endmodule
+     1	requires "semantic.k"
+     2	
+     3	// Mathematical reference layer used by the proof.  primeResult(N,D) is the
+     4	// trial-division definition of primality from candidate divisor D onward.
+     5	// For D = 2 and N >= 2 it is "YES" exactly when N is prime: if D*D > N no
+     6	// factor can remain; otherwise D is tested and the search advances.
+     7	module VERIFICATION
+     8	  imports MPY
+     9	
+    10	  syntax Value ::= "primeResult" "(" Int "," Int ")" [function]
+    11	  rule primeResult(N, D) => strVal("YES")
+    12	       requires D *Int D >Int N
+    13	  rule primeResult(N, D) => strVal("NO")
+    14	       requires D *Int D <=Int N andBool N %Int D ==Int 0
+    15	  rule primeResult(N, D) => primeResult(N, D +Int 1)
+    16	       requires D *Int D <=Int N andBool N %Int D =/=Int 0
+    17	
+    18	  syntax Value ::= "intersectionResult" "(" Int "," Int "," Int "," Int ")"
+    19	                   [function]
+    20	  rule intersectionResult(A, B, C, D) => strVal("NO")
+    21	       requires minInt(B, D) -Int maxInt(A, C) <Int 2
+    22	  rule intersectionResult(A, B, C, D)
+    23	       => primeResult(minInt(B, D) -Int maxInt(A, C), 2)
+    24	       requires minInt(B, D) -Int maxInt(A, C) >=Int 2
+    25	
+    26	  syntax Value ::= "lengthResult" "(" Int ")" [function]
+    27	  rule lengthResult(N) => strVal("NO") requires N <Int 2
+    28	  rule lengthResult(N) => primeResult(N, 2) requires N >=Int 2
+    29	
+    30	  // This is the exact constructor tree generated in solution.mpy.  Keeping it
+    31	  // as one named function makes the claims readable while still making their
+    32	  // subject syntactically precise.
+    33	  syntax Program ::= "solutionProgram" [function]
+    34	  rule solutionProgram =>
+    35	    Module(
+    36	      FuncDef("intersection", Params("interval1", "interval2"),
+    37	        Assign(Name("left"), Subscript(Name("interval1"), Int(0)))
+    38	        If(Compare(
+    39	          Subscript(Name("interval2"), Int(0)),
+    40	          CmpOp(">", Name("left"))),
+    41	          Assign(Name("left"), Subscript(Name("interval2"), Int(0))),
+    42	          .Stmts)
+    43	        Assign(Name("right"), Subscript(Name("interval1"), Int(1)))
+    44	        If(Compare(
+    45	          Subscript(Name("interval2"), Int(1)),
+    46	          CmpOp("<", Name("right"))),
+    47	          Assign(Name("right"), Subscript(Name("interval2"), Int(1))),
+    48	          .Stmts)
+    49	        Assign(Name("length"), BinOp("-", Name("right"), Name("left")))
+    50	        If(Compare(Name("length"), CmpOp("<", Int(2))),
+    51	          Return(Str("NO")),
+    52	          .Stmts)
+    53	        Assign(Name("divisor"), Int(2))
+    54	        While(Compare(
+    55	          BinOp("*", Name("divisor"), Name("divisor")),
+    56	          CmpOp("<=", Name("length"))),
+    57	          If(Compare(
+    58	            BinOp("%", Name("length"), Name("divisor")),
+    59	            CmpOp("==", Int(0))),
+    60	            Return(Str("NO")),
+    61	            .Stmts)
+    62	          Assign(Name("divisor"), BinOp("+", Name("divisor"), Int(1))))
+    63	        Return(Str("YES"))))
+    64	endmodule
+    65	
+    66	// After LOOP-CORRECTNESS-SPEC proves this same reachability fact from the
+    67	// small-step rules, the whole-program proof imports it here as a proof lemma.
+    68	module VERIFICATION-WITH-LOOP-LEMMA
+    69	  imports VERIFICATION
+    70	
+    71	  rule <k>
+    72	         While(Compare(
+    73	           BinOp("*", Name("divisor"), Name("divisor")),
+    74	           CmpOp("<=", Name("length"))),
+    75	           If(Compare(
+    76	             BinOp("%", Name("length"), Name("divisor")),
+    77	             CmpOp("==", Int(0))),
+    78	             Return(Str("NO")),
+    79	             .Stmts)
+    80	           Assign(Name("divisor"), BinOp("+", Name("divisor"), Int(1))))
+    81	         ~> (Return(Str("YES")) .Stmts)
+    82	         => primeResult(N, D)
+    83	       </k>
+    84	       <env>...
+    85	         "length" |-> intVal(N)
+    86	         "divisor" |-> intVal(D)
+    87	       ...</env>
+    88	       requires N >=Int 2 andBool D >=Int 2
+    89	       [priority(40)]
+    90	endmodule
+     1	requires "verification.k"
+     2	
+     3	// Inductive proof of the proof lemma used by the whole-program claim.  The
+     4	// recursive primeResult reference takes exactly the same three branches as
+     5	// one concrete execution of the While: exhausted search, found factor, or
+     6	// advance divisor.  The third branch closes by circularity after progress.
+     7	module LOOP-CORRECTNESS-SPEC
+     8	  imports VERIFICATION
+     9	
+    10	  claim <k>
+    11	          While(Compare(
+    12	            BinOp("*", Name("divisor"), Name("divisor")),
+    13	            CmpOp("<=", Name("length"))),
+    14	            If(Compare(
+    15	              BinOp("%", Name("length"), Name("divisor")),
+    16	              CmpOp("==", Int(0))),
+    17	              Return(Str("NO")),
+    18	              .Stmts)
+    19	            Assign(Name("divisor"), BinOp("+", Name("divisor"), Int(1))))
+    20	          ~> (Return(Str("YES")) .Stmts)
+    21	          => primeResult(N, D)
+    22	        </k>
+    23	        <env> _RHO:Map
+    24	          "length" |-> intVal(N)
+    25	          "divisor" |-> (intVal(D) => ?_VD:Value)
+    26	        </env>
+    27	        requires N >=Int 2 andBool D >=Int 2
+    28	endmodule
+    29	
+    30	// Universal correctness for all integer endpoints satisfying the prompt's
+    31	// interval precondition.  These four claims are the exhaustive choices for
+    32	// max(start1,start2) and min(end1,end2); together their right sides are exactly
+    33	// lengthResult(min(B,D)-max(A,C)).
+    34	module SPEC
+    35	  imports VERIFICATION-WITH-LOOP-LEMMA
+    36	
+    37	  claim <mpy>
+    38	          <k>
+    39	            solutionProgram
+    40	            ~> runWith(
+    41	                 TupleExpr(Int(A), Int(B)),
+    42	                 TupleExpr(Int(C), Int(D)))
+    43	            => lengthResult(B -Int A)
+    44	          </k>
+    45	          <functions> .Map => ?_FUNCTIONS:Map </functions>
+    46	          <env> .Map => ?_ENV:Map </env>
+    47	        </mpy>
+    48	        requires A <=Int B andBool C <=Int D
+    49	          andBool C <=Int A andBool D >=Int B
+    50	
+    51	  claim <mpy>
+    52	          <k>
+    53	            solutionProgram
+    54	            ~> runWith(
+    55	                 TupleExpr(Int(A), Int(B)),
+    56	                 TupleExpr(Int(C), Int(D)))
+    57	            => lengthResult(D -Int A)
+    58	          </k>
+    59	          <functions> .Map => ?_FUNCTIONS:Map </functions>
+    60	          <env> .Map => ?_ENV:Map </env>
+    61	        </mpy>
+    62	        requires A <=Int B andBool C <=Int D
+    63	          andBool C <=Int A andBool D <Int B
+    64	
+    65	  claim <mpy>
+    66	          <k>
+    67	            solutionProgram
+    68	            ~> runWith(
+    69	                 TupleExpr(Int(A), Int(B)),
+    70	                 TupleExpr(Int(C), Int(D)))
+    71	            => lengthResult(B -Int C)
+    72	          </k>
+    73	          <functions> .Map => ?_FUNCTIONS:Map </functions>
+    74	          <env> .Map => ?_ENV:Map </env>
+    75	        </mpy>
+    76	        requires A <=Int B andBool C <=Int D
+    77	          andBool C >Int A andBool D >=Int B
+    78	
+    79	  claim <mpy>
+    80	          <k>
+    81	            solutionProgram
+    82	            ~> runWith(
+    83	                 TupleExpr(Int(A), Int(B)),
+    84	                 TupleExpr(Int(C), Int(D)))
+    85	            => lengthResult(D -Int C)
+    86	          </k>
+    87	          <functions> .Map => ?_FUNCTIONS:Map </functions>
+    88	          <env> .Map => ?_ENV:Map </env>
+    89	        </mpy>
+    90	        requires A <=Int B andBool C <=Int D
+    91	          andBool C >Int A andBool D <Int B
+    92	endmodule
+ATTRIBUTE_SCAN
+verification.k:10:  syntax Value ::= "primeResult" "(" Int "," Int ")" [function]
+verification.k:19:                   [function]
+verification.k:26:  syntax Value ::= "lengthResult" "(" Int ")" [function]
+verification.k:33:  syntax Program ::= "solutionProgram" [function]
+verification.k:89:       [priority(40)]
+OPAQUE_SCAN
+EXIT_STATUS: 0

@@ -1,0 +1,295 @@
+UTC_START: 2026-07-26T12:12:47Z
+CWD: /audit-output
+COMMAND: bash -lc for\ p\ in\ /reference/prompt.py\ /reference/canonical.py\ /candidate/solution.py\ /candidate/solution.mpy\ /candidate/semantic.k\ /candidate/verification.k\ /candidate/spec.k\ /candidate/prove.sh\;\ do\ echo\ \"BEGIN\ \$p\"\;\ nl\ -ba\ \"\$p\"\;\ echo\ \"END\ \$p\"\;\ done
+BEGIN /reference/prompt.py
+     1	
+     2	
+     3	def change_base(x: int, base: int):
+     4	    """Change numerical base of input number x to base.
+     5	    return string representation after the conversion.
+     6	    base numbers are less than 10.
+     7	    >>> change_base(8, 3)
+     8	    '22'
+     9	    >>> change_base(8, 2)
+    10	    '1000'
+    11	    >>> change_base(7, 2)
+    12	    '111'
+    13	    """
+END /reference/prompt.py
+BEGIN /reference/canonical.py
+     1	# canonical.py — the UNMODIFIED HumanEval/44 reference solution (from the dataset).
+     2	# Co-located with solution.py (the proof rewrite) to make the original<->rewrite link
+     3	# explicit & auditable.  entry point: change_base
+     4	
+     5	
+     6	
+     7	def change_base(x: int, base: int):
+     8	    """Change numerical base of input number x to base.
+     9	    return string representation after the conversion.
+    10	    base numbers are less than 10.
+    11	    >>> change_base(8, 3)
+    12	    '22'
+    13	    >>> change_base(8, 2)
+    14	    '1000'
+    15	    >>> change_base(7, 2)
+    16	    '111'
+    17	    """
+    18	    ret = ""
+    19	    while x > 0:
+    20	        ret = str(x % base) + ret
+    21	        x //= base
+    22	    return ret
+END /reference/canonical.py
+BEGIN /candidate/solution.py
+     1	def change_base(x: int, base: int):
+     2	    if x < base:
+     3	        return str(x)
+     4	    return change_base(x // base, base) + str(x % base)
+END /candidate/solution.py
+BEGIN /candidate/solution.mpy
+     1	Module(
+     2	  FuncDef("change_base", Params("x", "base"),
+     3	    If(Compare(Name("x"), CmpOp("<", Name("base"))),
+     4	      Return(Call(Name("str"), Name("x"))),
+     5	      )
+     6	    Return(
+     7	      BinOp(
+     8	        "+",
+     9	        Call(
+    10	          Name("change_base"),
+    11	          BinOp("//", Name("x"), Name("base")),
+    12	          Name("base")),
+    13	        Call(Name("str"), BinOp("%", Name("x"), Name("base")))))))
+END /candidate/solution.mpy
+BEGIN /candidate/semantic.k
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports STRING-SYNTAX
+     6	
+     7	  syntax Program ::= "Module" "(" Stmts ")"
+     8	  syntax Stmts  ::= List{Stmt, ""}
+     9	
+    10	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    11	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    12	                | "Return" "(" Expr ")"
+    13	
+    14	  syntax Params ::= "Params" "(" String "," String ")"
+    15	
+    16	  syntax Exprs ::= List{Expr, ","}
+    17	  syntax Expr  ::= "Name" "(" String ")"
+    18	                 | "Int" "(" Int ")"
+    19	                 | "BinOp" "(" String "," Expr "," Expr ")"
+    20	                 | "Compare" "(" Expr "," CmpOp ")"
+    21	                 | "Call" "(" Expr "," Exprs ")"
+    22	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    23	endmodule
+    24	
+    25	module MPY
+    26	  imports MPY-SYNTAX
+    27	  imports INT
+    28	  imports BOOL
+    29	  imports STRING
+    30	  imports MAP
+    31	
+    32	  syntax Value ::= intVal(Int)
+    33	                 | strVal(String)
+    34	                 | boolVal(Bool)
+    35	
+    36	  syntax Stmts ::= appendStmts(Stmts, Stmts) [function]
+    37	  rule appendStmts(.Stmts, SS) => SS
+    38	  rule appendStmts((S:Stmt SS:Stmts), TT) => S appendStmts(SS, TT)
+    39	
+    40	  // The internal control terms below are deliberately separate from the
+    41	  // source AST.  They form a small-step semantics for exactly the Python
+    42	  // constructs used by solution.py.
+    43	  syntax KItem ::= call(Program, String, Value, Value)
+    44	                 | exec(Stmts, Map, Program)
+    45	                 | eval(Expr, Map, Program)
+    46	                 | branch(Stmts, Stmts, Stmts, Map, Program)
+    47	                 | cmpLeft(String, Expr, Map, Program)
+    48	                 | cmpRight(String, Value)
+    49	                 | binLeft(String, Expr, Map, Program)
+    50	                 | binRight(String, Value)
+    51	                 | toString()
+    52	                 | callArgLeft(String, Expr, Map, Program)
+    53	                 | callArgRight(String, Value, Program)
+    54	
+    55	  configuration
+    56	    <k> call($PGM:Program, "change_base", intVal($X:Int), intVal($BASE:Int)) </k>
+    57	
+    58	  // Function lookup, parameter binding, and statement execution.
+    59	  rule <k>
+    60	         call(Module(FuncDef(F, Params(X, B), BODY)), F, VX, VB)
+    61	      => exec(BODY,
+    62	              ((X |-> VX) (B |-> VB)),
+    63	              Module(FuncDef(F, Params(X, B), BODY)))
+    64	       ...
+    65	       </k>
+    66	
+    67	  rule <k> exec(.Stmts, _RHO, _PGM) => strVal("") ... </k>
+    68	
+    69	  // A return exits the whole current statement list.  This subset contains
+    70	  // no fall-through expression statements, so no extra completion value is
+    71	  // needed.
+    72	  rule <k> exec(Return(E) _REST, RHO, PGM) => eval(E, RHO, PGM) ... </k>
+    73	
+    74	  rule <k>
+    75	         exec(If(COND, THEN, ELSE) REST, RHO, PGM)
+    76	      => eval(COND, RHO, PGM) ~> branch(THEN, ELSE, REST, RHO, PGM)
+    77	       ...
+    78	       </k>
+    79	  rule <k>
+    80	         boolVal(true) ~> branch(THEN:Stmts, _ELSE:Stmts, REST:Stmts, RHO, PGM)
+    81	      => exec(appendStmts(THEN, REST), RHO, PGM)
+    82	       ...
+    83	       </k>
+    84	  rule <k>
+    85	         boolVal(false) ~> branch(_THEN:Stmts, ELSE:Stmts, REST:Stmts, RHO, PGM)
+    86	      => exec(appendStmts(ELSE, REST), RHO, PGM)
+    87	       ...
+    88	       </k>
+    89	
+    90	  // Literals and variables.
+    91	  rule <k> eval(Int(I), _RHO, _PGM) => intVal(I) ... </k>
+    92	  rule <k> eval(Name(X), RHO, _PGM) => RHO [ X ] ... </k>
+    93	
+    94	  // Single comparisons (the only comparison shape used by the program).
+    95	  rule <k>
+    96	         eval(Compare(LEFT, CmpOp(OP, RIGHT)), RHO, PGM)
+    97	      => eval(LEFT, RHO, PGM) ~> cmpLeft(OP, RIGHT, RHO, PGM)
+    98	       ...
+    99	       </k>
+   100	  rule <k>
+   101	         V:Value ~> cmpLeft(OP, RIGHT, RHO, PGM)
+   102	      => eval(RIGHT, RHO, PGM) ~> cmpRight(OP, V)
+   103	       ...
+   104	       </k>
+   105	  rule <k> intVal(J) ~> cmpRight("<", intVal(I))
+   106	        => boolVal(I <Int J) ... </k>
+   107	
+   108	  // Binary expressions evaluate left-to-right, as Python does.
+   109	  rule <k>
+   110	         eval(BinOp(OP, LEFT, RIGHT), RHO, PGM)
+   111	      => eval(LEFT, RHO, PGM) ~> binLeft(OP, RIGHT, RHO, PGM)
+   112	       ...
+   113	       </k>
+   114	  rule <k>
+   115	         V:Value ~> binLeft(OP, RIGHT, RHO, PGM)
+   116	      => eval(RIGHT, RHO, PGM) ~> binRight(OP, V)
+   117	       ...
+   118	       </k>
+   119	  rule <k> intVal(J) ~> binRight("//", intVal(I))
+   120	        => intVal(I /Int J) ... </k>
+   121	    requires J =/=Int 0
+   122	  rule <k> intVal(J) ~> binRight("%", intVal(I))
+   123	        => intVal(I %Int J) ... </k>
+   124	    requires J =/=Int 0
+   125	  rule <k> strVal(T) ~> binRight("+", strVal(S))
+   126	        => strVal(S +String T) ... </k>
+   127	
+   128	  // Built-in str(int), plus ordinary two-argument function calls.
+   129	  rule <k>
+   130	         eval(Call(Name("str"), ARG), RHO, PGM)
+   131	      => eval(ARG, RHO, PGM) ~> toString()
+   132	       ...
+   133	       </k>
+   134	  rule <k> intVal(I) ~> toString() => strVal(Int2String(I)) ... </k>
+   135	
+   136	  rule <k>
+   137	         eval(Call(Name(F), ARG1, ARG2), RHO, PGM)
+   138	      => eval(ARG1, RHO, PGM) ~> callArgLeft(F, ARG2, RHO, PGM)
+   139	       ...
+   140	       </k>
+   141	  rule <k>
+   142	         V1:Value ~> callArgLeft(F, ARG2, RHO, PGM)
+   143	      => eval(ARG2, RHO, PGM) ~> callArgRight(F, V1, PGM)
+   144	       ...
+   145	       </k>
+   146	  rule <k>
+   147	         V2:Value ~> callArgRight(F, V1, PGM)
+   148	      => call(PGM, F, V1, V2)
+   149	       ...
+   150	       </k>
+   151	endmodule
+END /candidate/semantic.k
+BEGIN /candidate/verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Mathematical reference function for the contract.  Because base <= 9,
+     7	  // every remainder is a single decimal digit, exactly as required by the
+     8	  // prompt's string representation.
+     9	  syntax String ::= baseString(Int, Int) [function]
+    10	
+    11	  rule baseString(X, B) => Int2String(X)
+    12	    requires X <Int B
+    13	
+    14	  rule baseString(X, B)
+    15	        => baseString(X /Int B, B) +String Int2String(X %Int B)
+    16	    requires B <=Int X andBool 0 <Int B
+    17	endmodule
+END /candidate/verification.k
+BEGIN /candidate/spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Total functional correctness over the HumanEval input domain.  CONT is
+     7	  // universally quantified, so the circularity also applies to recursive
+     8	  // calls while their string-concatenation continuation is still pending.
+     9	  claim
+    10	    <k>
+    11	      call(
+    12	        Module(
+    13	          FuncDef("change_base", Params("x", "base"),
+    14	            If(Compare(Name("x"), CmpOp("<", Name("base"))),
+    15	              Return(Call(Name("str"), Name("x"))),
+    16	              .Stmts)
+    17	            Return(
+    18	              BinOp(
+    19	                "+",
+    20	                Call(
+    21	                  Name("change_base"),
+    22	                  BinOp("//", Name("x"), Name("base")),
+    23	                  Name("base")),
+    24	                Call(Name("str"),
+    25	                     BinOp("%", Name("x"), Name("base"))))))),
+    26	        "change_base", intVal(X), intVal(B))
+    27	      ~> CONT:K
+    28	    =>
+    29	      strVal(baseString(X, B)) ~> CONT
+    30	    </k>
+    31	    requires 0 <=Int X andBool 2 <=Int B andBool B <=Int 9
+    32	endmodule
+END /candidate/spec.k
+BEGIN /candidate/prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	
+     6	kompile verification.k \
+     7	  --backend haskell \
+     8	  --main-module VERIFICATION \
+     9	  --syntax-module MPY-SYNTAX
+    10	
+    11	krun solution.mpy -cX=8 -cBASE=3 --definition verification-kompiled \
+    12	  --pattern '<k> strVal("22") ~> .K </k>'
+    13	krun solution.mpy -cX=8 -cBASE=2 --definition verification-kompiled \
+    14	  --pattern '<k> strVal("1000") ~> .K </k>'
+    15	krun solution.mpy -cX=7 -cBASE=2 --definition verification-kompiled \
+    16	  --pattern '<k> strVal("111") ~> .K </k>'
+    17	krun solution.mpy -cX=1234 -cBASE=7 --definition verification-kompiled \
+    18	  --pattern '<k> strVal("3412") ~> .K </k>'
+    19	
+    20	kprove spec.k \
+    21	  --definition verification-kompiled \
+    22	  --spec-module SPEC
+END /candidate/prove.sh
+EXIT_STATUS: 0
+UTC_END: 2026-07-26T12:12:47Z

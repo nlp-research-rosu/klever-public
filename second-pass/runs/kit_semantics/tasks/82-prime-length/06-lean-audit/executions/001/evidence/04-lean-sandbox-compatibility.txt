@@ -1,0 +1,92 @@
+INITIAL PREFLIGHT COMMAND
+PYTHONPATH=/reference python - <<'PY'
+import json
+from pathlib import Path
+from tools.klean_preflight import check_generation
+result = check_generation(
+    Path('/reference/k-proof'),
+    Path('/reference/lemma-discovery.json'),
+    Path('/reference/klean-generation'),
+    toolchain_lock=Path('/reference/klean-toolchain.lock.json'),
+)
+print(json.dumps(result, indent=2, sort_keys=True))
+PY
+
+INITIAL EXIT
+1
+
+INITIAL OUTPUT
+Traceback (most recent call last):
+  File "<stdin>", line 4, in <module>
+  File "/reference/tools/klean_preflight.py", line 582, in check_generation
+    raise KleanPreflightError(
+tools.klean_preflight.KleanPreflightError: lake clean failed (1): error: could not detect the configuration of the Lake installation
+
+ROOT-CAUSE COMMAND
+python - <<'PY'
+import os
+p=f'/proc/{os.getpid()}/exe'
+print('pid',os.getpid(),'path',p)
+try: print('readlink',os.readlink(p))
+except OSError as e: print('error',repr(e))
+print('self',os.readlink('/proc/self/exe'))
+PY
+printf 'shell pid=%s exe=' "$$"; readlink "/proc/$$/exe" 2>&1; printf 'exit=%s\n' "$?"
+
+ROOT-CAUSE OUTPUT
+pid 3 path /proc/3/exe
+error FileNotFoundError(2, 'No such file or directory')
+self /usr/bin/python3.10
+shell pid=2 exe=exit=1
+
+OBSERVED LEAN RUNTIME IMPLEMENTATION
+`objdump` of `lean_io_app_path` in the pinned toolchain's
+`libleanshared.so` shows `getpid`, formatting `/proc/%d/exe`, and then
+`readlink`; the sandbox exposes only `/proc/self/exe` for nested processes.
+
+COMPATIBILITY SHIM SOURCE
+#define _GNU_SOURCE
+#include <dlfcn.h>
+#include <errno.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+typedef ssize_t (*readlink_fn)(const char *, char *, size_t);
+
+ssize_t readlink(const char *path, char *buffer, size_t size) {
+    static readlink_fn real_readlink;
+    char expected[64];
+
+    if (real_readlink == NULL) {
+        real_readlink = (readlink_fn)dlsym(RTLD_NEXT, "readlink");
+        if (real_readlink == NULL) {
+            errno = ENOSYS;
+            return -1;
+        }
+    }
+
+    snprintf(expected, sizeof(expected), "/proc/%ld/exe", (long)getpid());
+    if (strcmp(path, expected) == 0) {
+        return real_readlink("/proc/self/exe", buffer, size);
+    }
+    return real_readlink(path, buffer, size);
+}
+
+SHIM BUILD AND TOOLCHAIN COMMAND
+cc -shared -fPIC -O2 -Wall -Wextra -Werror -o /tmp/audit-work/lean-proc-self.so /tmp/audit-work/lean-proc-self.c -ldl
+sha256sum /tmp/audit-work/lean-proc-self.c /tmp/audit-work/lean-proc-self.so
+LD_PRELOAD=/tmp/audit-work/lean-proc-self.so /opt/elan/toolchains/leanprover--lean4---v4.22.0/bin/lean --version
+
+SHIM BUILD AND TOOLCHAIN EXIT
+0
+
+SHIM BUILD AND TOOLCHAIN OUTPUT
+931544d1237368cac8f73c73757feb5546be2f9de85f7eb2f014a7647aad5120  /tmp/audit-work/lean-proc-self.c
+80823f5b1694de2af221f902a7878d02a1bc48917f8812fd217351565b640eeb  /tmp/audit-work/lean-proc-self.so
+Lean (version 4.22.0, x86_64-unknown-linux-gnu, commit ba2cbbf09d4978f416e0ebd1fceeebc2c4138c05, Release)
+
+SCOPE
+The shim changes only a `readlink` whose input exactly equals
+`/proc/<current-getpid>/exe`; every other `readlink` is forwarded unchanged.

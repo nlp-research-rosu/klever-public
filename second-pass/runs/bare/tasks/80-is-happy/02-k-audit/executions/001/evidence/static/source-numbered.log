@@ -1,0 +1,315 @@
+WORKDIR: /tmp/audit-work/fresh
+COMMAND: bash -lc for\ f\ in\ semantic.k\ verification.k\ spec.k\ solution.mpy\ solution.py\;\ do\ echo\ FILE=\$f\;\ nl\ -ba\ \"\$f\"\;\ done
+EXIT_STATUS: 0
+--- OUTPUT BEGIN ---
+FILE=semantic.k
+     1	requires "domains.md"
+     2	
+     3	module MPY-SYNTAX
+     4	  imports INT-SYNTAX
+     5	  imports BOOL-SYNTAX
+     6	  imports STRING-SYNTAX
+     7	
+     8	  // A finite Python string represented as a list of Unicode code points.
+     9	  syntax PString ::= "eps"
+    10	                   | "ch" "(" Int "," PString ")"
+    11	
+    12	  syntax PValue ::= "pyInt" "(" Int ")"
+    13	                  | "pyBool" "(" Bool ")"
+    14	                  | "pyStr" "(" PString ")"
+    15	                  | "pyTest" "(" Test ")"
+    16	
+    17	  syntax Test ::= "yes" | "no"
+    18	                | "#short3" "(" PString ")"
+    19	                | "#same" "(" Int "," Int ")"
+    20	
+    21	  syntax Program ::= "Module" "(" Stmts ")"
+    22	
+    23	  syntax Stmts ::= List{Stmt, ""}
+    24	
+    25	  syntax Stmt ::= "FuncDef" "(" String "," Params "," Stmts ")"
+    26	                | "Return" "(" Expr ")"
+    27	                | "If" "(" Expr "," Stmts "," Stmts ")"
+    28	
+    29	  syntax Params ::= "Params" "(" String ")"
+    30	
+    31	  syntax Expr ::= "Bool" "(" Bool ")"
+    32	                | "Int" "(" Int ")"
+    33	                | "Name" "(" String ")"
+    34	                | "Call" "(" Expr "," Expr ")"
+    35	                | "Compare" "(" Expr "," CmpOp ")"
+    36	                | "Subscript" "(" Expr "," Expr ")"
+    37	                | "Slice" "(" Bound "," Bound "," Bound ")"
+    38	
+    39	  syntax CmpOp ::= "CmpOp" "(" String "," Expr ")"
+    40	  syntax Bound ::= "NoBound" | Expr
+    41	endmodule
+    42	
+    43	module MPY-SEMANTIC
+    44	  imports MPY-SYNTAX
+    45	  imports INT
+    46	  imports BOOL
+    47	  imports STRING
+    48	
+    49	  configuration
+    50	    <k> #call($PGM:Program, "is_happy", pyStr($INPUT:PString)) </k>
+    51	
+    52	  // Mathematical operations on the concrete inductive representation of
+    53	  // Python strings.  Code points are compared as Python characters are.
+    54	  syntax Int ::= #len ( PString ) [function, total]
+    55	  rule #len(eps) => 0
+    56	  rule #len(ch(_, S)) => 1 +Int #len(S)
+    57	
+    58	  syntax Int ::= #at ( PString , Int ) [function]
+    59	  rule #at(ch(C, _), 0) => C
+    60	  rule #at(ch(_, S), I) => #at(S, I -Int 1) requires I >Int 0
+    61	
+    62	  syntax PString ::= #drop ( PString , Int ) [function]
+    63	  rule #drop(S, 0) => S
+    64	  rule #drop(ch(_, S), I) => #drop(S, I -Int 1) requires I >Int 0
+    65	
+    66	  // This non-functional predicate gives symbolic execution an explicit,
+    67	  // exhaustive constructor split for the only length test in solution.mpy.
+    68	  rule #short3(eps) => yes
+    69	  rule #short3(ch(_, eps)) => yes
+    70	  rule #short3(ch(_, ch(_, eps))) => yes
+    71	  rule #short3(ch(_, ch(_, ch(_, _)))) => no
+    72	
+    73	  rule #same(I, I) => yes
+    74	  rule #same(I, J) => no requires I =/=Int J
+    75	
+    76	  syntax Int ::= #asInt ( PValue ) [function]
+    77	  syntax Bool ::= #asBool ( PValue ) [function]
+    78	  syntax PString ::= #asStr ( PValue ) [function]
+    79	  syntax Test ::= #asTest ( PValue ) [function]
+    80	  rule #asInt(pyInt(I)) => I
+    81	  rule #asBool(pyBool(B)) => B
+    82	  rule #asStr(pyStr(S)) => S
+    83	  rule #asTest(pyTest(T)) => T
+    84	
+    85	  syntax Bool ::= #valueEq ( PValue , PValue ) [function]
+    86	  rule #valueEq(pyInt(I), pyInt(J)) => I ==Int J
+    87	
+    88	  // Function lookup retains the whole module so recursive calls use the same
+    89	  // definitions.  This semantics deliberately implements only the AST nodes
+    90	  // exercised by solution.mpy; unsupported constructs cannot silently run.
+    91	  syntax PValue ::= #call ( Program , String , PValue ) [function]
+    92	  syntax PValue ::= #findCall ( Stmts , Program , String , PValue ) [function]
+    93	  rule #call(Module(DEFS), F, V) => #findCall(DEFS, Module(DEFS), F, V)
+    94	  rule #findCall(FuncDef(F, Params(P), BODY) _REST, PGM, F, V)
+    95	    => #exec(BODY, P, V, PGM)
+    96	  rule #findCall(FuncDef(G, Params(_), _) REST, PGM, F, V)
+    97	    => #findCall(REST, PGM, F, V)
+    98	    requires F =/=String G
+    99	
+   100	  syntax PValue ::= #exec ( Stmts , String , PValue , Program ) [function]
+   101	  syntax PValue ::= #choose ( Test , Stmts , Stmts , Stmts , String , PValue , Program )
+   102	  syntax PValue ::= #branch ( Stmts , Stmts , String , PValue , Program ) [function]
+   103	
+   104	  rule #exec(Return(E) _, P, V, PGM) => #eval(E, P, V, PGM)
+   105	  rule #exec(If(COND, YES, NO) REST, P, V, PGM)
+   106	    => #choose(#asTest(#eval(COND, P, V, PGM)), YES, NO, REST, P, V, PGM)
+   107	
+   108	  rule #choose(yes, YES, _, REST, P, V, PGM)
+   109	    => #branch(YES, REST, P, V, PGM)
+   110	  rule #choose(no, _, NO, REST, P, V, PGM)
+   111	    => #branch(NO, REST, P, V, PGM)
+   112	
+   113	  // Direct contextual rules expose constructor/equality case splits to the
+   114	  // symbolic backend without relying on an evaluation-order extension.
+   115	  rule #choose(#short3(eps), YES, _, REST, P, V, PGM)
+   116	    => #branch(YES, REST, P, V, PGM)
+   117	  rule #choose(#short3(ch(_, eps)), YES, _, REST, P, V, PGM)
+   118	    => #branch(YES, REST, P, V, PGM)
+   119	  rule #choose(#short3(ch(_, ch(_, eps))), YES, _, REST, P, V, PGM)
+   120	    => #branch(YES, REST, P, V, PGM)
+   121	  rule #choose(#short3(ch(_, ch(_, ch(_, _)))), _, NO, REST, P, V, PGM)
+   122	    => #branch(NO, REST, P, V, PGM)
+   123	  rule #choose(#same(I, I), YES, _, REST, P, V, PGM)
+   124	    => #branch(YES, REST, P, V, PGM)
+   125	  rule #choose(#same(I, J), _, NO, REST, P, V, PGM)
+   126	    => #branch(NO, REST, P, V, PGM)
+   127	    requires I =/=Int J
+   128	
+   129	  rule #branch(.Stmts, REST, P, V, PGM) => #exec(REST, P, V, PGM)
+   130	  rule #branch(Return(E) _, _, P, V, PGM) => #eval(E, P, V, PGM)
+   131	  rule #branch(If(COND, YES, NO) MORE, REST, P, V, PGM)
+   132	    => #choose(#asTest(#eval(COND, P, V, PGM)), YES, NO,
+   133	               #append(MORE, REST), P, V, PGM)
+   134	
+   135	  syntax Stmts ::= #append ( Stmts , Stmts ) [function, total]
+   136	  rule #append(.Stmts, REST) => REST
+   137	  rule #append(S MORE, REST) => S #append(MORE, REST)
+   138	
+   139	  syntax PValue ::= #eval ( Expr , String , PValue , Program ) [function]
+   140	  rule #eval(Bool(B), _, _, _) => pyBool(B)
+   141	  rule #eval(Int(I), _, _, _) => pyInt(I)
+   142	  rule #eval(Name(P), P, V, _) => V
+   143	
+   144	  rule #eval(Call(Name("len"), E), P, V, PGM)
+   145	    => pyInt(#len(#asStr(#eval(E, P, V, PGM))))
+   146	  rule #eval(Call(Name(F), E), P, V, PGM)
+   147	    => #call(PGM, F, #eval(E, P, V, PGM))
+   148	    requires F =/=String "len"
+   149	
+   150	  rule #eval(Compare(Call(Name("len"), E), CmpOp("<", Int(3))), P, V, PGM)
+   151	    => pyTest(#short3(#asStr(#eval(E, P, V, PGM))))
+   152	  rule #eval(Compare(L, CmpOp("==", R)), P, V, PGM)
+   153	    => pyTest(#same(#asInt(#eval(L, P, V, PGM)),
+   154	                    #asInt(#eval(R, P, V, PGM))))
+   155	
+   156	  rule #eval(Subscript(E, Int(I)), P, V, PGM)
+   157	    => pyInt(#at(#asStr(#eval(E, P, V, PGM)), I))
+   158	  rule #eval(Subscript(E, Slice(Int(I), NoBound, NoBound)), P, V, PGM)
+   159	    => pyStr(#drop(#asStr(#eval(E, P, V, PGM)), I))
+   160	endmodule
+FILE=verification.k
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY-SEMANTIC
+     5	
+     6	  // Independent mathematical reading of the prompt.  #allTriples is true
+     7	  // exactly when every length-three window has pairwise-distinct code points.
+     8	  syntax Bool ::= #distinct3 ( Int , Int , Int ) [function, total]
+     9	  rule #distinct3(A, B, C)
+    10	    => notBool (A ==Int B)
+    11	       andBool notBool (A ==Int C)
+    12	       andBool notBool (B ==Int C)
+    13	
+    14	  syntax Bool ::= #allTriples ( PString ) [function, total]
+    15	  rule #allTriples(eps) => true
+    16	  rule #allTriples(ch(_A, eps)) => true
+    17	  rule #allTriples(ch(_A, ch(_B, eps))) => true
+    18	  rule #allTriples(ch(A, ch(B, ch(C, REST))))
+    19	    => #distinct3(A, B, C)
+    20	       andBool #allTriples(ch(B, ch(C, REST)))
+    21	
+    22	  syntax Bool ::= #happy ( PString ) [function, total]
+    23	  rule #happy(eps) => false
+    24	  rule #happy(ch(_A, eps)) => false
+    25	  rule #happy(ch(_A, ch(_B, eps))) => false
+    26	  rule #happy(ch(A, ch(B, ch(C, REST))))
+    27	    => #allTriples(ch(A, ch(B, ch(C, REST))))
+    28	
+    29	  // The exact constructor tree emitted in solution.mpy.  Giving it a name
+    30	  // keeps proof claims readable while still forcing the semantics to execute
+    31	  // precisely the translated implementation.
+    32	  syntax Program ::= "#solution" [function]
+    33	  rule #solution =>
+    34	    Module(
+    35	      FuncDef("is_happy", Params("s"),
+    36	        If(Compare(Call(Name("len"), Name("s")), CmpOp("<", Int(3))),
+    37	          Return(Bool(false)),
+    38	          .Stmts)
+    39	        Return(Call(Name("check_happy_triples"), Name("s"))))
+    40	      FuncDef("check_happy_triples", Params("s"),
+    41	        If(Compare(Call(Name("len"), Name("s")), CmpOp("<", Int(3))),
+    42	          Return(Bool(true)),
+    43	          .Stmts)
+    44	        If(Compare(Subscript(Name("s"), Int(0)),
+    45	                   CmpOp("==", Subscript(Name("s"), Int(1)))),
+    46	          Return(Bool(false)),
+    47	          .Stmts)
+    48	        If(Compare(Subscript(Name("s"), Int(0)),
+    49	                   CmpOp("==", Subscript(Name("s"), Int(2)))),
+    50	          Return(Bool(false)),
+    51	          .Stmts)
+    52	        If(Compare(Subscript(Name("s"), Int(1)),
+    53	                   CmpOp("==", Subscript(Name("s"), Int(2)))),
+    54	          Return(Bool(false)),
+    55	          .Stmts)
+    56	        Return(Call(Name("check_happy_triples"),
+    57	                    Subscript(Name("s"),
+    58	                              Slice(Int(1), NoBound, NoBound))))))
+    59	endmodule
+FILE=spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Recursive helper correctness.  #short3 in the semantics supplies the
+     7	  // exhaustive constructor split; the recursive branch uses this claim as a
+     8	  // circularity only after consuming one character.
+     9	  claim <k> #call(#solution, "check_happy_triples", pyStr(S))
+    10	          => pyBool(#allTriples(S))
+    11	        </k>
+    12	
+    13	  // Required entry point for every finite input string.
+    14	  claim <k> #call(#solution, "is_happy", pyStr(S))
+    15	          => pyBool(#happy(S))
+    16	        </k>
+    17	
+    18	  // The six examples from prompt.py are also executable proof claims.
+    19	  claim <k> #call(#solution, "is_happy", pyStr(ch(97, eps)))
+    20	          => pyBool(false)
+    21	        </k>
+    22	  claim <k> #call(#solution, "is_happy", pyStr(ch(97, ch(97, eps))))
+    23	          => pyBool(false)
+    24	        </k>
+    25	  claim <k> #call(#solution, "is_happy",
+    26	                  pyStr(ch(97, ch(98, ch(99, ch(100, eps))))))
+    27	          => pyBool(true)
+    28	        </k>
+    29	  claim <k> #call(#solution, "is_happy",
+    30	                  pyStr(ch(97, ch(97, ch(98, ch(98, eps))))))
+    31	          => pyBool(false)
+    32	        </k>
+    33	  claim <k> #call(#solution, "is_happy",
+    34	                  pyStr(ch(97, ch(100, ch(98, eps)))))
+    35	          => pyBool(true)
+    36	        </k>
+    37	  claim <k> #call(#solution, "is_happy",
+    38	                  pyStr(ch(120, ch(121, ch(121, eps)))))
+    39	          => pyBool(false)
+    40	        </k>
+    41	endmodule
+FILE=solution.mpy
+     1	Module(
+     2	  FuncDef("is_happy", Params("s"),
+     3	    If(Compare(Call(Name("len"), Name("s")), CmpOp("<", Int(3))),
+     4	      Return(Bool(false)),
+     5	      )
+     6	    Return(Call(Name("check_happy_triples"), Name("s"))))
+     7	  FuncDef("check_happy_triples", Params("s"),
+     8	    If(Compare(Call(Name("len"), Name("s")), CmpOp("<", Int(3))),
+     9	      Return(Bool(true)),
+    10	      )
+    11	    If(Compare(
+    12	      Subscript(Name("s"), Int(0)),
+    13	      CmpOp("==", Subscript(Name("s"), Int(1)))),
+    14	      Return(Bool(false)),
+    15	      )
+    16	    If(Compare(
+    17	      Subscript(Name("s"), Int(0)),
+    18	      CmpOp("==", Subscript(Name("s"), Int(2)))),
+    19	      Return(Bool(false)),
+    20	      )
+    21	    If(Compare(
+    22	      Subscript(Name("s"), Int(1)),
+    23	      CmpOp("==", Subscript(Name("s"), Int(2)))),
+    24	      Return(Bool(false)),
+    25	      )
+    26	    Return(
+    27	      Call(
+    28	        Name("check_happy_triples"),
+    29	        Subscript(Name("s"), Slice(Int(1), NoBound, NoBound))))))
+FILE=solution.py
+     1	def is_happy(s):
+     2	    if len(s) < 3:
+     3	        return False
+     4	    return check_happy_triples(s)
+     5	
+     6	
+     7	def check_happy_triples(s):
+     8	    if len(s) < 3:
+     9	        return True
+    10	    if s[0] == s[1]:
+    11	        return False
+    12	    if s[0] == s[2]:
+    13	        return False
+    14	    if s[1] == s[2]:
+    15	        return False
+    16	    return check_happy_triples(s[1:])
+--- OUTPUT END ---

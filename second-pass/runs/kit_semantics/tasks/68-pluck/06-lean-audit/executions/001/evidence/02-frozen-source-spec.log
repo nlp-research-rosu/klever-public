@@ -1,0 +1,339 @@
+$ nl -ba verification.k
+     1	requires "reference-semantics/semantics.k"
+     2	
+     3	module VERIFICATION
+     4	  imports MPY
+     5	
+     6	  // Guarded total projection from the dynamic Val sort to Int.  This is the
+     7	  // standard total twin of K's partial subsort cast; it is used only under
+     8	  // definedProjectInt and collapses on every statically known Int.
+     9	  syntax Bool ::= definedProjectInt(Val) [function, total]
+    10	  rule definedProjectInt(V:Val) => isInt(V)
+    11	
+    12	  syntax Int ::= projectIntTotal(Val)
+    13	    [function, total, symbol(projectIntTotal), no-evaluators]
+    14	
+    15	  rule #Ceil({@V:Val}:>Int)
+    16	    => ({ definedProjectInt(@V) #Equals true } #And #Ceil(@V))
+    17	    [simplification]
+    18	
+    19	  rule projectIntTotal(V:Val) => {V}:>Int
+    20	    requires definedProjectInt(V)
+    21	    [concrete, simplification(10), preserves-definedness]
+    22	
+    23	  rule {V:Val}:>Int => projectIntTotal(V)
+    24	    requires definedProjectInt(V)
+    25	    [symbolic(V), simplification, preserves-definedness]
+    26	
+    27	  rule projectIntTotal(I:Int) => I [simplification]
+    28	  rule projectIntTotal(projectIntTotal(V:Val))
+    29	    => projectIntTotal(V)
+    30	    [simplification]
+    31	
+    32	  // Guarded dispatch twin for the exact fixed rule
+    33	  // applyBin("+", I1:Int, I2:Int) => I1 +Int I2.  It lets the source's
+    34	  // value + 0 normalization refine a dynamically sorted list head.
+    35	  rule applyBin("+", V:Val, I:Int)
+    36	    => projectIntTotal(V) +Int I
+    37	    requires definedProjectInt(V)
+    38	    [simplification]
+    39	
+    40	  // Exact contract domain: finite list payloads containing only non-negative
+    41	  // Python integers.
+    42	  syntax Bool ::= allNonNegative(ValSeq) [function, total]
+    43	  rule allNonNegative(.ValSeq) => true
+    44	  rule allNonNegative(vCons(V:Val, R:ValSeq))
+    45	    => definedProjectInt(V)
+    46	       andBool projectIntTotal(V) >=Int 0
+    47	       andBool allNonNegative(R)
+    48	
+    49	  // shouldTake exactly mirrors the nested source condition.  A negative
+    50	  // current best is the source sentinel; otherwise only a strictly smaller
+    51	  // even value replaces it.
+    52	  syntax Bool ::= shouldTake(Int, Int) [function, total]
+    53	  rule shouldTake(B:Int, V:Int)
+    54	    => pyMod(V, 2) ==Int 0
+    55	       andBool (B <Int 0 orBool V <Int B)
+    56	
+    57	  syntax Int ::= nextBest(Int, Int) [function, total]
+    58	  rule nextBest(B:Int, V:Int) => V
+    59	    requires shouldTake(B, V)
+    60	  rule nextBest(B:Int, V:Int) => B
+    61	    requires notBool shouldTake(B, V)
+    62	
+    63	  syntax Int ::= nextBestIndex(Int, Int, Int, Int) [function, total]
+    64	  rule nextBestIndex(B:Int, _J:Int, V:Int, I:Int) => I
+    65	    requires shouldTake(B, V)
+    66	  rule nextBestIndex(B:Int, J:Int, V:Int, _I:Int) => J
+    67	    requires notBool shouldTake(B, V)
+    68	
+    69	  syntax Int ::= scanBest(ValSeq, Int, Int) [function, total]
+    70	  rule scanBest(.ValSeq, _I:Int, B:Int) => B
+    71	  rule scanBest(vCons(V:Val, R:ValSeq), I:Int, B:Int)
+    72	    => scanBest(R, I +Int 1, nextBest(B, projectIntTotal(V)))
+    73	
+    74	  syntax Int ::= scanBestIndex(ValSeq, Int, Int, Int)
+    75	    [function, total]
+    76	  rule scanBestIndex(.ValSeq, _I:Int, _B:Int, J:Int) => J
+    77	  rule scanBestIndex(
+    78	         vCons(V:Val, R:ValSeq), I:Int, B:Int, J:Int)
+    79	    => scanBestIndex(
+    80	         R,
+    81	         I +Int 1,
+    82	         nextBest(B, projectIntTotal(V)),
+    83	         nextBestIndex(B, J, projectIntTotal(V), I))
+    84	
+    85	  syntax Int ::= afterIndex(ValSeq, Int) [function, total]
+    86	  rule afterIndex(.ValSeq, I:Int) => I
+    87	  rule afterIndex(vCons(_V:Val, R:ValSeq), I:Int)
+    88	    => afterIndex(R, I +Int 1)
+    89	
+    90	  syntax Val ::= resultList(Int, Int) [function, total]
+    91	  rule resultList(B:Int, _J:Int) => list(.ValSeq)
+    92	    requires B <Int 0
+    93	  rule resultList(B:Int, J:Int)
+    94	    => list(vCons(B, vCons(J, .ValSeq)))
+    95	    requires B >=Int 0
+    96	endmodule
+$ nl -ba spec.k
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [pluck-loop]:
+     7	    <k>
+     8	      #loop(
+     9	        list(vCons(HEAD:Val, REST:ValSeq)),
+    10	        Name("value"),
+    11	        Assign(Name("value"), BinOp("+", Name("value"), Int(0)))
+    12	        If(
+    13	          Compare(
+    14	            BinOp("%", Name("value"), Int(2)),
+    15	            CmpOp("==", Int(0))),
+    16	          If(
+    17	            Compare(Name("smallest"), CmpOp("<", Int(0))),
+    18	            Assign(Name("smallest"), Name("value"))
+    19	            Assign(Name("smallest_index"), Name("index")),
+    20	            If(
+    21	              Compare(Name("value"), CmpOp("<", Name("smallest"))),
+    22	              Assign(Name("smallest"), Name("value"))
+    23	              Assign(Name("smallest_index"), Name("index")),
+    24	              .Stmts)),
+    25	          .Stmts)
+    26	        AugAssign(Name("index"), "+", Int(1)))
+    27	      => .K
+    28	      ...
+    29	    </k>
+    30	    <env> L:Int </env>
+    31	    <scopes>
+    32	      ...
+    33	      L |-> scope(
+    34	        "arr"            |-> list(ORIGINAL:ValSeq)
+    35	        "smallest"       |-> (BEST:Int
+    36	                              => scanBest(
+    37	                                   vCons(HEAD, REST), POS, BEST))
+    38	        "smallest_index" |-> (BEST_INDEX:Int
+    39	                              => scanBestIndex(
+    40	                                   vCons(HEAD, REST),
+    41	                                   POS,
+    42	                                   BEST,
+    43	                                   BEST_INDEX))
+    44	        "index"          |-> (POS:Int
+    45	                              => afterIndex(vCons(HEAD, REST), POS))
+    46	        "value"          |-> (_OLD:Val => ?FINAL_VALUE:Val),
+    47	        parent(0))
+    48	      ...
+    49	    </scopes>
+    50	    requires POS >=Int 0
+    51	      andBool definedProjectInt(HEAD)
+    52	      andBool projectIntTotal(HEAD) >=Int 0
+    53	      andBool allNonNegative(REST)
+    54	
+    55	  claim [pluck-entry]:
+    56	    <k>
+    57	      Call(Name("pluck"), list(INPUT:ValSeq))
+    58	      => ref(0)
+    59	    </k>
+    60	    <env> 0 </env>
+    61	    <scopes>
+    62	      -1 |-> builtinsScope
+    63	      0  |-> scope(
+    64	        "pluck" |-> closureVal(
+    65	          "arr",
+    66	          Assign(Name("smallest"), UnaryOp("-", Int(1)))
+    67	          Assign(Name("smallest_index"), Int(0))
+    68	          Assign(Name("index"), Int(0))
+    69	          Assign(Name("value"), Int(0))
+    70	          For(
+    71	            Name("value"),
+    72	            Name("arr"),
+    73	            Assign(Name("value"), BinOp("+", Name("value"), Int(0)))
+    74	            If(
+    75	              Compare(
+    76	                BinOp("%", Name("value"), Int(2)),
+    77	                CmpOp("==", Int(0))),
+    78	              If(
+    79	                Compare(Name("smallest"), CmpOp("<", Int(0))),
+    80	                Assign(Name("smallest"), Name("value"))
+    81	                Assign(Name("smallest_index"), Name("index")),
+    82	                If(
+    83	                  Compare(Name("value"), CmpOp("<", Name("smallest"))),
+    84	                  Assign(Name("smallest"), Name("value"))
+    85	                  Assign(Name("smallest_index"), Name("index")),
+    86	                  .Stmts)),
+    87	              .Stmts)
+    88	            AugAssign(Name("index"), "+", Int(1)))
+    89	          If(
+    90	            Compare(Name("smallest"), CmpOp("<", Int(0))),
+    91	            Return(ListExpr(.Exprs)),
+    92	            .Stmts)
+    93	          Return(ListExpr(Name("smallest"), Name("smallest_index"))),
+    94	          0),
+    95	        parent(-1))
+    96	    </scopes>
+    97	    <scopeLoc> 1 </scopeLoc>
+    98	    <heap>
+    99	      .Map
+   100	      => 0 |-> resultList(
+   101	                  scanBest(INPUT, 0, -1),
+   102	                  scanBestIndex(INPUT, 0, -1, 0))
+   103	    </heap>
+   104	    <heapLoc> 0 => 1 </heapLoc>
+   105	    <stack> .List </stack>
+   106	    <ret> noRet </ret>
+   107	    <exc> NoExc </exc>
+   108	    <exit-code> 0 </exit-code>
+   109	    requires allNonNegative(INPUT)
+   110	endmodule
+$ nl -ba solution.py
+     1	def pluck(arr):
+     2	    smallest = -1
+     3	    smallest_index = 0
+     4	    index = 0
+     5	    value = 0
+     6	
+     7	    for value in arr:
+     8	        value = value + 0
+     9	        if value % 2 == 0:
+    10	            if smallest < 0:
+    11	                smallest = value
+    12	                smallest_index = index
+    13	            else:
+    14	                if value < smallest:
+    15	                    smallest = value
+    16	                    smallest_index = index
+    17	        index += 1
+    18	
+    19	    if smallest < 0:
+    20	        return []
+    21	    return [smallest, smallest_index]
+$ nl -ba solution.mpy
+     1	Module(
+     2	  FuncDef("pluck", Params("arr"),
+     3	    Assign(Name("smallest"), UnaryOp("-", Int(1)))
+     4	    Assign(Name("smallest_index"), Int(0))
+     5	    Assign(Name("index"), Int(0))
+     6	    Assign(Name("value"), Int(0))
+     7	    For(Name("value"), Name("arr"),
+     8	      Assign(Name("value"), BinOp("+", Name("value"), Int(0)))
+     9	      If(Compare(BinOp("%", Name("value"), Int(2)), CmpOp("==", Int(0))),
+    10	        If(Compare(Name("smallest"), CmpOp("<", Int(0))),
+    11	          Assign(Name("smallest"), Name("value"))
+    12	          Assign(Name("smallest_index"), Name("index")),
+    13	          If(Compare(Name("value"), CmpOp("<", Name("smallest"))),
+    14	            Assign(Name("smallest"), Name("value"))
+    15	            Assign(Name("smallest_index"), Name("index")),
+    16	            )),
+    17	        )
+    18	      AugAssign(Name("index"), "+", Int(1)))
+    19	    If(Compare(Name("smallest"), CmpOp("<", Int(0))),
+    20	      Return(ListExpr()),
+    21	      )
+    22	    Return(ListExpr(Name("smallest"), Name("smallest_index")))))
+$ nl -ba prompt.py
+     1	
+     2	def pluck(arr):
+     3	    """
+     4	    "Given an array representing a branch of a tree that has non-negative integer nodes
+     5	    your task is to pluck one of the nodes and return it.
+     6	    The plucked node should be the node with the smallest even value.
+     7	    If multiple nodes with the same smallest even value are found return the node that has smallest index.
+     8	
+     9	    The plucked node should be returned in a list, [ smalest_value, its index ],
+    10	    If there are no even values or the given array is empty, return [].
+    11	
+    12	    Example 1:
+    13	        Input: [4,2,3]
+    14	        Output: [2, 1]
+    15	        Explanation: 2 has the smallest even value, and 2 has the smallest index.
+    16	
+    17	    Example 2:
+    18	        Input: [1,2,3]
+    19	        Output: [2, 1]
+    20	        Explanation: 2 has the smallest even value, and 2 has the smallest index. 
+    21	
+    22	    Example 3:
+    23	        Input: []
+    24	        Output: []
+    25	    
+    26	    Example 4:
+    27	        Input: [5, 0, 3, 0, 4, 2]
+    28	        Output: [0, 1]
+    29	        Explanation: 0 is the smallest value, but  there are two zeros,
+    30	                     so we will choose the first zero, which has the smallest index.
+    31	
+    32	    Constraints:
+    33	        * 1 <= nodes.length <= 10000
+    34	        * 0 <= node.value
+    35	    """
+$ nl -ba prove.sh
+     1	#!/usr/bin/env bash
+     2	set -euo pipefail
+     3	
+     4	python3 py2mpy.py solution.py > solution.mpy
+     5	python3 py2mpy.py smoke.py > smoke.mpy
+     6	
+     7	kompile reference-semantics/semantics.k \
+     8	  --backend llvm \
+     9	  --main-module MPY-KRUN \
+    10	  --syntax-module MPY-SYNTAX \
+    11	  --output-definition runtime-kompiled
+    12	
+    13	krun smoke.mpy --definition runtime-kompiled
+    14	python3 test_solution.py
+    15	
+    16	kompile verification.k \
+    17	  --backend haskell \
+    18	  --main-module VERIFICATION \
+    19	  --syntax-module MPY-SYNTAX \
+    20	  --output-definition verification-kompiled
+    21	
+    22	kprove spec.k \
+    23	  --definition verification-kompiled \
+    24	  --spec-module SPEC \
+    25	  --claims SPEC.pluck-loop
+    26	
+    27	kprove spec.k \
+    28	  --definition verification-kompiled \
+    29	  --spec-module SPEC
+    30	
+    31	if kprove spec-vacuity.k \
+    32	     --definition verification-kompiled \
+    33	     --spec-module SPEC-VACUITY
+    34	then
+    35	  echo "ERROR: false-postcondition mutation unexpectedly proved"
+    36	  exit 1
+    37	else
+    38	  echo "EXPECTED FAILURE: false-postcondition mutation was rejected"
+    39	fi
+    40	
+    41	if kprove spec-body-mutation.k \
+    42	     --definition verification-kompiled \
+    43	     --spec-module SPEC-BODY-MUTATION
+    44	then
+    45	  echo "ERROR: mutated implementation unexpectedly proved"
+    46	  exit 1
+    47	else
+    48	  echo "EXPECTED FAILURE: mutated implementation was rejected"
+    49	fi

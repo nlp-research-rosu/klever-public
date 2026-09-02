@@ -1,0 +1,482 @@
++ sed -n 1,130p /reference/tools/k_rule_inventory.py
+#!/usr/bin/env python3
+"""Canonical lexical inventory of simplification rules in verification.k."""
+
+from __future__ import annotations
+
+import dataclasses
+import hashlib
+import json
+import re
+import stat
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+_MODULE_NAME_RE = re.compile(
+    r"^[ \t]+(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"(?:[ \t]+\[[^\]\r\n]*\])?[ \t]*$"
+)
+_TRAILING_ATTRIBUTES_RE = re.compile(
+    r"\[(?P<attributes>[^\[\]]*)\][ \t\r\n]*\Z", re.S
+)
+_CELL_TAG_RE = re.compile(
+    r"<(?P<close>/)?(?P<name>[A-Za-z][A-Za-z0-9_'-]*)"
+    r"[ \t]*(?P<self_close>/)?>"
+)
+_OUTER_SENTENCE_KEYWORDS = {
+    "imports",
+    "syntax",
+    "rule",
+    "configuration",
+    "context",
+    "claim",
+    "alias",
+}
+
+
+class KRuleInventoryError(RuntimeError):
+    """Raised when verification.k cannot produce a canonical inventory."""
+
+
+@dataclass(frozen=True)
+class KRule:
+    source_rule_id: str
+    module: str
+    start_line: int
+    end_line: int
+    normalized_sha256: str
+    attributes: list[str]
+    text: str
+
+
+@dataclass(frozen=True)
+class _Sentence:
+    keyword: str
+    start: int
+
+
+@dataclass(frozen=True)
+class _Module:
+    name: str
+    content_start: int
+    content_end: int
+    imports: tuple[str, ...]
+    sentences: tuple[_Sentence, ...]
+
+
+@dataclass(frozen=True)
+class _RuleSpan:
+    rule: KRule
+    start_offset: int
+    end_offset: int
+    attribute_start: int | None
+    attribute_end: int | None
+
+
+def canonical_json_sha256(document: Any) -> str:
+    encoded = json.dumps(
+        document,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _mask_non_code(text: str) -> str:
+    """Mask comments and string bodies without changing source offsets."""
+
+    output = list(text)
+    index = 0
+    block_depth = 0
+    state = "code"
+    while index < len(text):
+        character = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "line-comment":
+            if character in "\r\n":
+                state = "code"
+            else:
+                output[index] = " "
+            index += 1
+            continue
+        if state == "string":
+            if character == "\\" and following:
+                output[index] = " "
+                output[index + 1] = " "
+                index += 2
+                continue
+            if character == '"':
+                state = "code"
+            elif character not in "\r\n":
+                output[index] = " "
+            index += 1
+            continue
+        if state == "block-comment":
+            if character == "/" and following == "*":
+                output[index] = output[index + 1] = " "
+                block_depth += 1
+                index += 2
+                continue
+            if character == "*" and following == "/":
+                output[index] = output[index + 1] = " "
+                block_depth -= 1
+                index += 2
+                if block_depth == 0:
+                    state = "code"
+                continue
+            if character not in "\r\n":
+                output[index] = " "
++ sed -n 700,840p /reference/tools/k_rule_inventory.py
+        tokens = _attribute_token_spans(
+            attribute_text,
+            masked_attributes,
+        )
+        matches = [
+            index
+            for index, (_start, _end, token) in enumerate(tokens)
+            if token == "simplification"
+        ]
+        if len(matches) != 1:
+            raise KRuleInventoryError(
+                "selected source rule has ambiguous simplification "
+                f"attributes: {source_rule_id}"
+            )
+        token_index = matches[0]
+        if len(tokens) == 1:
+            edit_start = span.attribute_start
+            edit_end = span.attribute_end
+        elif token_index < len(tokens) - 1:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index][0]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index + 1][0]
+            )
+        else:
+            edit_start = (
+                span.attribute_start + 1 + tokens[token_index - 1][1]
+            )
+            edit_end = (
+                span.attribute_start + 1 + tokens[token_index][1]
+            )
+        edits.append((edit_start, edit_end))
+
+    transformed = text
+    for start, end in sorted(edits, reverse=True):
+        transformed = (
+            transformed[:start]
+            + _blank_non_newlines(transformed[start:end])
+            + transformed[end:]
+        )
+    return transformed
+
+
+def inventory_verification(workspace: Path) -> dict[str, Any]:
+    workspace = Path(workspace)
+    try:
+        workspace_mode = workspace.stat(follow_symlinks=False).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        ) from error
+    if not stat.S_ISDIR(workspace_mode):
+        raise KRuleInventoryError(
+            f"workspace must be a real directory: {workspace}"
+        )
+    verification = workspace / "verification.k"
+    try:
+        verification_mode = verification.stat(
+            follow_symlinks=False
+        ).st_mode
+    except OSError as error:
+        raise KRuleInventoryError(
+            f"workspace has no regular verification.k: {verification}"
+        ) from error
+    if not stat.S_ISREG(verification_mode):
+        raise KRuleInventoryError(
+            f"workspace has no regular verification.k: {verification}"
+        )
+    try:
+        verification_bytes = verification.read_bytes()
+        text = verification_bytes.decode()
+    except (OSError, UnicodeError) as error:
+        raise KRuleInventoryError(
+            f"cannot read verification.k: {verification}"
+        ) from error
+    masked_text = _mask_non_code(text)
+    modules = _modules(masked_text)
+    module = _verification_module(
+        modules, _last_verification_main_module(workspace)
+    )
+    closure = _verification_closure(modules, module)
+    rule_documents = _rule_documents(text, closure)
+    return {
+        "schema_version": 2,
+        "verification_file": "verification.k",
+        "verification_sha256": hashlib.sha256(verification_bytes).hexdigest(),
+        "verification_module": module.name,
+        "verification_modules": [module.name for module in closure],
+        "rules": rule_documents,
+        "inventory_sha256": canonical_json_sha256(rule_documents),
+    }
++ sed -n 1,180p /reference/k-proof/verification.k
+requires "reference-semantics/semantics.k"
+
+module VERIFICATION
+  imports MPY
+
+  // The exact translated body of solution.py, named only to keep claims readable.
+  syntax Stmts ::= "evenOddBody" [function, total]
+  rule evenOddBody
+    => Expr(Str("Return the counts of even and odd decimal digits in num."))
+       Assign(Name("num"), Call(Name("abs"), Name("num")))
+       Assign(Name("even"), Int(0))
+       Assign(Name("odd"), Int(0))
+       If(Compare(Name("num"), CmpOp("==", Int(0))),
+          Return(TupleExpr(Int(1), Int(0))) .Stmts,
+          .Stmts)
+       While(Compare(Name("num"), CmpOp(">", Int(0))),
+         Assign(Name("even"),
+                BinOp("-",
+                  BinOp("+", Name("even"), Int(1)),
+                  BinOp("%", Name("num"), Int(2))))
+         Assign(Name("odd"),
+                BinOp("+", Name("odd"), BinOp("%", Name("num"), Int(2))))
+         Assign(Name("num"), BinOp("//", Name("num"), Int(10)))
+         .Stmts)
+       Return(TupleExpr(Name("even"), Name("odd")))
+       .Stmts
+
+  syntax Val ::= "evenOddClosure" [function, total]
+  rule evenOddClosure => closureVal("num", evenOddBody, 0)
+
+  // Mathematical counts for a strictly-positive decimal representation.
+  // The zero terminator contributes no digit; the public summaries below give
+  // the integer 0 its single even digit.
+  syntax Int ::= evenPos(Int) [function, total, no-evaluators]
+               | oddPos(Int)  [function, total, no-evaluators]
+               | decEven(Int) [function, total]
+               | decOdd(Int)  [function, total]
+
+  rule evenPos(0) => 0
+  rule oddPos(0)  => 0
+  rule evenPos(N) => 0 requires N ==Int 0 [simplification]
+  rule oddPos(N)  => 0 requires N ==Int 0 [simplification]
+
+  // The negative branch is outside loop use but totalizes the symbols.
+  rule evenPos(N) => evenPos(0 -Int N) requires N <Int 0
+  rule oddPos(N)  => oddPos(0 -Int N)  requires N <Int 0
+
+  rule decEven(0) => 1
+  rule decEven(N) => evenPos(N)        requires N >Int 0
+  rule decEven(N) => evenPos(0 -Int N) requires N <Int 0
+
+  rule decOdd(0) => 0
+  rule decOdd(N) => oddPos(N)        requires N >Int 0
+  rule decOdd(N) => oddPos(0 -Int N) requires N <Int 0
+
+  // Public zero case after the program's abs call.
+  rule { 1 #Equals decEven(N) } => #Top
+    requires absInt(N) ==Int 0
+    [simplification]
+  rule { 0 #Equals decOdd(N) } => #Top
+    requires absInt(N) ==Int 0
+    [simplification]
+  rule { evenPos(absInt(N)) #Equals decEven(N) } => #Top
+    requires absInt(N) >Int 0
+    [simplification]
+  rule { decEven(N) #Equals evenPos(absInt(N)) } => #Top
+    requires absInt(N) >Int 0
+    [simplification]
+  rule { oddPos(absInt(N)) #Equals decOdd(N) } => #Top
+    requires absInt(N) >Int 0
+    [simplification]
+  rule { decOdd(N) #Equals oddPos(absInt(N)) } => #Top
+    requires absInt(N) >Int 0
+    [simplification]
+
+  // One-step decimal recurrence in the exact matching-logic equality shapes
+  // produced after the loop circularity applies.
+  rule { E +Int evenPos(N)
+         #Equals (E +Int 1 -Int ((N %Int 2 +Int 2) %Int 2))
+                    +Int evenPos((N -Int ((N %Int 10 +Int 10) %Int 10))
+                                    /Int 10) } => #Top
+    requires N >Int 0
+    [simplification]
+  rule { (E +Int 1 -Int ((N %Int 2 +Int 2) %Int 2))
+           +Int evenPos((N -Int ((N %Int 10 +Int 10) %Int 10))
+                           /Int 10)
+         #Equals E +Int evenPos(N) } => #Top
+    requires N >Int 0
+    [simplification]
+  rule { O +Int oddPos(N)
+         #Equals (O +Int ((N %Int 2 +Int 2) %Int 2))
+                    +Int oddPos((N -Int ((N %Int 10 +Int 10) %Int 10))
+                                   /Int 10) } => #Top
+    requires N >Int 0
+    [simplification]
+  rule { (O +Int ((N %Int 2 +Int 2) %Int 2))
+           +Int oddPos((N -Int ((N %Int 10 +Int 10) %Int 10))
+                          /Int 10)
+         #Equals O +Int oddPos(N) } => #Top
+    requires N >Int 0
+    [simplification]
+endmodule
++ sed -n 1,180p /reference/k-proof/verification-with-lemma.k
+requires "verification.k"
+
+module VERIFICATION-WITH-LEMMA
+  imports VERIFICATION
+
+  // Operational use of the independently proved LOOP-PROOF.loop-tail theorem.
+  // Its complete match context and state footprint are identical to that claim.
+  rule
+    <k> #while(Compare(Name("num"), CmpOp(">", Int(0))),
+          Assign(Name("even"),
+                 BinOp("-",
+                   BinOp("+", Name("even"), Int(1)),
+                   BinOp("%", Name("num"), Int(2))))
+          Assign(Name("odd"),
+                 BinOp("+", Name("odd"), BinOp("%", Name("num"), Int(2))))
+          Assign(Name("num"), BinOp("//", Name("num"), Int(10)))
+          .Stmts)
+        ~> (Return(TupleExpr(Name("even"), Name("odd"))) .Stmts)
+        ~> #endcall
+        => tuple(vCons(E +Int evenPos(N),
+                      vCons(O +Int oddPos(N), .ValSeq))) ~> CONT
+    </k>
+    <env> 1 => 0 </env>
+    <scopes>
+      -1 |-> B:Scope
+       0 |-> scope("even_odd_count" |-> C:Val, parent(-1))
+       1 |-> scope("num"  |-> N
+                   "even" |-> E
+                   "odd"  |-> O,
+                   parent(0))
+      =>
+      -1 |-> B
+       0 |-> scope("even_odd_count" |-> C, parent(-1))
+    </scopes>
+    <scopeLoc> 2 => 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> ListItem(frame(CONT, 0, 1)) => .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    requires N >=Int 0
+    [priority(40)]
+endmodule
++ sed -n 1,220p /reference/k-proof/spec.k
+requires "verification.k"
+requires "verification-with-lemma.k"
+
+module LOOP-PROOF
+  imports VERIFICATION
+
+  // Loop-tail invariant: from nonnegative remaining magnitude N and current
+  // counters E/O, the exact loop and return suffix add the digit summaries.
+  claim [loop-tail]:
+    <k> #while(Compare(Name("num"), CmpOp(">", Int(0))),
+          Assign(Name("even"),
+                 BinOp("-",
+                   BinOp("+", Name("even"), Int(1)),
+                   BinOp("%", Name("num"), Int(2))))
+          Assign(Name("odd"),
+                 BinOp("+", Name("odd"), BinOp("%", Name("num"), Int(2))))
+          Assign(Name("num"), BinOp("//", Name("num"), Int(10)))
+          .Stmts)
+        ~> (Return(TupleExpr(Name("even"), Name("odd"))) .Stmts)
+        ~> #endcall
+        => tuple(vCons(?ER:Int, vCons(?OR:Int, .ValSeq))) ~> CONT
+    </k>
+    <env> 1 => 0 </env>
+    <scopes>
+      -1 |-> B:Scope
+       0 |-> scope("even_odd_count" |-> C:Val, parent(-1))
+       1 |-> scope("num"  |-> N
+                   "even" |-> E
+                   "odd"  |-> O,
+                   parent(0))
+      =>
+      -1 |-> B
+       0 |-> scope("even_odd_count" |-> C, parent(-1))
+    </scopes>
+    <scopeLoc> 2 => 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> ListItem(frame(CONT, 0, 1)) => .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    requires N >=Int 0
+    ensures ?ER ==Int E +Int evenPos(N)
+     andBool ?OR ==Int O +Int oddPos(N)
+endmodule
+
+module SPEC
+  imports VERIFICATION-WITH-LEMMA
+
+  // Whole function call from an exact module binding, for every mathematical
+  // integer accepted by the HumanEval signature.
+  claim [even-odd-count]:
+    <k> Call(Name("even_odd_count"), N:Int)
+        => tuple(vCons(?ER:Int, vCons(?OR:Int, .ValSeq)))
+    </k>
+    <env> 0 </env>
+    <scopes>
+      -1 |-> builtinsScope
+       0 |-> scope("even_odd_count" |-> evenOddClosure, parent(-1))
+    </scopes>
+    <scopeLoc> 1 </scopeLoc>
+    <heap> .Map </heap>
+    <heapLoc> 0 </heapLoc>
+    <stack> .List </stack>
+    <ret> noRet </ret>
+    <exc> NoExc </exc>
+    <exit-code> 0 </exit-code>
+    ensures ?ER ==Int decEven(N)
+     andBool ?OR ==Int decOdd(N)
+endmodule
++ sed -n 1,220p /reference/k-proof/solution.py
+def even_odd_count(num):
+    """Return the counts of even and odd decimal digits in num."""
+    num = abs(num)
+    even = 0
+    odd = 0
+
+    if num == 0:
+        return (1, 0)
+
+    while num > 0:
+        even = even + 1 - num % 2
+        odd = odd + num % 2
+        num = num // 10
+
+    return (even, odd)
++ sed -n 1,260p /reference/k-proof/solution.mpy
+Module(
+  FuncDef("even_odd_count", Params("num"),
+    Expr(
+      Str("Return the counts of even and odd decimal digits in num."))
+    Assign(Name("num"), Call(Name("abs"), Name("num")))
+    Assign(Name("even"), Int(0))
+    Assign(Name("odd"), Int(0))
+    If(Compare(Name("num"), CmpOp("==", Int(0))),
+      Return(TupleExpr(Int(1), Int(0))),
+      )
+    While(Compare(Name("num"), CmpOp(">", Int(0))),
+      Assign(
+        Name("even"),
+        BinOp(
+          "-",
+          BinOp("+", Name("even"), Int(1)),
+          BinOp("%", Name("num"), Int(2))))
+      Assign(
+        Name("odd"),
+        BinOp("+", Name("odd"), BinOp("%", Name("num"), Int(2))))
+      Assign(Name("num"), BinOp("//", Name("num"), Int(10))))
+    Return(TupleExpr(Name("even"), Name("odd")))))

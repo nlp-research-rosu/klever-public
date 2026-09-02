@@ -1,0 +1,225 @@
+        )
+    )
+
+required_directories = [
+    "/candidate",
+    "/generation-evidence",
+    "/generation-evidence/codex-trace",
+    "/kit-skills",
+]
+if audit_input["mount_reference_semantics"]:
+    required_directories.append("/reference/reference-semantics")
+
+print(f"REQUIRED AUDIT INPUTS ({layout})")
+for value in required_files:
+    path = Path(value)
+    if not path.is_file() or path.is_symlink():
+        raise SystemExit(f"MISSING file {value}")
+    print(f"OK file {value}")
+for value in required_directories:
+    path = Path(value)
+    if not path.is_dir() or path.is_symlink():
+        raise SystemExit(f"MISSING directory {value}")
+    print(f"OK directory {value}")
+
+print("READ-ONLY MOUNTS")
+mounts = [
+    "/candidate",
+    "/generation-evidence",
+    "/run.json",
+    "/task.json",
+    "/generation-result.json",
+    "/audit-input.json",
+    "/audit-campaign-lock.json",
+    "/reference/canonical.py",
+    "/reference/prompt.py",
+    "/reference/py2mpy.py",
+    "/kit-skills",
+    "/audit-prompt.md",
+    "/audit-entrypoint.sh",
+    "/auth/auth.json",
+]
+if audit_input["mount_reference_semantics"]:
+    mounts.append("/reference/reference-semantics")
+for value in mounts:
+    result = subprocess.run(
+        ["findmnt", "-T", value, "-n", "-o", "OPTIONS"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    options = result.stdout.strip()
+    if "ro" not in options.split(","):
+        raise SystemExit(f"WRITABLE mount {value}: {options}")
+    print(f"OK readonly {value} options={options}")
+
+campaign = json.loads(
+    Path("/audit-campaign-lock.json").read_text(encoding="utf-8")
+)
+print("AUDIT CAMPAIGN LOCK")
+for key in (
+    "campaign_id",
+    "audit_image_id",
+    "codex_cli_version",
+    "k_version",
+    "pyk_version",
+    "lean_toolchain",
+    "kit_commit",
+    "kit_skills_tree",
+    "audit_prompt_sha256",
+):
+    print(f"{key}: {campaign[key]}")
+print("NO MODEL CALL: probe complete")
+PY
+  exit 0
+fi
+
+if [[ ! -e "$WORK_DIR" && ! -L "$WORK_DIR" ]]; then
+  WORK_PARENT="$(dirname -- "$WORK_DIR")" \
+    || setup_error "cannot resolve scratch parent for $WORK_DIR"
+  is_real_directory "$WORK_PARENT" \
+    || setup_error "scratch parent is missing, linked, or not a directory: $WORK_PARENT"
+  mkdir -- "$WORK_DIR" || setup_error "cannot create scratch directory: $WORK_DIR"
+fi
+is_real_directory "$WORK_DIR" \
+  || setup_error "scratch path is linked or not a directory: $WORK_DIR"
+
+SUPERVISOR_DIR="$(mktemp -d "$SUPERVISOR_PARENT/.audit-supervisor.XXXXXX")" \
+  || setup_error "cannot create supervisor directory below $SUPERVISOR_PARENT"
+chmod 700 "$SUPERVISOR_DIR" \
+  || setup_error "cannot protect supervisor directory: $SUPERVISOR_DIR"
+CODEX_HOME="$SUPERVISOR_DIR/codex-home"
+SPOOL_DIR="$SUPERVISOR_DIR/spool"
+mkdir -m 700 "$CODEX_HOME" "$SPOOL_DIR" \
+  || setup_error "cannot create protected supervisor profile and spool"
+mkdir -m 700 "$CODEX_HOME/skills" \
+  || setup_error "cannot create Codex skills directory"
+install -m 600 -- "$AUTH_FILE" "$CODEX_HOME/auth.json" \
+  || setup_error "cannot install isolated Codex auth"
+cp -R -- "$KIT_SKILLS_DIR/." "$CODEX_HOME/skills/" \
+  || setup_error "cannot install approved Kit skills"
+export CODEX_HOME
+
+PROMPT_BUFFER="$SPOOL_DIR/rendered-audit-prompt.txt"
+LOG_BUFFER="$SPOOL_DIR/codex-output.log"
+LAST_BUFFER="$SPOOL_DIR/codex-last.txt"
+METRICS_BUFFER="$SPOOL_DIR/metrics.json"
+
+# Byte-oriented replacement preserves every non-placeholder byte from the
+# launcher-owned prompt.
+if ! python3 - \
+  "$PROMPT_FILE" \
+  "$AUDIT_PROBLEM_ID" \
+  "$AUDIT_CONDITION" \
+  "$AUDIT_SEMANTICS_MODE" \
+  > "$PROMPT_BUFFER" <<'PY'
+from pathlib import Path
+import sys
+
+prompt = Path(sys.argv[1]).read_bytes()
+replacements = (
+    (b"__PROBLEM_ID__", sys.argv[2].encode()),
+    (b"__CONDITION__", sys.argv[3].encode()),
+    (b"__SEMANTICS_MODE__", sys.argv[4].encode()),
+)
+for placeholder, value in replacements:
+    if prompt.count(placeholder) != 1:
+        raise SystemExit(
+            f"audit prompt must contain exactly one {placeholder.decode()} placeholder"
+        )
+    prompt = prompt.replace(placeholder, value)
+sys.stdout.buffer.write(prompt)
+PY
+then
+  setup_error "cannot render audit prompt"
+fi
+is_real_regular_file "$PROMPT_BUFFER" \
+  || setup_error "rendered audit prompt is not a real regular file"
+
+START_EPOCH="$(date +%s)" || setup_error "cannot record audit start time"
+setsid timeout --signal=TERM --kill-after=60 "$TIMEOUT_S" \
+  codex -a never exec \
+    --sandbox workspace-write \
+    --add-dir "$WORK_DIR" \
+    --ignore-user-config \
+    --skip-git-repo-check \
+    -C "$OUTPUT_DIR" \
+    -m "$MODEL" \
+    -c model_reasoning_effort="$EFFORT" \
+    --output-last-message "$LAST_BUFFER" \
+    - < "$PROMPT_BUFFER" \
+    > "$LOG_BUFFER" 2>&1 &
+MODEL_PGID=$!
+wait "$MODEL_PGID"
+MODEL_EXIT_CODE=$?
+terminate_model_group "$MODEL_PGID"
+MODEL_PGID=""
+END_EPOCH="$(date +%s)" || mark_harness_error "cannot record audit end time"
+
+publish_regular_file \
+  "$PROMPT_BUFFER" "$OUTPUT_DIR/prompt.txt" "rendered audit prompt" \
+  || mark_harness_error "rendered audit prompt publication failed"
+publish_regular_file \
+  "$LOG_BUFFER" "$OUTPUT_DIR/codex-output.log" "Codex output log" \
+  || mark_harness_error "Codex output log publication failed"
+publish_regular_file \
+  "$LAST_BUFFER" "$OUTPUT_DIR/codex-last.txt" "Codex last message" \
+  || mark_harness_error "Codex last-message publication failed"
+publish_trace_tree "$CODEX_HOME/sessions" "$OUTPUT_DIR/codex-trace" \
+  || mark_harness_error "Codex trace publication failed"
+
+MEM_PEAK=null
+for file in \
+  "$CGROUP_ROOT/memory.peak" \
+  "$CGROUP_ROOT/memory/memory.max_usage_in_bytes"
+do
+  if [[ -r "$file" ]]; then
+    value="$(<"$file")"
+    if [[ "$value" =~ ^[0-9]+$ ]]; then
+      MEM_PEAK="$value"
+      break
+    fi
+  fi
+done
+
+TIMED_OUT=false
+if [[ "$MODEL_EXIT_CODE" -eq 124 || "$MODEL_EXIT_CODE" -eq 137 ]]; then
+  TIMED_OUT=true
+fi
+
+FINAL_EXIT_CODE="$MODEL_EXIT_CODE"
+if [[ "$HARNESS_EXIT_CODE" -ne 0 ]]; then
+  FINAL_EXIT_CODE="$HARNESS_EXIT_CODE"
+fi
+
+if ! cat > "$METRICS_BUFFER" <<EOF
+{
+  "agent": "codex",
+  "model": "$MODEL",
+  "effort": "$EFFORT",
+  "timeout_s": $TIMEOUT_S,
+  "start_epoch": $START_EPOCH,
+  "end_epoch": $END_EPOCH,
+  "duration_s": $((END_EPOCH - START_EPOCH)),
+  "exit_code": $FINAL_EXIT_CODE,
+  "model_exit_code": $MODEL_EXIT_CODE,
+  "harness_exit_code": $HARNESS_EXIT_CODE,
+  "timed_out": $TIMED_OUT,
+  "mem_peak_bytes": $MEM_PEAK
+}
+EOF
+then
+  mark_harness_error "cannot create metrics publication source"
+fi
+
+if is_real_regular_file "$METRICS_BUFFER"; then
+  publish_regular_file "$METRICS_BUFFER" "$OUTPUT_DIR/metrics.json" "audit metrics" \
+    || mark_harness_error "metrics publication failed"
+fi
+
+FINAL_EXIT_CODE="$MODEL_EXIT_CODE"
+if [[ "$HARNESS_EXIT_CODE" -ne 0 ]]; then
+  FINAL_EXIT_CODE="$HARNESS_EXIT_CODE"
+fi
+echo "audit metrics: model_exit=$MODEL_EXIT_CODE harness_exit=$HARNESS_EXIT_CODE timed_out=$TIMED_OUT mem_peak=$MEM_PEAK" >&2
+exit "$FINAL_EXIT_CODE"

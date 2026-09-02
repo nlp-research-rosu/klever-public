@@ -1,0 +1,47 @@
+$ nl -ba /tmp/audit-work/readlink_app_path_shim.c
+     1	#define _GNU_SOURCE
+     2	#include <dlfcn.h>
+     3	#include <errno.h>
+     4	#include <libgen.h>
+     5	#include <stdio.h>
+     6	#include <string.h>
+     7	#include <unistd.h>
+     8	
+     9	extern char *program_invocation_name;
+    10	
+    11	typedef ssize_t (*readlink_fn)(const char *, char *, size_t);
+    12	
+    13	ssize_t readlink(const char *path, char *buffer, size_t size) {
+    14	    static readlink_fn real_readlink = NULL;
+    15	    char self_path[64];
+    16	    int count = snprintf(self_path, sizeof(self_path), "/proc/%ld/exe", (long)getpid());
+    17	    if (count > 0 && (size_t)count < sizeof(self_path) && strcmp(path, self_path) == 0) {
+    18	        const char *base = program_invocation_name;
+    19	        const char *slash = strrchr(base, '/');
+    20	        if (slash != NULL) {
+    21	            base = slash + 1;
+    22	        }
+    23	        if (strcmp(base, "lean") == 0 || strcmp(base, "lake") == 0) {
+    24	            const char *root = "/opt/elan/toolchains/leanprover--lean4---v4.22.0/bin/";
+    25	            char target[256];
+    26	            int target_count = snprintf(target, sizeof(target), "%s%s", root, base);
+    27	            if (target_count < 0 || (size_t)target_count >= sizeof(target)) {
+    28	                errno = ENAMETOOLONG;
+    29	                return -1;
+    30	            }
+    31	            size_t target_size = (size_t)target_count;
+    32	            size_t copied = target_size < size ? target_size : size;
+    33	            memcpy(buffer, target, copied);
+    34	            return (ssize_t)copied;
+    35	        }
+    36	    }
+    37	
+    38	    if (real_readlink == NULL) {
+    39	        real_readlink = (readlink_fn)dlsym(RTLD_NEXT, "readlink");
+    40	        if (real_readlink == NULL) {
+    41	            errno = ENOSYS;
+    42	            return -1;
+    43	        }
+    44	    }
+    45	    return real_readlink(path, buffer, size);
+    46	}

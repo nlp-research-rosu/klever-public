@@ -1,0 +1,2 @@
+cwd: /audit-output
+command: bash -lc python3\ /tmp/audit-work/rebuild-52/trusted-py2mpy.py\ /tmp/audit-work/rebuild-52/solution.py\ \>\ /tmp/audit-work/rebuild-52/solution.regenerated.mpy\ \&\&\ cmp\ /tmp/audit-work/rebuild-52/solution.mpy\ /tmp/audit-work/rebuild-52/solution.regenerated.mpy\ \&\&\ sha256sum\ /tmp/audit-work/rebuild-52/solution.mpy\ /tmp/audit-work/rebuild-52/solution.regenerated.mpy

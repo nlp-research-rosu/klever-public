@@ -1,0 +1,5 @@
+import Klean79DecimalToBinary.Func
+
+inductive Rewrites : SortGeneratedTopCell → SortGeneratedTopCell → Prop where
+  | tran {s1 s2 s3 : SortGeneratedTopCell} (t1 : Rewrites s1 s2) (t2 : Rewrites s2 s3) : Rewrites s1 s3
+  | VERIFICATION_KLEAN_EXPORT_kxExport0 {V0 : SortInt} {_DotVar0 : SortGeneratedCounterCell} {_DotVar2 : SortK} {_Gen0 : SortArgCell} {_Gen1 : SortResultCell} {_Val0 : SortString} (defn_Val0 : «decimalToBinarySpec(_)_VERIFICATION_String_Int» V0 = some _Val0) : Rewrites { python := { k := { val := SortK.kseq (SortKItem.«#kxExport0(_)_VERIFICATION-KLEAN-EXPORT_KItem_Int» V0) _DotVar2 }, arg := _Gen0, result := _Gen1 }, generatedCounter := _DotVar0 } { python := { k := { val := SortK.kseq ((@inj SortString SortKItem) _Val0) _DotVar2 }, arg := _Gen0, result := _Gen1 }, generatedCounter := _DotVar0 }

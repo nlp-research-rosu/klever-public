@@ -1,0 +1,244 @@
+WORKDIR: /tmp/audit-work/candidate-src
+COMMAND: bash -lc for\ f\ in\ semantic.k\ verification.k\ spec.k\ solution.mpy\ solution.py\;\ do\ echo\ \"=====\ \$f\ =====\"\;\ nl\ -ba\ \"\$f\"\;\ done
+===== semantic.k =====
+     1	module MPY-SYNTAX
+     2	  imports INT-SYNTAX
+     3	  imports BOOL-SYNTAX
+     4	  imports STRING-SYNTAX
+     5	
+     6	  syntax Program ::= Module(Stmts)
+     7	
+     8	  // The translator represents statement blocks by juxtaposition.
+     9	  syntax Stmts ::= List{Stmt, ""}
+    10	  syntax Stmt ::= FuncDef(String, Params, Stmts)
+    11	                | Return(Expr)
+    12	                | If(Expr, Stmts, Stmts)
+    13	
+    14	  syntax Params ::= Params(Ids)
+    15	  syntax Ids ::= List{String, ","}
+    16	
+    17	  syntax Expr ::= Int(Int)
+    18	                | Bool(Bool)
+    19	                | Name(String)
+    20	                | BinOp(String, Expr, Expr)
+    21	                | Compare(Expr, CmpOp)
+    22	                | Call(Expr, Exprs)
+    23	  syntax CmpOp ::= CmpOp(String, Expr)
+    24	  syntax Exprs ::= List{Expr, ","}
+    25	endmodule
+    26	
+    27	module SEMANTIC
+    28	  imports MPY-SYNTAX
+    29	  imports MAP
+    30	  imports INT
+    31	  imports BOOL
+    32	
+    33	  syntax Function ::= function(Params, Stmts)
+    34	
+    35	  syntax KItem ::= #invoke(String, Exprs)
+    36	                 | #branch(Expr, Stmts, Stmts)
+    37	                 | #finish(Expr)
+    38	
+    39	  syntax Expr ::= #eval(Expr, Map) [function]
+    40	                | #lookup(String, Map) [function]
+    41	                | #bin(String, Expr, Expr) [function]
+    42	                | #cmp(String, Expr, Expr) [function]
+    43	  syntax Exprs ::= #evalArgs(Exprs, Map) [function]
+    44	  syntax Map ::= #bind(Params, Exprs) [function]
+    45	
+    46	  configuration
+    47	    <py>
+    48	      <k> $PGM:Program ~> #invoke("is_prime", Int($N:Int)) </k>
+    49	      <functions> .Map </functions>
+    50	      <env> .Map </env>
+    51	      <result> Bool(false) </result>
+    52	    </py>
+    53	
+    54	  rule <k> Module(SS) => SS ... </k>
+    55	
+    56	  rule <k> (S:Stmt SS:Stmts) => S ~> SS ... </k>
+    57	  rule <k> .Stmts => .K ... </k>
+    58	
+    59	  rule <k> FuncDef(F, P, B) => .K ... </k>
+    60	       <functions> FS => FS [ F <- function(P, B) ] </functions>
+    61	
+    62	  rule <k> #invoke(F, VS) => B ... </k>
+    63	       <functions> ... F |-> function(P, B) ... </functions>
+    64	       <env> _ => #bind(P, VS) </env>
+    65	
+    66	  rule <k> If(E, THEN, ELSE) => #branch(#eval(E, RHO), THEN, ELSE) ... </k>
+    67	       <env> RHO </env>
+    68	  rule <k> #branch(Bool(true),  THEN, _) => THEN ... </k>
+    69	  rule <k> #branch(Bool(false), _, ELSE) => ELSE ... </k>
+    70	
+    71	  // Calls in solution.py are tail calls.  Return discards the rest of the
+    72	  // current block, exactly as Python does.
+    73	  rule <k> Return(Call(Name(F), ES)) ~> _ => #invoke(F, #evalArgs(ES, RHO)) </k>
+    74	       <env> RHO </env> [priority(40)]
+    75	  rule <k> Return(E) ~> _ => #finish(#eval(E, RHO)) </k>
+    76	       <env> RHO </env>
+    77	  rule <k> #finish(V) => .K </k>
+    78	       <result> _ => V </result>
+    79	
+    80	  rule #lookup(X, (X |-> V:Expr) _REST) => V
+    81	
+    82	  rule #eval(Int(I),    _)   => Int(I)
+    83	  rule #eval(Bool(B),   _)   => Bool(B)
+    84	  rule #eval(Name(X),   RHO) => #lookup(X, RHO)
+    85	  rule #eval(BinOp(OP, L, R), RHO)
+    86	    => #bin(OP, #eval(L, RHO), #eval(R, RHO))
+    87	  rule #eval(Compare(L, CmpOp(OP, R)), RHO)
+    88	    => #cmp(OP, #eval(L, RHO), #eval(R, RHO))
+    89	
+    90	  rule #bin("+", Int(I), Int(J)) => Int(I +Int J)
+    91	  rule #bin("*", Int(I), Int(J)) => Int(I *Int J)
+    92	  rule #bin("%", Int(I), Int(J)) => Int(I %Int J)
+    93	    requires J =/=Int 0
+    94	
+    95	  rule #cmp("<",  Int(I), Int(J)) => Bool(I <Int J)
+    96	  rule #cmp(">",  Int(I), Int(J)) => Bool(I >Int J)
+    97	  rule #cmp("==", Int(I), Int(J)) => Bool(I ==Int J)
+    98	
+    99	  rule #evalArgs((E:Expr), RHO) => #eval(E, RHO)
+   100	  rule #evalArgs((E1:Expr, E2:Expr), RHO)
+   101	    => (#eval(E1, RHO), #eval(E2, RHO))
+   102	
+   103	  rule #bind(Params(X:String), V:Expr) => X |-> V
+   104	  rule #bind(Params(X:String, Y:String), (V1:Expr, V2:Expr))
+   105	    => X |-> V1 Y |-> V2
+   106	endmodule
+===== verification.k =====
+     1	requires "semantic.k"
+     2	
+     3	module VERIFICATION
+     4	  imports SEMANTIC
+     5	
+     6	  // A mathematical reference predicate.  noDivisor(N,D) searches the finite
+     7	  // interval D .. floor(sqrt(N)); hence prime(N) says N >= 2 and has no
+     8	  // divisor in 2 .. floor(sqrt(N)), the standard characterization of primes.
+     9	  syntax Bool ::= noDivisor(Int, Int) [function]
+    10	                | prime(Int) [function]
+    11	
+    12	  rule noDivisor(N, D) => true
+    13	    requires D *Int D >Int N
+    14	  rule noDivisor(N, D) => false
+    15	    requires D *Int D <=Int N andBool D dividesInt N
+    16	  rule noDivisor(N, D) => noDivisor(N, D +Int 1)
+    17	    requires D *Int D <=Int N andBool notBool (D dividesInt N)
+    18	
+    19	  rule prime(N) => false
+    20	    requires N <Int 2
+    21	  rule prime(N) => noDivisor(N, 2)
+    22	    requires N >=Int 2
+    23	
+    24	  // Canonical terms for the two definitions translated from solution.py.
+    25	  // Naming them keeps the claims readable; these are equations, not shortcuts
+    26	  // in the execution semantics.
+    27	  syntax Function ::= noDivisorFunction() [function]
+    28	                    | isPrimeFunction() [function]
+    29	  syntax Program ::= solutionProgram() [function]
+    30	
+    31	  rule noDivisorFunction() =>
+    32	    function(
+    33	      Params("n", "d"),
+    34	      If(
+    35	        Compare(BinOp("*", Name("d"), Name("d")), CmpOp(">", Name("n"))),
+    36	        Return(Bool(true)),
+    37	        .Stmts)
+    38	      If(
+    39	        Compare(BinOp("%", Name("n"), Name("d")), CmpOp("==", Int(0))),
+    40	        Return(Bool(false)),
+    41	        .Stmts)
+    42	      Return(Call(Name("no_divisor"), Name("n"), BinOp("+", Name("d"), Int(1))))
+    43	    )
+    44	
+    45	  rule isPrimeFunction() =>
+    46	    function(
+    47	      Params("n"),
+    48	      If(
+    49	        Compare(Name("n"), CmpOp("<", Int(2))),
+    50	        Return(Bool(false)),
+    51	        .Stmts)
+    52	      Return(Call(Name("no_divisor"), Name("n"), Int(2)))
+    53	    )
+    54	
+    55	  rule solutionProgram() =>
+    56	    Module(
+    57	      FuncDef("no_divisor", Params("n", "d"),
+    58	        If(
+    59	          Compare(BinOp("*", Name("d"), Name("d")), CmpOp(">", Name("n"))),
+    60	          Return(Bool(true)),
+    61	          .Stmts)
+    62	        If(
+    63	          Compare(BinOp("%", Name("n"), Name("d")), CmpOp("==", Int(0))),
+    64	          Return(Bool(false)),
+    65	          .Stmts)
+    66	        Return(Call(Name("no_divisor"), Name("n"), BinOp("+", Name("d"), Int(1)))))
+    67	      FuncDef("is_prime", Params("n"),
+    68	        If(
+    69	          Compare(Name("n"), CmpOp("<", Int(2))),
+    70	          Return(Bool(false)),
+    71	          .Stmts)
+    72	        Return(Call(Name("no_divisor"), Name("n"), Int(2))))
+    73	    )
+    74	endmodule
+===== spec.k =====
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  // Tail-recursive invariant: for any search position D >= 2, executing the
+     7	  // helper computes exactly the finite divisor search in verification.k.
+     8	  claim
+     9	    <k> #invoke("no_divisor", (Int(N), Int(D))) => .K </k>
+    10	    <functions>
+    11	      "no_divisor" |-> noDivisorFunction() _REST
+    12	    </functions>
+    13	    <env> _RHO => ?_FINALENV </env>
+    14	    <result> _R => Bool(noDivisor(N, D)) </result>
+    15	    requires N >=Int 2 andBool D >=Int 2
+    16	    [label(helper-correct)]
+    17	
+    18	  // Universal target theorem for the required entry point.
+    19	  claim
+    20	    <k> solutionProgram() ~> #invoke("is_prime", Int(N)) => .K </k>
+    21	    <functions>
+    22	      .Map
+    23	      => "no_divisor" |-> noDivisorFunction()
+    24	         "is_prime" |-> isPrimeFunction()
+    25	    </functions>
+    26	    <env> .Map => ?_FINALENV </env>
+    27	    <result> Bool(false) => Bool(prime(N)) </result>
+    28	    [label(is-prime-correct)]
+    29	endmodule
+===== solution.mpy =====
+     1	Module(
+     2	  FuncDef("no_divisor", Params("n", "d"),
+     3	    If(Compare(BinOp("*", Name("d"), Name("d")), CmpOp(">", Name("n"))),
+     4	      Return(Bool(true)),
+     5	      )
+     6	    If(Compare(BinOp("%", Name("n"), Name("d")), CmpOp("==", Int(0))),
+     7	      Return(Bool(false)),
+     8	      )
+     9	    Return(
+    10	      Call(Name("no_divisor"), Name("n"), BinOp("+", Name("d"), Int(1)))))
+    11	  FuncDef("is_prime", Params("n"),
+    12	    If(Compare(Name("n"), CmpOp("<", Int(2))),
+    13	      Return(Bool(false)),
+    14	      )
+    15	    Return(Call(Name("no_divisor"), Name("n"), Int(2)))))
+===== solution.py =====
+     1	def no_divisor(n, d):
+     2	    if d * d > n:
+     3	        return True
+     4	    if n % d == 0:
+     5	        return False
+     6	    return no_divisor(n, d + 1)
+     7	
+     8	
+     9	def is_prime(n):
+    10	    if n < 2:
+    11	        return False
+    12	    return no_divisor(n, 2)
+EXIT_STATUS: 0

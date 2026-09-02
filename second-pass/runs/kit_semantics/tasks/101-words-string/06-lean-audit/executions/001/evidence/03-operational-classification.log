@@ -1,0 +1,125 @@
+COMMAND: inspect frozen source program, exact K postcondition, and supplied operational rules implementing replace/split
+     1	def words_string(s):
+     2	    return s.replace(",", " ").split()
+     1	requires "verification.k"
+     2	
+     3	module SPEC
+     4	  imports VERIFICATION
+     5	
+     6	  claim [words-string]:
+     7	    <k>
+     8	      #loadAll(Module(
+     9	        FuncDef(
+    10	          "words_string",
+    11	          Params("s"),
+    12	          Return(
+    13	            Call(
+    14	              Attribute(
+    15	                Call(Attribute(Name("s"), "replace"), Str(","), Str(" ")),
+    16	                "split"),
+    17	              .Exprs)))))
+    18	      ~> Call(Name("words_string"), str(CS:IntSeq))
+    19	      =>
+    20	      ref(0)
+    21	    </k>
+    22	    <env> 0 </env>
+    23	    <scopes>
+    24	      0 |-> scope(
+    25	        .Map
+    26	        =>
+    27	        "words_string" |-> closureVal(
+    28	          ("s", .ParamNames),
+    29	          (Return(
+    30	             Call(
+    31	               Attribute(
+    32	                 Call(Attribute(Name("s"), "replace"), Str(","), Str(" ")),
+    33	                 "split"),
+    34	               .Exprs))
+    35	           .Stmts),
+    36	          0),
+    37	        parent(-1))
+    38	      -1 |-> builtinsScope
+    39	    </scopes>
+    40	    <scopeLoc> 1 </scopeLoc>
+    41	    <heap>
+    42	      .Map
+    43	      =>
+    44	      0 |-> list(splitWS(replaceC(CS, 44, 32), .IntSeq, .ValSeq))
+    45	    </heap>
+    46	    <heapLoc> 0 => 1 </heapLoc>
+    47	    <stack> .List </stack>
+    48	    <ret> noRet </ret>
+    49	    <exc> NoExc </exc>
+    50	    <exit-code> 0 </exit-code>
+    51	endmodule
+    60	  // ==== prefix ===============================================================
+    61	  rule applyMethod(str(XC:IntSeq), "startswith", str(PC:IntSeq), .Vals) => startsWith(PC, XC)
+    62	
+    63	  // ==== list.count(v) — number of occurrences of v in the list (concrete for krun) ==========
+    64	  rule applyMethod(list(VS:ValSeq), "count", V:Val, .Vals) => cntOccVS(VS, V)
+    65	  syntax Int ::= cntOccVS(ValSeq, Val) [function, total]
+    66	  rule cntOccVS(.ValSeq, _:Val)                => 0
+    67	  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => 1 +Int cntOccVS(R, V) requires A ==K V
+    68	  rule cntOccVS(vCons(A:Val, R:ValSeq), V:Val) => cntOccVS(R, V)        requires notBool (A ==K V)
+    69	
+    70	  // ==== split (no-arg: on whitespace runs, dropping empty tokens) + replace (single char) ==========
+    71	  // Concrete string ops for krun. A proof over a symbolic string intercepts the split problem-locally.
+    72	  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals)
+    73	        => #alloc(list(splitWS(CS, .IntSeq, .ValSeq))) ... </k>
+    74	       [priority(40)]
+    75	  syntax ValSeq ::= splitWS(IntSeq, IntSeq, ValSeq) [function]  // remaining, current token, result
+    76	  rule splitWS(.IntSeq, CUR:IntSeq, ACC:ValSeq) => flushTok(ACC, CUR)
+    77	  rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, .IntSeq, flushTok(ACC, CUR))
+    78	       requires isWSC(C)
+    79	  rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, seqConcat(CUR, iCons(C, .IntSeq)), ACC)
+    80	       requires notBool isWSC(C)
+    81	  // flush the current token to the result list iff non-empty.
+    82	  syntax ValSeq ::= flushTok(ValSeq, IntSeq) [function]
+    83	  rule flushTok(ACC:ValSeq, .IntSeq)            => ACC
+    84	  rule flushTok(ACC:ValSeq, iCons(C:Int, T:IntSeq)) => valSeqConcat(ACC, vCons(str(iCons(C, T)), .ValSeq))
+    85	  syntax Bool ::= isWSC(Int) [function, total]
+    86	  rule isWSC(C:Int) => C ==Int 32 orBool C ==Int 9 orBool C ==Int 10 orBool C ==Int 13
+    87	
+    88	  // split(sep='x') keyword form delegates to the positional k-cell rule
+    89	  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (kwV("sep", str(S:IntSeq)), .Vals))
+    90	        => #applyK(toCall(boundMethodV(str(CS), "split")), (str(S), .Vals)) ... </k>
+    91	       [priority(39)]
+    92	
+    93	  // str.split(sep) — single-char separator, KEEPING empty parts (Python's sep-split; len == #sep + 1).
+    94	  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (str(iCons(SEP:Int, .IntSeq)), .Vals))
+    95	        => #alloc(list(splitSep(CS, SEP, .IntSeq))) ... </k>
+    96	       [priority(40)]
+    97	  syntax ValSeq ::= splitSep(IntSeq, Int, IntSeq) [function]  // remaining, sep code, current token
+    98	  rule splitSep(.IntSeq, _SEP:Int, CUR:IntSeq)              => vCons(str(CUR), .ValSeq)
+    99	  rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => vCons(str(CUR), splitSep(R, SEP, .IntSeq))
+   100	       requires C ==Int SEP
+   101	  rule splitSep(iCons(C:Int, R:IntSeq), SEP:Int, CUR:IntSeq) => splitSep(R, SEP, seqConcat(CUR, iCons(C, .IntSeq)))
+   102	       requires notBool (C ==Int SEP)
+   103	
+   104	  rule applyMethod(str(CS:IntSeq), "replace", str(iCons(A:Int, .IntSeq)), str(iCons(B:Int, .IntSeq)), .Vals)
+   105	    => str(replaceC(CS, A, B))
+   106	  syntax IntSeq ::= replaceC(IntSeq, Int, Int) [function, total]
+   107	  rule replaceC(.IntSeq, _:Int, _:Int)             => .IntSeq
+   108	  rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(B, replaceC(R, A, B)) requires C ==Int A
+   109	  rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(C, replaceC(R, A, B)) requires notBool (C ==Int A)
+   110	
+   111	  // ==== char helpers =========================================================
+   112	  syntax Bool ::= isUpperC(Int) [function, total]
+   113	  rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90
+   114	
+   115	  syntax Bool ::= isLowerC(Int) [function, total]
+MATCHED_REQUIRED_RULES:
+72:  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), .Vals)
+76:  rule splitWS(.IntSeq, CUR:IntSeq, ACC:ValSeq) => flushTok(ACC, CUR)
+77:  rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, .IntSeq, flushTok(ACC, CUR))
+79:  rule splitWS(iCons(C:Int, R:IntSeq), CUR:IntSeq, ACC:ValSeq) => splitWS(R, seqConcat(CUR, iCons(C, .IntSeq)), ACC)
+83:  rule flushTok(ACC:ValSeq, .IntSeq)            => ACC
+84:  rule flushTok(ACC:ValSeq, iCons(C:Int, T:IntSeq)) => valSeqConcat(ACC, vCons(str(iCons(C, T)), .ValSeq))
+86:  rule isWSC(C:Int) => C ==Int 32 orBool C ==Int 9 orBool C ==Int 10 orBool C ==Int 13
+89:  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (kwV("sep", str(S:IntSeq)), .Vals))
+94:  rule <k> #applyK(toCall(boundMethodV(str(CS:IntSeq), "split")), (str(iCons(SEP:Int, .IntSeq)), .Vals))
+104:  rule applyMethod(str(CS:IntSeq), "replace", str(iCons(A:Int, .IntSeq)), str(iCons(B:Int, .IntSeq)), .Vals)
+107:  rule replaceC(.IntSeq, _:Int, _:Int)             => .IntSeq
+108:  rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(B, replaceC(R, A, B)) requires C ==Int A
+109:  rule replaceC(iCons(C:Int, R:IntSeq), A:Int, B:Int) => iCons(C, replaceC(R, A, B)) requires notBool (C ==Int A)
+EXIT_CODE: 0

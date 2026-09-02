@@ -1,0 +1,607 @@
+Script started on 2026-07-31 09:19:43-05:00 [<not executed on terminal>]
+// reference/src/semantics/controls.k — MPY-CONTROLS
+
+module MPY-CONTROLS
+  imports MPY-CORE
+  imports MPY-TUPLE
+  imports MPY-ITER
+
+  // ==== Assign / AugAssign (write the current scope; RHS evaluated by strictness) ==
+  rule <k> Assign(Name(X:String), V:Val) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ X <- V ], _) ... </scopes>
+  rule <k> Assign(Name(X:String), V:Val) => #cellW({M[X]}:>Val, V) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires "$cells" in_keys(M)
+        andBool pnMember(X, cellsOf({M["$cells"]}:>Val))
+        andBool X in_keys(M) andBool isCellRef({M[X]}:>Val)
+       [priority(40)]
+
+  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ X <- applyBin(OP, {M[X]}:>Val, V) ], _) ... </scopes>
+       requires X in_keys(M)
+  // `lst += [..]` where lst is a heap ref: the generic rule leaves applyBin(OP, ref, V) — but the
+  // ref-deref preemption is BinOp-level (operators.k), so applyBin never derefs and it sticks. Route
+  // the ref case through BinOp so the deref + list-concat + #alloc path fires (result is a fresh ref).
+  rule <k> AugAssign(Name(X:String), OP:String, V:Val) => Assign(Name(X), BinOp(OP, Name(X), V)) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires X in_keys(M) andBool isRefV({M[X]}:>Val)
+       [priority(40)]
+
+  // ==== import trivia: `from math import floor, ceil` binds the supported
+  // names as builtins in the current scope; every other import is a no-op
+  rule <k> ImportFrom("math", NS:ParamNames) => #bindImports(NS) ... </k>
+  rule <k> ImportFrom(_:String, _:ParamNames) => .K ... </k> [owise]
+  syntax KItem ::= #bindImports(ParamNames)
+  rule <k> #bindImports(.ParamNames) => .K ... </k>
+  rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ N <- builtinV(N) ], _) ... </scopes>
+       requires N ==String "floor" orBool N ==String "ceil"
+  rule <k> #bindImports((N:String, NS:ParamNames)) => #bindImports(NS) ... </k>
+       requires notBool (N ==String "floor" orBool N ==String "ceil")
+
+  // ==== Expr statement: evaluate for effect, discard the value ===============
+  // (bare calls — mutator methods, docstrings; the WP0 statement-trivia rung)
+  rule <k> Expr(_:Val) => .K ... </k>
+
+  // ==== If (condition evaluated by strictness) ==============================
+  syntax KItem ::= #branch(Bool, Stmts, Stmts)
+  rule <k> If(C:Val, T:Stmts, E:Stmts) => #branch(truthy(C), T, E) ... </k>
+  rule <k> #branch(true,  T:Stmts, _:Stmts) => T ... </k>
+  rule <k> #branch(false, _:Stmts, E:Stmts) => E ... </k>
+
+  // ==== IfExp: ternary T if C else E ========================================
+  rule <k> IfExp(V:Val, T:Expr, _:Expr) => T ... </k>
+       requires truthy(V)
+  rule <k> IfExp(V:Val, _:Expr, E:Expr) => E ... </k>
+       requires notBool truthy(V)
+
+  // ==== For: one loop, in-cell continuation, over #iterNext =================
+  // (the iterable is evaluated once, by strictness; the protocol stays rewrites —
+  // circularities anchor on #loop and narrowing substitutes the structure)
+  syntax KItem ::= #loop(Val, Expr, Stmts) | #loopStep(Expr, Stmts)
+                 | #while(Expr, Stmts) | #whileCond(Expr, Stmts)
+                 | #loopLbl(K) | "#cont" | "#brk"
+
+  rule <k> For(T:Expr, OBJ:Val, B:Stmts) => #loop(OBJ, T, B) ... </k>
+
+  rule <k> #loop(IT:Iterable, T:Expr, B:Stmts) => #iterNext(IT) ~> #loopStep(T, B) ... </k>
+  rule <k> #iterDone ~> #loopStep(_:Expr, _:Stmts) => .K ... </k>
+  rule <k> #iterYield(V:Val, REST:Iterable) ~> #loopStep(T:Expr, B:Stmts)
+        => #bindTgt(T, V) ~> B ~> #loopLbl(#loop(REST, T, B)) ... </k>
+
+  // ==== While ==============================================================
+  rule <k> While(C:Expr, B:Stmts) => #while(C, B) ... </k>
+  rule <k> #while(C:Expr, B:Stmts) => C ~> #whileCond(C, B) ... </k>
+  rule <k> V:Val ~> #whileCond(C:Expr, B:Stmts) => B ~> #loopLbl(#while(C, B)) ... </k>
+       requires truthy(V)
+  rule <k> V:Val ~> #whileCond(_C:Expr, _B:Stmts) => .K ... </k>
+       requires notBool truthy(V)
+
+  // ==== loop control (break / continue) =====================================
+  rule <k> #loopLbl(NEXT:K) => NEXT ... </k>
+  rule <k> Continue => #cont ... </k>
+  rule <k> Break => #brk ... </k>
+  rule <k> #cont ~> #loopLbl(NEXT:K) => NEXT ... </k>
+  rule <k> #cont ~> (_:KItem => .K) ... </k> [owise]
+  rule <k> #brk ~> #loopLbl(_:K) => .K ... </k>
+  rule <k> #brk ~> (_:KItem => .K) ... </k> [owise]
+
+  // ==== heap-object deref at the truthiness/iteration consumers ==============
+  // (priority(40) preempts the generic Val rules so truthy/#loop never see a ref)
+  rule <k> If(ref(H:Int), T:Stmts, E:Stmts) => If(V, T, E) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> IfExp(ref(H:Int), T:Expr, E:Expr) => IfExp(V, T, E) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> ref(H:Int) ~> #whileCond(C:Expr, B:Stmts) => V ~> #whileCond(C, B) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  // For derefs its iterable ONCE at loop start (iteration is over the snapshot;
+  // mutating the iterated list inside its own loop is outside the subset)
+  rule <k> For(T:Expr, ref(H:Int), B:Stmts) => For(T, V, B) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+endmodule
+// reference/src/semantics/functions.k — MPY-FUNCTIONS
+
+module MPY-FUNCTIONS
+  imports MPY-CORE
+
+  // call routing + callee/arg evaluation (#callee/#args/#argCont) live in call.k;
+  // this module owns the frame lifecycle (bind params, return, pop).
+  syntax KItem ::= frame(continuation: K, callerEnv: Int, savedLoc: Int)
+                 | #bindP(ParamNames, Vals)
+                 | "#pop"
+                 | "#endcall"
+
+  // ==== def / anonymous closure =============================================
+  rule <k> FuncDef(F:String, Params(PNS:ParamNames), BODY:Stmts) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ F <- closureVal(PNS, BODY, L) ], _) ... </scopes>
+
+  syntax Expr ::= closureExpr(ParamNames, Stmts)
+  rule <k> closureExpr(PNS:ParamNames, BODY:Stmts) => closureVal(PNS, BODY, L) ... </k>
+       <env> L:Int </env>
+
+  // ==== annotated def/lambda (closure cells; spec 2.3) ======================
+  // closureValC(params, cellvars, body, captured-cells). No frame anchor: all
+  // enclosing-local reads are freevars (symtable-complete) and go through the
+  // captured cells; everything else is global/builtin, so the callee frame's
+  // parent is the module scope (0) — sound after the defining frame dies.
+  syntax Val ::= closureValC(ParamNames, ParamNames, Stmts, Map)
+
+  // capture: resolve each freevar to the enclosing frame's cellRef, then bind
+  // (FuncDef) or yield (Lambda) the closure value.
+  syntax KItem ::= #mkClosure(String, ParamNames, ParamNames, ParamNames, Stmts, Map)
+                 | #mkLambda(ParamNames, ParamNames, ParamNames, Stmts, Map)
+  rule <k> FuncDef(F:String, Params(PNS:ParamNames), CellVars(CVS:ParamNames),
+                   FreeVars(FVS:ParamNames), BODY:Stmts)
+        => #mkClosure(F, PNS, CVS, FVS, BODY, .Map) ... </k>
+  rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames,
+                      (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map)
+        => #mkClosure(F, PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires FV in_keys(M)
+  rule <k> #mkClosure(F:String, PNS:ParamNames, CVS:ParamNames,
+                      .ParamNames, BODY:Stmts, CM:Map) => .K ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ F <- closureValC(PNS, CVS, BODY, CM) ], _) ... </scopes>
+
+  rule <k> Lambda(Params(PNS:ParamNames), E:Expr)
+        => closureVal(PNS, Return(E) .Stmts, L) ... </k>
+       <env> L:Int </env>
+  rule <k> Lambda(Params(PNS:ParamNames), CellVars(CVS:ParamNames),
+                  FreeVars(FVS:ParamNames), E:Expr)
+        => #mkLambda(PNS, CVS, FVS, Return(E) .Stmts, .Map) ... </k>
+  rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames,
+                     (FV:String, FVR:ParamNames), BODY:Stmts, CM:Map)
+        => #mkLambda(PNS, CVS, FVR, BODY, CM [ FV <- {M[FV]}:>Val ]) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires FV in_keys(M)
+  rule <k> #mkLambda(PNS:ParamNames, CVS:ParamNames, .ParamNames, BODY:Stmts, CM:Map)
+        => closureValC(PNS, CVS, BODY, CM) ... </k>
+
+  // ==== bind params ========================================================
+  rule <k> #bindP(.ParamNames, .Vals) => .K ... </k>
+  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals)) => #bindP(PS, VS) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ P <- V ], _) ... </scopes>
+  // a param that is a cellvar was pre-bound to its cell at frame entry
+  rule <k> #bindP((P:String, PS:ParamNames), (V:Val, VS:Vals))
+        => #cellW({M[P]}:>Val, V) ~> #bindP(PS, VS) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map, _) ... </scopes>
+       requires "$cells" in_keys(M)
+        andBool pnMember(P, cellsOf({M["$cells"]}:>Val))
+        andBool P in_keys(M) andBool isCellRef({M[P]}:>Val)
+       [priority(40)]
+
+  // ==== return / pop the frame (the returned expr evaluates by strictness) ==
+  rule <k> Return(V:Val) ~> _ => #pop </k>
+       <ret> noRet => retV(V) </ret>
+  rule <k> #endcall => #pop ... </k>
+       <ret> noRet => retV(noneV) </ret>
+  // pop: restore env, DEALLOCATE the callee frame, and wind scopeLoc back (LIFO allocation
+  // makes the saved loc the callee frame's own loc). Sound because no closureVal outlives its
+  // defining frame (frontend subset: no returned/stored closures; module defs live in loc 0).
+  rule <k> #pop => V ~> CONT </k>
+       <ret>   retV(V) => noRet </ret>
+       <stack> ListItem(frame(CONT:K, CALLERL:Int, SAVEDL:Int)) => .List ... </stack>
+       <env>   L:Int => CALLERL </env>
+       <scopes> SC:Map => SC [ L <- undef ] </scopes>
+       <scopeLoc> _ => SAVEDL </scopeLoc>
+endmodule
+// reference/src/semantics/call.k — MPY-CALL
+// ONE call route for every callable: evaluate the callee to a VALUE (name lookup reaches
+// builtins at the root; a cooled Attribute is a bound method), evaluate the args (the shared
+// #evalArgs loop in core.k), then dispatch on the callee value:
+//   closureVal    -> bind params, push a frame (user function)
+//   boundMethodV  -> applyMethod
+//   builtinV      -> the #iterNext folds (sum/all/any/max/min) or applyBuiltin
+//   typeV         -> callable type objects: int(...) / str(...)
+
+module MPY-CALL
+  imports MPY-METHODS
+  imports MPY-BUILTINS
+  imports MPY-FUNCTIONS
+
+  // a cooled attribute is a bound method value
+  rule <k> Attribute(V:Val, M:String) => boundMethodV(V, M) ... </k>
+
+  // evaluate callee, then args ([owise]: problem-local Call interceptions beat this)
+  syntax KItem ::= #callee(Exprs)
+  rule <k> Call(Fe:Expr, ARGS:Exprs) => Fe ~> #callee(ARGS) ... </k> [owise]
+  rule <k> CV:Val ~> #callee(ARGS:Exprs) => #evalArgs(ARGS, .Vals, toCall(CV)) ... </k>
+
+  // ==== dispatch on the callee value ========================================
+  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), ACC:Vals) => applyMethod(OBJ, M, ACC) ... </k>
+
+  rule <k> #applyK(toCall(builtinV("sum")), (OBJ:Iterable, .Vals)) => #sumAcc(OBJ, 0) ... </k>
+  rule <k> #applyK(toCall(builtinV("all")), (OBJ:Iterable, .Vals)) => #allAcc(OBJ)    ... </k>
+  rule <k> #applyK(toCall(builtinV("any")), (OBJ:Iterable, .Vals)) => #anyAcc(OBJ)    ... </k>
+  rule <k> #applyK(toCall(builtinV("max")), (OBJ:Iterable, .Vals)) => #maxAcc0(OBJ)   ... </k>
+  rule <k> #applyK(toCall(builtinV("min")), (OBJ:Iterable, .Vals)) => #minAcc0(OBJ)   ... </k>
+  rule <k> #applyK(toCall(builtinV(BN:String)), ACC:Vals) => applyBuiltin(BN, ACC) ... </k> [owise]
+  rule <k> #applyK(toCall(typeV(T:String)),     ACC:Vals) => applyBuiltin(T, ACC)  ... </k>
+
+  // ==== heap-object arguments/receivers =====================================
+  // Builtins and type calls READ structure — deref the first two arg positions
+  // (covers len/sum/all/any/max/min/sorted/list/set + zip's pair). Mutating list
+  // methods take the ref itself; every other method receiver is deref'd.
+  rule <k> #applyK(toCall(builtinV(BN:String)), (ref(H:Int), REST:Vals))
+        => #applyK(toCall(builtinV(BN)), (V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+  rule <k> #applyK(toCall(builtinV(BN:String)), (A:Val, ref(H:Int), REST:Vals))
+        => #applyK(toCall(builtinV(BN)), (A, V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isRefV(A)
+       [priority(40)]
+  rule <k> #applyK(toCall(typeV(T:String)), (ref(H:Int), REST:Vals))
+        => #applyK(toCall(typeV(T)), (V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       [priority(40)]
+
+  syntax Bool ::= isMutMethod(String) [function, total]
+  rule isMutMethod(M:String)
+    => M ==String "append" orBool M ==String "sort" orBool M ==String "extend"
+       orBool M ==String "insert" orBool M ==String "pop" orBool M ==String "remove"
+  rule <k> #applyK(toCall(boundMethodV(ref(H:Int), M:String)), ACC:Vals)
+        => #applyK(toCall(boundMethodV(V, M)), ACC) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isMutMethod(M)
+       [priority(40)]
+  // non-mutating methods READ their heap-object arguments too (join's list);
+  // mutators keep refs (append of a list into a list-of-lists stays aliased)
+  rule <k> #applyK(toCall(boundMethodV(OBJ:Val, M:String)), (ref(H:Int), REST:Vals))
+        => #applyK(toCall(boundMethodV(OBJ, M)), (V, REST)) ... </k>
+       <heap> ... H |-> V:Val ... </heap>
+       requires notBool isMutMethod(M) andBool notBool isRefV(OBJ)
+       [priority(40)]
+
+  rule <k> #applyK(toCall(closureVal(PNS:ParamNames, BODY:Stmts, DEFL:Int)), ACC:Vals) ~> CONT
+        => #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+       <env>     CALLERL:Int => NEWL </env>
+       <scopes>   STORE:Map => STORE [ NEWL <- scope(.Map, parent(DEFL)) ] </scopes>
+       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+       <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+
+  // annotated closure: the frame starts with the captured freevar cells, its
+  // parent is the module scope (all enclosing-local reads go through cells),
+  // and the cellvars' fresh cells allocate before params bind (a cellvar param
+  // then writes through its cell in #bindP).
+  rule <k> #applyK(toCall(closureValC(PNS:ParamNames, CVS:ParamNames, BODY:Stmts, CM:Map)), ACC:Vals) ~> CONT
+        => #allocCells(CVS) ~> #bindP(PNS, ACC) ~> BODY ~> #endcall </k>
+       <env>     CALLERL:Int => NEWL </env>
+       <scopes>   STORE:Map => STORE [ NEWL <- scope(CM [ "$cells" <- cellsMark(CVS) ], parent(0)) ] </scopes>
+       <scopeLoc> NEWL:Int => NEWL +Int 1 </scopeLoc>
+       <stack>   .List => ListItem(frame(CONT, CALLERL, NEWL)) ... </stack>
+
+  syntax KItem ::= #allocCells(ParamNames)
+  rule <k> #allocCells(.ParamNames) => .K ... </k>
+  rule <k> #allocCells((CV:String, R:ParamNames)) => #allocCells(R) ... </k>
+       <env> L:Int </env>
+       <scopes> ... L |-> scope(M:Map => M [ CV <- cellRef(N) ], _) ... </scopes>
+       <heap>    H:Map => (N |-> cellV(noneV)) H </heap>
+       <heapLoc> N:Int => N +Int 1 </heapLoc>
+       requires notBool N in_keys(H)
+endmodule
+// reference/src/semantics/builtins.k — MPY-BUILTINS
+
+module MPY-BUILTINS
+  imports MPY-CORE
+  imports MPY-STR
+  imports MPY-SET
+  imports MPY-ITER
+  imports MPY-RANGE
+  imports MPY-INT
+  imports MPY-METHODS
+
+  // the builtins REGISTRY is core.k's builtinsScope (the -1 frame); names resolve by lookup
+
+  // Call routing + argument evaluation live in call.k, which also routes the fold
+  // builtins (sum/all/any/max/min) to the #_Acc folds below and everything else to
+  // applyBuiltin. This module owns applyBuiltin + the fold implementations.
+  syntax Val ::= applyBuiltin(String, Vals) [function]
+
+  // ==== len(obj) — O(1) per kind ============================================
+  syntax Int ::= seqLen(Val) [function]
+  rule applyBuiltin("len", OBJ:Val, .Vals) => seqLen(OBJ)
+  rule seqLen(list(VS:ValSeq))                  => vsLen(VS)
+  rule seqLen(tuple(VS:ValSeq))                 => vsLen(VS)
+  rule seqLen(str(IS:IntSeq))                   => isLen(IS)
+  rule seqLen(setV(DS:IntSeq))                  => isLen(DS)
+  rule seqLen(rangeObj(LO:Int, HI:Int, ST:Int)) => rangeLen(LO, HI, ST)
+
+  // ==== list(seq) — materialize a list/tuple into a list (e.g. list(d.keys())) ==
+  // Minimal: the "copy a sequence" case (list of a list is itself; list of a tuple keeps order).
+  // list() of other iterables (str/range/set/zip) is added via the iterator fold when needed.
+  // (k-cell — list() constructs a NEW object)
+  rule <k> #applyK(toCall(builtinV("list")), (list(VS:ValSeq),  .Vals)) => #alloc(list(VS)) ... </k>
+  rule <k> #applyK(toCall(builtinV("list")), (tuple(VS:ValSeq), .Vals)) => #alloc(list(VS)) ... </k>
+  rule <k> #applyK(toCall(builtinV("list")), .Vals)                     => #alloc(list(.ValSeq)) ... </k>
+  rule <k> #applyK(toCall(builtinV("list")), (str(CS:IntSeq), .Vals))   => #alloc(list(charsOf(CS))) ... </k>
+  syntax ValSeq ::= charsOf(IntSeq) [function, total]
+  rule charsOf(.IntSeq)                => .ValSeq
+  rule charsOf(iCons(C:Int, R:IntSeq)) => vCons(str(iCons(C, .IntSeq)), charsOf(R))
+
+  // ==== set(str) — distinct character codes =================================
+  rule applyBuiltin("set", str(CS:IntSeq), .Vals) => setV(dedupCodes(CS))
+
+  // ==== abs(int) ============================================================
+  rule applyBuiltin("abs", I:Int, .Vals) => absInt(I)
+
+  // ==== sum(iterable) — one #iterNext fold; intOf = int value of an int/bool ==
+  syntax KItem ::= #sumAcc(Iterable, Int) | #sumCont(Int)
+  rule <k> #sumAcc(IT:Iterable, ACC:Int) => #iterNext(IT) ~> #sumCont(ACC) ... </k>
+  rule <k> #iterDone ~> #sumCont(ACC:Int) => ACC ... </k>
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #sumCont(ACC:Int)
+        => #sumAcc(R, ACC +Int intOf(V)) ... </k>
+       requires isInt(V) orBool isBool(V)
+
+  syntax Int ::= intOf(Val) [function]
+  rule intOf(I:Int)  => I
+  rule intOf(B:Bool) => #if B #then 1 #else 0 #fi
+
+  // ==== all / any (short-circuiting #iterNext folds) ========================
+  syntax KItem ::= #allAcc(Iterable) | "#allCont"
+  rule <k> #allAcc(IT:Iterable) => #iterNext(IT) ~> #allCont ... </k>
+  rule <k> #iterDone ~> #allCont => true ... </k>
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #allCont => #allAcc(R) ... </k>
+       requires truthy(V)
+  rule <k> #iterYield(V:Val, _:Iterable) ~> #allCont => false ... </k>
+       requires notBool truthy(V)
+
+  syntax KItem ::= #anyAcc(Iterable) | "#anyCont"
+  rule <k> #anyAcc(IT:Iterable) => #iterNext(IT) ~> #anyCont ... </k>
+  rule <k> #iterDone ~> #anyCont => false ... </k>
+  rule <k> #iterYield(V:Val, _:Iterable) ~> #anyCont => true ... </k>
+       requires truthy(V)
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #anyCont => #anyAcc(R) ... </k>
+       requires notBool truthy(V)
+
+  // ==== max / min over an iterable (#iterNext folds; first element seeds) ====
+  syntax KItem ::= #maxAcc0(Iterable) | "#maxCont0" | #maxAcc(Iterable, Int) | #maxCont(Int)
+  rule <k> #maxAcc0(IT:Iterable) => #iterNext(IT) ~> #maxCont0 ... </k>
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont0 => #maxAcc(R, {V}:>Int) ... </k>
+       requires isInt(V)
+  rule <k> #maxAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #maxCont(M) ... </k>
+  rule <k> #iterDone ~> #maxCont(M:Int) => M ... </k>
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #maxCont(M:Int)
+        => #maxAcc(R, maxInt(M, {V}:>Int)) ... </k>
+       requires isInt(V)
+
+  syntax KItem ::= #minAcc0(Iterable) | "#minCont0" | #minAcc(Iterable, Int) | #minCont(Int)
+  rule <k> #minAcc0(IT:Iterable) => #iterNext(IT) ~> #minCont0 ... </k>
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont0 => #minAcc(R, {V}:>Int) ... </k>
+       requires isInt(V)
+  rule <k> #minAcc(IT:Iterable, M:Int) => #iterNext(IT) ~> #minCont(M) ... </k>
+  rule <k> #iterDone ~> #minCont(M:Int) => M ... </k>
+  rule <k> #iterYield(V:Val, R:Iterable) ~> #minCont(M:Int)
+        => #minAcc(R, minInt(M, {V}:>Int)) ... </k>
+       requires isInt(V)
+
+  // ==== variadic max / min (a Vals fold) ====================================
+  syntax Int ::= maxVals(Int, Vals) [function]
+  rule applyBuiltin("max", I:Int, REST:Vals) => maxVals(I, REST)
+  rule maxVals(M:Int, .Vals)           => M
+  rule maxVals(M:Int, (I:Int, R:Vals)) => maxVals(maxInt(M, I), R)
+
+  syntax Int ::= minVals(Int, Vals) [function]
+  rule applyBuiltin("min", I:Int, REST:Vals) => minVals(I, REST)
+  rule minVals(M:Int, .Vals)           => M
+  rule minVals(M:Int, (I:Int, R:Vals)) => minVals(minInt(M, I), R)
+
+  // ==== bin(n) — "0b" + binary digit codes (promoted from 103's defined fold) ==
+  rule applyBuiltin("bin", N:Int, .Vals) => str(iCons(48, iCons(98, binCodes(N))))
+       requires N >=Int 0
+  // negative operand: the '-' sign prefixes the magnitude's digits
+  rule applyBuiltin("bin", N:Int, .Vals)
+    => str(iCons(45, iCons(48, iCons(98, binCodes(0 -Int N)))))
+       requires N <Int 0
+  syntax IntSeq ::= binCodes(Int) [function, total]
+  rule binCodes(0) => iCons(48, .IntSeq)
+  rule binCodes(N:Int) => binAcc(N, .IntSeq) requires N >Int 0
+  syntax IntSeq ::= binAcc(Int, IntSeq) [function, total]
+  rule binAcc(0, ACC:IntSeq) => ACC
+  rule binAcc(N:Int, ACC:IntSeq)
+    => binAcc((N -Int pyMod(N, 2)) /Int 2, iCons(48 +Int pyMod(N, 2), ACC))
+       requires N >Int 0
+
+  // ==== enumerate(xs) — pairs (i, v); materialized eagerly over a list =========
+  rule <k> #applyK(toCall(builtinV("enumerate")), (list(VS:ValSeq), .Vals))
+        => #alloc(list(enumVS(VS, 0))) ... </k>
+  syntax ValSeq ::= enumVS(ValSeq, Int) [function, total]
+  rule enumVS(.ValSeq, _:Int) => .ValSeq
+  rule enumVS(vCons(V:Val, R:ValSeq), I:Int)
+    => vCons(tuple(vCons(I, vCons(V, .ValSeq))), enumVS(R, I +Int 1))
+
+  // ==== map(str, xs) — eager (only the str case is in the subset) =============
+  rule <k> #applyK(toCall(builtinV("map")), (typeV("str"), list(VS:ValSeq), .Vals))
+        => #alloc(list(mapStrVS(VS))) ... </k>
+  syntax ValSeq ::= mapStrVS(ValSeq) [function, total]
+  rule mapStrVS(.ValSeq) => .ValSeq
+  rule mapStrVS(vCons(I:Int, R:ValSeq)) => vCons(str(strToCodes(Int2String(I))), mapStrVS(R))
+  rule mapStrVS(vCons(str(CS:IntSeq), R:ValSeq)) => vCons(str(CS), mapStrVS(R))
+
+  // ==== int(x) identities (int(round(x)) composes through) ====================
+  rule applyBuiltin("int", I:Int, .Vals) => I
+
+  // ==== ord / chr ===========================================================
+  rule applyBuiltin("ord", str(iCons(C:Int, .IntSeq)), .Vals) => C
+  rule applyBuiltin("chr", I:Int, .Vals) => str(iCons(I, .IntSeq))
+       requires 0 <=Int I andBool I <Int 128
+
+  // ==== str(int) / str(str) =================================================
+  rule applyBuiltin("str", I:Int, .Vals)       => str(strToCodes(Int2String(I)))
+  rule applyBuiltin("str", str(CS:IntSeq), .Vals) => str(CS)
+
+  // ==== int(str) — a single digit char ('0'..'9', code 48..57) to its value =====
+  rule applyBuiltin("int", str(iCons(C:Int, .IntSeq)), .Vals) => C -Int 48
+       requires 48 <=Int C andBool C <=Int 57
+
+  // ==== int(str) — a multi-digit non-negative numeral (Horner fold; the single-char rule covers len 1)
+  rule applyBuiltin("int", str(CS:IntSeq), .Vals) => intDigAcc(CS, 0)
+       requires isLen(CS) >=Int 2
+  syntax Int ::= intDigAcc(IntSeq, Int) [function, total]
+  rule intDigAcc(.IntSeq, ACC:Int)             => ACC
+  rule intDigAcc(iCons(C:Int, R:IntSeq), ACC:Int) => intDigAcc(R, (ACC *Int 10) +Int (C -Int 48))
+
+  // ==== zip(a, b) — parallel iterable of pairs, truncating to the shorter =====
+  rule applyBuiltin("zip", list(A:ValSeq), list(B:ValSeq), .Vals) => zipObj(A, B)
+  rule applyBuiltin("zip", str(A:IntSeq), str(B:IntSeq), .Vals)   => zipObjS(A, B)
+
+  // zip's iterator-protocol cases (zip is created here, so its #iterNext lives here)
+  rule <k> #iterNext(zipObj(vCons(A:Val, As:ValSeq), vCons(B:Val, Bs:ValSeq)))
+        => #iterYield(tuple(vCons(A, vCons(B, .ValSeq))), zipObj(As, Bs)) ... </k>
+  rule <k> #iterNext(zipObj(.ValSeq, _:ValSeq))               => #iterDone ... </k>
+  rule <k> #iterNext(zipObj(vCons(_:Val, _:ValSeq), .ValSeq)) => #iterDone ... </k>
+  rule <k> #iterNext(zipObjS(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)))
+        => #iterYield(tuple(vCons(str(iCons(A, .IntSeq)), vCons(str(iCons(B, .IntSeq)), .ValSeq))), zipObjS(As, Bs)) ... </k>
+  rule <k> #iterNext(zipObjS(.IntSeq, _:IntSeq))              => #iterDone ... </k>
+  rule <k> #iterNext(zipObjS(iCons(_:Int, _:IntSeq), .IntSeq)) => #iterDone ... </k>
+
+  // ==== range(stop) / range(start, stop) / range(start, stop, step) =========
+  rule applyBuiltin("range", I:Int, .Vals)               => rangeObj(0, I, 1)
+  rule applyBuiltin("range", A:Int, B:Int, .Vals)        => rangeObj(A, B, 1)
+  rule applyBuiltin("range", A:Int, B:Int, S:Int, .Vals) => rangeObj(A, B, S)
+       requires S =/=Int 0
+// reference/src/semantics/int.k — MPY-INT
+// Int cases of the operator dispatch; Python // and % are floored (pyMod).
+
+module MPY-INT
+  imports MPY-CORE
+
+  rule applyUn("-", I:Int) => 0 -Int I
+
+  rule applyBin("+",  I1:Int, I2:Int) => I1 +Int I2
+  // Bool participates in int arithmetic (x += (a == b))
+  rule applyBin("+",  I:Int, B:Bool) => I +Int #if B #then 1 #else 0 #fi
+  rule applyBin("+",  B:Bool, I:Int) => #if B #then 1 #else 0 #fi +Int I
+  rule applyBin("-",  I1:Int, I2:Int) => I1 -Int I2
+  rule applyBin("*",  I1:Int, I2:Int) => I1 *Int I2
+  rule applyBin("%",  I1:Int, I2:Int) => pyMod(I1, I2)
+  rule applyBin("//", I1:Int, I2:Int) => (I1 -Int pyMod(I1, I2)) /Int I2
+  rule applyBin("**", I1:Int, I2:Int) => I1 ^Int I2 requires I2 >=Int 0
+
+  syntax Int ::= pyMod(Int, Int) [function]
+  rule pyMod(I1:Int, I2:Int) => ((I1 %Int I2) +Int I2) %Int I2
+
+  rule applyCmp("<",  I1:Int, I2:Int)   => I1 <Int  I2
+  rule applyCmp("<=", I1:Int, I2:Int)   => I1 <=Int I2
+  rule applyCmp(">",  I1:Int, I2:Int)   => I1 >Int  I2
+  rule applyCmp(">=", I1:Int, I2:Int)   => I1 >=Int I2
+  rule applyCmp("==", I1:Int, I2:Int)   => I1 ==Int I2
+  rule applyCmp("!=", I1:Int, I2:Int)   => I1 =/=Int I2
+endmodule
+// reference/src/semantics/str.k — MPY-STR
+
+module MPY-STR
+  imports MPY-CORE
+  imports MPY-ITER
+
+  // ==== iteration (the iterator protocol's str case; yields 1-char strings) ==
+  rule <k> #iterNext(str(.IntSeq))                 => #iterDone ... </k>
+  rule <k> #iterNext(str(iCons(C:Int, R:IntSeq)))
+        => #iterYield(str(iCons(C, .IntSeq)), str(R)) ... </k>
+
+  // ==== str literal (ASCII-only) ============================================
+  syntax IntSeq ::= strToCodes(String) [function]
+  rule <k> Str(S:String) => str(strToCodes(S)) ... </k>
+  rule strToCodes("") => .IntSeq
+  rule strToCodes(S:String) => iCons(ordChar(substrString(S, 0, 1)), strToCodes(substrString(S, 1, lengthString(S))))
+    requires S =/=String "" andBool ordChar(substrString(S, 0, 1)) <Int 128
+
+  // ==== operators: + / == / != / in =========================================
+  syntax IntSeq ::= seqConcat(IntSeq, IntSeq) [function, total]
+  rule seqConcat(.IntSeq, T:IntSeq)                => T
+  rule seqConcat(iCons(I:Int, S:IntSeq), T:IntSeq) => iCons(I, seqConcat(S, T))
+
+  rule applyBin("+",  str(A:IntSeq), str(B:IntSeq)) => str(seqConcat(A, B))
+  rule applyCmp("==", str(A:IntSeq), str(B:IntSeq)) => A ==K B
+  rule applyCmp("!=", str(A:IntSeq), str(B:IntSeq)) => notBool (A ==K B)
+
+  // substring membership: `P in X` iff the code-seq P occurs contiguously in X
+  rule applyCmp("in",     str(P:IntSeq), str(X:IntSeq)) => strContains(P, X)
+  rule applyCmp("not in", str(P:IntSeq), str(X:IntSeq)) => notBool strContains(P, X)
+
+  syntax Bool ::= strPrefix(IntSeq, IntSeq) [function, total]
+  rule strPrefix(.IntSeq, _:IntSeq)               => true
+  rule strPrefix(iCons(_:Int, _:IntSeq), .IntSeq) => false
+  rule strPrefix(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => A ==Int B andBool strPrefix(As, Bs)
+
+  syntax Bool ::= strContains(IntSeq, IntSeq) [function, total]
+  rule strContains(P:IntSeq, X:IntSeq) => true  requires strPrefix(P, X)
+  rule strContains(P:IntSeq, .IntSeq)  => false requires notBool strPrefix(P, .IntSeq)
+  rule strContains(P:IntSeq, iCons(C:Int, Xs:IntSeq)) => strContains(P, Xs)
+       requires notBool strPrefix(P, iCons(C, Xs))
+
+  // ==== lexicographic order: < / <= / > / >= by code point (= Python str order on the code
+  // model). strLt reduces on GROUND code-seqs (krun) but is inert/OPAQUE on symbolic ones
+  // (a proof's codesProj(V) is an abstract IntSeq — no constructor rule matches), so a symbolic
+  // str `<` stays a trusted opaque term the way sortVS / intFloatDiv do. Additive: fires only on
+  // str </<=/>/>= comparisons.
+  syntax Bool ::= strLt(IntSeq, IntSeq) [function, total]
+  rule strLt(.IntSeq, .IntSeq)                => false
+  rule strLt(.IntSeq, iCons(_:Int, _:IntSeq)) => true
+  rule strLt(iCons(_:Int, _:IntSeq), .IntSeq) => false
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => true          requires A  <Int B
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => false         requires A  >Int B
+  rule strLt(iCons(A:Int, As:IntSeq), iCons(B:Int, Bs:IntSeq)) => strLt(As, Bs) requires A ==Int B
+
+  rule applyCmp("<",  str(A:IntSeq), str(B:IntSeq)) => strLt(A, B)
+  rule applyCmp(">",  str(A:IntSeq), str(B:IntSeq)) => strLt(B, A)
+  rule applyCmp("<=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(B, A)
+  rule applyCmp(">=", str(A:IntSeq), str(B:IntSeq)) => notBool strLt(A, B)
+endmodule
+
+  // ==== char helpers =========================================================
+  syntax Bool ::= isUpperC(Int) [function, total]
+  rule isUpperC(C:Int) => C >=Int 65 andBool C <=Int 90
+
+  syntax Bool ::= isLowerC(Int) [function, total]
+  rule isLowerC(C:Int) => C >=Int 97 andBool C <=Int 122
+
+  syntax Bool ::= isAlphaC(Int) [function, total]
+  rule isAlphaC(C:Int) => isUpperC(C) orBool isLowerC(C)
+
+  syntax Bool ::= isDigitC(Int) [function, total]
+  rule isDigitC(C:Int) => C >=Int 48 andBool C <=Int 57
+
+  syntax Bool ::= hasUpper(IntSeq) [function, total]
+  rule hasUpper(.IntSeq) => false
+  rule hasUpper(iCons(C:Int, S:IntSeq)) => isUpperC(C) orBool hasUpper(S)
+
+  syntax Bool ::= hasLower(IntSeq) [function, total]
+  rule hasLower(.IntSeq) => false
+  rule hasLower(iCons(C:Int, S:IntSeq)) => isLowerC(C) orBool hasLower(S)
+
+  syntax Bool ::= allAlpha(IntSeq) [function, total]
+  rule allAlpha(.IntSeq) => true
+  rule allAlpha(iCons(C:Int, S:IntSeq)) => isAlphaC(C) andBool allAlpha(S)
+
+  syntax Bool ::= allDigit(IntSeq) [function, total]
+  rule allDigit(.IntSeq) => true
+  rule allDigit(iCons(C:Int, S:IntSeq)) => isDigitC(C) andBool allDigit(S)
+
+  syntax Int ::= lowerC(Int) [function, total]
+
+  rule lowerC(C:Int) => C +Int 32 requires isUpperC(C)
+  rule lowerC(C:Int) => C         [owise]
+
+  syntax Int ::= upperC(Int) [function, total]
+  rule upperC(C:Int) => C -Int 32 requires isLowerC(C)
+  rule upperC(C:Int) => C         [owise]
+
+  syntax Int ::= swapC(Int) [function, total]
+  rule swapC(C:Int) => C +Int 32 requires isUpperC(C)
+
+Script done on 2026-07-31 09:19:43-05:00 [COMMAND_EXIT_CODE="0"]
